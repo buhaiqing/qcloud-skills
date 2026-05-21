@@ -1,0 +1,85 @@
+# Redis Example Configuration
+
+## Instance Scenarios
+
+### Scenario 1: Development Cache
+
+```yaml
+redis:
+  name: "dev-cache"
+  memory_mb: 1024
+  mode: "standalone"
+  region: "ap-guangzhou"
+  zone: "100001"
+  vpc_id: "vpc-dev-xxx"
+  subnet_id: "subnet-dev-xxx"
+  billing: "pay-as-you-go"
+  password: "<masked>"
+  no_auth: false
+
+backup:
+  enabled: true
+  week_days: [1, 2, 3, 4, 5, 6, 7]
+  time_period: "02:00-04:00"
+  retention_days: 3
+
+parameters:
+  maxmemory-policy: "allkeys-lru"
+  timeout: 300
+```
+
+### Scenario 2: Production Master-Replica
+
+```yaml
+redis:
+  name: "prod-cache"
+  memory_mb: 8192
+  mode: "master-replica"
+  region: "ap-guangzhou"
+  vpc_id: "vpc-prod-xxx"
+  subnet_id: "subnet-prod-xxx"
+  billing: "prepaid-annual"
+  period: 12
+  auto_renew: true
+
+backup:
+  enabled: true
+  week_days: [1, 2, 3, 4, 5, 6, 7]
+  time_period: "03:00-05:00"
+  retention_days: 7
+
+parameters:
+  maxmemory-policy: "volatile-lru"
+  timeout: 600
+```
+
+### Scenario 3: High-Throughput Cluster
+
+```yaml
+redis:
+  name: "cluster-cache"
+  memory_mb: 65536
+  mode: "cluster"
+  region: "ap-shanghai"
+  vpc_id: "vpc-ha-xxx"
+  billing: "prepaid-annual"
+  auto_renew: true
+
+backup:
+  enabled: true
+  week_days: [1, 3, 5, 7]
+  time_period: "04:00-06:00"
+  retention_days: 14
+```
+
+## Environment Variables
+
+```bash
+export TENCENTCLOUD_SECRET_ID="AKID***"
+export TENCENTCLOUD_SECRET_KEY="***"
+export TENCENTCLOUD_REGION="ap-guangzhou"
+
+# Redis defaults
+export REDIS_DEFAULT_MEMORY=2048
+export REDIS_DEFAULT_ZONE="100001"
+```

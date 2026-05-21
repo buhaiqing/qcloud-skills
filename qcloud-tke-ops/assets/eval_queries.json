@@ -1,0 +1,22 @@
+[
+  { "query": "Create a TKE cluster in Guangzhou", "should_trigger": true },
+  { "query": "Deploy a Kubernetes cluster on Tencent Cloud", "should_trigger": true },
+  { "query": "How do I set up a k8s cluster?", "should_trigger": true },
+  { "query": "容器服务怎么创建集群", "should_trigger": true },
+  { "query": "Create a node pool for my TKE cluster cls-abc123", "should_trigger": true },
+  { "query": "Scale up the worker nodes in my kubernetes cluster", "should_trigger": true },
+  { "query": "Delete the TKE cluster cls-xyz and all its nodes", "should_trigger": true },
+  { "query": "Install metrics-server addon on my cluster", "should_trigger": true },
+  { "query": "List all my managed kubernetes clusters", "should_trigger": true },
+  { "query": "Get kubeconfig for TKE cluster", "should_trigger": true },
+  { "query": "Create a CVM instance", "should_trigger": false },
+  { "query": "Set up a load balancer for my website", "should_trigger": false },
+  { "query": "Create a VPC network and subnet", "should_trigger": false },
+  { "query": "Check my cloud account billing", "should_trigger": false },
+  { "query": "Upload a file to COS storage bucket", "should_trigger": false },
+  { "query": "Configure MySQL database instance", "should_trigger": false },
+  { "query": "Set up Redis cache", "should_trigger": false },
+  { "query": "Create a monitoring alert policy", "should_trigger": false },
+  { "query": "Manage CAM user permissions", "should_trigger": false },
+  { "query": "Debug my Python application deployment YAML", "should_trigger": false }
+]

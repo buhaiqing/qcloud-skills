@@ -1,0 +1,22 @@
+[
+  { "query": "Create a Redis cache instance in Guangzhou", "should_trigger": true },
+  { "query": "Set up a redis cluster for caching", "should_trigger": true },
+  { "query": "TencentDB Redis怎么创建实例", "should_trigger": true },
+  { "query": "Upgrade my redis instance memory to 4GB", "should_trigger": true },
+  { "query": "Backup my redis instance crs-abc123", "should_trigger": true },
+  { "query": "Delete the redis instance crs-xyz", "should_trigger": true },
+  { "query": "Renew my prepaid redis instance", "should_trigger": true },
+  { "query": "List all my cache redis instances", "should_trigger": true },
+  { "query": "Redis connection refused on production instance", "should_trigger": true },
+  { "query": "Configure auto backup for redis", "should_trigger": true },
+  { "query": "Create a CVM virtual machine", "should_trigger": false },
+  { "query": "Set up a MySQL database", "should_trigger": false },
+  { "query": "Create a load balancer listener", "should_trigger": false },
+  { "query": "Configure VPC network and subnet", "should_trigger": false },
+  { "query": "Check my cloud billing report", "should_trigger": false },
+  { "query": "Upload file to COS storage", "should_trigger": false },
+  { "query": "Create a Kubernetes cluster", "should_trigger": false },
+  { "query": "Set up PostgreSQL database", "should_trigger": false },
+  { "query": "Manage CAM user roles and policies", "should_trigger": false },
+  { "query": "Debug python redis-py client connection", "should_trigger": false }
+]

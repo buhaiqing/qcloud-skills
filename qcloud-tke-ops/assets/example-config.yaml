@@ -1,0 +1,112 @@
+# TKE Example Configuration
+
+## Cluster Scenarios
+
+### Scenario 1: Development Cluster (Minimal)
+
+```yaml
+cluster:
+  name: "dev-cluster"
+  type: "MANAGED_TKE"
+  version: "1.28.3"
+  os: "tlinux3.1x86_64"
+  region: "ap-guangzhou"
+  zone: "ap-guangzhou-3"
+  vpc_cidr: "10.0.0.0/16"
+  subnet_cidr: "10.0.1.0/24"
+  network_plugin: "GR"  # Global Routing for simplicity
+
+node_pool:
+  name: "dev-pool"
+  instance_type: "S5.SMALL2"  # 1C2G, cost-effective
+  min_nodes: 1
+  max_nodes: 3
+  autoscale: false
+  os: "tlinux3.1x86_64"
+
+addons:
+  - name: "coredns"
+    version: "1.9.3"
+  - name: "metrics-server"
+    version: "3.8.4"
+```
+
+### Scenario 2: Production Cluster (HA)
+
+```yaml
+cluster:
+  name: "prod-cluster"
+  type: "MANAGED_TKE"
+  version: "1.28.3"
+  os: "tlinux3.1x86_64"
+  region: "ap-guangzhou"
+  network_plugin: "VPC-CNI"  # Native VPC for performance
+  cluster_level: "L5"
+
+node_pools:
+  - name: "stateless-pool"
+    subnets:  # Multi-AZ
+      - "subnet-az1"
+      - "subnet-az2"
+    instance_type: "SA5.MEDIUM8"  # 2C16G, network-optimized
+    min_nodes: 3
+    max_nodes: 20
+    autoscale: true
+
+  - name: "stateful-pool"
+    subnets:
+      - "subnet-az1"
+      - "subnet-az2"
+    instance_type: "SA5.LARGE8"  # 4C32G
+    min_nodes: 3
+    max_nodes: 10
+    autoscale: false
+
+addons:
+  - name: "coredns"
+    version: "1.9.3"
+  - name: "metrics-server"
+    version: "3.8.4"
+  - name: "cbs-csi"
+    version: "latest"
+  - name: "prometheus"
+    version: "latest"
+```
+
+### Scenario 3: Auto-Scaling Cluster
+
+```yaml
+cluster:
+  name: "elastic-cluster"
+  type: "MANAGED_TKE"
+  version: "1.30.0"
+  region: "ap-shanghai"
+
+node_pools:
+  - name: "baseline"
+    instance_type: "SA5.MEDIUM4"  # 2C8G
+    min_nodes: 2
+    max_nodes: 5
+    autoscale: false  # Fixed baseline
+
+  - name: "burst-pool"
+    instance_type: "SA5.LARGE4"  # 4C16G
+    min_nodes: 0
+    max_nodes: 50
+    autoscale: true
+    scale_up_policy: "pod_pending"  # Trigger on unschedulable pods
+```
+
+## Environment Variables
+
+```bash
+# Required
+export TENCENTCLOUD_SECRET_ID="AKID***"
+export TENCENTCLOUD_SECRET_KEY="***"
+export TENCENTCLOUD_REGION="ap-guangzhou"
+
+# Optional defaults
+export TKE_DEFAULT_VERSION="1.28.3"
+export TKE_DEFAULT_OS="tlinux3.1x86_64"
+export TKE_DEFAULT_INSTANCE_TYPE="SA5.MEDIUM4"
+```
