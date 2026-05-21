@@ -1,0 +1,34 @@
+diagnosis:
+  time_range: 1h
+  resource_type: cvm
+  resource_id: ins-xxxxxx
+  log_source: cls
+
+thresholds:
+  cpu_warning: 90
+  cpu_critical: 97
+  memory_warning: 90
+  memory_critical: 95
+  disk_warning: 85
+  disk_critical: 95
+  connection_warning: 80
+  connection_critical: 90
+  latency_p99_warning_ms: 3000
+  latency_p99_critical_ms: 10000
+  error_rate_warning_pct: 1
+  error_rate_critical_pct: 5
+
+log_patterns:
+  error_spike_threshold: 10
+  exception_pattern: 'Exception:\s*(\w+)'
+  oom_pattern: '(OutOfMemoryError|OOM|cannot allocate memory)'
+  timeout_pattern: '(timeout|Timeout|TIMEOUT)'
+  connection_refused_pattern: '(Connection refused|ECONNREFUSED)'
+  slow_query_threshold_ms: 1000
+
+alarm_handling:
+  storm_threshold: 50
+  flapping_window_minutes: 10
+  flapping_count_threshold: 5
+  auto_deduplicate: true
+  mute_low_during_storm: true

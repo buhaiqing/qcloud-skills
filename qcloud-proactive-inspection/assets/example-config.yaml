@@ -1,0 +1,46 @@
+inspection:
+  products:
+    - cvm
+    - redis
+    - cdb
+    - tke
+    - es
+    - clb
+    - vpc
+    - cos
+  time_range: 24h
+  tag_filter: null
+
+thresholds:
+  cpu_warning: 90
+  cpu_critical: 97
+  memory_warning: 90
+  memory_critical: 95
+  disk_warning: 85
+  disk_critical: 95
+  disk_remaining_critical_gb: 50
+  connection_warning: 80
+  connection_critical: 90
+  qps_drop_warning_pct: 30
+  qps_drop_critical_pct: 50
+  expiry_warning_days: 30
+  expiry_critical_days: 7
+  unattached_disk_days: 30
+
+detection:
+  use_sustained_thresholds: true
+  sustained_window_minutes: 15
+  use_statistical_detection: true
+  sigma_threshold: 2.0
+  multi_metric_correlation: true
+
+report:
+  format: markdown
+  include_executive_summary: true
+  include_resource_details: true
+  include_recommendations: true
+  health_score_weight:
+    reliability: 0.3
+    security: 0.3
+    cost: 0.2
+    efficiency: 0.2

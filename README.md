@@ -12,8 +12,15 @@ qcloud-skills/
 ├── qcloud-cvm-ops/            # 云服务器运维技能
 ├── qcloud-es-ops/             # Elasticsearch 服务运维技能
 ├── qcloud-monitor-ops/        # 云监控运维技能
+├── qcloud-redis-ops/          # 云缓存 Redis 运维技能
 ├── qcloud-skill-generator/    # 技能生成器（元技能）
+├── qcloud-tke-ops/            # 容器服务 TKE 运维技能
 ├── qcloud-vpc-ops/            # 虚拟私有云运维技能
+├── qcloud-cam-ops/            # 访问管理 CAM 运维技能
+├── qcloud-cdn-ops/            # 内容分发 CDN 运维技能
+├── qcloud-aioops-diagnosis/   # AIOps 智能诊断（跨产品）
+├── qcloud-proactive-inspection/ # 主动巡检（跨产品）
+├── qcloud-well-architected-review/ # 卓越架构审查（跨产品）
 ├── README.md
 └── LICENSE
 ```
@@ -153,6 +160,41 @@ qcloud-skills/
 | `references/well-architected-assessment.md` | 卓越架构评估 |
 | `references/aiops-best-practices.md` | AIOps 最佳实践 |
 
+### qcloud-redis-ops — 云缓存 Redis 运维
+
+管理腾讯云 Redis（云缓存）实例的完整生命周期，包括创建/查询/升级/续费/隔离/销毁实例，备份恢复、参数配置、账号管理、网络诊断、性能调优、规格升级、自动备份配置等。
+
+| 文件 | 说明 |
+|------|------|
+| `SKILL.md` | 核心技能文档 |
+| `assets/eval_queries.json` | 评估查询集 |
+| `assets/example-config.yaml` | 示例配置 |
+| `references/core-concepts.md` | 核心概念 |
+| `references/cli-usage.md` | CLI 使用指南 |
+| `references/api-sdk-usage.md` | Python SDK 使用指南 |
+| `references/troubleshooting.md` | 故障排查 |
+| `references/monitoring.md` | 监控配置 |
+| `references/integration.md` | 集成指南 |
+| `references/well-architected-assessment.md` | 卓越架构评估 |
+| `references/enhanced-self-healing-framework.md` | 自愈框架 |
+
+### qcloud-tke-ops — 容器服务 TKE 运维
+
+管理腾讯云 TKE（Tencent Kubernetes Engine）集群的完整生命周期，包括集群创建/查询/删除、节点池管理、Addon 安装、集群安全配置、Kubernetes 诊断、集群实例管理等。
+
+| 文件 | 说明 |
+|------|------|
+| `SKILL.md` | 核心技能文档 |
+| `assets/eval_queries.json` | 评估查询集 |
+| `assets/example-config.yaml` | 示例配置 |
+| `references/core-concepts.md` | 核心概念 |
+| `references/cli-usage.md` | CLI 使用指南 |
+| `references/api-sdk-usage.md` | Python SDK 使用指南 |
+| `references/troubleshooting.md` | 故障排查 |
+| `references/monitoring.md` | 监控配置 |
+| `references/integration.md` | 集成指南 |
+| `references/well-architected-assessment.md` | 卓越架构评估 |
+| `references/enhanced-self-healing-framework.md` | 自愈框架 |
 ### qcloud-skill-generator — 技能生成器
 
 **元技能（Meta-Skill）**，用于生成或更新其他 `qcloud-[product]-ops` 技能。本身不执行云资源操作，而是根据腾讯云 API 规范生成 AI Agent 可读的运维剧本（runbook），包含完整的生成工作流、模板、提示词库和审查指南。
@@ -177,6 +219,84 @@ qcloud-skills/
 | `references/troubleshooting.md` | 故障排查模板 |
 | `references/well-architected-assessment.md` | 卓越架构评估 |
 | `templates/proactive-inspection.md` | 主动巡检模板（25.8 KB） |
+
+### qcloud-cam-ops — 访问管理 CAM 运维
+
+管理腾讯云 CAM（Cloud Access Management）策略的完整生命周期，包括策略 CRUD、用户/组/角色管理、API 密钥轮换、SAML/OIDC 配置、权限审计和最小权限检查等。
+
+| 文件 | 说明 |
+|------|------|
+| `SKILL.md` | 核心技能文档 |
+| `assets/eval_queries.json` | 评估查询集 |
+| `assets/example-config.yaml` | 示例配置 |
+| `references/core-concepts.md` | 核心概念 |
+| `references/cli-usage.md` | CLI 使用指南 |
+| `references/api-sdk-usage.md` | Python SDK 使用指南 |
+| `references/troubleshooting.md` | 故障排查 |
+| `references/well-architected-assessment.md` | 卓越架构评估 |
+
+### qcloud-cdn-ops — 内容分发 CDN 运维
+
+管理腾讯云 CDN（Content Delivery Network）加速域名的完整生命周期，包括域名管理、缓存刷新/预热、HTTPS 证书配置、源站管理、流量监控、防盗链和日志分析等。
+
+| 文件 | 说明 |
+|------|------|
+| `SKILL.md` | 核心技能文档 |
+| `assets/eval_queries.json` | 评估查询集 |
+| `assets/example-config.yaml` | 示例配置 |
+| `references/core-concepts.md` | 核心概念 |
+| `references/cli-usage.md` | CLI 使用指南 |
+| `references/api-sdk-usage.md` | Python SDK 使用指南 |
+| `references/troubleshooting.md` | 故障排查 |
+| `references/monitoring.md` | 监控配置 |
+| `references/well-architected-assessment.md` | 卓越架构评估 |
+| `references/finops-cost-optimization.md` | 成本优化 |
+| `references/secops-security-operations.md` | 安全运维 |
+| `references/integration.md` | 集成指南 |
+
+### qcloud-well-architected-review — 卓越架构审查（跨产品）
+
+对腾讯云资源进行四支柱（可靠性/安全性/成本/效率）架构评估，支持单资源审查和全站架构审计，可作为各产品运维技能的委派目标。
+
+| 文件 | 说明 |
+|------|------|
+| `SKILL.md` | 核心技能文档 |
+| `references/reliability-pillar.md` | 可靠性支柱：备份/恢复/多可用区 |
+| `references/security-pillar.md` | 安全性支柱：CAM/凭证/加密 |
+| `references/cost-pillar.md` | 成本支柱：计费/闲置检测/升配降配 |
+| `references/efficiency-pillar.md` | 效率支柱：批量操作/自动化/API优化 |
+| `assets/eval_queries.json` | 评估查询集 |
+| `assets/example-config.yaml` | 示例配置 |
+
+### qcloud-aioops-diagnosis — AIOps 智能诊断（跨产品）
+
+三维优化框架（故障诊断→根因定位→快速恢复）的智能诊断引擎，支持多指标关联分析、日志模式识别、告警风暴处理和诊断决策树。
+
+| 文件 | 说明 |
+|------|------|
+| `SKILL.md` | 核心技能文档 |
+| `references/diagnosis-framework.md` | 三维优化框架 |
+| `references/log-intelligence.md` | 日志模式识别 |
+| `references/diagnostic-workflows.md` | 诊断决策树 |
+| `references/alarm-handling.md` | 告警风暴处理 |
+| `references/delegation-matrix.md` | 委派路由 |
+| `assets/eval_queries.json` | 评估查询集 |
+| `assets/example-config.yaml` | 示例配置 |
+
+### qcloud-proactive-inspection — 主动巡检（跨产品）
+
+五步闭环巡检流程（发现→采集→检测→诊断→报告），支持多产品资源巡检、可配置阈值、统计异常检测和结构化报告生成。
+
+| 文件 | 说明 |
+|------|------|
+| `SKILL.md` | 核心技能文档 |
+| `references/discovery.md` | 资源发现模式 |
+| `references/collection.md` | 指标采集方法 |
+| `references/detection.md` | 异常检测规则 |
+| `references/diagnosis.md` | 根因分析工作流 |
+| `references/reporting.md` | 报告生成模板 |
+| `assets/eval_queries.json` | 评估查询集 |
+| `assets/example-config.yaml` | 示例配置 |
 
 ## 公共设计模式
 

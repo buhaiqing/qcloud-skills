@@ -1,0 +1,47 @@
+assessment:
+  scope: account-wide
+  pillars:
+    - reliability
+    - security
+    - cost
+    - efficiency
+  products:
+    - cvm
+    - redis
+    - cdb
+    - tke
+    - es
+    - clb
+    - vpc
+    - cos
+
+thresholds:
+  reliability:
+    min_az_count: 2
+    max_backup_age_hours: 24
+    dr_runbook_tested_quarterly: true
+  security:
+    mfa_required: true
+    max_api_key_age_days: 90
+    no_wildcard_actions: true
+    max_security_group_open_ports: 3
+  cost:
+    idle_cpu_threshold_pct: 10
+    idle_memory_threshold_pct: 20
+    stopped_instance_days: 7
+    unattached_disk_days: 30
+  efficiency:
+    batch_operations_required: true
+    ci_cd_integrated: true
+    auto_scaling_enabled: true
+
+report:
+  format: markdown
+  include_executive_summary: true
+  include_per_resource_findings: true
+  include_recommendations: true
+  recommendation_severity_levels:
+    - critical
+    - high
+    - medium
+    - low

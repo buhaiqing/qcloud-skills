@@ -1,0 +1,22 @@
+[
+  {"query": "帮我做一次架构审查", "should_trigger": true},
+  {"query": "Check if my Tencent Cloud architecture is secure", "should_trigger": true},
+  {"query": "分析一下云资源有没有成本浪费", "should_trigger": true},
+  {"query": "有没有单点故障风险", "should_trigger": true},
+  {"query": "帮我优化资源配置，看看有没有可以降配的地方", "should_trigger": true},
+  {"query": "做一次 Well-Architected 评估", "should_trigger": true},
+  {"query": "评估下备份策略是否到位", "should_trigger": true},
+  {"query": "看下安全合规有没有问题", "should_trigger": true},
+  {"query": "帮我看看多可用区部署情况", "should_trigger": true},
+  {"query": "Architecture review for our production environment", "should_trigger": true},
+  {"query": "创建一台CVM实例", "should_trigger": false},
+  {"query": "Delete the Redis instance", "should_trigger": false},
+  {"query": "帮我配置一个负载均衡器", "should_trigger": false},
+  {"query": "查看我的账单", "should_trigger": false},
+  {"query": "Create a new CAM user", "should_trigger": false},
+  {"query": "帮我刷新CDN缓存", "should_trigger": false},
+  {"query": "重启一下数据库", "should_trigger": false},
+  {"query": "Set up a VPC and subnet", "should_trigger": false},
+  {"query": "TKE集群加几个节点", "should_trigger": false},
+  {"query": "Upload a file to COS bucket", "should_trigger": false}
+]

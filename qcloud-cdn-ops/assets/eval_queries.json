@@ -1,0 +1,22 @@
+[
+  {"query": "添加CDN加速域名", "should_trigger": true},
+  {"query": "帮我刷新CDN缓存", "should_trigger": true},
+  {"query": "配置CDN的HTTPS证书", "should_trigger": true},
+  {"query": "查看CDN流量和带宽使用", "should_trigger": true},
+  {"query": "配置防盗链", "should_trigger": true},
+  {"query": "CDN预热URL", "should_trigger": true},
+  {"query": "分析CDN日志", "should_trigger": true},
+  {"query": "修改CDN源站配置", "should_trigger": true},
+  {"query": "Stop a CDN domain", "should_trigger": true},
+  {"query": "配置IP黑名单", "should_trigger": true},
+  {"query": "创建CVM实例", "should_trigger": false},
+  {"query": "帮我诊断数据库慢查询", "should_trigger": false},
+  {"query": "配置安全组规则", "should_trigger": false},
+  {"query": "做一次架构审查", "should_trigger": false},
+  {"query": "查看费用账单", "should_trigger": false},
+  {"query": "创建CAM用户", "should_trigger": false},
+  {"query": "配置VPC路由表", "should_trigger": false},
+  {"query": "升级Redis实例", "should_trigger": false},
+  {"query": "查看告警历史", "should_trigger": false},
+  {"query": "做一次资源巡检", "should_trigger": false}
+]

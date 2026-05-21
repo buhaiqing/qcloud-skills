@@ -1,0 +1,22 @@
+[
+  {"query": "帮我创建一个CAM策略", "should_trigger": true},
+  {"query": "Add a new user and assign permissions", "should_trigger": true},
+  {"query": "检查一下权限配置是否安全", "should_trigger": true},
+  {"query": "轮换API密钥", "should_trigger": true},
+  {"query": "配置SAML单点登录", "should_trigger": true},
+  {"query": "创建一个角色并关联策略", "should_trigger": true},
+  {"query": "删除不用的CAM用户", "should_trigger": true},
+  {"query": "audit who has admin access", "should_trigger": true},
+  {"query": "最小权限检查", "should_trigger": true},
+  {"query": "配置OIDC身份提供者", "should_trigger": true},
+  {"query": "创建一台CVM", "should_trigger": false},
+  {"query": "帮我做架构审查", "should_trigger": false},
+  {"query": "配置CDN域名", "should_trigger": false},
+  {"query": "升级Redis实例规格", "should_trigger": false},
+  {"query": "查看我的费用账单", "should_trigger": false},
+  {"query": "帮我诊断CPU飙高", "should_trigger": false},
+  {"query": "设置VPC和子网", "should_trigger": false},
+  {"query": "做一次资源巡检", "should_trigger": false},
+  {"query": "配置负载均衡", "should_trigger": false},
+  {"query": "刷新CDN缓存", "should_trigger": false}
+]

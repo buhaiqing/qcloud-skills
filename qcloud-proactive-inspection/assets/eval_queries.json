@@ -1,0 +1,22 @@
+[
+  {"query": "帮我做一次生产环境巡检", "should_trigger": true},
+  {"query": "生成一份资源健康报告", "should_trigger": true},
+  {"query": "做一次资源审计，看看有没有风险", "should_trigger": true},
+  {"query": "Weekly inspection report for all resources", "should_trigger": true},
+  {"query": "排查潜在风险，有哪些需要注意的", "should_trigger": true},
+  {"query": "上线前做一次全面检查", "should_trigger": true},
+  {"query": "资源巡检，看看有没有浪费的", "should_trigger": true},
+  {"query": "Compliance audit for our cloud resources", "should_trigger": true},
+  {"query": "检查下所有实例的资源使用情况", "should_trigger": true},
+  {"query": "做一次安全合规巡检", "should_trigger": true},
+  {"query": "帮我诊断下为什么服务慢了", "should_trigger": false},
+  {"query": "CPU突然飙高了，排查一下", "should_trigger": false},
+  {"query": "创建一台CVM实例", "should_trigger": false},
+  {"query": "做一次架构审查", "should_trigger": false},
+  {"query": "分析一下成本优化方案", "should_trigger": false},
+  {"query": "Delete the Redis instance", "should_trigger": false},
+  {"query": "配置负载均衡监听器", "should_trigger": false},
+  {"query": "帮我刷新CDN缓存", "should_trigger": false},
+  {"query": "查看告警历史", "should_trigger": false},
+  {"query": "创建CAM用户并分配权限", "should_trigger": false}
+]

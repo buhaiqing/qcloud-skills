@@ -1,0 +1,22 @@
+[
+  {"query": "CPU突然飙高了，帮我排查一下", "should_trigger": true},
+  {"query": "服务连不上了，看看什么问题", "should_trigger": true},
+  {"query": "告警太多了快被淹没了，帮我分析下", "should_trigger": true},
+  {"query": "帮我找下这个故障的根因", "should_trigger": true},
+  {"query": "分析下这些日志有什么异常", "should_trigger": true},
+  {"query": "Redis内存一直在涨，怎么回事", "should_trigger": true},
+  {"query": "数据库查询特别慢，帮我诊断", "should_trigger": true},
+  {"query": "OutOfMemory了，帮我看看原因", "should_trigger": true},
+  {"query": "有什么潜在问题需要关注的", "should_trigger": true},
+  {"query": "帮我诊断下这个集群为什么响应很慢", "should_trigger": true},
+  {"query": "创建一台新的CVM", "should_trigger": false},
+  {"query": "帮我做一次架构审查", "should_trigger": false},
+  {"query": "删除这个Redis实例", "should_trigger": false},
+  {"query": "做一次成本分析", "should_trigger": false},
+  {"query": "配置一下负载均衡", "should_trigger": false},
+  {"query": "帮我做一次资源巡检", "should_trigger": false},
+  {"query": "升级一下实例规格", "should_trigger": false},
+  {"query": "Create a CAM policy", "should_trigger": false},
+  {"query": "刷新CDN缓存", "should_trigger": false},
+  {"query": "查看我的账单", "should_trigger": false}
+]

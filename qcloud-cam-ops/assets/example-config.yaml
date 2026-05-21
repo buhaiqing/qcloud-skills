@@ -1,0 +1,24 @@
+# CAM Configuration Example
+cam:
+  region: ap-guangzhou
+  policy_defaults:
+    max_versions: 5
+    require_description: true
+  user_defaults:
+    require_mfa: true
+  key_rotation_days: 90
+
+permissions:
+  admin_role: QcloudCamFullAccess
+  readonly_role: QcloudCamReadOnlyAccess
+  custom_policies:
+    - name: CVMReadOnly
+      actions:
+        - cvm:Describe*
+      resource: "*"
+    - name: CVMAdmin
+      actions:
+        - cvm:Describe*
+        - cvm:RunInstances
+        - cvm:TerminateInstances
+      resource: "*"
