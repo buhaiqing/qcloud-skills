@@ -1,0 +1,82 @@
+[
+  {
+    "query": "Create an alarm policy for CPU usage above 80%",
+    "should_trigger": true
+  },
+  {
+    "query": "Set up 告警 for my CVM instances",
+    "should_trigger": true
+  },
+  {
+    "query": "Query 监控 metrics for instance ins-abc123",
+    "should_trigger": true
+  },
+  {
+    "query": "Configure notification template for alarms",
+    "should_trigger": true
+  },
+  {
+    "query": "Check my alarm policy list",
+    "should_trigger": true
+  },
+  {
+    "query": "Why is my alarm policy not triggering?",
+    "should_trigger": true
+  },
+  {
+    "query": "Get metric data for QCE/CVM namespace",
+    "should_trigger": true
+  },
+  {
+    "query": "Delete alarm policy policy-xyz789",
+    "should_trigger": true
+  },
+  {
+    "query": "Bind alarm policy to instance ins-server1",
+    "should_trigger": true
+  },
+  {
+    "query": "Configure 云监控 dashboard",
+    "should_trigger": true
+  },
+  {
+    "query": "Create a CVM instance in Guangzhou",
+    "should_trigger": false
+  },
+  {
+    "query": "Check my CLB backend health",
+    "should_trigger": false
+  },
+  {
+    "query": "Create a VPC and subnet",
+    "should_trigger": false
+  },
+  {
+    "query": "Deploy MySQL database",
+    "should_trigger": false
+  },
+  {
+    "query": "Expand disk storage to 200GB",
+    "should_trigger": false
+  },
+  {
+    "query": "Configure load balancer listener",
+    "should_trigger": false
+  },
+  {
+    "query": "Check my account billing",
+    "should_trigger": false
+  },
+  {
+    "query": "Set up Redis cache cluster",
+    "should_trigger": false
+  },
+  {
+    "query": "Upload files to COS bucket",
+    "should_trigger": false
+  },
+  {
+    "query": "Create Kubernetes cluster",
+    "should_trigger": false
+  }
+]

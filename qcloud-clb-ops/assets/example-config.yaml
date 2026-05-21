@@ -1,0 +1,152 @@
+# CLB Example Configuration
+
+## Basic Public CLB Configuration
+
+```yaml
+# example-config.yaml
+# Tencent Cloud CLB (Load Balancer) Example Configuration
+
+load_balancer:
+  name: "my-web-lb"
+  type: "OPEN"  # Public network
+  vpc_id: "vpc-abc123"
+  subnet_id: "subnet-xyz789"
+  
+listeners:
+  - name: "http-listener"
+    protocol: "HTTP"
+    port: 80
+    health_check:
+      enabled: true
+      interval: 5  # seconds
+      timeout: 2
+      healthy_threshold: 3
+      unhealthy_threshold: 3
+      http_path: "/health"
+      http_domain: "www.example.com"
+    
+  - name: "https-listener"
+    protocol: "HTTPS"
+    port: 443
+    certificate_id: "cert-abc123"
+    health_check:
+      enabled: true
+      http_path: "/health"
+
+backend_servers:
+  - instance_id: "ins-server1"
+    port: 8080
+    weight: 10
+  - instance_id: "ins-server2"
+    port: 8080
+    weight: 10
+  - instance_id: "ins-server3"
+    port: 8080
+    weight: 10
+
+target_group:
+  enabled: false
+  name: "backend-group"
+
+# UX Configuration
+ux:
+  smart_defaults:
+    default_protocol: "HTTP"
+    default_port: 80
+    default_weight: 10
+    default_health_path: "/health"
+  
+  minimal_prompts:
+    required_fields:
+      - load_balancer_name
+      - vpc_id
+    optional_fields:
+      - subnet_id
+      - listener_protocol
+      - backend_port
+  
+  feedback:
+    success_message: "✅ LoadBalancer {{output.loadbalancer_id}} created successfully"
+    progress_indicator: true
+    error_format: "[ERROR] {code}: {message} → {resolution}"
+```
+
+## High Availability Configuration
+
+```yaml
+# ha-config.yaml
+load_balancer:
+  name: "ha-lb"
+  type: "OPEN"
+  vpc_id: "vpc-prod"
+  
+listeners:
+  - protocol: "TCP"
+    port: 3306
+    session_persistence:
+      enabled: true
+      type: "source_ip"  # Source IP hash
+
+backend_servers:
+  # Multi-zone deployment
+  - instance_id: "ins-zone1-a"
+    zone: "ap-guangzhou-1"
+    port: 3306
+    weight: 10
+  - instance_id: "ins-zone2-a"
+    zone: "ap-guangzhou-2"
+    port: 3306
+    weight: 10
+  - instance_id: "ins-zone3-a"
+    zone: "ap-guangzhou-3"
+    port: 3306
+    weight: 10
+
+health_check:
+  tcp_check:
+    enabled: true
+    interval: 5
+    timeout: 2
+```
+
+## Optimization Settings
+
+```yaml
+# optimization.yaml
+optimization:
+  # Three-dimensional optimization framework
+  
+  # Fault Diagnosis Dimension
+  fault_diagnosis:
+    detection:
+      - health_check_failure
+      - connection_timeout
+      - ssl_certificate_error
+    root_cause_localization:
+      - backend_port_mismatch
+      - security_group_block
+      - certificate_expired
+    rapid_resolution:
+      - auto_weight_adjustment
+      - fallback_backend_activation
+  
+  # Root Cause Localization Dimension
+  root_cause:
+    symptoms:
+      - connection_failure
+      - ssl_error
+      - traffic_distribution_imbalance
+    causes:
+      - backend_unhealthy
+      - weight_misconfigured
+      - listener_missing
+  
+  # Rapid Resolution Dimension
+  resolution:
+    strategies:
+      - fix_backend_health
+      - adjust_weights
+      - create_missing_listener
+    automation:
+      - health_check_auto_recovery
+```

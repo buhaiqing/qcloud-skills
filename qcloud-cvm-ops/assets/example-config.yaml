@@ -1,0 +1,429 @@
+# CVM Example Configuration
+
+Example configurations for instance creation, disk management, and network setup.
+
+---
+
+## 1. Basic Instance Creation
+
+```yaml
+# basic-instance.yaml
+instance:
+  name: "web-server"
+  type: "S5.LARGE4"
+  image_id: "img-xxx"
+  
+placement:
+  zone: "ap-guangzhou-3"
+  
+network:
+  vpc_id: "vpc-xxx"
+  subnet_id: "subnet-xxx"
+  security_groups:
+    - "sg-xxx"
+  
+storage:
+  system_disk:
+    type: "CLOUD_PREMIUM"
+    size: 50
+  data_disks:
+    - type: "CLOUD_PREMIUM"
+      size: 100
+  
+billing:
+  charge_type: "POSTPAID_BY_HOUR"
+  
+tags:
+  Environment: "Production"
+  ManagedBy: "Automation"
+```
+
+---
+
+## 2. Production Web Server
+
+```yaml
+# production-web.yaml
+instance:
+  name: "prod-web-01"
+  type: "S5.2XLARGE16"  # 8 vCPU, 16 GB
+  image_id: "img-centos-7-6"
+  
+placement:
+  zone: "ap-guangzhou-3"
+  
+network:
+  vpc_id: "vpc-prod-xxx"
+  subnet_id: "subnet-web-xxx"
+  security_groups:
+    - "sg-web-public"
+    - "sg-web-internal"
+  public_ip: true
+  bandwidth:
+    type: "BANDWIDTH_PREPAID"
+    size: 10  # Mbps
+  
+storage:
+  system_disk:
+    type: "CLOUD_SSD"
+    size: 100
+  data_disks:
+    - type: "CLOUD_SSD"
+      size: 500
+  
+billing:
+  charge_type: "PREPAID"
+  period: 12  # Monthly prepaid
+  
+login:
+  key_ids:
+    - "skey-prod-xxx"
+  
+auto_recovery:
+  enabled: true
+  
+monitoring:
+  enabled: true
+  
+tags:
+  Environment: "Production"
+  Role: "WebServer"
+  Project: "CorePlatform"
+```
+
+---
+
+## 3. Database Server (MySQL Backend)
+
+```yaml
+# database-server.yaml
+instance:
+  name: "db-master-01"
+  type: "M5.4XLARGE64"  # 16 vCPU, 64 GB (Memory optimized)
+  image_id: "img-centos-7-6"
+  
+placement:
+  zone: "ap-guangzhou-3"
+  
+network:
+  vpc_id: "vpc-prod-xxx"
+  subnet_id: "subnet-db-xxx"
+  security_groups:
+    - "sg-db-private"
+  public_ip: false  # No public IP for DB
+  
+storage:
+  system_disk:
+    type: "CLOUD_SSD"
+    size: 50
+  data_disks:
+    - type: "CLOUD_HSSD"  # Enhanced SSD for high IOPS
+      size: 1000
+    - type: "CLOUD_HSSD"
+      size: 1000  # Second disk for backup/logs
+  
+billing:
+  charge_type: "PREPAID"
+  period: 12
+  
+login:
+  key_ids:
+    - "skey-db-admin"
+  
+tags:
+  Environment: "Production"
+  Role: "Database"
+  Type: "MySQL-Master"
+```
+
+---
+
+## 4. GPU Instance (AI/ML)
+
+```yaml
+# gpu-instance.yaml
+instance:
+  name: "ml-training-01"
+  type: "GN7.8XLARGE32"  # GPU instance type
+  image_id: "img-ubuntu-18-04-gpu"
+  
+placement:
+  zone: "ap-guangzhou-3"
+  
+network:
+  vpc_id: "vpc-ml-xxx"
+  subnet_id: "subnet-ml-xxx"
+  security_groups:
+    - "sg-ml-training"
+  
+storage:
+  system_disk:
+    type: "CLOUD_PREMIUM"
+    size: 100
+  data_disks:
+    - type: "CLOUD_SSD"
+      size: 2000  # Large disk for datasets
+  
+billing:
+  charge_type: "POSTPAID_BY_HOUR"  # Pay-by-hour for variable training
+  
+gpu:
+  count: 1
+  type: "T4"
+  
+tags:
+  Environment: "Training"
+  Role: "ML-Compute"
+```
+
+---
+
+## 5. Dev/Test Instance
+
+```yaml
+# dev-instance.yaml
+instance:
+  name: "dev-web-01"
+  type: "S5.SMALL2"  # Small instance for dev
+  image_id: "img-centos-7-6"
+  
+placement:
+  zone: "ap-guangzhou-3"
+  
+network:
+  vpc_id: "vpc-dev-xxx"
+  subnet_id: "subnet-dev-xxx"
+  security_groups:
+    - "sg-dev-open"
+  public_ip: true
+  bandwidth:
+    type: "TRAFFIC_POSTPAID_BY_HOUR"
+  
+storage:
+  system_disk:
+    type: "CLOUD_BASIC"
+    size: 50
+  
+billing:
+  charge_type: "POSTPAID_BY_HOUR"
+  
+login:
+  key_ids:
+    - "skey-dev"
+  
+scheduled:
+  auto_stop: "22:00"
+  auto_start: "08:00"
+  
+tags:
+  Environment: "Development"
+  AutoShutdown: "Enabled"
+```
+
+---
+
+## 6. Multi-Instance Batch Creation
+
+```yaml
+# batch-creation.yaml
+instances:
+  - name: "web-01"
+    type: "S5.LARGE4"
+    zone: "ap-guangzhou-3"
+    
+  - name: "web-02"
+    type: "S5.LARGE4"
+    zone: "ap-guangzhou-4"  # Multi-AZ
+    
+  - name: "web-03"
+    type: "S5.LARGE4"
+    zone: "ap-guangzhou-3"
+
+common_config:
+  image_id: "img-centos-7-6"
+  vpc_id: "vpc-prod-xxx"
+  subnet_id: "subnet-web-xxx"
+  security_groups:
+    - "sg-web"
+  system_disk_type: "CLOUD_PREMIUM"
+  system_disk_size: 50
+  
+billing:
+  charge_type: "POSTPAID_BY_HOUR"
+  
+tags:
+  Environment: "Production"
+  Role: "WebServer"
+```
+
+---
+
+## 7. Instance with Custom UserData
+
+```yaml
+# instance-with-userdata.yaml
+instance:
+  name: "app-server-01"
+  type: "S5.LARGE8"
+  image_id: "img-centos-7-6"
+  
+userdata: |
+  #!/bin/bash
+  # Install Docker
+  yum install -y docker
+  systemctl start docker
+  systemctl enable docker
+  
+  # Install application
+  docker pull myapp:latest
+  docker run -d -p 80:80 myapp:latest
+  
+  # Disable password SSH
+  sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+  systemctl restart sshd
+  
+  # Configure monitoring agent
+  wget https://monitor-agent-install.sh
+  bash monitor-agent-install.sh
+  
+placement:
+  zone: "ap-guangzhou-3"
+  
+network:
+  vpc_id: "vpc-app-xxx"
+  subnet_id: "subnet-app-xxx"
+```
+
+---
+
+## 8. Disk Configuration Examples
+
+### System Disk Types
+
+```yaml
+disk_types:
+  cloud_basic:
+    type: "CLOUD_BASIC"
+    use_case: "Archive, backup"
+    max_size: 500
+    performance: "Standard"
+    
+  cloud_premium:
+    type: "CLOUD_PREMIUM"
+    use_case: "General workloads"
+    max_size: 32000
+    performance: "High throughput"
+    
+  cloud_ssd:
+    type: "CLOUD_SSD"
+    use_case: "Database, critical apps"
+    max_size: 32000
+    performance: "Ultra-high IOPS"
+    
+  cloud_hssd:
+    type: "CLOUD_HSSD"
+    use_case: "High-performance database"
+    max_size: 32000
+    performance: "Maximum IOPS"
+```
+
+### Data Disk Configuration
+
+```yaml
+data_disk_example:
+  disks:
+    - id: "disk-data-01"
+      type: "CLOUD_SSD"
+      size: 1000
+      delete_with_instance: true
+      
+    - id: "disk-backup-01"
+      type: "CLOUD_PREMIUM"
+      size: 500
+      delete_with_instance: false  # Retain after instance deletion
+```
+
+---
+
+## 9. Network Configuration Examples
+
+### Public IP Configuration
+
+```yaml
+internet_access:
+  # Option 1: Pay by traffic (variable bandwidth)
+  traffic_postpaid:
+    charge_type: "TRAFFIC_POSTPAID_BY_HOUR"
+    public_ip: true
+    
+  # Option 2: Pay by bandwidth (fixed bandwidth)
+  bandwidth_postpaid:
+    charge_type: "BANDWIDTH_POSTPAID_BY_HOUR"
+    bandwidth: 10  # Mbps
+    public_ip: true
+    
+  # Option 3: Monthly bandwidth package
+  bandwidth_prepaid:
+    charge_type: "BANDWIDTH_PREPAID"
+    bandwidth: 20
+    period: 12
+```
+
+### Security Group Configuration
+
+```yaml
+security_groups:
+  web_public:
+    name: "sg-web-public"
+    rules:
+      inbound:
+        - protocol: "TCP"
+          port: 80
+          source: "0.0.0.0/0"
+        - protocol: "TCP"
+          port: 443
+          source: "0.0.0.0/0"
+      outbound:
+        - protocol: "ALL"
+          port: "ALL"
+          destination: "0.0.0.0/0"
+          
+  ssh_restricted:
+    name: "sg-ssh-restricted"
+    rules:
+      inbound:
+        - protocol: "TCP"
+          port: 22
+          source: "10.0.0.0/8"  # VPC internal only
+```
+
+---
+
+## 10. Tag Strategy
+
+```yaml
+tagging:
+  required_tags:
+    - key: "Environment"
+      values: ["Production", "Staging", "Development", "Test"]
+    - key: "Role"
+      values: ["WebServer", "Database", "Cache", "AppServer"]
+    - key: "Project"
+      values: ["CorePlatform", "Analytics", "Internal"]
+    - key: "ManagedBy"
+      values: ["Manual", "Terraform", "Ansible", "Automation"]
+      
+  optional_tags:
+    - key: "CostCenter"
+    - key: "Owner"
+    - key: "AutoShutdown"
+    - key: "BackupPolicy"
+```
+
+---
+
+## References
+
+- [CVM Configuration Guide](https://cloud.tencent.com/document/product/213)
+- [Instance Type Selection](https://cloud.tencent.com/document/product/213)
+- [CBS Disk Types](https://cloud.tencent.com/document/product/362)

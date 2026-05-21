@@ -1,0 +1,23 @@
+[
+  {"query": "创建一个腾讯云VPC", "should_trigger": true},
+  {"query": "新建私有网络", "should_trigger": true},
+  {"query": "我需要规划网络架构", "should_trigger": true},
+  {"query": "配置子网CIDR", "should_trigger": true},
+  {"query": "VPC网络隔离问题", "should_trigger": true},
+  {"query": "腾讯云私有网络配置", "should_trigger": true},
+  {"query": "help me set up vpc on tencent cloud", "should_trigger": true},
+  {"query": "网络拓扑设计", "should_trigger": true},
+  {"query": "跨可用区子网部署", "should_trigger": true},
+  {"query": "VPC路由表配置", "should_trigger": true},
+  
+  {"query": "创建CVM实例", "should_trigger": false},
+  {"query": "云服务器操作", "should_trigger": false},
+  {"query": "对象存储上传", "should_trigger": false},
+  {"query": "COS bucket创建", "should_trigger": false},
+  {"query": "数据库MySQL配置", "should_trigger": false},
+  {"query": "负载均衡CLB设置", "should_trigger": false},
+  {"query": "账单和费用查询", "should_trigger": false},
+  {"query": "CAM权限管理", "should_trigger": false},
+  {"query": "安全组规则配置", "should_trigger": false},
+  {"query": "CDN加速设置", "should_trigger": false}
+]

@@ -1,0 +1,27 @@
+bucket_name: myapp-prod-gz-12345
+region: ap-guangzhou
+storage_class: STANDARD
+
+lifecycle:
+  rules:
+    - id: archive-logs
+      status: Enabled
+      prefix: logs/
+      transition_days: 30
+      storage_class: ARCHIVE
+    - id: delete-temp
+      status: Enabled
+      prefix: temp/
+      expiration_days: 7
+
+versioning: Enabled
+acl: private
+
+ux_config:
+  max_upload_size_simple: 5GB
+  multipart_threshold: 5GB
+  default_storage_class: STANDARD
+
+optimization:
+  multipart_chunk_size: 100MB
+  upload_threads: 10

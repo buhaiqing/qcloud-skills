@@ -1,0 +1,96 @@
+region: ap-guangzhou
+vpc:
+  name: prod-vpc
+  cidr_block: 10.0.0.0/16
+  enable_multicast: false
+  
+subnets:
+  - name: web-subnet-az1
+    cidr_block: 10.0.1.0/24
+    zone: ap-guangzhou-1
+    route_table: default
+    
+  - name: web-subnet-az2
+    cidr_block: 10.0.2.0/24
+    zone: ap-guangzhou-2
+    route_table: default
+    
+  - name: app-subnet-az1
+    cidr_block: 10.0.3.0/24
+    zone: ap-guangzhou-1
+    route_table: default
+    
+  - name: app-subnet-az2
+    cidr_block: 10.0.4.0/24
+    zone: ap-guangzhou-2
+    route_table: default
+    
+  - name: db-subnet-az1
+    cidr_block: 10.0.5.0/24
+    zone: ap-guangzhou-1
+    route_table: default
+    
+  - name: db-subnet-az2
+    cidr_block: 10.0.6.0/24
+    zone: ap-guangzhou-2
+    route_table: default
+
+route_tables:
+  - name: custom-route-table
+    routes:
+      - destination: 0.0.0.0/0
+        next_hop_type: NAT_GATEWAY
+        next_hop_id: nat-xxx
+        
+network_acls:
+  - name: web-acl
+    subnet_association: web-subnet-az1
+    inbound_rules:
+      - protocol: TCP
+        port: 80
+        cidr: 0.0.0.0/0
+        action: ALLOW
+      - protocol: TCP
+        port: 443
+        cidr: 0.0.0.0/0
+        action: ALLOW
+      - protocol: TCP
+        port: 22
+        cidr: 10.0.100.0/24
+        action: ALLOW
+    outbound_rules:
+      - protocol: ALL
+        port: ALL
+        cidr: 10.0.3.0/24
+        action: ALLOW
+
+tags:
+  - key: env
+    value: production
+  - key: owner
+    value: ops-team
+  - key: application
+    value: three-tier-app
+
+# UX Configuration (per user-experience-spec.md)
+ux_config:
+  onboarding_time_seconds: 45
+  max_prompts_per_operation: 3
+  smart_defaults:
+    cidr_block: 10.0.0.0/16
+    zone: ap-guangzhou-1
+  feedback_format:
+    success: "✅ VPC {vpc_id} created successfully"
+    error: "[ERROR] {code}: {message} → {fix} → Next: {action}"
+
+# Optimization Settings (per optimization-analysis.md)
+optimization:
+  fault_diagnosis:
+    cidr_conflict_auto_detect: true
+    quota_check_before_create: true
+  root_cause_localization:
+    dependency_chain_check: true
+    network_acl_impact_analysis: true
+  rapid_resolution:
+    auto_suggest_available_cidr: true
+    rollback_on_failure: true

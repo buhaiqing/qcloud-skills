@@ -1,0 +1,114 @@
+# Monitor Example Configuration
+
+```yaml
+# example-config.yaml
+# Tencent Cloud Monitoring (云监控) Example Configuration
+
+alarm_policy:
+  name: "cvm-high-cpu-alert"
+  namespace: "QCE/CVM"
+  module: "monitor"
+  
+conditions:
+  - metric_name: "CPUUsage"
+    calc_type: "Greater"  # Greater, Less, Equal, GreaterOrEqual, LessOrEqual
+    calc_value: "80"      # Threshold
+    continue_time: 60     # Duration in seconds
+    
+  - metric_name: "MemUsage"
+    calc_type: "Greater"
+    calc_value: "90"
+    continue_time: 60
+
+notification:
+  notice_name: "ops-team-notification"
+  channels:
+    - type: "SMS"
+      receivers: ["user1", "user2"]
+    - type: "Email"
+      receivers: ["ops@example.com"]
+    - type: "WechatWork"
+      receivers: ["group_id"]
+    - type: "Webhook"
+      url: "https://webhook.example.com/alarm"
+
+binding:
+  dimensions:
+    - key: "InstanceId"
+      values: ["ins-server1", "ins-server2", "ins-server3"]
+
+# UX Configuration
+ux:
+  smart_defaults:
+    default_namespace: "QCE/CVM"
+    default_metric: "CPUUsage"
+    default_threshold: "80"
+    default_continue_time: 60
+  
+  minimal_prompts:
+    required_fields:
+      - policy_name
+      - namespace
+      - metric_name
+      - threshold
+    optional_fields:
+      - continue_time
+      - notification_template
+  
+  feedback:
+    success_message: "✅ Alarm policy {{output.policy_id}} created successfully"
+    progress_indicator: true
+    error_format: "[ERROR] {code}: {message} → {resolution}"
+
+# AIOps Integration
+aiops:
+  alarm_storm_threshold: 50  # alerts in 5 minutes
+  alarm_storm_action: "aggregate_suppress"
+  
+  multi_metric_correlation:
+    enabled: true
+    groups:
+      - namespace: "QCE/CVM"
+        metrics: ["CPUUsage", "MemUsage", "DiskUsage"]
+      - namespace: "QCE/LB_PUBLIC"
+        metrics: ["ClientConnum", "TrafficOut", "HealthStatus"]
+  
+  proactive_inspection:
+    enabled: true
+    schedule: "daily"
+    detection_rules:
+      - trend_prediction: true
+      - threshold_proximity: 80
+
+# Optimization Framework
+optimization:
+  fault_diagnosis:
+    detection:
+      - alarm_triggered
+      - metric_anomaly
+      - threshold_breach
+    root_cause_localization:
+      - resource_overload
+      - policy_misconfigured
+      - binding_missing
+    rapid_resolution:
+      - adjust_threshold
+      - bind_policy_objects
+      - create_notification
+  
+  root_cause:
+    symptoms:
+      - alarm_not_triggered
+      - metric_data_empty
+      - notification_failed
+    causes:
+      - policy_disabled
+      - binding_missing
+      - wrong_namespace
+  
+  resolution:
+    strategies:
+      - enable_policy
+      - bind_objects
+      - fix_notification_template
+```

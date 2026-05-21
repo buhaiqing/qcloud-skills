@@ -1,0 +1,23 @@
+[
+  {"query": "创建腾讯云COS bucket", "should_trigger": true},
+  {"query": "对象存储上传文件", "should_trigger": true},
+  {"query": "COS bucket配置", "should_trigger": true},
+  {"query": "文件存储到腾讯云", "should_trigger": true},
+  {"query": "配置对象生命周期", "should_trigger": true},
+  {"query": "备份文件到COS", "should_trigger": true},
+  {"query": "help me setup object storage", "should_trigger": true},
+  {"query": "静态网站托管", "should_trigger": true},
+  {"query": "存储分类管理", "should_trigger": true},
+  {"query": "COS multipart upload", "should_trigger": true},
+  
+  {"query": "创建CVM实例", "should_trigger": false},
+  {"query": "云服务器操作", "should_trigger": false},
+  {"query": "VPC网络配置", "should_trigger": false},
+  {"query": "私有网络创建", "should_trigger": false},
+  {"query": "数据库MySQL", "should_trigger": false},
+  {"query": "负载均衡CLB", "should_trigger": false},
+  {"query": "账单费用查询", "should_trigger": false},
+  {"query": "CAM权限管理", "should_trigger": false},
+  {"query": "CDN域名加速", "should_trigger": false},
+  {"query": "安全组规则", "should_trigger": false}
+]

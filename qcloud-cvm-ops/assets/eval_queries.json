@@ -1,0 +1,172 @@
+[
+  {
+    "query": "Create a CVM instance in Guangzhou",
+    "should_trigger": true,
+    "intent": "RunInstances"
+  },
+  {
+    "query": "I need a cloud server in ap-guangzhou region",
+    "should_trigger": true,
+    "intent": "RunInstances"
+  },
+  {
+    "query": "Launch a Tencent Cloud virtual machine",
+    "should_trigger": true,
+    "intent": "RunInstances"
+  },
+  {
+    "query": "我要创建一台云服务器",
+    "should_trigger": true,
+    "intent": "RunInstances"
+  },
+  {
+    "query": "在腾讯云部署一个服务器",
+    "should_trigger": true,
+    "intent": "RunInstances"
+  },
+  {
+    "query": "Start my stopped instance ins-xxx",
+    "should_trigger": true,
+    "intent": "StartInstances"
+  },
+  {
+    "query": "Stop the CVM instance before maintenance",
+    "should_trigger": true,
+    "intent": "StopInstances"
+  },
+  {
+    "query": "Reboot the cloud server",
+    "should_trigger": true,
+    "intent": "RebootInstances"
+  },
+  {
+    "query": "Delete this instance permanently",
+    "should_trigger": true,
+    "intent": "TerminateInstances"
+  },
+  {
+    "query": "Terminate ins-xxx",
+    "should_trigger": true,
+    "intent": "TerminateInstances"
+  },
+  {
+    "query": "List all my CVM instances",
+    "should_trigger": true,
+    "intent": "DescribeInstances"
+  },
+  {
+    "query": "Show me all virtual machines in ap-guangzhou",
+    "should_trigger": true,
+    "intent": "DescribeInstances"
+  },
+  {
+    "query": "查看我的云服务器列表",
+    "should_trigger": true,
+    "intent": "DescribeInstances"
+  },
+  {
+    "query": "Expand the disk size to 200GB",
+    "should_trigger": true,
+    "intent": "ResizeInstanceDisks"
+  },
+  {
+    "query": "Resize the CBS disk attached to ins-xxx",
+    "should_trigger": true,
+    "intent": "ResizeInstanceDisks"
+  },
+  {
+    "query": "Create a snapshot backup for my instance",
+    "should_trigger": true,
+    "intent": "CreateSnapshot"
+  },
+  {
+    "query": "Make a custom image from this server",
+    "should_trigger": true,
+    "intent": "CreateImage"
+  },
+  {
+    "query": "我的服务器CPU使用率很高怎么办",
+    "should_trigger": true,
+    "intent": "Troubleshooting"
+  },
+  {
+    "query": "SSH连接不上云服务器",
+    "should_trigger": true,
+    "intent": "Troubleshooting"
+  },
+  {
+    "query": "My instance is stuck in pending state",
+    "should_trigger": true,
+    "intent": "Troubleshooting"
+  },
+  {
+    "query": "Create a VPC for my network",
+    "should_trigger": false,
+    "delegate_to": "qcloud-vpc-ops"
+  },
+  {
+    "query": "Configure a subnet in ap-guangzhou",
+    "should_trigger": false,
+    "delegate_to": "qcloud-vpc-ops"
+  },
+  {
+    "query": "Add a security group rule for port 3306",
+    "should_trigger": false,
+    "delegate_to": "qcloud-vpc-ops"
+  },
+  {
+    "query": "Setup load balancer for my backend servers",
+    "should_trigger": false,
+    "delegate_to": "qcloud-clb-ops"
+  },
+  {
+    "query": "Create a MySQL database instance",
+    "should_trigger": false,
+    "delegate_to": "qcloud-mysql-ops"
+  },
+  {
+    "query": "Deploy Redis cluster",
+    "should_trigger": false,
+    "delegate_to": "qcloud-redis-ops"
+  },
+  {
+    "query": "Check my account billing details",
+    "should_trigger": false,
+    "delegate_to": "qcloud-billing-ops"
+  },
+  {
+    "query": "Grant CAM permissions to a user",
+    "should_trigger": false,
+    "delegate_to": "qcloud-cam-ops"
+  },
+  {
+    "query": "Upload files to object storage",
+    "should_trigger": false,
+    "delegate_to": "qcloud-cos-ops"
+  },
+  {
+    "query": "Create a function for serverless compute",
+    "should_trigger": false,
+    "delegate_to": "qcloud-scf-ops"
+  },
+  {
+    "query": "My Alibaba Cloud ECS instance is slow",
+    "should_trigger": false,
+    "reason": "Not Tencent Cloud product"
+  },
+  {
+    "query": "AWS EC2 instance creation",
+    "should_trigger": false,
+    "reason": "Not Tencent Cloud product"
+  },
+  {
+    "query": "How to install Docker",
+    "should_trigger": false,
+    "reason": "General application, not CVM-specific"
+  },
+  {
+    "query": "Python script for data processing",
+    "should_trigger": false,
+    "reason": "General development, not CVM-specific"
+  }
+]

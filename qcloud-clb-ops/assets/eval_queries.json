@@ -1,0 +1,82 @@
+[
+  {
+    "query": "I need to create a load balancer for my web application",
+    "should_trigger": true
+  },
+  {
+    "query": "Check my CLB health status",
+    "should_trigger": true
+  },
+  {
+    "query": "Configure HTTPS listener for 负载均衡",
+    "should_trigger": true
+  },
+  {
+    "query": "Bind backend servers to load balancer lb-abc123",
+    "should_trigger": true
+  },
+  {
+    "query": "Why is my CLB VIP not responding?",
+    "should_trigger": true
+  },
+  {
+    "query": "Set up traffic distribution across multiple instances",
+    "should_trigger": true
+  },
+  {
+    "query": "Create a Tencent Cloud LB instance",
+    "should_trigger": true
+  },
+  {
+    "query": "Check backend server health in my load balancer",
+    "should_trigger": true
+  },
+  {
+    "query": "Delete load balancer lb-xyz789",
+    "should_trigger": true
+  },
+  {
+    "query": "Modify listener weight for ins-server1",
+    "should_trigger": true
+  },
+  {
+    "query": "Create a CVM instance with 4 CPUs",
+    "should_trigger": false
+  },
+  {
+    "query": "Check my billing and account balance",
+    "should_trigger": false
+  },
+  {
+    "query": "Create a VPC subnet for my network",
+    "should_trigger": false
+  },
+  {
+    "query": "Configure MySQL database parameters",
+    "should_trigger": false
+  },
+  {
+    "query": "Set up alarm policy for CPU usage",
+    "should_trigger": false
+  },
+  {
+    "query": "Deploy an application to Kubernetes",
+    "should_trigger": false
+  },
+  {
+    "query": "Create SSL certificate for my domain",
+    "should_trigger": false
+  },
+  {
+    "query": "Check Redis cache hit rate",
+    "should_trigger": false
+  },
+  {
+    "query": "Expand my CBS disk to 100GB",
+    "should_trigger": false
+  },
+  {
+    "query": "Configure security group rules",
+    "should_trigger": false
+  }
+]
