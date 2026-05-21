@@ -1,0 +1,102 @@
+[
+  {
+    "query": "Generate qcloud-cvm-ops for CVM instances, CBS disks, and snapshots",
+    "should_trigger": true,
+    "reason": "Explicit product (CVM) + generation request"
+  },
+  {
+    "query": "Add a Tencent Cloud skill for MySQL database operations",
+    "should_trigger": true,
+    "reason": "Explicit cloud (Tencent) + generation request"
+  },
+  {
+    "query": "Create qcloud-vpc-ops skill for VPC and subnet management",
+    "should_trigger": true,
+    "reason": "Explicit skill naming pattern + product"
+  },
+  {
+    "query": "I need to scaffold a skill for Tencent Cloud CLB load balancers",
+    "should_trigger": true,
+    "reason": "Generation keywords (scaffold) + Tencent Cloud"
+  },
+  {
+    "query": "Help me create an ops skill for TencentDB Redis",
+    "should_trigger": true,
+    "reason": "Generation keywords (create, ops skill) + TencentDB"
+  },
+  {
+    "query": "Regenerate the qcloud-cbs-ops skill from updated API spec",
+    "should_trigger": true,
+    "reason": "Explicit update/regenerate request for existing skill"
+  },
+  {
+    "query": "Fix the gaps found in qcloud-mysql-ops during review",
+    "should_trigger": true,
+    "reason": "Maintenance request for existing generated skill"
+  },
+  {
+    "query": "腾讯云CVM实例的运维技能生成",
+    "should_trigger": true,
+    "reason": "Chinese: Tencent Cloud + generation keywords"
+  },
+  {
+    "query": "为腾讯云CBS云硬盘创建运维技能模板",
+    "should_trigger": true,
+    "reason": "Chinese: Create skill template for Tencent CBS"
+  },
+  {
+    "query": "Update skill generator for Tencent Cloud new product",
+    "should_trigger": true,
+    "reason": "Meta-skill context + update request"
+  },
+  {
+    "query": "Create a CVM instance in my account",
+    "should_trigger": false,
+    "reason": "Operational execution, not skill generation - use qcloud-cvm-ops instead"
+  },
+  {
+    "query": "Describe my TencentDB MySQL instances",
+    "should_trigger": false,
+    "reason": "Operational query, not skill generation - use qcloud-mysql-ops"
+  },
+  {
+    "query": "Delete a CBS disk from Tencent Cloud",
+    "should_trigger": false,
+    "reason": "Operational deletion, not generation - use qcloud-cbs-ops"
+  },
+  {
+    "query": "How do I use tccli to list VPCs?",
+    "should_trigger": false,
+    "reason": "CLI usage question, not skill generation"
+  },
+  {
+    "query": "Check my Tencent Cloud billing",
+    "should_trigger": false,
+    "reason": "Billing operation - different skill domain"
+  },
+  {
+    "query": "Generate an Alibaba Cloud ECS skill",
+    "should_trigger": false,
+    "reason": "Different cloud provider - use alicloud-skill-generator"
+  },
+  {
+    "query": "Create a general cloud resource management skill",
+    "should_trigger": false,
+    "reason": "Multi-cloud/generic - not specific to Tencent Cloud"
+  },
+  {
+    "query": "Write documentation for my existing qcloud-cvm-ops skill",
+    "should_trigger": false,
+    "reason": "Documentation task, not skill generation/regeneration"
+  },
+  {
+    "query": "Debug why my CVM creation failed",
+    "should_trigger": false,
+    "reason": "Debugging operational issue, not skill generation"
+  },
+  {
+    "query": "Create a Terraform module for Tencent Cloud",
+    "should_trigger": false,
+    "reason": "Terraform/Infrastructure as Code, not skill generation"
+  }
+]

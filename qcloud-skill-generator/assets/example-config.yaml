@@ -1,0 +1,366 @@
+# Example Configuration
+
+Example configuration with UX and optimization settings for qcloud-[product]-ops.
+
+---
+
+## Credential Configuration
+
+### Environment Variables (Recommended)
+
+```bash
+# Tencent Cloud credentials
+export TENCENTCLOUD_SECRET_ID="<YOUR_TENCENT_CLOUD_SECRET_ID>"
+export TENCENTCLOUD_SECRET_KEY="<YOUR_TENCENT_CLOUD_SECRET_KEY>"
+export TENCENTCLOUD_REGION="ap-guangzhou"
+
+# Optional: Output format
+export TENCENTCLOUD_OUTPUT="json"
+
+# Optional: Language
+export TENCENTCLOUD_LANG="zh-CN"
+```
+
+### Config File Configuration
+
+```yaml
+# ~/.tccli/config
+default:
+  secretId: <YOUR_TENCENT_CLOUD_SECRET_ID>
+  secretKey: <YOUR_TENCENT_CLOUD_SECRET_KEY>
+  region: ap-guangzhou
+  output: json
+  lang: zh-CN
+
+# Multiple profiles
+profile_prod:
+  secretId: AKID_prod_xxxx
+  secretKey: prod_xxxx
+  region: ap-guangzhou
+
+profile_dev:
+  secretId: AKID_dev_xxxx
+  secretKey: dev_xxxx
+  region: ap-shanghai
+
+profile_hk:
+  secretId: AKID_hk_xxxx
+  secretKey: hk_xxxx
+  region: ap-hongkong
+```
+
+---
+
+## Skill Execution Settings
+
+### Operation Defaults
+
+```yaml
+# skill-config.yaml
+defaults:
+  region: ap-guangzhou  # Default region if not specified
+  
+  create:
+    wait_timeout: 300   # Max wait time for create operations (seconds)
+    poll_interval: 5    # Polling interval (seconds)
+    
+  delete:
+    require_confirmation: true  # ALWAYS require confirmation
+    suggest_backup: true        # Suggest backup before delete
+    
+  describe:
+    max_results: 100    # Max items per request
+    pagination: true    # Enable pagination
+    
+  modify:
+    require_confirmation: true  # Require confirmation for changes
+```
+
+### Prompt Settings
+
+```yaml
+prompt_settings:
+  # Maximum prompts before execution
+  max_prompts:
+    create: 2      # Ask for required fields only
+    describe: 0    # No prompts for read-only
+    modify: 1      # Confirm changes
+    delete: 1      # Confirm deletion
+    
+  # Smart defaults
+  smart_defaults:
+    instance_type: S5.SMALL1  # Default instance type
+    disk_size: 50            # Default disk size (GB)
+    disk_type: CLOUD_PREMIUM # Default disk type
+```
+
+---
+
+## Monitoring Settings
+
+### Threshold Configuration
+
+```yaml
+thresholds:
+  # CPU thresholds
+  cpu_usage:
+    high: 90      # Alert threshold
+    medium: 70    # Warning threshold
+    low: 50       # Attention threshold
+    
+  # Memory thresholds
+  mem_usage:
+    high: 90
+    medium: 75
+    low: 60
+    
+  # Disk thresholds
+  disk_usage:
+    high: 95
+    medium: 80
+    low: 70
+    
+  # Network thresholds (bandwidth usage %)
+  network_usage:
+    high: 90
+    medium: 70
+    low: 50
+```
+
+### Proactive Inspection Settings
+
+```yaml
+proactive_inspection:
+  enabled: true
+  
+  schedule:
+    daily: "02:00"    # Daily at 2 AM
+    weekly: "Sun 03:00"  # Weekly Sunday 3 AM
+    monthly: "1st 04:00" # Monthly 1st at 4 AM
+    
+  scope:
+    regions:
+      - ap-guangzhou
+      - ap-shanghai
+      
+    resource_types:
+      - CVM
+      - CBS
+      - MySQL
+      
+  alert_rules:
+    capacity_projection: true    # Alert on capacity projection
+    baseline_shift: true         # Alert on baseline changes
+    anomaly_detection: true      # Alert on detected anomalies
+```
+
+---
+
+## UX Settings
+
+### Feedback Format
+
+```yaml
+feedback:
+  # Success feedback
+  success_format: |
+    ✅ {operation} completed successfully
+    
+    Details:
+    - Resource ID: {resource_id}
+    - Status: {status}
+    - Duration: {duration}s
+    
+  # Progress feedback (for operations > 5s)
+  progress_format: |
+    ⏳ {operation} in progress...
+    [{current}/{total}] Status: {status} ({elapsed}s)
+    
+  # Error feedback
+  error_format: |
+    [ERROR] {code}: {summary}
+    
+    What happened: {explanation}
+    How to fix: {fix_steps}
+    Next step: {next_action}
+```
+
+### Safety Gates
+
+```yaml
+safety_gates:
+  destructive_operations:
+    - delete
+    - terminate
+    - release
+    
+  confirmation_required:
+    message: |
+      ⚠️ **Confirm Destructive Operation**
+      
+      You are about to:
+      - **Action**: {action} (irreversible)
+      - **Resource**: {resource_type}
+      - **Name**: {resource_name}
+      - **ID**: {resource_id}
+      
+      Type "CONFIRM" to proceed.
+      
+  backup_reminder:
+    message: |
+      💡 **Backup Reminder**
+      
+      Before {operation}, consider creating a backup.
+      
+      Would you like to create a backup first?
+```
+
+---
+
+## Optimization Settings
+
+### Capacity Planning
+
+```yaml
+capacity_planning:
+  # Recommended sizing based on workload
+  sizing_recommendations:
+    light:
+      cpu: 2
+      memory: 4GB
+      disk: 50GB
+      
+    medium:
+      cpu: 4
+      memory: 8GB
+      disk: 100GB
+      
+    heavy:
+      cpu: 8
+      memory: 16GB
+      disk: 200GB
+      
+  # Right-sizing thresholds
+  right_sizing:
+    cpu_low_threshold: 10    # Downsize if CPU < 10%
+    cpu_high_threshold: 80   # Upsize if CPU > 80%
+    mem_low_threshold: 20    # Downsize if Mem < 20%
+    mem_high_threshold: 85   # Upsize if Mem > 85%
+```
+
+### Cost Optimization
+
+```yaml
+cost_optimization:
+  # Reserved instance recommendations
+  reserved_instance:
+    threshold_hours: 720  # Recommend reserved if running > 720h/month
+    
+  # Spot instance eligibility
+  spot_instance:
+    eligible_workloads:
+      - batch_processing
+      - dev_testing
+      - stateless_services
+      
+  # Idle resource detection
+  idle_detection:
+    stopped_threshold_days: 7   # Alert if stopped > 7 days
+    low_utilization_threshold: 10  # Alert if utilization < 10%
+```
+
+---
+
+## Security Settings
+
+### CAM Policy Template
+
+```json
+{
+  "version": "2.0",
+  "statement": [
+    {
+      "action": [
+        "[product]:Describe*",
+        "[product]:Create*",
+        "[product]:Modify*",
+        "[product]:Delete*"
+      ],
+      "effect": "allow",
+      "resource": "qcs:[product]:[region]:*:/*"
+    },
+    {
+      "action": [
+        "monitor:GetMonitorData",
+        "cam:ListUsers",
+        "cam:ListRoles"
+      ],
+      "effect": "allow",
+      "resource": "*"
+    }
+  ]
+}
+```
+
+### Credential Security
+
+```yaml
+credential_security:
+  # Never expose these patterns
+  forbidden_patterns:
+    - "echo $TENCENTCLOUD_SECRET_KEY"
+    - "print(secret_key)"
+    - "cat ~/.tccli/config"
+    
+  # Masking format
+  mask_format: "<masked>"
+  
+  # Verification (check existence only)
+  safe_verification:
+    bash: "test -n '$TENCENTCLOUD_SECRET_KEY'"
+    python: "os.environ.get('TENCENTCLOUD_SECRET_KEY') != ''"
+```
+
+---
+
+## Integration Settings
+
+### Cross-Skill Delegation
+
+```yaml
+delegation:
+  # When to delegate to other skills
+  rules:
+    - condition: "disk_issue_detected"
+      delegate_to: "qcloud-cbs-ops"
+      
+    - condition: "vpc_issue_detected"
+      delegate_to: "qcloud-vpc-ops"
+      
+    - condition: "loadbalancer_issue_detected"
+      delegate_to: "qcloud-clb-ops"
+```
+
+---
+
+## Logging Settings
+
+```yaml
+logging:
+  level: INFO
+  
+  # What to log
+  log_items:
+    - request_id
+    - operation
+    - resource_id
+    - duration
+    - success/failure
+    
+  # Never log
+  forbidden_log_items:
+    - TENCENTCLOUD_SECRET_KEY
+    - SecretKey
+    - password
+    - token
+```
