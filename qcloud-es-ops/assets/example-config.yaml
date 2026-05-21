@@ -1,0 +1,115 @@
+# ES Example Configurations
+# 10 common scenarios for Tencent Cloud Elasticsearch Service
+
+- name: "es-cluster-minimal"
+  description: "Minimal ES cluster for development"
+  params:
+    Zone: "ap-guangzhou-3"
+    NodeType: "ES.S1.MEDIUM4"
+    NodeNum: 1
+    DiskSize: 100
+    DiskType: "CLOUD_PREMIUM"
+    EsVersion: "7.14.2"
+    InstanceName: "dev-es-cluster"
+
+- name: "es-cluster-production"
+  description: "Production ES cluster with dedicated master nodes"
+  params:
+    Zone: "ap-guangzhou-3"
+    NodeType: "ES.S1.LARGE8"
+    NodeNum: 5
+    DiskSize: 500
+    DiskType: "CLOUD_SSD"
+    EsVersion: "7.14.2"
+    EnableDedicatedMaster: true
+    MasterNodeNum: 3
+    MasterNodeType: "ES.S1.MEDIUM4"
+    MasterNodeDiskSize: 50
+    InstanceName: "prod-es-cluster"
+
+- name: "es-cluster-write-heavy"
+  description: "ES cluster optimized for write-heavy indexing workloads"
+  params:
+    Zone: "ap-guangzhou-3"
+    NodeType: "ES.S1.LARGE8"
+    NodeNum: 5
+    DiskSize: 1000
+    DiskType: "CLOUD_HSSD"
+    EsVersion: "7.14.2"
+    EnableDedicatedMaster: true
+    MasterNodeNum: 3
+    InstanceName: "write-heavy-es"
+
+- name: "es-cluster-multi-zone-dr"
+  description: "Multi-region DR setup with cross-region snapshot"
+  params:
+    primary_cluster:
+      Zone: "ap-guangzhou-3"
+      NodeType: "ES.S1.LARGE8"
+      NodeNum: 5
+      DiskSize: 500
+      DiskType: "CLOUD_SSD"
+      EsVersion: "7.14.2"
+      InstanceName: "es-primary"
+    dr_snapshot_config:
+      schedule: "daily 02:00"
+      retention_days: 30
+      cross_region_copy: true
+
+- name: "es-index-standard"
+  description: "Standard index with replication for production"
+  params:
+    Operation: CreateIndex
+    InstanceId: "es-xxxxxx"
+    IndexName: "app-logs-2026-05"
+    IndexType: "normal"
+    IndexMetaJson:
+      settings:
+        number_of_shards: 5
+        number_of_replicas: 1
+      mappings:
+        properties:
+          timestamp: {"type": "date"}
+          level: {"type": "keyword"}
+          message: {"type": "text"}
+          service: {"type": "keyword"}
+
+- name: "es-snapshot-backup"
+  description: "Manual snapshot backup of ES cluster"
+  params:
+    Operation: CreateClusterSnapshot
+    InstanceId: "es-xxxxxx"
+    SnapshotName: "manual-backup-20260521"
+
+- name: "es-snapshot-restore"
+  description: "Restore ES cluster from snapshot"
+  params:
+    Operation: RestoreClusterSnapshot
+    InstanceId: "es-xxxxxx"
+    SnapshotId: "snap-xxxxxx"
+
+- name: "es-install-plugins"
+  description: "Install IK and Pinyin analysis plugins"
+  params:
+    Operation: UpdatePlugins
+    InstanceId: "es-xxxxxx"
+    InstallPluginList:
+      - "analysis-ik"
+      - "analysis-pinyin"
+
+- name: "es-upgrade-version"
+  description: "Upgrade ES version from 7.10 to 7.14"
+  params:
+    Operation: UpgradeInstance
+    InstanceId: "es-xxxxxx"
+    EsVersion: "7.14.2"
+    CheckOnly: false
+
+- name: "es-scale-cluster"
+  description: "Scale ES cluster to larger node type and more nodes"
+  params:
+    Operation: UpdateInstance
+    InstanceId: "es-xxxxxx"
+    NodeType: "ES.S1.2XLARGE16"
+    NodeNum: 10
+    DiskSize: 2000

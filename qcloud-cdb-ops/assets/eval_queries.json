@@ -1,0 +1,22 @@
+[
+  {"query": "Create a MySQL database instance on Tencent Cloud", "should_trigger": true},
+  {"query": "帮我创建一个腾讯云MySQL数据库", "should_trigger": true},
+  {"query": "List all my TencentDB instances", "should_trigger": true},
+  {"query": "My MySQL database is running slow, check slow queries", "should_trigger": true},
+  {"query": "Create a backup for my CDB instance", "should_trigger": true},
+  {"query": "Restore MySQL from backup", "should_trigger": true},
+  {"query": "Upgrade my MySQL instance configuration", "should_trigger": true},
+  {"query": "Restart my TencentDB for MySQL instance", "should_trigger": true},
+  {"query": "Change the MySQL parameter settings", "should_trigger": true},
+  {"query": "Create a new MySQL account with privileges", "should_trigger": true},
+  {"query": "Create an Elasticsearch cluster for log analysis", "should_trigger": false},
+  {"query": "Upload files to COS bucket", "should_trigger": false},
+  {"query": "Set up CAM permissions for sub-accounts", "should_trigger": false},
+  {"query": "Create a VPC peering connection", "should_trigger": false},
+  {"query": "Deploy a CVM instance for web server", "should_trigger": false},
+  {"query": "Set up a Redis cache cluster", "should_trigger": false},
+  {"query": "Configure a CDN acceleration domain", "should_trigger": false},
+  {"query": "Create a PostgreSQL database instance", "should_trigger": false},
+  {"query": "Check my Tencent Cloud billing report", "should_trigger": false},
+  {"query": "Set up a CLB with health check", "should_trigger": false}
+]

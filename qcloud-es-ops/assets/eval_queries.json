@@ -1,0 +1,22 @@
+[
+  {"query": "I need to create an Elasticsearch cluster on Tencent Cloud", "should_trigger": true},
+  {"query": "帮我创建一个腾讯云ES集群", "should_trigger": true},
+  {"query": "Check the health status of my ES cluster", "should_trigger": true},
+  {"query": "My Elasticsearch cluster is red, what's wrong?", "should_trigger": true},
+  {"query": "How do I upgrade my ES cluster version?", "should_trigger": true},
+  {"query": "Create a snapshot backup for my ES cluster", "should_trigger": true},
+  {"query": "List all indices in my Elasticsearch cluster", "should_trigger": true},
+  {"query": "Restart Kibana for my ES instance", "should_trigger": true},
+  {"query": "Install a plugin on my Elasticsearch cluster", "should_trigger": true},
+  {"query": "Scale up my ES cluster node configuration", "should_trigger": true},
+  {"query": "Check my Tencent Cloud account bill", "should_trigger": false},
+  {"query": "Create a new VPC subnet", "should_trigger": false},
+  {"query": "Set up a CAM policy for read-only access", "should_trigger": false},
+  {"query": "Upload a file to COS bucket", "should_trigger": false},
+  {"query": "Create a CVM instance for my application", "should_trigger": false},
+  {"query": "Set up a CLB load balancer", "should_trigger": false},
+  {"query": "Configure a CDN domain", "should_trigger": false},
+  {"query": "Create a MySQL database instance", "should_trigger": false},
+  {"query": "Deploy a Redis cache cluster", "should_trigger": false},
+  {"query": "Set up DTS data migration", "should_trigger": false}
+]

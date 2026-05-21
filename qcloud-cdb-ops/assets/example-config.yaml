@@ -1,0 +1,121 @@
+# CDB Example Configurations
+# 10 common scenarios for Tencent Cloud TencentDB for MySQL
+
+- name: "cdb-minimal"
+  description: "Minimal MySQL instance for development"
+  params:
+    Memory: 1000
+    Volume: 20
+    Period: 1
+    GoodsNum: 1
+    Zone: "ap-guangzhou-3"
+    EngineVersion: "8.0"
+    InstanceRole: "master"
+
+- name: "cdb-production"
+  description: "Production MySQL instance with VPC"
+  params:
+    Memory: 8000
+    Volume: 500
+    Period: 12
+    GoodsNum: 1
+    Zone: "ap-guangzhou-3"
+    UniqVpcId: "vpc-xxxxxx"
+    UniqSubnetId: "subnet-xxxxxx"
+    Port: 3306
+    EngineVersion: "8.0"
+    InstanceRole: "master"
+    ProjectId: 0
+
+- name: "cdb-hourly-billing"
+  description: "Postpaid (hourly) MySQL instance for variable workloads"
+  params:
+    Operation: CreateDBInstanceHour
+    Memory: 4000
+    Volume: 200
+    GoodsNum: 1
+    Zone: "ap-guangzhou-3"
+    EngineVersion: "8.0"
+    InstanceRole: "master"
+
+- name: "cdb-multi-az-dr"
+  description: "Disaster recovery instance in different AZ"
+  params:
+    Memory: 4000
+    Volume: 200
+    Period: 12
+    GoodsNum: 1
+    Zone: "ap-guangzhou-6"
+    EngineVersion: "8.0"
+    InstanceRole: "dr"
+    MasterInstanceId: "cdb-xxxxxx"
+
+- name: "cdb-backup-config"
+  description: "Recommended backup configuration"
+  params:
+    Operation: ModifyBackupConfig
+    InstanceId: "cdb-xxxxxx"
+    BackupTimeStart: "02:00"
+    BackupTimeEnd: "06:00"
+    BackupModel: "physical"
+    BackupPeriods:
+      - "monday"
+      - "tuesday"
+      - "wednesday"
+      - "thursday"
+      - "friday"
+      - "saturday"
+      - "sunday"
+    BackupRetentionDays: 30
+
+- name: "cdb-clone-from-backup"
+  description: "Clone a new instance from backup for recovery testing"
+  params:
+    Operation: CreateCloneInstance
+    InstanceId: "cdb-xxxxxx"
+    SpecifyBackupId: 12345
+    SpecifyBackupType: "BackupId"
+
+- name: "cdb-create-account"
+  description: "Create MySQL account with restricted host"
+  params:
+    Operation: CreateAccounts
+    InstanceId: "cdb-xxxxxx"
+    Accounts:
+      - User: "app_user"
+        Host: "10.0.0.%"
+    Password: "SecurePassword123!"
+    Description: "Application account"
+
+- name: "cdb-parameter-tuning"
+  description: "Optimize MySQL parameters for production workload"
+  params:
+    Operation: ModifyInstanceParam
+    InstanceIds:
+      - "cdb-xxxxxx"
+    ParamList:
+      - Name: "max_connections"
+        CurrentValue: "1000"
+      - Name: "wait_timeout"
+        CurrentValue: "28800"
+      - Name: "innodb_buffer_pool_size"
+        CurrentValue: "2147483648"
+      - Name: "slow_query_log"
+        CurrentValue: "ON"
+      - Name: "long_query_time"
+        CurrentValue: "2"
+
+- name: "cdb-enable-ssl"
+  description: "Enable SSL for encrypted connections"
+  params:
+    Operation: OpenSSL
+    InstanceId: "cdb-xxxxxx"
+
+- name: "cdb-upgrade-instance"
+  description: "Upgrade instance configuration"
+  params:
+    Operation: UpgradeDBInstance
+    InstanceId: "cdb-xxxxxx"
+    Memory: 16000
+    Volume: 1000
+    WaitSwitch: 1

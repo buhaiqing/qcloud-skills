@@ -1,0 +1,577 @@
+---
+name: qcloud-es-ops
+description: >-
+  Use when the user needs to deploy, configure, troubleshoot, or monitor Tencent
+  Cloud Elasticsearch Service (ES) clusters, indices, snapshots, and Kibana.
+  User mentions ES, Elasticsearch, 腾讯云ES, 弹性搜索, cluster health, index
+  management, or describes product-specific scenarios (e.g., cluster creation,
+  health status red/yellow, index performance, snapshot backup, version upgrade,
+  plugin management, Kibana access, node scaling, dictionary update) even
+  without naming the product directly. Not for billing, CAM, VPC-only, COS
+  standalone, or related products that have their own ops skills.
+license: MIT
+compatibility: >-
+  Official Tencent Cloud CLI (`tccli`, Python tool, pip installable),
+  Python 3.8+ runtime (for SDK fallback with tencentcloud-sdk-python-es),
+  valid API credentials, network access to Tencent Cloud endpoints.
+metadata:
+  author: qcloud
+  version: "1.0.0"
+  last_updated: "2026-05-21"
+  runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
+  python_version_minimum: "3.8"
+  api_profile: "2018-04-16 - https://cloud.tencent.com/document/api/845"
+  cli_applicability: "dual-path"
+  cli_support_evidence: >-
+    Verified via `tccli es help` - CLI exposes CreateInstance, DescribeInstances,
+    DeleteInstance, UpdateInstance, UpgradeInstance, UpgradeLicense, RestartInstance,
+    RestartNodes, RestartKibana, DescribeInstanceLogs, DescribeInstanceOperations,
+    DescribeViews, CreateIndex, DeleteIndex, DescribeIndexList, DescribeIndexMeta,
+    UpdateIndex, UpdatePlugins, UpdateDictionaries, DiagnoseInstance,
+    CreateClusterSnapshot, DescribeClusterSnapshot, DeleteClusterSnapshot,
+    RestoreClusterSnapshot, and 30+ more operations.
+  environment:
+    - TENCENTCLOUD_SECRET_ID
+    - TENCENTCLOUD_SECRET_KEY
+    - TENCENTCLOUD_REGION
+---
+
+> This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).
+
+# Tencent Cloud Elasticsearch Service Operations Skill
+
+## Overview
+
+Elasticsearch Service (ES) on Tencent Cloud provides a fully managed, elastically scalable cloud-native search and analytics engine built on open-source Elasticsearch, fully compatible with the ELK stack. This skill is an **operational runbook** for agents: explicit scope, credential rules, pre-flight checks, **dual-path execution** (official **`tccli` CLI** and **Python SDK fallback**), response validation, and failure recovery. **Do not use the web console as the primary agent execution path**.
+
+> **UX Compliance:** This skill follows the [User Experience Specification](../qcloud-skill-generator/references/user-experience-spec.md). All operations include onboarding guidance, minimal prompts, smart defaults, clear feedback, and user-friendly error handling.
+
+### CLI applicability (repository policy)
+
+- **`cli_applicability: dual-path`**: Official `tccli` fully supports ES. You **MUST** ship **`references/cli-usage.md`** and, in **each** execution flow below, document **both** the SDK step **and** the `tccli` step. CLI is the **primary** execution path for simplicity; Python SDK is used for edge-case operations CLI doesn't expose or for complex parameter handling.
+
+## Five Core Standards (Quality Gates)
+
+| # | Standard | How This Skill Fulfills It |
+|---|----------|---------------------------|
+| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT Use conditions with precise triggers (ES, Elasticsearch, 弹性搜索) and delegation rules (VPC → qcloud-vpc-ops, COS → qcloud-cos-ops) |
+| 2 | **Structured I/O** | Placeholder conventions (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`) with type and source documented per operation |
+| 3 | **Explicit Actionable Steps** | Every operation: Pre-flight → Execute → Validate → Recover, with numbered imperative steps for CLI and SDK paths |
+| 4 | **Complete Failure Strategies** | Error taxonomy table with ≥ 12 ES-specific codes; HALT vs retry per error type |
+| 5 | **Absolute Single Responsibility** | One product (ES), primary resource model (Instance); cross-product delegation documented |
+
+Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates) for detailed descriptions.
+
+### Well-Architected Framework Integration (卓越架构)
+
+| Pillar | Skill Integration | Reference |
+|--------|-------------------|-----------|
+| **可靠性 (Reliability)** | Multi-AZ ES cluster deployment, COS snapshot backup/restore, cross-region disaster recovery, health diagnosis | `references/well-architected-assessment.md` |
+| **安全性 (Security)** | CAM permissions, VPC network isolation, HTTPS/TLS encryption, Kibana access control, security groups | `references/well-architected-assessment.md` |
+| **成本 (Cost)** | Node type right-sizing, hot/warm/cold/frozen tiering, COS snapshot cost optimization, reserved instances | `references/well-architected-assessment.md` |
+| **效率 (Efficiency)** | ILM (Index Lifecycle Management), rollover/ shrink/force-merge, batch operations, dictionary/plugin automation | `references/well-architected-assessment.md` |
+
+## Trigger & Scope (Agent-Readable)
+
+### SHOULD Use This Skill When
+
+- User mentions "ES" OR "Elasticsearch" OR "弹性搜索" OR "腾讯云ES" OR "腾讯云elasticsearch"
+- Task involves CRUD or lifecycle operations on **ES cluster instances** (CreateInstance, DescribeInstances, UpdateInstance, DeleteInstance, UpgradeInstance, UpgradeLicense)
+- Task involves **Index management** (CreateIndex, DescribeIndexList, DescribeIndexMeta, DeleteIndex, UpdateIndex)
+- Task involves **Cluster operations** (RestartInstance, RestartNodes, RestartKibana, DiagnoseInstance)
+- Task involves **Snapshots and backups** (CreateClusterSnapshot, DescribeClusterSnapshot, DeleteClusterSnapshot, RestoreClusterSnapshot)
+- Task involves **Plugins and dictionaries** (UpdatePlugins, UpdateDictionaries)
+- Task keywords: elasticsearch, ES cluster, index, shard, replica, Kibana, logstash, snapshot, health status (green/yellow/red), node scaling, version upgrade, plugin, dictionary
+- User asks to deploy, configure, troubleshoot, or monitor ES **via API, SDK, CLI, or automation**
+- User describes performance issues (slow search, high indexing latency, JVM memory pressure) without naming the product
+
+### SHOULD NOT Use This Skill When
+
+- Task is purely billing / account management → delegate to: `qcloud-billing-ops` (when present)
+- Task is CAM / permission model only → delegate to: `qcloud-cam-ops` (when present)
+- Task is **VPC network only** (subnet, route table, NAT gateway) → delegate to: `qcloud-vpc-ops`
+- Task is **COS standalone** (object upload/download without ES context) → delegate to: `qcloud-cos-ops`
+- Task is **CVM / compute instance** → delegate to: `qcloud-cvm-ops`
+- Task is **MySQL/Redis/PostgreSQL database** → delegate to: `qcloud-cdb-ops` / `qcloud-redis-ops` / `qcloud-pg-ops`
+- User insists on **console-only** flows with no API → state limitation; do not invent undocumented HTTP steps
+
+### Delegation Rules
+
+- ES cluster depends on VPC: verify VPC/Subnet/SecurityGroup exist via `qcloud-vpc-ops` before CreateInstance
+- ES uses COS for snapshot backup: delegate COS storage management to `qcloud-cos-ops` for bucket-level operations
+- ES monitoring integration uses `qcloud-monitor-ops` for Cloud Monitor dashboard and alarm configuration
+- Multi-product requests: handle each product with its skill; do not merge unrelated APIs into one ambiguous flow
+
+## Variable Convention (Agent-Readable)
+
+| Placeholder | Meaning | Agent Action |
+|-------------|---------|--------------|
+| `{{env.TENCENTCLOUD_SECRET_ID}}` | From runtime environment | NEVER ask the user; fail if unset |
+| `{{env.TENCENTCLOUD_SECRET_KEY}}` | From runtime environment | NEVER ask the user; fail if unset |
+| `{{env.TENCENTCLOUD_REGION}}` | From runtime environment | Use documented default only if skill explicitly allows |
+| `{{user.region}}` | User-supplied region | Ask once; reuse |
+| `{{user.cluster_name}}` | User-supplied ES cluster name | Ask once; reuse |
+| `{{user.instance_id}}` | ES cluster InstanceId (es-xxxxxx) | Ask once; reuse |
+| `{{user.index_name}}` | Index name | Ask once |
+| `{{user.node_type}}` | Node specification (ES.S1.MEDIUM4, etc.) | Use smart defaults |
+| `{{user.node_num}}` | Number of nodes | Default from existing config |
+| `{{user.disk_size}}` | Disk size in GB | Default from existing config |
+| `{{user.es_version}}` | Elasticsearch version (7.14, 7.10, etc.) | List available versions |
+| `{{output.instance_id}}` | `$.Response.InstanceId` | Parse from API response |
+| `{{output.deal_name}}` | `$.Response.DealName` | Order number from create response |
+| `{{output.index_name}}` | `$.Response.IndexName` | Index creation response |
+| `{{output.snapshot_id}}` | `$.Response.SnapshotId` | Snapshot operation response |
+| `{{output.request_id}}` | `$.Response.RequestId` | Request tracking ID |
+
+> **`{{env.*}}` MUST NOT** be collected from the user. **`{{user.*}}`** MUST be collected interactively when missing.
+
+> **Security Warning (Credential Masking — MANDATORY):** **NEVER** log, print, or expose `TENCENTCLOUD_SECRET_KEY`, `SecretKey`, or any credential field value. Credential verification MUST check existence only.
+
+## Quick Start
+
+### What This Skill Does
+This skill enables you to deploy, configure, troubleshoot, and monitor Tencent Cloud Elasticsearch Service resources using the `tccli es` CLI (primary) or `tencentcloud-sdk-python-es` SDK (fallback).
+
+### Prerequisites
+- [ ] `tccli` CLI installed (or Python 3.8+ runtime for SDK fallback)
+- [ ] Credentials configured: `TENCENTCLOUD_SECRET_ID`, `TENCENTCLOUD_SECRET_KEY`
+- [ ] Region set: `TENCENTCLOUD_REGION`
+
+### Verify Setup
+```bash
+tccli es DescribeInstances --Region {{env.TENCENTCLOUD_REGION}} --Limit 5
+```
+
+### Your First Command
+```bash
+# List ES clusters in current region
+tccli es DescribeInstances --Region {{env.TENCENTCLOUD_REGION}} --Limit 10
+```
+
+### Next Steps
+- [Core Concepts](references/core-concepts.md) — Understand ES architecture
+- [Common Operations](#execution-flows) — Create, manage, and monitor ES clusters
+- [Troubleshooting](references/troubleshooting.md) — Fix common issues
+
+## Capabilities at a Glance
+
+| Operation | Description | Complexity | Risk Level |
+|-----------|-------------|------------|------------|
+| CreateInstance | Create ES cluster | High | Low |
+| DescribeInstances | List ES clusters | Low | None |
+| UpdateInstance | Scale/modify ES cluster | Medium | Medium |
+| DeleteInstance | Terminate ES cluster | Medium | **High** — irreversible |
+| UpgradeInstance | Upgrade ES version | High | Medium |
+| RestartInstance | Restart ES cluster | Medium | Medium |
+| DiagnoseInstance | Health diagnosis | Low | None |
+| CreateIndex | Create index | Low | Low |
+| DeleteIndex | Delete index | Low | **High** — data loss |
+| CreateClusterSnapshot | Create snapshot backup | Medium | None |
+| RestoreClusterSnapshot | Restore from snapshot | High | **High** — overwrite data |
+
+## Changelog
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-05-21 | Initial API/SDK-oriented template with tccli CLI support |
+
+---
+
+## Execution Flows (Agent-Readable)
+
+Every operation: **Pre-flight → Execute (SDK/API and tccli) → Validate → Recover**. Do not skip phases.
+
+### Operation: CreateInstance (Create ES Cluster)
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| Python SDK | `pip show tencentcloud-sdk-python-es` | Version ≥ minimum | Document install |
+| CLI / deps | `tccli version` | Exit code 0 | Document CLI install |
+| Credentials | Check env vars | Non-empty values | HALT; user configures env |
+| Region | Call DescribeInstances with limit 1 | Region valid | Suggest valid region |
+| VPC/Subnet | Verify via qcloud-vpc-ops | VPC and subnet exist | HALT; create VPC first |
+| Quota | Check `ResourceInsufficient` patterns | Sufficient quota | HALT; raise quota |
+
+#### Execution — CLI (`tccli`) (Primary Path)
+
+```bash
+# Basic create (required params)
+tccli es CreateInstance \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Zone "{{user.zone}}" \
+  --NodeType "ES.S1.MEDIUM4" \
+  --NodeNum 3 \
+  --DiskSize 200 \
+  --DiskType "CLOUD_SSD" \
+  --EsVersion "7.14.2" \
+  --VpcId "{{user.vpc_id}}" \
+  --SubnetId "{{user.subnet_id}}" \
+  --Password "{{user.password}}" \
+  --InstanceName "{{user.cluster_name}}"
+
+# With dedicated master node and Kibana
+tccli es CreateInstance \
+  --Region "ap-guangzhou" \
+  --Zone "ap-guangzhou-3" \
+  --NodeType "ES.S1.MEDIUM4" \
+  --NodeNum 3 \
+  --DiskSize 200 \
+  --DiskType "CLOUD_SSD" \
+  --EsVersion "7.14.2" \
+  --VpcId "vpc-xxxx" \
+  --SubnetId "subnet-xxxx" \
+  --Password "{{user.password}}" \
+  --InstanceName "my-es-cluster" \
+  --EnableDedicatedMaster true \
+  --MasterNodeNum 3 \
+  --MasterNodeType "ES.S1.MEDIUM4" \
+  --MasterNodeDiskSize 50
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+#!/usr/bin/env python3
+import os
+import json
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.es.v20180416 import es_client, models
+
+def main():
+    try:
+        cred = credential.Credential(
+            os.environ.get("TENCENTCLOUD_SECRET_ID"),
+            os.environ.get("TENCENTCLOUD_SECRET_KEY")
+        )
+        client = es_client.EsClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+        req = models.CreateInstanceRequest()
+        req.Zone = "ap-guangzhou-3"
+        req.NodeType = "ES.S1.MEDIUM4"
+        req.NodeNum = 3
+        req.DiskSize = 200
+        req.DiskType = "CLOUD_SSD"
+        req.EsVersion = "7.14.2"
+        req.VpcId = "vpc-xxxx"
+        req.SubnetId = "subnet-xxxx"
+        req.Password = os.environ.get("ES_PASSWORD")
+        req.InstanceName = "my-es-cluster"
+
+        resp = client.CreateInstance(req)
+        print(json.dumps(resp.to_json_string(), indent=2))
+
+    except TencentCloudSDKException as err:
+        print(f"[ERROR] {err}")
+
+if __name__ == "__main__":
+    main()
+```
+
+#### Post-execution Validation
+
+1. Capture `{{output.instance_id}}` from response: `$.Response.InstanceId`
+2. Poll `DescribeInstances` until `HealthStatus` is stable (0=green, 1=yellow) or timeout:
+
+```bash
+# CLI polling
+for i in $(seq 1 60); do
+  STATUS=$(tccli es DescribeInstances --InstanceIds '["{{output.instance_id}}"]' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['Response']['InstanceList'][0]['HealthStatus'])")
+  [ "$STATUS" = "0" ] || [ "$STATUS" = "1" ] && break
+  sleep 10
+done
+```
+
+```python
+# SDK polling
+import time
+for i in range(60):
+    desc_req = models.DescribeInstancesRequest()
+    desc_req.InstanceIds = [instance_id]
+    resp = client.DescribeInstances(desc_req)
+    if resp.InstanceList[0].HealthStatus in [0, 1]:
+        break
+    time.sleep(10)
+```
+
+3. On success, report `{{output.instance_id}}` and cluster endpoint details to the user
+4. On terminal failure, go to **Failure Recovery**
+
+#### Failure Recovery
+
+| Error pattern | Max retries | Backoff | Agent Action | UX Feedback |
+|--------------|-------------|---------|--------------|-------------|
+| `InvalidParameterValue` / invalid node type | 0–1 | — | Fix node type from spec; retry once | `[ERROR] InvalidParameterValue: Node type invalid. Check available node types via DescribeInstance` |
+| `ResourceInsufficient` / quota exceeded | 0 | — | HALT | `[ERROR] ResourceInsufficient: Quota limit reached. Delete unused resources or request quota increase.` |
+| `FailedOperation.NoEnoughNodes` | 0 | — | HALT | `[ERROR] NoEnoughNodes: Insufficient resources in this AZ. Try a different zone.` |
+| `FailedOperation.PayFailed` | 0 | — | HALT | `[ERROR] PayFailed: Payment failed. Check account balance.` |
+| `InvalidSecretKey` / `InvalidSecretId` | 0 | — | HALT | `[ERROR] Credential invalid. Verify TENCENTCLOUD_SECRET_ID and TENCENTCLOUD_SECRET_KEY.` |
+| `RequestLimitExceeded` / 429 | 3 | exponential | Back off; respect rate limit | `⚠️ Rate limit reached. Retrying in {backoff}s...` |
+| `InternalError` / 5xx | 3 | 2s, 4s, 8s | Retry; then HALT with RequestId | `[ERROR] InternalError. Retry or escalate with RequestId.` |
+
+### Operation: DescribeInstances (List ES Clusters)
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| Credentials | Check env vars | Non-empty | HALT |
+
+#### Execution — CLI
+
+```bash
+# List all clusters (paginated)
+tccli es DescribeInstances --Region {{env.TENCENTCLOUD_REGION}} --Offset 0 --Limit 20
+
+# Filter by specific instance IDs
+tccli es DescribeInstances --InstanceIds '["es-xxxxxx"]'
+
+# Filter by health status (0=green, 1=yellow, 2=red)
+tccli es DescribeInstances --HealthStatus "[0]"
+```
+
+#### Execution — SDK
+
+```python
+req = models.DescribeInstancesRequest()
+req.Offset = 0
+req.Limit = 20
+resp = client.DescribeInstances(req)
+print(json.dumps(resp.to_json_string(), indent=2))
+```
+
+#### Key Response Fields
+
+| Field | JSON Path | Notes |
+|-------|-----------|-------|
+| InstanceId | `$.Response.InstanceList[].InstanceId` | Cluster unique ID |
+| InstanceName | `$.Response.InstanceList[].InstanceName` | Cluster name |
+| HealthStatus | `$.Response.InstanceList[].HealthStatus` | 0=green, 1=yellow, 2=red, -1=unknown |
+| EsVersion | `$.Response.InstanceList[].EsVersion` | Elasticsearch version |
+| NodeType | `$.Response.InstanceList[].NodeType` | Node specification |
+| NodeNum | `$.Response.InstanceList[].NodeNum` | Number of nodes |
+| DiskSize | `$.Response.InstanceList[].DiskSize` | Disk size in GB |
+| EsDomain | `$.Response.InstanceList[].EsDomain` | ES cluster access domain |
+| KibanaUrl | `$.Response.InstanceList[].KibanaUrl` | Kibana dashboard URL |
+| Status | `$.Response.InstanceList[].Status` | 0=processing, 1=normal, -1=stopped |
+| CreateTime | `$.Response.InstanceList[].CreateTime` | Creation time (ISO 8601) |
+
+### Operation: DeleteInstance (Terminate ES Cluster) — DESTRUCTIVE
+
+#### Pre-flight (Safety Gate)
+
+- **MUST** obtain explicit confirmation: irreversible delete of ES cluster `{{user.cluster_name}}` (`{{user.instance_id}}`)
+- **MUST** suggest creating a final snapshot backup before deletion
+- **MUST** warn: all indices, data, and Kibana configurations will be permanently lost
+- **MUST NOT** proceed without clear user assent (type "CONFIRM" to proceed)
+
+#### Execution — CLI
+
+```bash
+tccli es DeleteInstance --InstanceId "{{user.instance_id}}" --Region {{env.TENCENTCLOUD_REGION}}
+```
+
+#### Execution — SDK
+
+```python
+req = models.DeleteInstanceRequest()
+req.InstanceId = "{{user.instance_id}}"
+resp = client.DeleteInstance(req)
+```
+
+#### Post-execution Validation
+
+```bash
+# Verify deletion
+tccli es DescribeInstances --InstanceIds '["{{user.instance_id}}"]'
+# Expected: ResourceNotFound or empty result
+```
+
+### Operation: UpdateInstance (Scale Cluster)
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| Resource exists | DescribeInstances | Status=1 (normal) | HALT |
+| Cluster healthy | HealthStatus | 0 or 1 (green/yellow) | Warn user; proceed with caution |
+
+#### Execution — CLI
+
+```bash
+# Scale node type and count
+tccli es UpdateInstance \
+  --InstanceId "{{user.instance_id}}" \
+  --NodeType "ES.S1.LARGE8" \
+  --NodeNum 5 \
+  --DiskSize 500
+```
+
+### Operation: RestartInstance (Restart ES Cluster)
+
+#### Pre-flight
+
+- Warn user: cluster will be unavailable during restart (typically 30s–5min)
+
+#### Execution — CLI
+
+```bash
+tccli es RestartInstance --InstanceId "{{user.instance_id}}"
+```
+
+```bash
+# Restart specific nodes
+tccli es RestartNodes --InstanceId "{{user.instance_id}}" --NodeNames '["node1","node2"]'
+```
+
+### Operation: CreateClusterSnapshot (Backup)
+
+> **Reliability Pillar:** Following Tencent Cloud Well-Architected Framework, snapshot backup is the primary data protection mechanism for ES.
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| Cluster exists | DescribeInstances | Instance exists | HALT |
+| COS backup configured | DescribeClusterSnapshot | Backup repository accessible | Configure COS backup first |
+
+#### Execution — CLI
+
+```bash
+tccli es CreateClusterSnapshot \
+  --InstanceId "{{user.instance_id}}" \
+  --SnapshotName "auto-snapshot-$(date +%Y%m%d-%H%M%S)"
+```
+
+### Operation: RestoreClusterSnapshot (Restore)
+
+#### Pre-flight (Safety Gate)
+
+- **MUST** warn: restore overwrites current data
+- **MUST** confirm target cluster and snapshot source
+
+#### Execution — CLI
+
+```bash
+tccli es RestoreClusterSnapshot \
+  --InstanceId "{{user.instance_id}}" \
+  --SnapshotId "{{user.snapshot_id}}"
+```
+
+### Operation: DiagnoseInstance (Health Diagnosis)
+
+#### Execution — CLI
+
+```bash
+# Run diagnostics
+tccli es DiagnoseInstance --InstanceId "{{user.instance_id}}"
+
+# Get diagnosis settings
+tccli es DescribeDiagnose --InstanceId "{{user.instance_id}}"
+```
+
+---
+
+## Prerequisites
+
+1. **Install `tccli` CLI** (primary execution path):
+   ```bash
+   pip install tccli
+   ```
+
+2. **Bootstrap Python runtime** (for SDK fallback — Python 3.8+):
+   ```bash
+   pip install tencentcloud-sdk-python-es
+   ```
+
+3. **Configure Credentials** — Environment variables:
+   ```bash
+   export TENCENTCLOUD_SECRET_ID="{{env.TENCENTCLOUD_SECRET_ID}}"
+   export TENCENTCLOUD_SECRET_KEY="{{env.TENCENTCLOUD_SECRET_KEY}}"
+   export TENCENTCLOUD_REGION="{{env.TENCENTCLOUD_REGION}}"
+   ```
+
+4. **Verify Configuration**:
+   ```bash
+   tccli es DescribeInstances --Region ap-guangzhou --Limit 5
+   ```
+
+---
+
+## Error Code Reference (≥ 12 Product-Specific Codes)
+
+| Code | Meaning | Retry? | Agent Action |
+|------|---------|--------|--------------|
+| `InvalidParameterValue` | Parameter value invalid | No | Fix parameter per API spec |
+| `InvalidParameter.InvalidNodeType` | Node type not supported | No | Check available node types |
+| `InvalidParameter.InvalidAppId` | AppId mismatch | No | Check account configuration |
+| `MissingParameter` | Required parameter missing | No | Add missing parameter |
+| `ResourceNotFound` | ES instance not found | No | Verify InstanceId with DescribeInstances |
+| `ResourceInsufficient` | Resource quota exceeded | No | HALT; request quota increase or delete resources |
+| `AuthFailure.UnAuthDescribeInstances` | No CAM permission for describe | No | HALT; add CAM policy |
+| `FailedOperation.ClusterStateError` | Cluster in wrong state for operation | Yes (3x, 30s) | Wait for cluster stable state; retry |
+| `FailedOperation.NoEnoughNodes` | Insufficient node resources | No | Choose different AZ or node type |
+| `FailedOperation.PayFailed` | Payment failure | No | HALT; check account balance |
+| `FailedOperation.GetTagInfoError` | Tag query error | Yes (2x) | Retry; if persists, skip tag filter |
+| `OperationDenied` | Operation not allowed | No | Check instance status and permissions |
+| `RequestLimitExceeded` | API rate limit exceeded | Yes (3x) | Exponential backoff |
+| `InternalError` | Internal server error | Yes (3x) | Retry; escalate with RequestId |
+
+---
+
+## Safety Gates (Destructive Operations)
+
+Every **DeleteInstance**, **DeleteIndex**, **DeleteClusterSnapshot**, or **irreversible** operation MUST have:
+
+1. **Explicit user confirmation** with resource identifier displayed
+2. **Pre-backup reminder** (snapshot before destroy)
+3. **Dependency check** (warn if cluster has active indices)
+4. **Post-delete verification** (poll until ResourceNotFound)
+
+---
+
+## Output Schema
+
+All responses follow Tencent Cloud API structure:
+
+```json
+{
+  "Response": {
+    "RequestId": "abc123",
+    "InstanceId": "es-xxxxxx"
+  }
+}
+```
+
+Error responses:
+
+```json
+{
+  "Response": {
+    "RequestId": "abc123",
+    "Error": {
+      "Code": "InvalidParameterValue",
+      "Message": "Parameter node type is invalid"
+    }
+  }
+}
+```
+
+## Reference Directory
+
+- [Core Concepts](references/core-concepts.md) — ES architecture, node types, storage hierarchy
+- [API & SDK Usage](references/api-sdk-usage.md) — Operation map with request/response examples
+- [CLI Usage](references/cli-usage.md) — tccli es command map and invocation patterns
+- [Troubleshooting Guide](references/troubleshooting.md) — Error code diagnostics (≥ 12 codes)
+- [Monitoring & Alerts](references/monitoring.md) — Metrics, dashboards, Cloud Monitor integration
+- [Integration](references/integration.md) — SDK setup, env config, cross-skill delegation
+- [Well-Architected Assessment](references/well-architected-assessment.md) — Four-pillar assessment (Tencent Cloud framework)
+
+## Operational Best Practices
+
+- **Least privilege:** CAM policies scoped to required ES APIs only
+- **Availability:** Multi-AZ deployment for production clusters; dedicated master nodes for stability
+- **Cost:** Right-size node specifications based on workload; use warm/cold tiering for old indices
+- **Performance:** Monitor JVM heap usage; set ILM policies for index rollover; force-merge read-only indices
