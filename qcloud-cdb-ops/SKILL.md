@@ -283,6 +283,40 @@ tccli cdb DescribeDBInstances --Status "[1]"
 tccli cdb DescribeDBInstances --ProjectId 0
 ```
 
+#### Execution — SDK
+
+```python
+#!/usr/bin/env python3
+import os, json
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.cdb.v20170320 import cdb_client, models
+
+def main():
+    try:
+        cred = credential.Credential(
+            os.environ.get("TENCENTCLOUD_SECRET_ID"),
+            os.environ.get("TENCENTCLOUD_SECRET_KEY")
+        )
+        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+        req = models.DescribeDBInstancesRequest()
+        req.Offset = 0
+        req.Limit = 20
+        # Optional filters
+        # req.InstanceIds = ["cdb-xxxxxx"]
+        # req.Status = [1]  # 1=running
+
+        resp = client.DescribeDBInstances(req)
+        print(json.dumps(resp.to_json_string(), indent=2))
+
+    except TencentCloudSDKException as err:
+        print(f"[ERROR] {err}")
+
+if __name__ == "__main__":
+    main()
+```
+
 #### Key Response Fields
 
 | Field | JSON Path | Notes |
@@ -319,6 +353,39 @@ tccli cdb UpgradeDBInstance \
   --WaitSwitch 1
 ```
 
+#### Execution — SDK
+
+```python
+#!/usr/bin/env python3
+import os, json
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.cdb.v20170320 import cdb_client, models
+
+def main():
+    try:
+        cred = credential.Credential(
+            os.environ.get("TENCENTCLOUD_SECRET_ID"),
+            os.environ.get("TENCENTCLOUD_SECRET_KEY")
+        )
+        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+        req = models.UpgradeDBInstanceRequest()
+        req.InstanceId = "{{user.instance_id}}"
+        req.Memory = 4000
+        req.Volume = 200
+        req.WaitSwitch = 1  # 0=immediate, 1=maintain window
+
+        resp = client.UpgradeDBInstance(req)
+        print(json.dumps(resp.to_json_string(), indent=2))
+
+    except TencentCloudSDKException as err:
+        print(f"[ERROR] {err}")
+
+if __name__ == "__main__":
+    main()
+```
+
 ### Operation: RestartDBInstances
 
 #### Pre-flight
@@ -329,6 +396,36 @@ tccli cdb UpgradeDBInstance \
 
 ```bash
 tccli cdb RestartDBInstances --InstanceIds '["{{user.instance_id}}"]'
+```
+
+#### Execution — SDK
+
+```python
+#!/usr/bin/env python3
+import os, json
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.cdb.v20170320 import cdb_client, models
+
+def main():
+    try:
+        cred = credential.Credential(
+            os.environ.get("TENCENTCLOUD_SECRET_ID"),
+            os.environ.get("TENCENTCLOUD_SECRET_KEY")
+        )
+        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+        req = models.RestartDBInstancesRequest()
+        req.InstanceIds = ["{{user.instance_id}}"]
+
+        resp = client.RestartDBInstances(req)
+        print(json.dumps(resp.to_json_string(), indent=2))
+
+    except TencentCloudSDKException as err:
+        print(f"[ERROR] {err}")
+
+if __name__ == "__main__":
+    main()
 ```
 
 ### Operation: IsolateDBInstance — DESTRUCTIVE
@@ -370,10 +467,38 @@ tccli cdb CreateBackup \
 #### Execution — SDK
 
 ```python
-req = models.CreateBackupRequest()
-req.InstanceId = "{{user.instance_id}}"
-req.BackupMethod = "physical"  # or "logical"
-resp = client.CreateBackup(req)
+#!/usr/bin/env python3
+import os, json
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.cdb.v20170320 import cdb_client, models
+
+def main():
+    try:
+        cred = credential.Credential(
+            os.environ.get("TENCENTCLOUD_SECRET_ID"),
+            os.environ.get("TENCENTCLOUD_SECRET_KEY")
+        )
+        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+        req = models.CreateBackupRequest()
+        req.InstanceId = "{{user.instance_id}}"
+        req.BackupMethod = "physical"  # or "logical"
+
+        # Optional: backup specific tables
+        # table_item = models.BackupItem()
+        # table_item.Db = "mysql"
+        # table_item.Table = "user"
+        # req.BackupDBTableList = [table_item]
+
+        resp = client.CreateBackup(req)
+        print(json.dumps(resp.to_json_string(), indent=2))
+
+    except TencentCloudSDKException as err:
+        print(f"[ERROR] {err}")
+
+if __name__ == "__main__":
+    main()
 ```
 
 #### Post-execution Validation
@@ -395,6 +520,46 @@ tccli cdb ModifyInstanceParam \
   --ParamList '[{"Name":"auto_increment_increment","CurrentValue":"2"},{"Name":"max_connections","CurrentValue":"1000"}]'
 ```
 
+#### Execution — SDK
+
+```python
+#!/usr/bin/env python3
+import os, json
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.cdb.v20170320 import cdb_client, models
+
+def main():
+    try:
+        cred = credential.Credential(
+            os.environ.get("TENCENTCLOUD_SECRET_ID"),
+            os.environ.get("TENCENTCLOUD_SECRET_KEY")
+        )
+        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+        req = models.ModifyInstanceParamRequest()
+        req.InstanceIds = ["{{user.instance_id}}"]
+
+        param1 = models.Parameter()
+        param1.Name = "auto_increment_increment"
+        param1.CurrentValue = "2"
+
+        param2 = models.Parameter()
+        param2.Name = "max_connections"
+        param2.CurrentValue = "1000"
+
+        req.ParamList = [param1, param2]
+
+        resp = client.ModifyInstanceParam(req)
+        print(json.dumps(resp.to_json_string(), indent=2))
+
+    except TencentCloudSDKException as err:
+        print(f"[ERROR] {err}")
+
+if __name__ == "__main__":
+    main()
+```
+
 #### Post-execution Validation
 
 1. Verify via `DescribeInstanceParams` that values were applied
@@ -412,10 +577,79 @@ tccli cdb CreateAccounts \
   --Description "Application account"
 ```
 
+#### Create Account — SDK
+
+```python
+#!/usr/bin/env python3
+import os, json
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.cdb.v20170320 import cdb_client, models
+
+def main():
+    try:
+        cred = credential.Credential(
+            os.environ.get("TENCENTCLOUD_SECRET_ID"),
+            os.environ.get("TENCENTCLOUD_SECRET_KEY")
+        )
+        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+        req = models.CreateAccountsRequest()
+        req.InstanceId = "{{user.instance_id}}"
+
+        account = models.Account()
+        account.User = "dbuser"
+        account.Host = "%"
+
+        req.Accounts = [account]
+        req.Password = "{{user.password}}"
+        req.Description = "Application account"
+
+        resp = client.CreateAccounts(req)
+        print(json.dumps(resp.to_json_string(), indent=2))
+
+    except TencentCloudSDKException as err:
+        print(f"[ERROR] {err}")
+
+if __name__ == "__main__":
+    main()
+```
+
 #### Describe Accounts — CLI
 
 ```bash
 tccli cdb DescribeAccounts --InstanceId "{{user.instance_id}}" --Limit 20
+```
+
+#### Describe Accounts — SDK
+
+```python
+#!/usr/bin/env python3
+import os, json
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.cdb.v20170320 import cdb_client, models
+
+def main():
+    try:
+        cred = credential.Credential(
+            os.environ.get("TENCENTCLOUD_SECRET_ID"),
+            os.environ.get("TENCENTCLOUD_SECRET_KEY")
+        )
+        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+        req = models.DescribeAccountsRequest()
+        req.InstanceId = "{{user.instance_id}}"
+        req.Limit = 20
+
+        resp = client.DescribeAccounts(req)
+        print(json.dumps(resp.to_json_string(), indent=2))
+
+    except TencentCloudSDKException as err:
+        print(f"[ERROR] {err}")
+
+if __name__ == "__main__":
+    main()
 ```
 
 #### Modify Password — CLI
@@ -425,6 +659,43 @@ tccli cdb ModifyAccountPassword \
   --InstanceId "{{user.instance_id}}" \
   --Accounts '[{"User":"dbuser","Host":"%"}]' \
   --NewPassword "{{user.new_password}}"
+```
+
+#### Modify Password — SDK
+
+```python
+#!/usr/bin/env python3
+import os, json
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.cdb.v20170320 import cdb_client, models
+
+def main():
+    try:
+        cred = credential.Credential(
+            os.environ.get("TENCENTCLOUD_SECRET_ID"),
+            os.environ.get("TENCENTCLOUD_SECRET_KEY")
+        )
+        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+        req = models.ModifyAccountPasswordRequest()
+        req.InstanceId = "{{user.instance_id}}"
+
+        account = models.Account()
+        account.User = "dbuser"
+        account.Host = "%"
+
+        req.Accounts = [account]
+        req.NewPassword = "{{user.new_password}}"
+
+        resp = client.ModifyAccountPassword(req)
+        print(json.dumps(resp.to_json_string(), indent=2))
+
+    except TencentCloudSDKException as err:
+        print(f"[ERROR] {err}")
+
+if __name__ == "__main__":
+    main()
 ```
 
 ### Operation: Slow Query Log

@@ -325,6 +325,39 @@ tccli clb CreateListener \
   --ListenerName "{{user.listener_name}}"
 ```
 
+#### Execution — Python SDK (Fallback Path)
+
+```python
+#!/usr/bin/env python3
+import os, json
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.clb.v20180317 import clb_client, models
+
+def main():
+    try:
+        cred = credential.Credential(
+            os.environ.get("TENCENTCLOUD_SECRET_ID"),
+            os.environ.get("TENCENTCLOUD_SECRET_KEY")
+        )
+        client = clb_client.ClbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+        req = models.CreateListenerRequest()
+        req.LoadBalancerId = "{{user.loadbalancer_id}}"
+        req.Protocol = "{{user.listener_protocol}}"
+        req.Port = {{user.listener_port}}
+        req.ListenerName = "{{user.listener_name}}"
+
+        resp = client.CreateListener(req)
+        print(json.dumps(resp.to_json_string(), indent=2))
+
+    except TencentCloudSDKException as err:
+        print(f"[ERROR] {err}")
+
+if __name__ == "__main__":
+    main()
+```
+
 #### Post-execution Validation
 
 1. Capture `{{output.listener_id}}` from `$.Response.ListenerIds[0]`
@@ -347,7 +380,44 @@ tccli clb RegisterTargets \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
   --LoadBalancerId "{{user.loadbalancer_id}}" \
   --ListenerId "{{user.listener_id}}" \
-  --Targets "[{\"InstanceId\":\"{{user.instance_id}}\",\"Port\":{{user.target_port}},\"Weight\":{{user.target_weight}}}]"
+  --Targets "[\"InstanceId\":\"{{user.instance_id}}\",\"Port\":{{user.target_port}},\"Weight\":{{user.target_weight}}}]"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+#!/usr/bin/env python3
+import os, json
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.clb.v20180317 import clb_client, models
+
+def main():
+    try:
+        cred = credential.Credential(
+            os.environ.get("TENCENTCLOUD_SECRET_ID"),
+            os.environ.get("TENCENTCLOUD_SECRET_KEY")
+        )
+        client = clb_client.ClbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+        req = models.RegisterTargetsRequest()
+        req.LoadBalancerId = "{{user.loadbalancer_id}}"
+        req.ListenerId = "{{user.listener_id}}"
+
+        target = models.Target()
+        target.InstanceId = "{{user.instance_id}}"
+        target.Port = {{user.target_port}}
+        target.Weight = {{user.target_weight}}
+        req.Targets = [target]
+
+        resp = client.RegisterTargets(req)
+        print(json.dumps(resp.to_json_string(), indent=2))
+
+    except TencentCloudSDKException as err:
+        print(f"[ERROR] {err}")
+
+if __name__ == "__main__":
+    main()
 ```
 
 #### Post-execution Validation
@@ -357,12 +427,42 @@ tccli clb RegisterTargets \
 
 ### Operation: Describe Target Health
 
-#### Execution
+#### Execution — CLI
 
 ```bash
 tccli clb DescribeTargetHealth \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
   --LoadBalancerId "{{user.loadbalancer_id}}"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+#!/usr/bin/env python3
+import os, json
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.clb.v20180317 import clb_client, models
+
+def main():
+    try:
+        cred = credential.Credential(
+            os.environ.get("TENCENTCLOUD_SECRET_ID"),
+            os.environ.get("TENCENTCLOUD_SECRET_KEY")
+        )
+        client = clb_client.ClbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+        req = models.DescribeTargetHealthRequest()
+        req.LoadBalancerId = "{{user.loadbalancer_id}}"
+
+        resp = client.DescribeTargetHealth(req)
+        print(json.dumps(resp.to_json_string(), indent=2))
+
+    except TencentCloudSDKException as err:
+        print(f"[ERROR] {err}")
+
+if __name__ == "__main__":
+    main()
 ```
 
 #### Present to User

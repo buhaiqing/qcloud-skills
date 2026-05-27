@@ -184,6 +184,17 @@ coscmd upload --multipart "{{user.local_file}}" "/{{user.bucket_name}}/{{user.ob
 #### SDK Fallback
 
 ```python
+#!/usr/bin/env python3
+import os
+from tencentcloud.common import credential
+from tencentcloud.cos import cos_client, models
+
+cred = credential.Credential(
+    os.environ.get("TENCENTCLOUD_SECRET_ID"),
+    os.environ.get("TENCENTCLOUD_SECRET_KEY")
+)
+client = cos_client.CosClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
 req = models.PutObjectRequest()
 req.Bucket = "{{user.bucket_name}}"
 req.Key = "{{user.object_key}}"
@@ -191,7 +202,130 @@ req.Body = file_content
 req.StorageClass = "{{user.storage_class}}"
 resp = client.PutObject(req)
 etag = resp.ETag
+print(f"Upload successful. ETag: {etag}")
 ```
+
+### Get Object (Download)
+
+#### Pre-flight
+
+| Check | Expected | On Failure |
+|-------|----------|------------|
+| Bucket exists | GetBucket succeeds | HALT |
+| Object exists | HeadObject succeeds | HALT |
+
+#### CLI (coscmd)
+
+```bash
+coscmd download "/{{user.bucket_name}}/{{user.object_key}}" "{{user.local_file}}"
+```
+
+#### SDK Fallback
+
+```python
+#!/usr/bin/env python3
+import os
+from tencentcloud.common import credential
+from tencentcloud.cos import cos_client, models
+
+cred = credential.Credential(
+    os.environ.get("TENCENTCLOUD_SECRET_ID"),
+    os.environ.get("TENCENTCLOUD_SECRET_KEY")
+)
+client = cos_client.CosClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+req = models.GetObjectRequest()
+req.Bucket = "{{user.bucket_name}}"
+req.Key = "{{user.object_key}}"
+resp = client.GetObject(req)
+
+# Save to file
+with open("{{user.local_file}}", "wb") as f:
+    f.write(resp.Body.read())
+print("Download successful")
+```
+
+### Delete Object
+
+#### Safety Gate (Mandatory)
+
+1. **MUST** confirm: delete object `{{user.object_key}}` from bucket `{{user.bucket_name}}`
+2. **MUST** warn: deletion is irreversible
+3. **MUST NOT** proceed without explicit user assent
+
+#### CLI (coscmd)
+
+```bash
+coscmd delete "/{{user.bucket_name}}/{{user.object_key}}"
+```
+
+#### SDK Fallback
+
+```python
+#!/usr/bin/env python3
+import os
+from tencentcloud.common import credential
+from tencentcloud.cos import cos_client, models
+
+cred = credential.Credential(
+    os.environ.get("TENCENTCLOUD_SECRET_ID"),
+    os.environ.get("TENCENTCLOUD_SECRET_KEY")
+)
+client = cos_client.CosClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+req = models.DeleteObjectRequest()
+req.Bucket = "{{user.bucket_name}}"
+req.Key = "{{user.object_key}}"
+resp = client.DeleteObject(req)
+print(f"Deleted: {{user.object_key}}")
+```
+
+### List Objects
+
+#### Pre-flight
+
+| Check | Expected | On Failure |
+|-------|----------|------------|
+| Bucket exists | GetBucket succeeds | Create bucket first |
+
+#### CLI (coscmd)
+
+```bash
+coscmd list "{{user.bucket_name}}"
+```
+
+#### SDK Fallback
+
+```python
+#!/usr/bin/env python3
+import os, json
+from tencentcloud.common import credential
+from tencentcloud.cos import cos_client, models
+
+cred = credential.Credential(
+    os.environ.get("TENCENTCLOUD_SECRET_ID"),
+    os.environ.get("TENCENTCLOUD_SECRET_KEY")
+)
+client = cos_client.CosClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+req = models.ListObjectsRequest()
+req.Bucket = "{{user.bucket_name}}"
+req.MaxKeys = 1000
+resp = client.ListObjects(req)
+
+for obj in resp.Contents:
+    print(f"{obj.Key} - {obj.Size} bytes")
+```
+
+#### Present to User
+
+| Field | Path | Notes |
+|-------|------|-------|
+| Object Key | `$.Response.Contents[].Key` | Full object path |
+| Size | `$.Response.Contents[].Size` | Size in bytes |
+| Last Modified | `$.Response.Contents[].LastModified` | ISO timestamp |
+| ETag | `$.Response.Contents[].ETag` | MD5 hash |
+| Storage Class | `$.Response.Contents[].StorageClass` | STANDARD/IA/ARCHIVE |
 
 ### Delete Bucket
 
@@ -215,6 +349,37 @@ read CONFIRM
 [ "$CONFIRM" = "yes" ] || exit 0
 
 tccli cos DeleteBucket --Bucket "{{user.bucket_name}}"
+```
+
+#### SDK Fallback
+
+```python
+#!/usr/bin/env python3
+import os
+from tencentcloud.common import credential
+from tencentcloud.cos import cos_client, models
+
+cred = credential.Credential(
+    os.environ.get("TENCENTCLOUD_SECRET_ID"),
+    os.environ.get("TENCENTCLOUD_SECRET_KEY")
+)
+client = cos_client.CosClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+# First check if bucket is empty
+list_req = models.ListObjectsRequest()
+list_req.Bucket = "{{user.bucket_name}}"
+list_req.MaxKeys = 1
+list_resp = client.ListObjects(list_req)
+
+if list_resp.Contents:
+    print("Bucket not empty. Delete objects first.")
+    exit(1)
+
+# Delete bucket
+del_req = models.DeleteBucketRequest()
+del_req.Bucket = "{{user.bucket_name}}"
+resp = client.DeleteBucket(del_req)
+print(f"Bucket deleted: {{user.bucket_name}}")
 ```
 
 ### Configure Lifecycle
