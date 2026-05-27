@@ -182,9 +182,9 @@ Every generated skill MUST satisfy these five standards. Reference them througho
 ### Self-Check Flowchart
 
 ```
-生成完成 → 执行宪章检查 (C1-C5)
+生成完成 → 执行宪章检查 (C1-C6)
   ↓
-C1-C5 全通过？
+C1-C6 全通过？
   ↓ YES          ↓ NO
 报告成功    → HALT + 报告违规项
   ↓              ↓
@@ -204,6 +204,7 @@ C1-C5 全通过？
 | C3 | Five Core Standards | `grep -c "Five Core Standards" SKILL.md` | ≥ 1 match | Add Five Core Standards table from template |
 | C4 | Well-Architected | `grep -c "Well-Architected Framework" SKILL.md` | ≥ 1 match | Add Well-Architected Framework table |
 | C5 | Variables | `grep -c "^## Variables" SKILL.md` | ≥ 1 match | Add Variables section with `{{env.*}}`/`{{user.*}}`/`{{output.*}}` |
+| C6 | Token Efficiency | `grep -c "TE-[1-7]" SKILL.md` | ≥ 1 TE rule applied | Apply Token Efficiency rules per [Token Efficiency Requirements](#token-efficiency-requirements-p0) |
 
 ### Self-Remediation Template (自动修复模板)
 
@@ -259,6 +260,168 @@ metadata:
 ```
 
 > **原则：自解优先于人工介入。Agent 必须在报告问题前尝试自动修复。**
+
+---
+
+## Token Efficiency Requirements (P0 — 强制)
+
+> **Token Efficiency 原则**：每条 Token 都是成本。LLM 上下文窗口有限，生成技能应尽量减少不必要的内容膨胀。
+> **C6 检查**: 生成完成后自动检查 TE-1 至 TE-7 是否落实，不符合则自动修复后重新检查。
+
+### TE-1: 用 API 查询替代硬编码静态数据
+
+**规则**：引擎版本、端口列表、可用区枚举等静态数据，使用 `tccli` 查询而非硬编码表格。
+
+```markdown
+# ❌ 硬编码
+| Engine | Version | Port |
+|--------|---------|------|
+| MySQL  | 5.7     | 3306 |
+| MySQL  | 8.0     | 3306 |
+
+# ✅ 动态查询
+tccli sqlserver DescribeDBInstances --filters '[{"Name":"engine-version","Values":["*"]}]'
+```
+
+**预估节省**：~200–500 Token/文件
+
+### TE-2: 省略不必要的 Python docstring
+
+**规则**：生成的 `references/api-sdk-usage.md` 等文件中的 Python 代码示例，用 `#` 行内注释代替函数级 `"""docstring"""`。
+
+```python
+# ❌ 函数级 docstring（占用多行）
+def describe_instances(region: str) -> dict:
+    """查询云服务器实例列表
+    Args:
+        region: 地域
+    Returns:
+        实例列表
+    """
+    ...
+
+# ✅ 函数签名 + 行内注释（紧凑）
+def describe_instances(region: str) -> dict:
+    # 查询云服务器实例列表
+    ...
+
+# 保存模块级别 docstring（描述用途），删除函数级别 docstring
+"""CVM 实例操作 — 查询、创建、删除、修改"""
+```
+
+**预估节省**：~100–200 Token/函数
+
+### TE-3: 错误表 → 紧凑格式
+
+**规则**：错误码表最多 3 列（`Error Code | Description | Recovery`），去掉冗余的 `Category`、`Retry`、`UX Feedback` 列。
+
+```markdown
+# ✅ 紧凑格式（3列）
+| Error Code | Description | Recovery |
+|------------|-------------|----------|
+| InvalidInstance | 实例不存在 | `tccli cvm DescribeInstances --InstanceIds '["ins-xxx"]'` |
+| InsufficientBalance | 余额不足 | 充值后再操作 |
+| OperationDenied | 操作被拒绝 | 检查 CAM 权限 |
+```
+
+**预估节省**：~300–500 Token/文件
+
+### TE-4: JSON paths 集中声明
+
+**规则**：API 响应的 JSON paths 在文件头部集中声明（如 `## Response Fields` 区块），后续操作通过名称引用，不内联重复书写完整路径。
+
+```markdown
+# ✅ 集中声明
+## Response Fields
+| Field | Path | Type | Description |
+|-------|------|------|-------------|
+| InstanceId | `$.Response.InstanceSet[*].InstanceId` | String | 实例ID |
+| InstanceName | `$.Response.InstanceSet[*].InstanceName` | String | 实例名称 |
+| CreatedTime | `$.Response.InstanceSet[*].CreatedTime` | String | 创建时间 |
+
+# 后续操作中通过名称引用
+> 从 `InstanceName` 字段获取实例名称
+```
+
+**预估节省**：~50–100 Token/文件
+
+### TE-5: YAML anchors 消除重复字段
+
+**规则**：`example-config.yaml` 等文件中共享字段使用 `&anchor` / `<<: *anchor` 语法。
+
+```yaml
+# ✅ 使用 anchors 消除冗余
+x-default-thresholds: &default-thresholds
+  high: 90
+  medium: 70
+  low: 50
+
+thresholds:
+  cpu_usage:
+    <<: *default-thresholds
+  mem_usage:
+    high: 90
+    medium: 75
+    low: 60       # 差异字段覆盖
+  disk_usage:
+    <<: *default-thresholds
+  network_usage:
+    <<: *default-thresholds
+```
+
+**预估节省**：~200–400 Token/文件
+
+### TE-6: 消除跨文件重复流程
+
+**规则**：Pre-flight → Execute → Validate → Recover 流程仅在 `SKILL.md` 中完整定义，`references/` 和 `assets/` 中不重复相同流程。
+
+```markdown
+# ❌ 重复：execution-environment.md 中再次出现完整流程
+## Installation Flow
+1. Pre-flight: check Python...
+2. Execute: pip install...
+3. Validate: tccli --version...
+4. Recover: retry with...
+
+# ✅ 单一真相来源：仅在 SKILL.md 定义，引用文件只存唯一内容
+references/execution-environment.md → 仅含安装命令和环境变量表
+assets/example-config.yaml → 仅含配置字段示例
+```
+
+**预估节省**：~200–400 Token/文件
+
+### TE-7: 消除冗余表格描述列
+
+**规则**：表格中的 `Description` 列如果只是重述字段名的含义，则应合并或删除；对字段含义不言自明的行去掉描述。
+
+```markdown
+# ❌ Description 列多余（每行都在复述字段名）
+| Variable | Source | Description | Example |
+|----------|--------|-------------|---------|
+| `region` | env | 地域 | `ap-guangzhou` |
+| `zone` | env | 可用区 | `ap-guangzhou-3` |
+
+# ✅ 去掉冗余 Description 列
+| Variable | Source | Example |
+|----------|--------|---------|
+| `region` | env | `ap-guangzhou` |
+| `zone` | env | `ap-guangzhou-3` |
+
+# 仅在字段含义不明确时保留 Description
+| Variable | Source | Description | Example |
+|----------|--------|-------------|---------|
+| `instance_type` | user | 实例规格（需用户指定） | `S5.SMALL1` |
+```
+
+**预估节省**：~100–200 Token/文件
+
+### TE 边界 — 不可压缩的内容
+
+| 可压缩 | 不可压缩 |
+|--------|----------|
+| Docstring、静态表格、重复流程 | Agent 可执行命令本身（参数、JSON paths） |
+| 长篇架构描述 | 错误恢复逻辑、安全门、Credential 规则 |
+| 多个示例变体（保留 1-2 个核心） | 跨技能编排链、AIOps/Well-Architected 场景定义 |
 
 ---
 
@@ -551,6 +714,7 @@ Optional later improvements: PR template checkbox linking to that doc; periodic 
 - [ ] **Well-Architected — Cost Pillar:** Billing model comparison table present; idle resource detection pattern documented per [well-architected-assessment.md](references/well-architected-assessment.md)
 - [ ] **Well-Architected — Efficiency Pillar:** Batch operation pattern documented; automation recommendations present per [well-architected-assessment.md](references/well-architected-assessment.md)
 - [ ] **Well-Architected Reference:** SKILL.md links to `well-architected-assessment.md` for pillar-specific assessment patterns
+- [ ] **Token Efficiency applied:** TE-1 to TE-7 rules applied per [Token Efficiency Requirements](#token-efficiency-requirements-p0)
 
 ### P1 — SHOULD PASS
 

@@ -298,49 +298,46 @@ network:
 
 ## 8. Disk Configuration Examples
 
-### System Disk Types
+### System Disk Types & Data Disk Configuration
 
 ```yaml
-disk_types:
-  cloud_basic:
-    type: "CLOUD_BASIC"
-    use_case: "Archive, backup"
-    max_size: 500
-    performance: "Standard"
-    
-  cloud_premium:
-    type: "CLOUD_PREMIUM"
-    use_case: "General workloads"
-    max_size: 32000
-    performance: "High throughput"
-    
-  cloud_ssd:
-    type: "CLOUD_SSD"
-    use_case: "Database, critical apps"
-    max_size: 32000
-    performance: "Ultra-high IOPS"
-    
-  cloud_hssd:
-    type: "CLOUD_HSSD"
-    use_case: "High-performance database"
-    max_size: 32000
-    performance: "Maximum IOPS"
-```
+# Disk type definitions with anchors for reuse
+cloud_basic: &disk_basic
+  type: "CLOUD_BASIC"
+  use_case: "Archive, backup"
+  max_size: 500
+  performance: "Standard"
+  
+cloud_premium: &disk_premium
+  type: "CLOUD_PREMIUM"
+  use_case: "General workloads"
+  max_size: 32000
+  performance: "High throughput"
+  
+cloud_ssd: &disk_ssd
+  type: "CLOUD_SSD"
+  use_case: "Database, critical apps"
+  max_size: 32000
+  performance: "Ultra-high IOPS"
+  
+cloud_hssd: &disk_hssd
+  type: "CLOUD_HSSD"
+  use_case: "High-performance database"
+  max_size: 32000
+  performance: "Maximum IOPS"
 
-### Data Disk Configuration
-
-```yaml
+# Reference anchors in data disk config
 data_disk_example:
   disks:
     - id: "disk-data-01"
-      type: "CLOUD_SSD"
+      <<: *disk_ssd
       size: 1000
       delete_with_instance: true
       
     - id: "disk-backup-01"
-      type: "CLOUD_PREMIUM"
+      <<: *disk_premium
       size: 500
-      delete_with_instance: false  # Retain after instance deletion
+      delete_with_instance: false
 ```
 
 ---

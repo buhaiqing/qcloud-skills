@@ -10,26 +10,30 @@ Cost optimization patterns specifically for CLB (Load Balancer) resources.
 
 ### CLB Instance Types
 
-| Type | Pricing Model | Hourly Rate | Best For |
-|------|----------------|-------------|----------|
-| **公网共享型 (Shared)** | Postpaid + bandwidth | ¥0.02/hr | Low traffic, cost-sensitive |
-| **公网独享型 (Dedicated)** | Postpaid + bandwidth | ¥0.8/hr | High traffic, guaranteed performance |
-| **内网型 (Internal)** | Postpaid | ¥0.01/hr | Internal microservices |
-| **Anycast** | Postpaid + cross-region | ¥1.2/hr | Global access, cross-region |
+| Type | Pricing Model | Best For |
+|------|----------------|----------|
+| **公网共享型 (Shared)** | Postpaid + bandwidth | Low traffic, cost-sensitive |
+| **公网独享型 (Dedicated)** | Postpaid + bandwidth | High traffic, guaranteed performance |
+| **内网型 (Internal)** | Postpaid | Internal microservices |
+| **Anycast** | Postpaid + cross-region | Global access, cross-region |
+
+> Hourly rates vary by region and are subject to change. Check current pricing via `https://buy.cloud.tencent.com/price/clb` or query billing APIs.
 
 ### Bandwidth Pricing
 
-| Bandwidth Package | Pricing | Notes |
-|-------------------|---------|-------|
-| Postpaid bandwidth | ¥0.8/GB/day | Charged daily |
-| Bandwidth package | ¥50/Mbps/month | Prepaid, cheaper for stable traffic |
-| Shared bandwidth | Team-level billing | Share across multiple LBs |
+| Bandwidth Package | Notes |
+|-------------------|-------|
+| Postpaid bandwidth | Charged daily |
+| Bandwidth package | Prepaid, cheaper for stable traffic |
+| Shared bandwidth | Team-level billing share across multiple LBs |
+
+> Check current bandwidth pricing at `https://buy.cloud.tencent.com/price/clb`.
 
 ### Monthly Cost Calculator
 
 ```python
 def calculate_clb_monthly_cost(lb_type: str, bandwidth_mbps: int, hours: int = 720) -> float:
-    """Calculate CLB monthly cost"""
+    # Calculate CLB monthly cost
     base_rates = {
         'shared': 0.02,
         'dedicated': 0.8,
@@ -79,12 +83,12 @@ tccli clb DescribeLoadBalancers --LoadBalancerIds "[\"lb-xxx\"]" | jq '.Response
 
 ### Idle CLB Patterns
 
-| Pattern | Detection | Threshold | Monthly Waste |
-|---------|-----------|-----------|---------------|
-| **No listeners** | DescribeListeners returns empty | Empty | ¥14.4 (shared) |
-| **No backends** | DescribeTargets returns empty | Empty | ¥14.4 (shared) |
-| **Zero traffic** | ClientConnum = 0 for 24h | 0 | ¥14.4 + bandwidth |
-| **Stopped backends** | All targets unhealthy for 7d | All unhealthy | Full LB cost |
+| Pattern | Detection | Threshold |
+|---------|-----------|-----------|
+| **No listeners** | DescribeListeners returns empty | Empty |
+| **No backends** | DescribeTargets returns empty | Empty |
+| **Zero traffic** | ClientConnum = 0 for 24h | 0 |
+| **Stopped backends** | All targets unhealthy for 7d | All unhealthy |
 
 ### Idle Detection Query
 
@@ -104,12 +108,12 @@ done
 
 ### CLB Type Optimization
 
-| Current State | Recommendation | Savings |
-|---------------|----------------|---------|
-| Shared LB with > 5000 connections | Upgrade to Dedicated | Better performance |
-| Dedicated LB with < 100 connections | Downgrade to Shared | ~¥560/month |
-| Multiple Shared LBs | Consolidate to 1 Dedicated | Hardware + bandwidth |
-| Internal LB in public subnet | Review VPC config | Possible VPC cost |
+| Current State | Recommendation |
+|---------------|----------------|
+| Shared LB with > 5000 connections | Upgrade to Dedicated |
+| Dedicated LB with < 100 connections | Downgrade to Shared |
+| Multiple Shared LBs | Consolidate to 1 Dedicated |
+| Internal LB in public subnet | Review VPC config |
 
 ### Bandwidth Optimization
 
@@ -125,17 +129,19 @@ done
 
 ### CLB Prepaid Options
 
-| Option | Commitment | Discount | Best For |
-|--------|------------|----------|----------|
-| Monthly package | 1 month | 10% off | Stable workload |
-| Quarterly package | 3 months | 15% off | Production stable |
-| Annual package | 12 months | 25% off | Long-term production |
+| Option | Commitment | Best For |
+|--------|------------|----------|
+| Monthly package | 1 month | Stable workload |
+| Quarterly package | 3 months | Production stable |
+| Annual package | 12 months | Long-term production |
+
+> Discount rates vary. Check current prepaid pricing at `https://buy.cloud.tencent.com/price/clb`.
 
 ### RI Analysis
 
 ```python
 def should_use_prepaid_clb(avg_daily_connections: int, stability_months: int) -> bool:
-    """Determine if prepaid CLB makes sense"""
+    # Determine if prepaid CLB makes sense
     # Prepaid recommended for:
     # 1. Stable workload (> 720h/month usage)
     # 2. Production environment

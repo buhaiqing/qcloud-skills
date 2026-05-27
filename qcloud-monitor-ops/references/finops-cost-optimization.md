@@ -22,7 +22,7 @@ Cost optimization for Monitor (云监控) operations, focusing on notification c
 
 ```python
 def calculate_monthly_notification_cost(sms_count: int, voice_count: int) -> float:
-    """Calculate monthly notification cost"""
+    # Calculate monthly notification cost
     sms_rate = 0.05  # ¥/message
     voice_rate = 0.15  # ¥/call
     
@@ -80,7 +80,7 @@ notification_optimization:
 
 ```python
 def handle_alarm_storm_for_cost(alarms: List) -> CostOptimizationResult:
-    """Reduce notification cost during alarm storms"""
+    # Reduce notification cost during alarm storms
     
     # Level 1: 5-10 alarms - aggregate into 1 SMS
     if 5 <= len(alarms) <= 10:

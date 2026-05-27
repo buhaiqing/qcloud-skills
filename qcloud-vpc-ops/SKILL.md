@@ -116,16 +116,22 @@ Every generated skill MUST satisfy these five standards. Use them as a design ch
 - **Errors:** Map to `Response.Error.Code` and `Response.Error.Message`
 - **Timestamps:** ISO 8601 format (e.g., `2026-05-21T10:00:00+08:00`)
 
-### VPC Response Field Table
+### JSON Path Reference
 
-| Operation | JSON Path | Type | Description |
-|-----------|-----------|------|-------------|
-| CreateVpc | `$.Response.Vpc.VpcId` | string | VPC ID (e.g., `vpc-xxx`) |
-| CreateVpc | `$.Response.Vpc.CidrBlock` | string | CIDR range (e.g., `10.0.0.0/16`) |
-| DescribeVpcs | `$.Response.VpcSet[].VpcId` | array | VPC IDs list |
-| DescribeVpcs | `$.Response.VpcSet[].VpcName` | array | VPC names |
-| CreateSubnet | `$.Response.Subnet.SubnetId` | string | Subnet ID (e.g., `subnet-xxx`) |
-| DescribeSubnets | `$.Response.SubnetSet[].SubnetId` | array | Subnet IDs |
+| Path | Maps To |
+|------|---------|
+| `vpc.id` | `$.Response.Vpc.VpcId` |
+| `vpc.name` | `$.Response.VpcSet[].VpcName` |
+| `vpc.cidr` | `$.Response.VpcSet[].CidrBlock` |
+| `vpc.state` | `$.Response.VpcSet[].State` |
+| `subnet.id` | `$.Response.Subnet.SubnetId` / `$.Response.SubnetSet[].SubnetId` |
+| `subnet.name` | `$.Response.SubnetSet[].SubnetName` |
+| `subnet.cidr` | `$.Response.SubnetSet[].CidrBlock` |
+| `subnet.zone` | `$.Response.SubnetSet[].Zone` |
+| `subnet.ips` | `$.Response.SubnetSet[].AvailableIpAddressCount` |
+| `rtable.id` | `$.Response.RouteTable.RouteTableId` / `$.Response.RouteTableSet[].RouteTableId` |
+| `rtable.name` | `$.Response.RouteTableSet[].RouteTableName` |
+| `rtable.routes` | `$.Response.RouteTableSet[].RouteSet` |
 
 ### Expected State Transitions
 
@@ -253,13 +259,13 @@ done
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Backoff | Agent Action |
-|--------------|-------------|---------|--------------|
-| `InvalidParameter.InvalidCidr` | 0 | — | Fix CIDR format |
-| `ResourceQuotaExceeded.Vpc` | 0 | — | HALT; suggest quota increase |
-| `InvalidSecretKey` | 0 | — | HALT; fix credentials |
-| `ResourceAlreadyExists.Vpc` | 0 | — | Ask reuse or new name |
-| `RequestLimitExceeded` | 3 | 2s,4s,8s | Backoff retry |
+| Error pattern | Recovery |
+|--------------|----------|
+| `InvalidParameter.InvalidCidr` | Fix CIDR format |
+| `ResourceQuotaExceeded.Vpc` | HALT; suggest quota increase |
+| `InvalidSecretKey` | HALT; fix credentials |
+| `ResourceAlreadyExists.Vpc` | Ask reuse or new name |
+| `RequestLimitExceeded` | Backoff retry (2s,4s,8s) |
 
 ### Operation: Describe VPCs
 
@@ -294,13 +300,13 @@ print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 
 #### Present to User
 
-| Field | Path | Notes |
-|-------|------|-------|
-| VPC ID | `$.Response.VpcSet[0].VpcId` | Plain text |
-| VPC Name | `$.Response.VpcSet[0].VpcName` | Plain text |
-| CIDR | `$.Response.VpcSet[0].CidrBlock` | Network range |
-| State | `$.Response.VpcSet[0].State` | AVAILABLE/CREATING |
-| Subnets | `$.Response.VpcSet[0].SubnetSet` | Subnet list |
+| Field | Path |
+|-------|------|
+| VPC ID | `vpc.id` |
+| VPC Name | `vpc.name` |
+| CIDR | `vpc.cidr` |
+| State | `vpc.state` |
+| Subnets | `$.Response.VpcSet[0].SubnetSet` |
 
 ### Operation: Delete VPC
 
@@ -445,14 +451,14 @@ print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 
 #### Present to User
 
-| Field | Path | Notes |
-|-------|------|-------|
-| Subnet ID | `$.Response.SubnetSet[0].SubnetId` | Primary identifier |
-| Subnet Name | `$.Response.SubnetSet[0].SubnetName` | Display name |
-| CIDR | `$.Response.SubnetSet[0].CidrBlock` | Network range |
-| State | `$.Response.SubnetSet[0].State` | AVAILABLE/CREATING |
-| Zone | `$.Response.SubnetSet[0].Zone` | Availability zone |
-| Available IPs | `$.Response.SubnetSet[0].AvailableIpAddressCount` | Remaining IPs |
+| Field | Path |
+|-------|------|
+| Subnet ID | `subnet.id` |
+| Subnet Name | `subnet.name` |
+| CIDR | `subnet.cidr` |
+| State | `vpc.state` |
+| Zone | `subnet.zone` |
+| Available IPs | `subnet.ips` |
 
 ### Operation: Create Route Table
 
@@ -507,12 +513,12 @@ print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 
 #### Present to User
 
-| Field | Path | Notes |
-|-------|------|-------|
-| Route Table ID | `$.Response.RouteTableSet[0].RouteTableId` | Primary identifier |
-| Route Table Name | `$.Response.RouteTableSet[0].RouteTableName` | Display name |
-| Routes | `$.Response.RouteTableSet[0].RouteSet` | Route entries list |
-| Association | `$.Response.RouteTableSet[0].AssociationSet` | Associated subnets |
+| Field | Path |
+|-------|------|
+| Route Table ID | `rtable.id` |
+| Route Table Name | `rtable.name` |
+| Routes | `rtable.routes` |
+| Association | `$.Response.RouteTableSet[0].AssociationSet` |
 
 ### Operation: Delete Route Table
 
@@ -581,20 +587,20 @@ tccli vpc DescribeVpcs --Region ap-guangzhou
 
 ## Error Code Reference (VPC-Specific)
 
-| Code | Meaning | Retry? | Agent Action |
-|------|---------|--------|--------------|
-| `InvalidParameter.InvalidCidr` | CIDR format invalid | No | Fix CIDR notation |
-| `InvalidParameter.InvalidVpcName` | VPC name invalid | No | Use valid name |
-| `ResourceNotFound.InvalidVpc` | VPC not found | No | Verify VPC ID |
-| `ResourceNotFound.InvalidSubnet` | Subnet not found | No | Verify subnet ID |
-| `ResourceQuotaExceeded.Vpc` | VPC quota exceeded | No | HALT; raise quota |
-| `ResourceQuotaExceeded.Subnet` | Subnet quota exceeded | No | HALT; raise quota |
-| `InvalidVpc.StateMismatch` | VPC state invalid | No | Wait for stable state |
-| `InvalidSubnet.CidrConflict` | CIDR overlaps | No | Use different CIDR |
-| `InvalidSubnet.NotInVpcCidr` | Subnet CIDR outside VPC | No | Use subset CIDR |
-| `InvalidSecretKey` | Credential invalid | No | HALT; fix credentials |
-| `RequestLimitExceeded` | API rate limit | Yes (3x) | Exponential backoff |
-| `InternalError` | Server error | Yes (3x) | Retry with RequestId |
+| Code | Description | Recovery |
+|------|-------------|----------|
+| `InvalidParameter.InvalidCidr` | CIDR format invalid | Fix CIDR notation |
+| `InvalidParameter.InvalidVpcName` | VPC name invalid | Use valid name |
+| `ResourceNotFound.InvalidVpc` | VPC not found | Verify VPC ID |
+| `ResourceNotFound.InvalidSubnet` | Subnet not found | Verify subnet ID |
+| `ResourceQuotaExceeded.Vpc` | VPC quota exceeded | HALT; raise quota |
+| `ResourceQuotaExceeded.Subnet` | Subnet quota exceeded | HALT; raise quota |
+| `InvalidVpc.StateMismatch` | VPC state invalid | Wait for stable state |
+| `InvalidSubnet.CidrConflict` | CIDR overlaps | Use different CIDR |
+| `InvalidSubnet.NotInVpcCidr` | Subnet CIDR outside VPC | Use subset CIDR |
+| `InvalidSecretKey` | Credential invalid | HALT; fix credentials |
+| `RequestLimitExceeded` | API rate limit | Exponential backoff (3x) |
+| `InternalError` | Server error | Retry with RequestId (3x) |
 
 ## Safety Gates (Destructive Operations)
 

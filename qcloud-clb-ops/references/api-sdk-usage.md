@@ -10,33 +10,33 @@ This document covers the API operation map and Python SDK usage for CLB (Load Ba
 
 ### Instance Operations
 
-| API | Description | Required Parameters | Rate Limit |
-|-----|-------------|---------------------|------------|
-| `CreateLoadBalancer` | Create LB instance | LoadBalancerType, VpcId | 20/s |
-| `DescribeLoadBalancers` | Query LB list | LoadBalancerIds (optional) | 20/s |
-| `ModifyLoadBalancerAttributes` | Modify LB config | LoadBalancerId | 20/s |
-| `DeleteLoadBalancer` | Delete LB | LoadBalancerId | 20/s |
-| `DescribeLoadBalancersDetail` | LB details | LoadBalancerIds | 20/s |
+| API | Required Parameters | Rate Limit |
+|-----|---------------------|------------|
+| `CreateLoadBalancer` | LoadBalancerType, VpcId | 20/s |
+| `DescribeLoadBalancers` | LoadBalancerIds (optional) | 20/s |
+| `ModifyLoadBalancerAttributes` | LoadBalancerId | 20/s |
+| `DeleteLoadBalancer` | LoadBalancerId | 20/s |
+| `DescribeLoadBalancersDetail` | LoadBalancerIds | 20/s |
 
 ### Listener Operations
 
-| API | Description | Required Parameters | Rate Limit |
-|-----|-------------|---------------------|------------|
-| `CreateListener` | Create listener | LoadBalancerId, Protocol, Port | 20/s |
-| `DescribeListeners` | Query listeners | LoadBalancerId | 20/s |
-| `ModifyListener` | Modify listener | ListenerId | 20/s |
-| `DeleteListener` | Delete listener | ListenerId | 20/s |
-| `CreateRule` | Create HTTP rule | ListenerId, Domain, Url | 20/s |
+| API | Required Parameters | Rate Limit |
+|-----|---------------------|------------|
+| `CreateListener` | LoadBalancerId, Protocol, Port | 20/s |
+| `DescribeListeners` | LoadBalancerId | 20/s |
+| `ModifyListener` | ListenerId | 20/s |
+| `DeleteListener` | ListenerId | 20/s |
+| `CreateRule` | ListenerId, Domain, Url | 20/s |
 
 ### Backend Operations
 
-| API | Description | Required Parameters | Rate Limit |
-|-----|-------------|---------------------|------------|
-| `RegisterTargets` | Bind backend | LoadBalancerId, ListenerId, Targets | 20/s |
-| `DeregisterTargets` | Unbind backend | LoadBalancerId, ListenerId, Targets | 20/s |
-| `DescribeTargets` | Query backends | LoadBalancerId | 20/s |
-| `DescribeTargetHealth` | Health status | LoadBalancerId | 20/s |
-| `ModifyTargetWeight` | Change weight | Targets[].Weight | 20/s |
+| API | Required Parameters | Rate Limit |
+|-----|---------------------|------------|
+| `RegisterTargets` | LoadBalancerId, ListenerId, Targets | 20/s |
+| `DeregisterTargets` | LoadBalancerId, ListenerId, Targets | 20/s |
+| `DescribeTargets` | LoadBalancerId | 20/s |
+| `DescribeTargetHealth` | LoadBalancerId | 20/s |
+| `ModifyTargetWeight` | Targets[].Weight | 20/s |
 
 ---
 
@@ -125,7 +125,7 @@ client = clb_client.ClbClient(cred, "ap-guangzhou")
 
 ```python
 def create_load_balancer(client, vpc_id, lb_name, lb_type="OPEN"):
-    """Create a new LoadBalancer"""
+    # Create a new LoadBalancer
     req = models.CreateLoadBalancerRequest()
     req.LoadBalancerType = lb_type
     req.VpcId = vpc_id
@@ -143,7 +143,7 @@ print(f"Created LB: {lb_id}")
 
 ```python
 def describe_load_balancers(client, lb_ids=None):
-    """Query LoadBalancer instances"""
+    # Query LoadBalancer instances
     req = models.DescribeLoadBalancersRequest()
     
     if lb_ids:
@@ -166,7 +166,7 @@ def describe_load_balancers(client, lb_ids=None):
 
 ```python
 def create_listener(client, lb_id, protocol, port, name=None):
-    """Create a listener"""
+    # Create a listener
     req = models.CreateListenerRequest()
     req.LoadBalancerId = lb_id
     req.Protocol = protocol  # TCP/UDP/HTTP/HTTPS
@@ -181,7 +181,7 @@ def create_listener(client, lb_id, protocol, port, name=None):
 
 ```python
 def register_targets(client, lb_id, listener_id, targets):
-    """Bind backend servers"""
+    # Bind backend servers
     req = models.RegisterTargetsRequest()
     req.LoadBalancerId = lb_id
     req.ListenerId = listener_id
@@ -204,7 +204,7 @@ def register_targets(client, lb_id, listener_id, targets):
 
 ```python
 def check_target_health(client, lb_id):
-    """Check backend server health status"""
+    # Check backend server health status
     req = models.DescribeTargetHealthRequest()
     req.LoadBalancerId = lb_id
     
@@ -226,7 +226,7 @@ def check_target_health(client, lb_id):
 
 ```python
 def describe_all_load_balancers(client):
-    """Paginate through all LoadBalancers"""
+    # Paginate through all LoadBalancers
     req = models.DescribeLoadBalancersRequest()
     req.Limit = 100
     req.Offset = 0
@@ -253,7 +253,7 @@ def describe_all_load_balancers(client):
 from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
 
 def safe_create_lb(client, vpc_id, lb_name):
-    """Create LB with error handling"""
+    # Create LB with error handling
     try:
         lb_id = create_load_balancer(client, vpc_id, lb_name)
         return {"success": True, "lb_id": lb_id}
@@ -273,20 +273,20 @@ def safe_create_lb(client, vpc_id, lb_name):
 
 ### CreateLoadBalancer
 
-| Parameter | Required | Type | Notes |
-|-----------|----------|------|-------|
-| LoadBalancerType | ✓ | string | OPEN or Internal |
-| VpcId | ✓ | string | VPC ID |
-| LoadBalancerName | ✗ | string | Default: lb-xxx |
-| SubnetId | ✗ | string | Auto-selected if omitted |
-| AddressIPVersion | ✗ | string | Default IPv4 |
+| Parameter | Required | Notes |
+|-----------|----------|-------|
+| LoadBalancerType | ✓ | OPEN or Internal |
+| VpcId | ✓ | VPC ID |
+| LoadBalancerName | ✗ | Default: lb-xxx |
+| SubnetId | ✗ | Auto-selected if omitted |
+| AddressIPVersion | ✗ | Default IPv4 |
 
 ### CreateListener
 
-| Parameter | Required | Type | Notes |
-|-----------|----------|------|-------|
-| LoadBalancerId | ✓ | string | LB instance ID |
-| Protocol | ✓ | string | TCP/UDP/HTTP/HTTPS |
-| Port | ✓ | int | Listener port |
-| ListenerName | ✗ | string | Auto-generated |
-| CertificateSSLId | ✓ (HTTPS) | string | SSL certificate ID |
+| Parameter | Required | Notes |
+|-----------|----------|-------|
+| LoadBalancerId | ✓ | LB instance ID |
+| Protocol | ✓ | TCP/UDP/HTTP/HTTPS |
+| Port | ✓ | Listener port |
+| ListenerName | ✗ | Auto-generated |
+| CertificateSSLId | ✓ (HTTPS) | SSL certificate ID |

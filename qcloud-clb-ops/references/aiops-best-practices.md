@@ -212,10 +212,10 @@ clb_alarm_storm_handling:
 
 ## AIOps Compliance Checklist
 
-| Requirement | CLB Implementation | Location |
-|-------------|--------------------|----------|
-| Multi-metric correlation | ✓ CLB correlation matrix | This document |
-| Diagnosis decision tree | ✓ CLB diagnosis tree | This document |
-| Delegation matrix | ✓ CLB → CVM/VPC delegation | This document |
-| Proactive inspection | ✓ Daily/Weekly checks | This document |
-| Alarm storm handling | ✓ Health alarm aggregation | This document |
+| Requirement | CLB Implementation |
+|-------------|--------------------|
+| Multi-metric correlation | ✓ CLB correlation matrix |
+| Diagnosis decision tree | ✓ CLB diagnosis tree |
+| Delegation matrix | ✓ CLB → CVM/VPC delegation |
+| Proactive inspection | ✓ Daily/Weekly checks |
+| Alarm storm handling | ✓ Health alarm aggregation |

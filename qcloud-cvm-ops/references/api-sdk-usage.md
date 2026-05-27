@@ -467,7 +467,7 @@ except TencentCloudSDKException as err:
 import time
 
 def wait_for_instance(client, instance_id, target_state, timeout=300):
-    """Wait for instance to reach target state"""
+    # Wait for instance to reach target state
     start = time.time()
     
     while time.time() - start < timeout:
@@ -498,7 +498,7 @@ print(f"Instance ready: {final_state}")
 
 ```python
 def batch_describe(client, instance_ids, batch_size=20):
-    """Batch describe with chunking"""
+    # Batch describe with chunking
     results = []
     
     for i in range(0, len(instance_ids), batch_size):

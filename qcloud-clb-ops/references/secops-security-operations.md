@@ -97,7 +97,7 @@ clb_security_group:
 
 ```python
 def audit_clb_security_groups(sg_rules: List) -> List[SecurityIssue]:
-    """Audit CLB security group for risks"""
+    # Audit CLB security group for risks
     issues = []
     
     for rule in sg_rules:

@@ -47,7 +47,7 @@ tccli cloudaudit LookUpEvents \
 
 ```python
 def analyze_audit_logs(events: List[AuditEvent]) -> SecurityAuditReport:
-    """Analyze audit logs for security insights"""
+    # Analyze audit logs for security insights
     
     report = SecurityAuditReport()
     
@@ -206,7 +206,7 @@ tccli vpc DescribeSecurityGroupPolicies \
 
 ```python
 def audit_security_group(sg: SecurityGroup) -> List[SecurityIssue]:
-    """Audit security group for best practices"""
+    # Audit security group for best practices
     
     issues = []
     
@@ -421,7 +421,7 @@ network_tiers:
 
 ```python
 def calculate_compliance_score(checklist: Dict) -> ComplianceResult:
-    """Calculate compliance score from checklist"""
+    # Calculate compliance score from checklist
     
     total_checks = sum(len(category) for category in checklist.values())
     passed_checks = sum(
@@ -495,55 +495,7 @@ security_gate:
         action: "Require: 'CONFIRM SSH open to [CIDR]'"
 ```
 
----
-
-## 7. Integration in CVM Skill
-
-Add SecOps section to SKILL.md:
-
-```markdown
-## SecOps Security Operations
-
-### Security Audit
-
-```bash
-# Query security audit logs
-tccli cloudaudit LookUpEvents \
-  --StartTime "$(date -d '-7 days' +'%Y-%m-%dT%H:%M:%S+08:00')" \
-  --EndTime "$(date +'%Y-%m-%dT%H:%M:%S+08:00')"
-```
-
-### Security Group Audit
-
-```bash
-# Describe security group rules
-tccli vpc DescribeSecurityGroupPolicies \
-  --Region ap-guangzhou \
-  --SecurityGroupId sg-xxx
-```
-
-### Credential Rotation Reminder
-
-- API SecretKey: Rotate every **90 days**
-- SSH Key Pair: Rotate every **180 days**
-
-### Compliance Checklist
-
-- [ ] VPC isolation (not Basic Network)
-- [ ] SSH restricted to VPN/IPs
-- [ ] Database ports NOT public
-- [ ] CAM least-privilege permissions
-- [ ] Regular audit log review
-
-### References
-
-- [SecOps Security Operations Module](../qcloud-skill-generator/references/secops-security-operations.md)
-- [CAM Documentation](https://cloud.tencent.com/document/product/598)
-```
-
----
-
-## 8. CVM Audit Rules Integration
+## 7. CVM Audit Rules Integration
 
 This section cross-references SecOps checklist items with the centralized audit rules in [audit-rules.md](audit-rules.md).
 

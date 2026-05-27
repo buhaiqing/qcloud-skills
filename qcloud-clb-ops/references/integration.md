@@ -177,7 +177,7 @@ cam_role:
 
 ```python
 def handle_clb_error_with_delegation(error_code: str, context: Dict) -> Dict:
-    """Handle CLB errors with skill delegation"""
+    # Handle CLB errors with skill delegation
     
     delegation_map = {
         'InvalidParameter.VpcNotFound': {

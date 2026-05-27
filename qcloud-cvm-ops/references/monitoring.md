@@ -14,39 +14,39 @@ CVM uses namespace `QCE/CVM` in Tencent Cloud Monitor.
 
 ### CPU Metrics
 
-| Metric | Unit | Description | Typical Threshold |
-|--------|------|-------------|-------------------|
-| `CPUUsage` | % | CPU utilization | > 80% warning, > 90% critical |
-| `CPUUseRate` | % | CPU usage rate (deprecated) | Same |
+| Metric | Unit | Typical Threshold |
+|--------|------|------------------|
+| `CPUUsage` | % | > 80% warning, > 90% critical |
+| `CPUUseRate` | % (deprecated) | Same |
 
 ### Memory Metrics
 
-| Metric | Unit | Description | Typical Threshold |
-|--------|------|-------------|-------------------|
-| `MemUsage` | % | Memory utilization | > 80% warning, > 90% critical |
+| Metric | Unit | Typical Threshold |
+|--------|------|------------------|
+| `MemUsage` | % | > 80% warning, > 90% critical |
 
 ### Disk Metrics
 
-| Metric | Unit | Description | Typical Threshold |
-|--------|------|-------------|-------------------|
-| `DiskUsage` | % | Disk utilization (agent required) | > 80% warning, > 95% critical |
-| `DiskRead` | KB/s | Disk read throughput | Monitor baseline |
-| `DiskWrite` | KB/s | Disk write throughput | Monitor baseline |
+| Metric | Unit | Typical Threshold |
+|--------|------|------------------|
+| `DiskUsage` | % (agent required) | > 80% warning, > 95% critical |
+| `DiskRead` | KB/s | Monitor baseline |
+| `DiskWrite` | KB/s | Monitor baseline |
 
 ### Network Metrics
 
-| Metric | Unit | Description | Typical Threshold |
-|--------|------|-------------|-------------------|
-| `NetworkIn` | Mbps | Inbound bandwidth | Compare to cap |
-| `NetworkOut` | Mbps | Outbound bandwidth | Compare to cap |
-| `TrafficIn` | MB | Inbound traffic | Cost tracking |
-| `TrafficOut` | MB | Outbound traffic | Cost tracking |
+| Metric | Unit | Typical Threshold |
+|--------|------|------------------|
+| `NetworkIn` | Mbps | Compare to cap |
+| `NetworkOut` | Mbps | Compare to cap |
+| `TrafficIn` | MB | Cost tracking |
+| `TrafficOut` | MB | Cost tracking |
 
 ### Status Metrics
 
-| Metric | Unit | Description |
-|--------|------|-------------|
-| `Status` | Enum | Instance state (agent required) |
+| Metric | Unit |
+|--------|------|
+| `Status` | Enum (agent required) |
 
 ---
 
@@ -69,23 +69,16 @@ tccli monitor GetMonitorData \
 ```json
 {
   "Response": {
-    "RequestId": "...",
     "StartTime": "2026-05-21T00:00:00+08:00",
     "EndTime": "2026-05-21T23:59:59+08:00",
     "Period": 300,
     "MetricName": "CPUUsage",
-    "DataPoints": [
-      {
-        "Dimensions": [{"Name": "InstanceId", "Value": "ins-xxx"}],
-        "Values": [
-          {"Timestamp": 1716264000, "Value": 45.5},
-          {"Timestamp": 1716264300, "Value": 52.3}
-        ]
-      }
-    ]
+    "DataPoints": [{"Dimensions": [...], "Values": [...], "Timestamps": [...]}],
+    "RequestId": "..."
   }
 }
 ```
+<!-- Actual values vary; parse $.Response.DataPoints[0].Values for metrics -->
 
 ---
 
@@ -95,7 +88,7 @@ tccli monitor GetMonitorData \
 from tencentcloud.monitor import monitor_client, models
 
 def get_cpu_usage(client, instance_id, hours=24):
-    """Get CPU usage for last N hours"""
+    # Get CPU usage for last N hours
     req = models.GetMonitorDataRequest()
     req.Namespace = "QCE/CVM"
     req.MetricName = "CPUUsage"
@@ -186,7 +179,7 @@ Tencent Cloud supports Grafana integration:
 
 ```python
 def analyze_cpu_trend(client, instance_id):
-    """Analyze CPU trend for optimization"""
+    # Analyze CPU trend for optimization
     data = get_cpu_usage(client, instance_id, hours=168)  # 7 days
     
     if data["avg_cpu"] < 20:
@@ -247,7 +240,7 @@ For skills implementing AIOps patterns, see [AIOps Best Practices](../qcloud-ski
 
 ```python
 def correlate_metrics(cpu_data, mem_data, disk_data):
-    """Correlate metrics for root cause analysis"""
+    # Correlate metrics for root cause analysis
     anomalies = []
     
     # High CPU + High Memory → Application issue

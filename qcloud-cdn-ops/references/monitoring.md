@@ -2,15 +2,20 @@
 
 ## Key Metrics
 
-| Metric | Namespace | MetricName | Description | Alert Threshold |
-|--------|-----------|------------|-------------|----------------|
-| Bandwidth | QCE/CDN | CdnnetworkTraffic | Bandwidth usage (bps) | > 80% of plan limit |
-| QPS | QCE/CDN | CdnRequest | Requests per second | Sudden spike > 2x baseline |
-| Cache Hit Ratio | QCE/CDN | CacheHitRate | % of requests served from cache | < 80% = investigate |
-| 200 Status Rate | QCE/CDN | StatusCode2XX | % of successful responses | < 95% = investigate |
-| 4xx Rate | QCE/CDN | StatusCode4XX | % of client errors | > 5% = investigate |
-| 5xx Rate | QCE/CDN | StatusCode5XX | % of origin errors | > 1% = Critical |
-| Response Time | QCE/CDN | CdnResponseTime | Edge response latency | p99 > 500ms |
+All CDN metrics use namespace `QCE/CDN`. Verify current metric names via:
+```bash
+tccli monitor DescribeBaseMetrics --Namespace QCE/CDN
+```
+
+| Metric | MetricName | Description | Alert Threshold |
+|--------|------------|-------------|----------------|
+| Bandwidth | CdnnetworkTraffic | Bandwidth usage (bps) | > 80% of plan limit |
+| QPS | CdnRequest | Requests per second | Sudden spike > 2x baseline |
+| Cache Hit Ratio | CacheHitRate | % of requests served from cache | < 80% = investigate |
+| 200 Status Rate | StatusCode2XX | % of successful responses | < 95% = investigate |
+| 4xx Rate | StatusCode4XX | % of client errors | > 5% = investigate |
+| 5xx Rate | StatusCode5XX | % of origin errors | > 1% = Critical |
+| Response Time | CdnResponseTime | Edge response latency | p99 > 500ms |
 
 ## Dashboard Configuration
 

@@ -4,32 +4,37 @@
 # example-config.yaml
 # Tencent Cloud Monitoring (云监控) Example Configuration
 
+# &condition shared condition structure
 alarm_policy:
   name: "cvm-high-cpu-alert"
   namespace: "QCE/CVM"
   module: "monitor"
   
 conditions:
-  - metric_name: "CPUUsage"
+  - &condition_default
     calc_type: "Greater"  # Greater, Less, Equal, GreaterOrEqual, LessOrEqual
-    calc_value: "80"      # Threshold
     continue_time: 60     # Duration in seconds
+    metric_name: "CPUUsage"
+    calc_value: "80"      # Threshold
     
-  - metric_name: "MemUsage"
-    calc_type: "Greater"
+  - <<: *condition_default
+    metric_name: "MemUsage"
     calc_value: "90"
-    continue_time: 60
 
 notification:
   notice_name: "ops-team-notification"
-  channels:
-    - type: "SMS"
+  channels: &channels_default
+    - &channel_sms
+      type: "SMS"
       receivers: ["user1", "user2"]
-    - type: "Email"
+    - &channel_email
+      type: "Email"
       receivers: ["ops@example.com"]
-    - type: "WechatWork"
+    - &channel_wechat
+      type: "WechatWork"
       receivers: ["group_id"]
-    - type: "Webhook"
+    - &channel_webhook
+      type: "Webhook"
       url: "https://webhook.example.com/alarm"
 
 binding:

@@ -109,12 +109,12 @@ Official API documentation: https://cloud.tencent.com/document/api/215
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| Vpc.VpcId | string | VPC unique identifier |
-| Vpc.State | string | CREATING / AVAILABLE / DELETING |
-| Vpc.CidrBlock | string | CIDR range |
-| Vpc.CreatedTime | string | ISO timestamp |
+| Field | Type |
+|-------|------|
+| Vpc.VpcId | string |
+| Vpc.State | string (CREATING / AVAILABLE / DELETING) |
+| Vpc.CidrBlock | string |
+| Vpc.CreatedTime | string (ISO 8601) |
 
 #### DescribeVpcs Response
 

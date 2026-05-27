@@ -1,42 +1,43 @@
 # CDB Example Configurations
 # 10 common scenarios for Tencent Cloud TencentDB for MySQL
 
+# Common parameter anchors
+x-common-instance: &common-instance
+  Zone: "ap-guangzhou-3"
+  EngineVersion: "8.0"
+  InstanceRole: "master"
+  GoodsNum: 1
+
+x-common-vpc: &common-vpc
+  UniqVpcId: "vpc-xxxxxx"
+  UniqSubnetId: "subnet-xxxxxx"
+
 - name: "cdb-minimal"
   description: "Minimal MySQL instance for development"
   params:
+    <<: *common-instance
     Memory: 1000
     Volume: 20
     Period: 1
-    GoodsNum: 1
-    Zone: "ap-guangzhou-3"
-    EngineVersion: "8.0"
-    InstanceRole: "master"
 
 - name: "cdb-production"
   description: "Production MySQL instance with VPC"
   params:
+    <<: *common-instance
     Memory: 8000
     Volume: 500
     Period: 12
-    GoodsNum: 1
-    Zone: "ap-guangzhou-3"
-    UniqVpcId: "vpc-xxxxxx"
-    UniqSubnetId: "subnet-xxxxxx"
+    <<: *common-vpc
     Port: 3306
-    EngineVersion: "8.0"
-    InstanceRole: "master"
     ProjectId: 0
 
 - name: "cdb-hourly-billing"
   description: "Postpaid (hourly) MySQL instance for variable workloads"
   params:
     Operation: CreateDBInstanceHour
+    <<: *common-instance
     Memory: 4000
     Volume: 200
-    GoodsNum: 1
-    Zone: "ap-guangzhou-3"
-    EngineVersion: "8.0"
-    InstanceRole: "master"
 
 - name: "cdb-multi-az-dr"
   description: "Disaster recovery instance in different AZ"
@@ -44,10 +45,10 @@
     Memory: 4000
     Volume: 200
     Period: 12
-    GoodsNum: 1
     Zone: "ap-guangzhou-6"
     EngineVersion: "8.0"
     InstanceRole: "dr"
+    GoodsNum: 1
     MasterInstanceId: "cdb-xxxxxx"
 
 - name: "cdb-backup-config"

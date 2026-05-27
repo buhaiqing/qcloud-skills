@@ -115,8 +115,8 @@ tccli vpc DescribeVpcs --VpcIds "[\"vpc-xxx\"]"
 
 ## Error Code Reference
 
-| Code | Diagnosis | Resolution |
-|------|-----------|------------|
+| Code | Description | Recovery |
+|------|-------------|----------|
 | `InvalidParameter.LBIdNotFound` | LB ID incorrect | Verify via DescribeLoadBalancers |
 | `InvalidParameter.ListenerIdNotFound` | Listener ID incorrect | Verify via DescribeListeners |
 | `InvalidParameter.PortCheckFailed` | Port conflict | Use different port or delete conflicting listener |
@@ -125,24 +125,3 @@ tccli vpc DescribeVpcs --VpcIds "[\"vpc-xxx\"]"
 | `FailedOperation.ResourceInOperating` | Concurrent operation | Wait and retry |
 | `FailedOperation.TrafficCheckRisk` | High traffic LB deletion | Confirm force delete or wait |
 
-## Diagnostic Flowchart
-
-```
-CLB Issue
-├── Connection Failure?
-│   ├── Check LB Status → Not running? → Wait
-│   ├── Check Listener → Missing? → Create
-│   ├── Check Backend Binding → Not registered? → Register
-│   └── Check Security Group → Blocked? → Add rule
-│
-├── Health Check Failure?
-│   ├── Check Backend Port → Wrong? → Update
-│   ├── Check Health Path → Invalid? → Configure
-│   ├── Check Security Group → CLB VIP blocked? → Allow
-│   └── Check Backend App → Timeout? -> Increase timeout
-│
-└── SSL Issue?
-    ├── Check Cert Status → Expired? → Renew
-    ├── Check Cert Domain → Mismatch? → Replace
-    └── Check Cert Deployment → Not deployed? → Deploy
-```

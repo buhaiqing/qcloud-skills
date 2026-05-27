@@ -77,21 +77,14 @@ tccli monitor GetMonitorData \
 ```json
 {
   "Response": {
-    "StartTime": "2026-05-21T00:00:00+08:00",
-    "EndTime": "2026-05-21T23:59:59+08:00",
-    "Period": 300,
+    "StartTime": "...", "EndTime": "...", "Period": 300,
     "MetricName": "JvmHeapUsage",
-    "DataPoints": [
-      {
-        "Dimensions": [{"Name": "InstanceId", "Value": "es-xxxxxx"}],
-        "Values": [65.2, 68.1, 72.3, 70.5],
-        "Timestamps": [1747785600, 1747785900, 1747786200, 1747786500]
-      }
-    ],
-    "RequestId": "abc-123-def-456"
+    "DataPoints": [{"Dimensions": [...], "Values": [65.2, 68.1, ...], "Timestamps": [1747785600, ...]}],
+    "RequestId": "..."
   }
 }
 ```
+<!-- Actual values vary; parse $.Response.DataPoints[0].Values for metrics -->
 
 ### Get Search Latency
 

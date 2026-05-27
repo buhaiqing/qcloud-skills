@@ -53,12 +53,18 @@ CLB (Cloud Load Balancer, 负载均衡) provides traffic distribution across mul
 
 ## Limits and Quotas
 
-| Resource | Default Limit |
-|----------|---------------|
-| LoadBalancer instances per region | 50 |
-| Listeners per LB | 50 |
-| Backend servers per listener | 100 |
-| Target groups per region | 50 |
+Quotas vary by account. Query current limits via API:
+
+```bash
+# Count current LBs per region
+tccli clb DescribeLoadBalancers | jq '.Response.TotalCount'
+
+# Count listeners per LB
+tccli clb DescribeListeners --LoadBalancerId "lb-xxx" | jq '.Response.TotalCount'
+
+# Check backend servers per listener
+tccli clb DescribeTargets --LoadBalancerId "lb-xxx" --ListenerIds '["listener-xxx"]' | jq '.Response.Targets | length'
+```
 
 ## Region and Zone Support
 

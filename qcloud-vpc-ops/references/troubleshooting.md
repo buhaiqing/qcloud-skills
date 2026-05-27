@@ -4,25 +4,25 @@
 
 ### Common VPC Errors
 
-| Code | Meaning | Retry? | Recovery Action |
-|------|---------|--------|-----------------|
-| `InvalidParameter.InvalidCidr` | CIDR format invalid | No | Use valid CIDR notation (RFC 1918) |
-| `InvalidParameter.InvalidVpcName` | VPC name invalid | No | Use 1-60 alphanumeric chars |
-| `InvalidParameter.InvalidSubnetName` | Subnet name invalid | No | Use valid name format |
-| `InvalidParameter.InvalidZone` | Zone not in region | No | Use zone from DescribeZones |
-| `ResourceNotFound.InvalidVpc` | VPC not found | No | Verify VpcId via DescribeVpcs |
-| `ResourceNotFound.InvalidSubnet` | Subnet not found | No | Verify SubnetId |
-| `ResourceNotFound.InvalidRouteTableId` | Route table not found | No | Verify route table ID |
-| `ResourceQuotaExceeded.Vpc` | VPC quota exceeded | No | Delete unused or request quota increase |
-| `ResourceQuotaExceeded.Subnet` | Subnet quota exceeded | No | Delete unused or increase quota |
-| `InvalidVpc.StateMismatch` | VPC state error | No | Wait for VPC to reach stable state |
-| `InvalidSubnet.CidrConflict` | CIDR overlap | No | Use different CIDR |
-| `InvalidSubnet.NotInVpcCidr` | Subnet CIDR outside VPC | No | Use subset of VPC CIDR |
-| `InvalidSecretKey` | Credential invalid | No | Verify SecretKey configuration |
-| `InvalidSecretId` | Credential ID invalid | No | Verify SecretId |
-| `RequestLimitExceeded` | API rate limit | Yes (3x) | Exponential backoff (2s, 4s, 8s) |
-| `InternalError` | Server error | Yes (3x) | Retry; escalate with RequestId |
-| `OperationConflict` | Concurrent operation | Yes (3x, 30s) | Wait and retry |
+| Code | Description | Recovery |
+|------|-------------|----------|
+| `InvalidParameter.InvalidCidr` | CIDR format invalid | Use valid RFC 1918 CIDR |
+| `InvalidParameter.InvalidVpcName` | VPC name invalid | Use 1-60 alphanumeric chars |
+| `InvalidParameter.InvalidSubnetName` | Subnet name invalid | Use valid name format |
+| `InvalidParameter.InvalidZone` | Zone not in region | Use zone from DescribeZones |
+| `ResourceNotFound.InvalidVpc` | VPC not found | Verify VpcId via DescribeVpcs |
+| `ResourceNotFound.InvalidSubnet` | Subnet not found | Verify SubnetId |
+| `ResourceNotFound.InvalidRouteTableId` | Route table not found | Verify route table ID |
+| `ResourceQuotaExceeded.Vpc` | VPC quota exceeded | Delete unused or request increase |
+| `ResourceQuotaExceeded.Subnet` | Subnet quota exceeded | Delete unused or increase quota |
+| `InvalidVpc.StateMismatch` | VPC state error | Wait for VPC to reach stable state |
+| `InvalidSubnet.CidrConflict` | CIDR overlap | Use different CIDR |
+| `InvalidSubnet.NotInVpcCidr` | Subnet CIDR outside VPC | Use subset of VPC CIDR |
+| `InvalidSecretKey` | Credential invalid | Verify SecretKey configuration |
+| `InvalidSecretId` | Credential ID invalid | Verify SecretId |
+| `RequestLimitExceeded` | API rate limit | Exponential backoff (2s, 4s, 8s) |
+| `InternalError` | Server error | Retry; escalate with RequestId |
+| `OperationConflict` | Concurrent operation | Wait 30s and retry (3x) |
 
 ## Diagnostic Procedures
 

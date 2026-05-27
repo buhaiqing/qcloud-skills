@@ -6,16 +6,18 @@ Tencent Cloud VPC (Virtual Private Cloud) provides an isolated virtual network e
 
 ### Key Components
 
-| Component | Function | Limits |
-|-----------|----------|--------|
-| **VPC** | Isolated network container | 5 per region (default quota) |
-| **Subnet** | Network segment within VPC | 100 per VPC |
-| **Route Table** | Traffic routing rules | 50 per VPC |
-| **Network ACL** | Subnet-level firewall | Default ACL per VPC |
-| **Security Group** | Instance-level firewall | 50 per region |
-| **NAT Gateway** | Outbound internet access | 1 per VPC (default) |
-| **VPN Gateway** | Hybrid cloud connection | 1 per VPC |
-| **Direct Connect** | Dedicated line connection | Per subscription |
+| Component | Function |
+|-----------|----------|
+| **VPC** | Isolated network container |
+| **Subnet** | Network segment within VPC |
+| **Route Table** | Traffic routing rules |
+| **Network ACL** | Subnet-level firewall |
+| **Security Group** | Instance-level firewall |
+| **NAT Gateway** | Outbound internet access |
+| **VPN Gateway** | Hybrid cloud connection |
+| **Direct Connect** | Dedicated line connection |
+
+> **Queries**: Use `DescribeVpcs` to count current VPCs, `DescribeSubnets` per VPC, `DescribeRouteTables` per VPC. See [VPC Limits](https://cloud.tencent.com/document/product/215/537) for default quotas.
 
 ## CIDR Planning
 
@@ -45,21 +47,30 @@ Tencent Cloud VPC (Virtual Private Cloud) provides an isolated virtual network e
 
 ## Region and Zone Coverage
 
-### Supported Regions
+### Query Regions and Zones
 
-| Region | Code | Zones |
-|--------|------|-------|
-| 广州 | `ap-guangzhou` | 1, 2, 3, 4, 6, 7 |
-| 上海 | `ap-shanghai` | 1, 2, 3, 4, 5 |
-| 北京 | `ap-beijing` | 1, 2, 3, 4, 5, 6, 7, 8 |
-| 成都 | `ap-chengdu` | 1, 2 |
-| 重庆 | `ap-chongqing` | 1 |
-| 深圳 | `ap-shenzhen-fsi` | 1, 2, 3, 4 |
-| 南京 | `ap-nanjing` | 1, 2 |
-| 香港 | `ap-hongkong` | 1, 2, 3 |
-| 新加坡 | `ap-singapore` | 1, 2, 3 |
-| 东京 | `ap-tokyo` | 1, 2 |
-| 雅加达 | `ap-jakarta` | 1, 2 |
+Use the API to get current region/zone availability:
+
+```bash
+# List all available regions
+tccli vpc DescribeRegions
+
+# List zones in a specific region
+tccli vpc DescribeZones --Region ap-guangzhou
+```
+
+### Common Regions
+
+| Region | Code |
+|--------|------|
+| 广州 | `ap-guangzhou` |
+| 上海 | `ap-shanghai` |
+| 北京 | `ap-beijing` |
+| 成都 | `ap-chengdu` |
+| 香港 | `ap-hongkong` |
+| 新加坡 | `ap-singapore` |
+
+> Query all regions and zones via `tccli vpc DescribeZones --Region <region_code>` for the latest zone list per region.
 
 ### Multi-AZ Subnet Strategy
 
@@ -112,25 +123,27 @@ VPC
 
 ### Default Quotas
 
-| Resource | Default Limit | Adjustable |
-|----------|---------------|------------|
-| VPCs per region | 5 | Yes (max 20) |
-| Subnets per VPC | 100 | Yes |
-| Route tables per VPC | 50 | Yes |
-| Network ACLs per VPC | 50 | Yes |
-| Security groups per region | 50 | Yes |
-| NAT gateways per VPC | 1 | Yes |
-| VPN gateways per VPC | 1 | Yes |
-| Peering connections per VPC | 10 | Yes |
+Query current quotas via the corresponding Describe APIs; typical defaults are listed below.
 
-### IP Address Limits
+| Resource | Adjustable |
+|----------|------------|
+| VPCs per region | Yes (max 20) |
+| Subnets per VPC | Yes |
+| Route tables per VPC | Yes |
+| Network ACLs per VPC | Yes |
+| Security groups per region | Yes |
+| NAT gateways per VPC | Yes |
+| VPN gateways per VPC | Yes |
+| Peering connections per VPC | Yes |
 
-| Resource | Limit |
-|----------|-------|
-| Minimum subnet CIDR | `/28` (16 IPs) |
-| Maximum subnet CIDR | `/16` (65,536 IPs) |
-| VPC CIDR range | `/16` to `/28` |
-| Reserved IPs per subnet | First 4 IPs |
+```bash
+# Count current usage
+VPC_COUNT=$(tccli vpc DescribeVpcs | jq -r '.Response.TotalCount')
+SUBNET_COUNT=$(tccli vpc DescribeSubnets | jq -r '.Response.TotalCount')
+echo "VP: $VPC_COUNT / 5 (default), Subnets: $SUBNET_COUNT / 100 (default per VPC)"
+```
+
+> See [VPC Limits](https://cloud.tencent.com/document/product/215/537) for the latest default quotas and adjustment requests.
 
 ## Connectivity Options
 

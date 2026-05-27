@@ -141,7 +141,7 @@ client = monitor_client.MonitorClient(cred, "")
 
 ```python
 def create_alarm_policy(client, name, namespace, metric, threshold, duration=60):
-    """Create alarm policy"""
+    # Create alarm policy
     req = models.CreateAlarmPolicyRequest()
     req.Module = "monitor"
     req.PolicyName = name
@@ -173,7 +173,7 @@ policy_id = create_alarm_policy(
 
 ```python
 def get_monitor_data(client, namespace, metric, instance_id, start_time, end_time):
-    """Query metric data"""
+    # Query metric data
     req = models.GetMonitorDataRequest()
     req.Namespace = namespace
     req.MetricName = metric
@@ -194,7 +194,7 @@ def get_monitor_data(client, namespace, metric, instance_id, start_time, end_tim
 
 ```python
 def bind_policy_to_instance(client, policy_id, instance_id):
-    """Bind alarm policy to instance"""
+    # Bind alarm policy to instance
     req = models.BindingPolicyObjectRequest()
     req.Module = "monitor"
     req.PolicyId = policy_id

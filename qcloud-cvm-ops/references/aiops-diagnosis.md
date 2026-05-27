@@ -33,7 +33,7 @@ AIOps for CVM implements:
 from scipy import stats
 
 def calculate_correlation(metric_a: List[float], metric_b: List[float]) -> float:
-    """Calculate Pearson correlation coefficient"""
+    # Calculate Pearson correlation coefficient
     if len(metric_a) != len(metric_b) or len(metric_a) < 2:
         return 0.0
     
@@ -41,7 +41,7 @@ def calculate_correlation(metric_a: List[float], metric_b: List[float]) -> float
     return correlation
 
 def interpret_correlation(value: float) -> str:
-    """Interpret correlation value"""
+    # Interpret correlation value
     if value > 0.7:
         return "Strong positive - likely same root cause"
     elif value > 0.3:
@@ -56,7 +56,7 @@ def interpret_correlation(value: float) -> str:
 
 ```python
 def correlate_metrics_for_instance(instance_id: str, metrics_data: Dict) -> CorrelationResult:
-    """Perform multi-metric correlation for single instance"""
+    # Perform multi-metric correlation for single instance
     
     result = CorrelationResult()
     result.instance_id = instance_id
@@ -162,7 +162,7 @@ cvm_diagnosis:
 
 ```python
 class DiagnosisDecisionTree:
-    """Cross-skill diagnosis decision tree"""
+    # Cross-skill diagnosis decision tree
     
     skill_map = {
         'CVM': 'qcloud-cvm-ops',
@@ -174,7 +174,7 @@ class DiagnosisDecisionTree:
     }
     
     def diagnose(self, issue: IssueContext) -> DiagnosisResult:
-        """Execute diagnosis decision tree"""
+        # Execute diagnosis decision tree
         
         # Load appropriate skill
         skill_name = self.skill_map.get(issue.resource_type)
@@ -208,7 +208,7 @@ class DiagnosisDecisionTree:
         return result
     
     def _evaluate_condition(self, condition: str, metrics: Dict) -> bool:
-        """Evaluate decision tree condition"""
+        # Evaluate decision tree condition
         # Parse condition string
         # Example: "CPUUsage > 90% AND NetworkIn correlation > 0.7"
         
@@ -290,7 +290,7 @@ delegation_protocol:
 
 ```python
 def delegate_to_vpc_skill(cvm_client, instance_id: str, issue: str):
-    """Delegate network issue to VPC skill"""
+    # Delegate network issue to VPC skill
     
     # Prepare context
     context = {
@@ -328,7 +328,7 @@ def delegate_to_vpc_skill(cvm_client, instance_id: str, issue: str):
 
 ```python
 def detect_alarm_storm(alarm_events: List[AlarmEvent], threshold: int = 10) -> Optional[AlarmStorm]:
-    """Detect alarm storm condition"""
+    # Detect alarm storm condition
     
     # Filter recent alarms (last 5 minutes)
     recent_alarms = [
@@ -406,7 +406,7 @@ alarm_storm_handling:
 
 ```python
 def handle_alarm_storm(storm: AlarmStorm) -> AlarmStormResolution:
-    """Handle alarm storm and generate resolution"""
+    # Handle alarm storm and generate resolution
     
     resolution = AlarmStormResolution()
     resolution.storm_id = storm.resource_id
@@ -457,7 +457,7 @@ def handle_alarm_storm(storm: AlarmStorm) -> AlarmStormResolution:
 
 ```python
 def analyze_metric_trend(metric_values: List[float], window: int = 7) -> TrendResult:
-    """Analyze metric trend for prediction"""
+    # Analyze metric trend for prediction
     
     if len(metric_values) < window:
         return TrendResult(trend='insufficient_data')
@@ -501,7 +501,7 @@ def analyze_metric_trend(metric_values: List[float], window: int = 7) -> TrendRe
     )
 
 def calculate_days_to_threshold(current: float, slope: float, threshold: float) -> int:
-    """Calculate days until threshold is reached"""
+    # Calculate days until threshold is reached
     if slope <= 0:
         return -1  # Never reached
     
@@ -574,7 +574,7 @@ def cross_skill_correlation(
     delegated_metrics: Dict,
     resource_relationships: Dict
 ) -> CrossSkillCorrelationResult:
-    """Correlate metrics across skills"""
+    # Correlate metrics across skills
     
     result = CrossSkillCorrelationResult()
     

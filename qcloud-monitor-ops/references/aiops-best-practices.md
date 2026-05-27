@@ -22,7 +22,7 @@ Monitor skill MUST implement comprehensive AIOps patterns for observability exce
 
 ```python
 def analyze_metric_correlation(metrics: Dict[str, List]) -> Dict:
-    """Multi-metric correlation for Monitor"""
+    # Multi-metric correlation for Monitor
     correlations = {}
     
     # CVM capacity correlation
@@ -219,7 +219,7 @@ alarm_storm_protocol:
 
 ```python
 def aggregate_alarm_storm(alarms: List[Alarm]) -> AggregatedIncident:
-    """Aggregate alarm storm by pattern"""
+    # Aggregate alarm storm by pattern
     patterns = {}
     
     for alarm in alarms:
@@ -254,7 +254,7 @@ def aggregate_alarm_storm(alarms: List[Alarm]) -> AggregatedIncident:
 
 ```python
 def predict_metric_trend(metric_history: List[float]) -> TrendPrediction:
-    """Predict metric trend for proactive alerting"""
+    # Predict metric trend for proactive alerting
     # Linear regression
     x = list(range(len(metric_history)))
     y = metric_history

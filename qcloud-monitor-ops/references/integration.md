@@ -130,7 +130,7 @@ alarm_triggered_flow:
 
 ```python
 def run_proactive_inspection():
-    """Proactive inspection invoking all skills"""
+    # Proactive inspection invoking all skills
     # Discovery phase
     resources = discover_all_resources()  # Monitor
     

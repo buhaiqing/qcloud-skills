@@ -4,6 +4,21 @@
 
 `tccli` is the official Tencent Cloud CLI tool for managing VPC resources. It supports JSON output by default and uses environment credentials.
 
+### JSON Path Reference
+
+| Short Name | Full jq Path |
+|------------|-------------|
+| `vpc.id` | `.Response.Vpc.VpcId` |
+| `vpc.name` | `.Response.VpcSet[0].VpcName` |
+| `vpc.cidr` | `.Response.VpcSet[0].CidrBlock` |
+| `vpc.state` | `.Response.VpcSet[0].State` |
+| `vpc.count` | `.Response.TotalCount` |
+| `subnet.id` | `.Response.Subnet.SubnetId` / `.Response.SubnetSet[].SubnetId` |
+| `subnet.cidr` | `.Response.SubnetSet[].CidrBlock` |
+| `subnet.state` | `.Response.SubnetSet[].State` |
+| `rtable.id` | `.Response.RouteTableSet[0].RouteTableId` |
+| `rtable.routes` | `.Response.RouteTableSet[0].RouteSet` |
+
 ### Installation
 
 ```bash
@@ -237,17 +252,15 @@ tccli vpc DescribeSubnets --Filters "[{\"Name\":\"zone\",\"Values\":[\"ap-guangz
 ### Common Extraction Patterns
 
 ```bash
-# Extract single field
-jq -r '.Response.Vpc.VpcId'
+# Extract single field (see JSON Path Reference above)
+jq -r 'vpc.id'
+jq -r 'vpc.name'
 
-# Extract array elements
+# List all VPC IDs
 jq -r '.Response.VpcSet[].VpcId'
 
-# Extract nested object
-jq -r '.Response.VpcSet[0].SubnetSet[].SubnetId'
-
 # Count results
-jq -r '.Response.TotalCount'
+jq -r 'vpc.count'
 
 # Filter by state
 jq '.Response.VpcSet[] | select(.State == "AVAILABLE")'

@@ -6,35 +6,35 @@ CDB-specific error codes, diagnostic steps, and recovery patterns for Tencent Cl
 
 ## 1. Error Code Reference (CDB-Specific)
 
-| Code | Meaning | Retry? | Agent Action |
-|------|---------|--------|--------------|
-| `InvalidParameter` | Parameter validation failed | No | Fix parameter per API spec |
-| `InvalidParameterValue` | Parameter value out of range | No | Adjust value per spec |
-| `MissingParameter` | Required parameter missing | No | Add missing parameter |
-| `ResourceNotFound` | Resource not found | No | Verify instance ID via DescribeDBInstances |
-| `ResourceNotFound.NoDBInstanceFound` | DB instance not found | No | Verify InstanceId |
-| `ResourceInsufficient` | Resource quota insufficient | No | HALT; raise quota or delete resources |
-| `InvalidSecretKey` | Credential invalid | No | HALT; fix credentials |
-| `InvalidSecretId` | Credential ID invalid | No | HALT; fix credentials |
-| `OperationDenied.InstanceLocked` | Instance locked by operation | Yes (3x, 30s) | Wait for operation completion; retry |
-| `OperationDenied.InstanceStatusError` | Wrong instance status for op | No | Check status via DescribeDBInstances |
-| `OperationDenied.NotSupported` | Operation not supported | No | Check instance type/version |
-| `OperationDenied.PayModeError` | Billing mode doesn't support op | No | Check prepaid vs postpaid |
-| `FailedOperation.AsyncTaskError` | Async task execution failure | Yes (3x) | Check async task; retry or escalate |
-| `FailedOperation.CreateOrderFailed` | Order creation failed | No | HALT; check account balance/spec validity |
-| `FailedOperation.StatusConflict` | Status conflict | Yes (2x, 10s) | Wait; retry |
-| `FailedOperation.TaskAlreadyExist` | Task already in progress | Yes (3x, 30s) | Wait; check DescribeTasks |
-| `FailedOperation.AuthStrategyError` | Authentication strategy error | No | Check account privileges |
-| `FailedOperation.TagDryRunError` | Tag dry-run error | No | Check tag format; retry without tags |
-| `LimitExceeded.ExceedMaxInstanceCount` | Max instance count exceeded | No | HALT; raise instance quota |
-| `LimitExceeded.ExceedMaxBackupCount` | Max backup count exceeded | No | Delete old backups |
-| `LimitExceeded.TooManyAccounts` | Too many accounts | No | Delete unused accounts |
-| `RequestLimitExceeded` | API rate limit exceeded | Yes (3x) | Exponential backoff (2s, 4s, 8s) |
-| `InternalError` | Internal server error | Yes (3x) | Retry; escalate with RequestId |
-| `InternalError.DBError` | Database internal error | Yes (3x) | Retry; escalate with RequestId |
-| `InternalError.TaskError` | Task internal error | Yes (3x) | Retry; check task details |
-| `UnauthorizedOperation` | Unauthorized operation | No | HALT; check CAM permissions |
-| `UnsupportedOperation` | Unsupported operation | No | Check version/region compatibility |
+| Code | Description | Recovery |
+|------|-------------|----------|
+| `InvalidParameter` | Parameter validation failed | Fix parameter per API spec |
+| `InvalidParameterValue` | Parameter value out of range | Adjust value per spec |
+| `MissingParameter` | Required parameter missing | Add missing parameter |
+| `ResourceNotFound` | Resource not found | Verify instance ID via DescribeDBInstances |
+| `ResourceNotFound.NoDBInstanceFound` | DB instance not found | Verify InstanceId |
+| `ResourceInsufficient` | Resource quota insufficient | HALT; raise quota or delete resources |
+| `InvalidSecretKey` | Credential invalid | HALT; fix credentials |
+| `InvalidSecretId` | Credential ID invalid | HALT; fix credentials |
+| `OperationDenied.InstanceLocked` | Instance locked by operation | Retry (3x, 30s); wait for completion |
+| `OperationDenied.InstanceStatusError` | Wrong instance status for op | Check status via DescribeDBInstances |
+| `OperationDenied.NotSupported` | Operation not supported | Check instance type/version |
+| `OperationDenied.PayModeError` | Billing mode doesn't support op | Check prepaid vs postpaid |
+| `FailedOperation.AsyncTaskError` | Async task execution failure | Retry (3x); check async task or escalate |
+| `FailedOperation.CreateOrderFailed` | Order creation failed | HALT; check account balance/spec validity |
+| `FailedOperation.StatusConflict` | Status conflict | Retry (2x, 10s); wait and retry |
+| `FailedOperation.TaskAlreadyExist` | Task already in progress | Retry (3x, 30s); check DescribeTasks |
+| `FailedOperation.AuthStrategyError` | Authentication strategy error | Check account privileges |
+| `FailedOperation.TagDryRunError` | Tag dry-run error | Check tag format; retry without tags |
+| `LimitExceeded.ExceedMaxInstanceCount` | Max instance count exceeded | HALT; raise instance quota |
+| `LimitExceeded.ExceedMaxBackupCount` | Max backup count exceeded | Delete old backups |
+| `LimitExceeded.TooManyAccounts` | Too many accounts | Delete unused accounts |
+| `RequestLimitExceeded` | API rate limit exceeded | Retry (3x); exponential backoff (2s, 4s, 8s) |
+| `InternalError` | Internal server error | Retry (3x); escalate with RequestId |
+| `InternalError.DBError` | Database internal error | Retry (3x); escalate with RequestId |
+| `InternalError.TaskError` | Task internal error | Retry (3x); check task details |
+| `UnauthorizedOperation` | Unauthorized operation | HALT; check CAM permissions |
+| `UnsupportedOperation` | Unsupported operation | Check version/region compatibility |
 
 ---
 

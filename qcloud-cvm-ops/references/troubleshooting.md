@@ -6,43 +6,43 @@ CVM-specific error codes, diagnostic steps, and recovery patterns.
 
 ## 1. Error Code Reference (CVM-Specific)
 
-| Code | Meaning | Retry? | Agent Action |
-|------|---------|--------|--------------|
-| `InvalidParameter` | Generic parameter error | No | Fix per API spec |
-| `InvalidParameter.ImageIdMalformed` | Image ID format invalid | No | Use `img-xxx` format |
-| `InvalidParameter.SubnetIdMalformed` | Subnet ID format invalid | No | Use `subnet-xxx` |
-| `InvalidParameter.VpcIdMalformed` | VPC ID format invalid | No | Use `vpc-xxx` |
-| `InvalidParameterValue` | Value out of valid range | No | Check enum/range in spec |
-| `InvalidParameterValue.InstanceTypeUnsupported` | Instance type not in zone | No | DescribeZoneInstanceConfigInfos |
-| `InvalidParameterValue.ZoneNotSupported` | Zone invalid for region | No | DescribeZones |
-| `InvalidParameterValue.RangeNotAllowed` | Disk size not allowed | No | Check disk size limits |
-| `MissingParameter` | Required param missing | No | Add required param |
-| `ResourceNotFound` | Generic not found | No | Verify resource exists |
-| `ResourceNotFound.InstanceNotFound` | Instance ID invalid | No | DescribeInstances to verify |
-| `ResourceNotFound.ImageNotFound` | Image ID invalid | No | DescribeImages to verify |
-| `ResourceNotFound.VpcNotFound` | VPC ID invalid | No | Delegate to VPC skill |
-| `ResourceNotFound.SubnetNotFound` | Subnet ID invalid | No | Delegate to VPC skill |
-| `ResourceNotFound.SecurityGroupNotFound` | SG ID invalid | No | Delegate to VPC skill |
-| `ResourceInsufficient` | Generic resource shortage | No | HALT |
-| `ResourceInsufficient.CvmInstanceQuotaIsFull` | Instance quota exceeded | No | Request quota increase |
-| `ResourceInsufficient.DiskQuotaIsFull` | CBS disk quota exceeded | No | Request quota increase |
-| `QuotaExceeded.SecurityGroupLimit` | SG quota exceeded | No | Use existing SG |
-| `QuotaExceeded.SnapshotLimit` | Snapshot quota exceeded | No | Delete old snapshots |
-| `InvalidVpc.NotFound` | VPC not found | No | Delegate to VPC skill |
-| `InvalidSubnet.NotFound` | Subnet not found | No | Delegate to VPC skill |
-| `InvalidSecurityGroupID.NotFound` | SG not found | No | Delegate to VPC skill |
-| `InvalidKeyPair.NotFound` | Key pair not found | No | CreateKeyPair first |
-| `OperationDenied` | Operation not allowed | No | Check account/instance state |
-| `OperationDenied.InstanceOperationConflict` | Another operation in progress | Yes (3x, 30s) | Wait, retry |
-| `OperationDenied.ImageStateConflict` | Image being modified | Yes (3x, 30s) | Wait, retry |
-| `RequestLimitExceeded` | API rate limit exceeded | Yes (3x, exp) | Back off exponentially |
-| `RequestLimitExceeded.UinLimitExceeded` | Account-level rate limit | Yes (3x, 60s) | Slow down requests |
-| `InternalError` | Server-side error | Yes (3x) | Retry; escalate if persists |
-| `InternalError.ResourceOpFailed` | Resource operation failed | Yes (3x) | Retry; check RequestId |
-| `UnauthorizedOperation` | No CAM permission | No | Grant CAM policy |
-| `UnauthorizedOperation.CamUnauthorized` | CAM permission denied | No | Add permission to policy |
-| `UnsupportedOperation` | Operation not supported | No | Check instance/region |
-| `UnsupportedOperation.InvalidInstanceState` | Instance state invalid for op | No | Wait for correct state |
+| Code | Description | Recovery |
+|------|-------------|----------|
+| `InvalidParameter` | Generic parameter error | Fix per API spec |
+| `InvalidParameter.ImageIdMalformed` | Image ID format invalid | Use `img-xxx` format |
+| `InvalidParameter.SubnetIdMalformed` | Subnet ID format invalid | Use `subnet-xxx` |
+| `InvalidParameter.VpcIdMalformed` | VPC ID format invalid | Use `vpc-xxx` |
+| `InvalidParameterValue` | Value out of valid range | Check enum/range in spec |
+| `InvalidParameterValue.InstanceTypeUnsupported` | Instance type not in zone | DescribeZoneInstanceConfigInfos |
+| `InvalidParameterValue.ZoneNotSupported` | Zone invalid for region | DescribeZones |
+| `InvalidParameterValue.RangeNotAllowed` | Disk size not allowed | Check disk size limits |
+| `MissingParameter` | Required param missing | Add required param |
+| `ResourceNotFound` | Generic not found | Verify resource exists |
+| `ResourceNotFound.InstanceNotFound` | Instance ID invalid | DescribeInstances to verify |
+| `ResourceNotFound.ImageNotFound` | Image ID invalid | DescribeImages to verify |
+| `ResourceNotFound.VpcNotFound` | VPC ID invalid | Delegate to VPC skill |
+| `ResourceNotFound.SubnetNotFound` | Subnet ID invalid | Delegate to VPC skill |
+| `ResourceNotFound.SecurityGroupNotFound` | SG ID invalid | Delegate to VPC skill |
+| `ResourceInsufficient` | Generic resource shortage | HALT |
+| `ResourceInsufficient.CvmInstanceQuotaIsFull` | Instance quota exceeded | Request quota increase |
+| `ResourceInsufficient.DiskQuotaIsFull` | CBS disk quota exceeded | Request quota increase |
+| `QuotaExceeded.SecurityGroupLimit` | SG quota exceeded | Use existing SG |
+| `QuotaExceeded.SnapshotLimit` | Snapshot quota exceeded | Delete old snapshots |
+| `InvalidVpc.NotFound` | VPC not found | Delegate to VPC skill |
+| `InvalidSubnet.NotFound` | Subnet not found | Delegate to VPC skill |
+| `InvalidSecurityGroupID.NotFound` | SG not found | Delegate to VPC skill |
+| `InvalidKeyPair.NotFound` | Key pair not found | CreateKeyPair first |
+| `OperationDenied` | Operation not allowed | Check account/instance state |
+| `OperationDenied.InstanceOperationConflict` | Another operation in progress | Retry (3x, 30s) |
+| `OperationDenied.ImageStateConflict` | Image being modified | Retry (3x, 30s) |
+| `RequestLimitExceeded` | API rate limit exceeded | Retry (3x, exp backoff) |
+| `RequestLimitExceeded.UinLimitExceeded` | Account-level rate limit | Retry (3x, 60s) |
+| `InternalError` | Server-side error | Retry (3x); escalate if persists |
+| `InternalError.ResourceOpFailed` | Resource operation failed | Retry (3x); check RequestId |
+| `UnauthorizedOperation` | No CAM permission | Grant CAM policy |
+| `UnauthorizedOperation.CamUnauthorized` | CAM permission denied | Add permission to policy |
+| `UnsupportedOperation` | Operation not supported | Check instance/region |
+| `UnsupportedOperation.InvalidInstanceState` | Instance state invalid for op | Wait for correct state |
 
 ---
 
@@ -251,7 +251,7 @@ Next step: {Specific action to take}
 
 ```python
 def diagnose_instance(client, instance_id):
-    """Round 1: Basic existence and state check"""
+    # Round 1: Basic existence and state check
     req = models.DescribeInstancesRequest()
     req.InstanceIds = [instance_id]
     
@@ -275,7 +275,7 @@ def diagnose_instance(client, instance_id):
 
 ```python
 def diagnose_network(client, instance_id, vpc_client):
-    """Round 2: Network configuration check"""
+    # Round 2: Network configuration check
     # Get instance VPC info
     instance_info = diagnose_instance(client, instance_id)
     
@@ -303,7 +303,7 @@ def diagnose_network(client, instance_id, vpc_client):
 
 ```python
 def diagnose_metrics(monitor_client, instance_id):
-    """Round 3: Check recent metrics for performance issues"""
+    # Round 3: Check recent metrics for performance issues
     req = models.GetMonitorDataRequest()
     req.Namespace = "QCE/CVM"
     req.MetricName = "CPUUsage"
@@ -350,7 +350,7 @@ For any CVM issue:
 
 ```python
 def retry_with_backoff(func, max_retries=3):
-    """Execute function with exponential backoff"""
+    # Execute function with exponential backoff
     for attempt in range(max_retries):
         try:
             return func()

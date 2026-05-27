@@ -480,13 +480,13 @@ class AuditCategory:
 
 @dataclass
 class AuditResult:
-    """Overall audit result with recommendations"""
+    # Overall audit result with recommendations
     categories: Dict[str, AuditCategory] = field(default_factory=dict)
     score: float = 0.0
     grade: str = "F"
 
     def calculate(self) -> None:
-        """Calculate weighted score and determine grade"""
+        # Calculate weighted score and determine grade
         weighted_sum = 0.0
         total_critical = 0
 
@@ -533,7 +533,7 @@ class AuditResult:
 
 
 def run_audit(rules_results: Dict[str, bool]) -> AuditResult:
-    """Run audit from rule pass/fail results"""
+    # Run audit from rule pass/fail results
     categories = {
         "Lifecycle": AuditCategory("Lifecycle", 0.10, ["LIFE-001","LIFE-002","LIFE-003","LIFE-004","LIFE-005","LIFE-006","LIFE-007"]),
         "Security": AuditCategory("Security", 0.30, ["SEC-001","SEC-002","SEC-003","SEC-004","SEC-005","SEC-006","SEC-007","SEC-008","SEC-009"]),

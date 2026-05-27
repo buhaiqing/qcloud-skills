@@ -434,7 +434,7 @@ def get_error_logs(instance_id, start_time, end_time):
 
 ```python
 def paginate_all_instances():
-    """Fetch all instances with pagination."""
+    # Fetch all instances with pagination
     all_instances = []
     offset = 0
     limit = 100
@@ -463,7 +463,7 @@ def paginate_all_instances():
 
 ```python
 def safe_api_call(func, *args, max_retries=3, **kwargs):
-    """Retry wrapper for CDB API calls."""
+    # Retry wrapper for CDB API calls
     last_error = None
     for attempt in range(max_retries):
         try:

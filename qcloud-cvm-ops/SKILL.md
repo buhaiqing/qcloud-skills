@@ -49,15 +49,13 @@ CVM (Cloud Virtual Machine) is Tencent Cloud's primary compute service providing
 
 ## Five Core Standards (Quality Gates)
 
-Every generated skill MUST satisfy these five standards. Use them as a design checklist:
-
 | # | Standard | How This Skill Fulfills It |
 |---|----------|---------------------------|
-| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT Use conditions with precise triggers (CVM, 云服务器) and delegation rules (VPC → qcloud-vpc-ops, CLB → qcloud-clb-ops) |
-| 2 | **Structured I/O** | Placeholder conventions (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`) with type and source documented per operation |
-| 3 | **Explicit Actionable Steps** | Every operation: Pre-flight → Execute → Validate → Recover, with numbered imperative steps for CLI and SDK paths |
-| 4 | **Complete Failure Strategies** | Error taxonomy table with ≥ 12 CVM-specific codes; HALT vs retry per error type |
-| 5 | **Absolute Single Responsibility** | One product (CVM), primary resource model (Instance); cross-product delegation documented |
+| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT with precise triggers and delegation rules |
+| 2 | **Structured I/O** | Placeholder conventions (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`) per operation |
+| 3 | **Explicit Actionable Steps** | Every operation: Pre-flight → Execute → Validate → Recover |
+| 4 | **Complete Failure Strategies** | Error taxonomy with ≥ 12 CVM-specific codes; HALT vs retry per error type |
+| 5 | **Absolute Single Responsibility** | One product (CVM), primary resource model (Instance) |
 
 Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates) for detailed descriptions.
 
@@ -354,15 +352,15 @@ done
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Backoff | Agent Action | UX Feedback |
-|--------------|-------------|---------|--------------|-------------|
-| `InvalidParameter.ImageIdMalformed` | 0 | — | Fix image ID format | `[ERROR] InvalidParameter.ImageIdMalformed: Image ID format invalid. Fix: Use valid format img-xxx. Next: DescribeImages to find valid images.` |
-| `InvalidParameterValue.InstanceTypeUnsupported` | 0 | — | Check instance type availability in zone | `[ERROR] InvalidParameterValue: Instance type not available. Fix: Check zone-instance type matrix. Next: DescribeZoneInstanceConfigInfos` |
-| `ResourceInsufficient.CvmInstanceQuotaIsFull` | 0 | — | HALT | `[ERROR] Quota exceeded. Fix: Request quota increase or delete unused instances. Next: DescribeAccountQuota` |
-| `QuotaExceeded.SecurityGroupLimit` | 0 | — | HALT | `[ERROR] Security group quota exceeded. Fix: Use existing SG or request quota increase.` |
-| `InvalidVpc.NotFound` | 0 | — | HALT, delegate to VPC skill | `[ERROR] VPC not found. Delegate to qcloud-vpc-ops.` |
-| `RequestLimitExceeded` | 3 | exp | Back off, retry | `⚠️ Rate limit. Retrying...` |
-| `InternalError` | 3 | 2s,4s,8s | Retry; HALT with RequestId if persists | `[ERROR] Internal error. Retry or escalate with RequestId.` |
+| Error pattern | Retry Strategy | Recovery |
+|--------------|----------------|----------|
+| `InvalidParameter.ImageIdMalformed` | 0 | Fix image ID format to `img-xxx`; use DescribeImages to find valid images |
+| `InvalidParameterValue.InstanceTypeUnsupported` | 0 | Check zone-instance type matrix via DescribeZoneInstanceConfigInfos |
+| `ResourceInsufficient.CvmInstanceQuotaIsFull` | 0 | HALT. Request quota increase or delete unused instances |
+| `QuotaExceeded.SecurityGroupLimit` | 0 | HALT. Use existing SG or request quota increase |
+| `InvalidVpc.NotFound` | 0 | HALT. Delegate to qcloud-vpc-ops |
+| `RequestLimitExceeded` | 3, exp backoff | Back off and retry |
+| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
 
 ### Operation: DescribeInstances
 
@@ -721,21 +719,21 @@ python3 -c "from tencentcloud.cvm import cvm_client; print('✅ SDK OK')" && tcc
 
 ## Error Code Reference (CVM-Specific)
 
-| Code | Meaning | Retry? | Agent Action |
-|------|---------|--------|--------------|
-| `InvalidParameter` | Generic parameter error | No | Fix per API spec |
-| `InvalidParameter.ImageIdMalformed` | Image ID format wrong | No | Use `img-xxx` format |
-| `InvalidParameterValue.InstanceTypeUnsupported` | Type not in zone | No | Check zone-type matrix |
-| `InvalidParameterValue.ZoneNotSupported` | Zone invalid for operation | No | Use valid zone |
-| `MissingParameter` | Required param absent | No | Add missing param |
-| `ResourceNotFound.InstanceNotFound` | Instance ID invalid | No | Verify via Describe |
-| `ResourceInsufficient.CvmInstanceQuotaIsFull` | Instance quota exceeded | No | Request quota increase |
-| `QuotaExceeded.SecurityGroupLimit` | SG quota exceeded | No | Use existing SG |
-| `InvalidVpc.NotFound` | VPC ID invalid | No | Delegate to VPC skill |
-| `InvalidSubnet.NotFound` | Subnet ID invalid | No | Delegate to VPC skill |
-| `OperationConflict.InstanceOperationConflict` | Another op in progress | Yes (3x, 30s) | Wait, retry |
-| `RequestLimitExceeded` | API rate limit | Yes (3x, exp) | Back off |
-| `InternalError` | Server error | Yes (3x) | Retry; escalate |
+| Code | Description | Recovery |
+|------|-------------|----------|
+| `InvalidParameter` | Generic parameter error | Fix per API spec |
+| `InvalidParameter.ImageIdMalformed` | Image ID format wrong | Use `img-xxx` format |
+| `InvalidParameterValue.InstanceTypeUnsupported` | Type not in zone | Check zone-type matrix |
+| `InvalidParameterValue.ZoneNotSupported` | Zone invalid for operation | Use valid zone |
+| `MissingParameter` | Required param absent | Add missing param |
+| `ResourceNotFound.InstanceNotFound` | Instance ID invalid | Verify via Describe |
+| `ResourceInsufficient.CvmInstanceQuotaIsFull` | Instance quota exceeded | Request quota increase |
+| `QuotaExceeded.SecurityGroupLimit` | SG quota exceeded | Use existing SG |
+| `InvalidVpc.NotFound` | VPC ID invalid | Delegate to VPC skill |
+| `InvalidSubnet.NotFound` | Subnet ID invalid | Delegate to VPC skill |
+| `OperationConflict.InstanceOperationConflict` | Another op in progress | Retry (3x, 30s) |
+| `RequestLimitExceeded` | API rate limit | Retry (3x, exp backoff) |
+| `InternalError` | Server error | Retry (3x); escalate |
 
 ---
 

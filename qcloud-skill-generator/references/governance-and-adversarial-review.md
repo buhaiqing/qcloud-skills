@@ -16,7 +16,7 @@ Adversarial review catches issues before merge:
 
 ## Charter (宪章)
 
-**§0 Charter**: Every generated skill MUST pass Charter Compliance Checklist (C1-C5) before merge.
+**§0 Charter**: Every generated skill MUST pass Charter Compliance Checklist (C1-C6) before merge.
 
 ---
 
@@ -137,13 +137,32 @@ Adversarial review catches issues before merge:
 
 ---
 
+### Scenario 6: Token Efficiency Violations (C6)
+
+**Scenario**: Generated skill contains unnecessarily verbose content — redundant docstrings, bloated tables, duplicated flows, or hardcoded static data that wastes LLM context.
+
+**Test Steps**:
+1. Check for TE-1 violations: hardcoded static data (engine versions, ports, zones) — verify with `tccli help <product>` or API Describe[Version] calls
+2. Check for TE-2 violations: Python `"""docstring"""` on every function in SDK code blocks — should use `#` line comments instead
+3. Check for TE-3 violations: error tables with > 3 columns — compact to `Error Code | Description | Recovery`
+4. Check for TE-4 violations: JSON paths repeated inline instead of centralized declaration
+5. Check for TE-5 violations: YAML configs with duplicate anchor-eligible fields
+6. Check for TE-6 violations: Pre-flight → Execute → Validate → Recover flow duplicated across SKILL.md and reference files
+7. Check for TE-7 violations: tables with redundant Description columns that merely restate the field name
+
+**Expected Result**: All TE rules applied per [Token Efficiency Requirements](../../SKILL.md#token-efficiency-requirements-p0).
+
+**Severity**: MEDIUM — Optimize before merge. Blocking for context-heavy files (>2000 tokens).
+
+---
+
 ## Review Protocol
 
 ### Pre-Merge Review Steps
 
 ```markdown
 1. **Automated Charter Check**:
-   - Run C1-C5 checklist via grep commands
+   - Run C1-C6 checklist via grep commands
    - All MUST pass
    
 2. **Security Review (R1)**:
@@ -163,7 +182,7 @@ Adversarial review catches issues before merge:
    - Error format check
    
 6. **Adversarial Scenarios**:
-   - Run all 5 scenarios
+   - Run all 6 scenarios
    - All MUST pass or be addressed
 ```
 
@@ -173,12 +192,12 @@ Adversarial review catches issues before merge:
 
 | Category | Items | Severity |
 |----------|-------|----------|
-| Charter (C1-C5) | 5 checks | Blocking |
+| Charter (C1-C6) | 6 checks | Blocking |
 | Security (R1) | 4 checks | Blocking for HIGH |
 | API Fidelity (R2) | 4 checks | Blocking for HIGH |
 | Safety (R3) | 4 checks | Blocking for missing confirmation |
 | UX (R4) | 4 checks | Non-blocking |
-| Adversarial | 5 scenarios | Blocking for HIGH |
+| Adversarial | 6 scenarios | Blocking for HIGH |
 
 ---
 
@@ -201,6 +220,7 @@ Adversarial review catches issues before merge:
 | C3 Five Standards | ✓/✗ | [notes] |
 | C4 Well-Architected | ✓/✗ | [notes] |
 | C5 Variables | ✓/✗ | [notes] |
+| C6 Token Efficiency | ✓/✗ | [notes] |
 
 ### Security Review (R1)
 
@@ -237,6 +257,7 @@ Adversarial review catches issues before merge:
 | API Hallucination | ✓ | All methods verified |
 | Missing Dependency | ✓ | Delegation documented |
 | Over-Broad Trigger | ✓ | Description specific |
+| Token Efficiency | ✓ | TE-1~TE-7 rules applied |
 
 ### Overall Assessment
 

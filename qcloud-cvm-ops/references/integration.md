@@ -258,7 +258,7 @@ TENCENTCLOUD_REGION=ap-guangzhou
 ```python
 # Before creating CVM, verify VPC exists
 def verify_vpc_exists(vpc_client, vpc_id):
-    """Delegate to VPC skill for verification"""
+    # Delegate to VPC skill for verification
     from qcloud_vpc_ops import DescribeVpcsRequest
     
     req = DescribeVpcsRequest()
@@ -272,7 +272,7 @@ def verify_vpc_exists(vpc_client, vpc_id):
 
 # Before creating CVM, verify Security Group exists
 def verify_sg_exists(vpc_client, sg_id):
-    """Delegate to VPC skill for verification"""
+    # Delegate to VPC skill for verification
     req = DescribeSecurityGroupsRequest()
     req.SecurityGroupIds = [sg_id]
     

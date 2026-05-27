@@ -160,19 +160,23 @@ clb_security_group:
 
 ### 3.1 Billing Model Comparison
 
-| Model | Pricing | Best For |
-|-------|---------|----------|
-| Shared CLB (公网共享型) | ¥0.02/hour + bandwidth | Small traffic, cost-sensitive |
-| Dedicated CLB (公网独享型) | ¥0.8/hour + bandwidth | High traffic, stable performance |
-| Internal CLB (内网型) | ¥0.01/hour | Internal microservices |
+| Model | Best For |
+|-------|----------|
+| Shared CLB (公网共享型) | Small traffic, cost-sensitive |
+| Dedicated CLB (公网独享型) | High traffic, stable performance |
+| Internal CLB (内网型) | Internal microservices |
+
+> Hourly rates vary by region. Check current pricing at `https://buy.cloud.tencent.com/price/clb`.
 
 **Monthly Cost Estimation:**
 
-| Type | Hourly | Monthly (24*30) | Bandwidth |
-|------|--------|-----------------|-----------|
-| Shared OPEN | ¥0.02 | ¥14.4 | Extra |
-| Dedicated OPEN | ¥0.8 | ¥576 | Extra |
-| Internal | ¥0.01 | ¥7.2 | None |
+| Type | Best For |
+|------|----------|
+| Shared OPEN | Small traffic, cost-sensitive |
+| Dedicated OPEN | High traffic, stable performance |
+| Internal | Internal microservices |
+
+> Current pricing available at `https://buy.cloud.tencent.com/price/clb`.
 
 ### 3.2 Idle Resource Detection
 
@@ -192,11 +196,11 @@ tccli clb DescribeIdleLoadBalancers --Region ap-guangzhou
 
 ### 3.3 Right-Sizing Recommendations
 
-| Current State | Recommendation | Savings |
-|---------------|----------------|---------|
-| Shared with high traffic | Upgrade to Dedicated | Better performance |
-| Dedicated with low traffic | Downgrade to Shared | ~¥560/month |
-| Multiple LBs with low traffic | Consolidate to one | Hardware savings |
+| Current State | Recommendation |
+|---------------|----------------|
+| Shared with high traffic | Upgrade to Dedicated |
+| Dedicated with low traffic | Downgrade to Shared |
+| Multiple LBs with low traffic | Consolidate to one |
 
 ---
 

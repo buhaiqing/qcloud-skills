@@ -527,35 +527,35 @@ tccli cdb DescribeAsyncRequestInfo \
 
 Most CDB operations are supported by `tccli cdb`. The following operations may require SDK fallback:
 
-| Operation | CLI Support | SDK Fallback Needed? | Reason |
-|-----------|-------------|---------------------|--------|
-| DescribeDBInstances | ✅ Full | No | — |
-| CreateDBInstance | ✅ Full | No | — |
-| CreateDBInstanceHour | ✅ Full | No | — |
-| UpgradeDBInstance | ✅ Full | No | — |
-| RestartDBInstances | ✅ Full | No | — |
-| IsolateDBInstance | ✅ Full | No | — |
-| ReleaseIsolatedDBInstances | ✅ Full | No | — |
-| RenewDBInstance | ✅ Full | No | — |
-| CreateBackup | ✅ Full | No | — |
-| DescribeBackups | ✅ Full | No | — |
-| DeleteBackups | ✅ Full | No | — |
-| ModifyBackupConfig | ✅ Full | No | — |
-| CreateCloneInstance | ✅ Full | No | — |
-| CreateAccounts | ✅ Full | No | — |
-| DescribeAccounts | ✅ Full | No | — |
-| ModifyAccountPassword | ✅ Full | No | — |
-| ModifyAccountPrivileges | ✅ Full | No | — |
-| DeleteAccounts | ✅ Full | No | — |
-| ModifyInstanceParam | ✅ Full | No | — |
-| DescribeInstanceParams | ✅ Full | No | — |
-| OpenSSL | ✅ Full | No | — |
-| CloseSSL | ✅ Full | No | — |
-| DescribeSSLStatus | ✅ Full | No | — |
-| OpenWanService | ✅ Full | No | — |
-| CloseWanService | ✅ Full | No | — |
-| DescribeSlowLogData | ✅ Full | No | — |
-| DescribeErrorLogData | ✅ Full | No | — |
-| UpgradeDBInstanceEngineVersion | ✅ Full | No | — |
-| DescribeTasks | ✅ Full | No | — |
-| DescribeAsyncRequestInfo | ✅ Full | No | — |
+| Operation | CLI Support | SDK Fallback Needed? |
+|-----------|-------------|---------------------|
+| DescribeDBInstances | ✅ Full | No |
+| CreateDBInstance | ✅ Full | No |
+| CreateDBInstanceHour | ✅ Full | No |
+| UpgradeDBInstance | ✅ Full | No |
+| RestartDBInstances | ✅ Full | No |
+| IsolateDBInstance | ✅ Full | No |
+| ReleaseIsolatedDBInstances | ✅ Full | No |
+| RenewDBInstance | ✅ Full | No |
+| CreateBackup | ✅ Full | No |
+| DescribeBackups | ✅ Full | No |
+| DeleteBackups | ✅ Full | No |
+| ModifyBackupConfig | ✅ Full | No |
+| CreateCloneInstance | ✅ Full | No |
+| CreateAccounts | ✅ Full | No |
+| DescribeAccounts | ✅ Full | No |
+| ModifyAccountPassword | ✅ Full | No |
+| ModifyAccountPrivileges | ✅ Full | No |
+| DeleteAccounts | ✅ Full | No |
+| ModifyInstanceParam | ✅ Full | No |
+| DescribeInstanceParams | ✅ Full | No |
+| OpenSSL | ✅ Full | No |
+| CloseSSL | ✅ Full | No |
+| DescribeSSLStatus | ✅ Full | No |
+| OpenWanService | ✅ Full | No |
+| CloseWanService | ✅ Full | No |
+| DescribeSlowLogData | ✅ Full | No |
+| DescribeErrorLogData | ✅ Full | No |
+| UpgradeDBInstanceEngineVersion | ✅ Full | No |
+| DescribeTasks | ✅ Full | No |
+| DescribeAsyncRequestInfo | ✅ Full | No |

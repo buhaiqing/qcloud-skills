@@ -158,13 +158,7 @@ Operations not exposed via CLI (requires SDK):
 
 ## Rate Limits
 
-| API | Rate Limit |
-|-----|------------|
-| CreateLoadBalancer | 20/s |
-| DescribeLoadBalancers | 20/s |
-| DeleteLoadBalancer | 20/s |
-| CreateListener | 20/s |
-| RegisterTargets | 20/s |
+All CLB APIs share a rate limit of 20 requests per second. Check current limits via API documentation at `https://cloud.tencent.com/document/api/214`.
 
 ## Error Handling Patterns
 

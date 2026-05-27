@@ -251,7 +251,7 @@ if __name__ == "__main__":
 
 #### Post-execution Validation
 
-1. Capture `{{output.deal_id}}` from `$.Response.DealIds[0]`
+1. Capture `{{output.deal_id}}` from CreateDBInstance response
 2. Poll `DescribeTasks` or use `DescribeAsyncRequestInfo` until instance status is 1 (running)
 3. On success, report instance ID and connection info
 
@@ -322,14 +322,14 @@ if __name__ == "__main__":
 | Field | JSON Path | Notes |
 |-------|-----------|-------|
 | InstanceId | `$.Response.Items[].InstanceId` | Instance unique ID |
-| InstanceName | `$.Response.Items[].InstanceName` | Instance name |
+| InstanceName | `$.Response.Items[].InstanceName` | — |
 | Status | `$.Response.Items[].Status` | 0=creating, 1=running, 4=isolating, 5=isolated |
 | Memory | `$.Response.Items[].Memory` | Memory in MB |
 | Volume | `$.Response.Items[].Volume` | Disk in GB |
-| EngineVersion | `$.Response.Items[].EngineVersion` | MySQL version |
-| Vip | `$.Response.Items[].Vip` | Private IP address |
+| EngineVersion | `$.Response.Items[].EngineVersion` | — |
+| Vip | `$.Response.Items[].Vip` | — |
 | Vport | `$.Response.Items[].Vport` | Port (default 3306) |
-| Zone | `$.Response.Items[].Zone` | Availability zone |
+| Zone | `$.Response.Items[].Zone` | — |
 | InstanceType | `$.Response.Items[].InstanceType` | 1=master, 2=DR, 3=read-only |
 | AutoRenew | `$.Response.Items[].AutoRenew` | Auto-renewal flag |
 
@@ -740,26 +740,26 @@ tccli cdb DescribeSlowLogData \
 
 ## Error Code Reference (≥ 12 Product-Specific Codes)
 
-| Code | Meaning | Retry? | Agent Action |
-|------|---------|--------|--------------|
-| `InvalidParameter` | Parameter validation failed | No | Fix parameter; retry with correct value |
-| `InvalidParameterValue` | Parameter value out of range | No | Adjust value per spec |
-| `MissingParameter` | Required parameter missing | No | Add missing parameter |
-| `ResourceNotFound` | Resource not found | No | Verify instance ID via DescribeDBInstances |
-| `ResourceNotFound.NoDBInstanceFound` | DB instance not found | No | Verify InstanceId |
-| `ResourceInsufficient` | Resource quota insufficient | No | HALT; raise quota or delete resources |
-| `InvalidSecretKey` | Credential invalid | No | HALT; fix credentials |
-| `OperationDenied.InstanceLocked` | Instance locked by operation | Yes (3x, 30s) | Wait for operation completion; retry |
-| `OperationDenied.InstanceStatusError` | Wrong instance status | No | Check instance status via DescribeDBInstances |
-| `FailedOperation.AsyncTaskError` | Async task execution failure | Yes (3x) | Check async task; retry or escalate |
-| `FailedOperation.CreateOrderFailed` | Order creation failed | No | HALT; check account balance/spec validity |
-| `FailedOperation.StatusConflict` | Status conflict | Yes (2x, 10s) | Wait; retry |
-| `LimitExceeded.ExceedMaxInstanceCount` | Max instance count exceeded | No | HALT; raise instance quota |
-| `RequestLimitExceeded` | API rate limit | Yes (3x) | Exponential backoff |
-| `InternalError` | Internal server error | Yes (3x) | Retry; escalate with RequestId |
-| `InternalError.DBError` | Database internal error | Yes (3x) | Retry; escalate with RequestId |
-| `InternalError.TaskError` | Task internal error | Yes (3x) | Retry; check task details |
-| `UnauthorizedOperation` | Unauthorized operation | No | HALT; check CAM permissions |
+| Code | Description | Recovery |
+|------|-------------|----------|
+| `InvalidParameter` | Parameter validation failed | Fix parameter per API spec |
+| `InvalidParameterValue` | Parameter value out of range | Adjust value per spec |
+| `MissingParameter` | Required parameter missing | Add missing parameter |
+| `ResourceNotFound` | Resource not found | Verify instance ID via DescribeDBInstances |
+| `ResourceNotFound.NoDBInstanceFound` | DB instance not found | Verify InstanceId |
+| `ResourceInsufficient` | Resource quota insufficient | HALT; raise quota or delete resources |
+| `InvalidSecretKey` | Credential invalid | HALT; fix credentials |
+| `OperationDenied.InstanceLocked` | Instance locked by operation | Retry (3x, 30s); wait for completion |
+| `OperationDenied.InstanceStatusError` | Wrong instance status | Check status via DescribeDBInstances |
+| `FailedOperation.AsyncTaskError` | Async task execution failure | Retry (3x); check async task or escalate |
+| `FailedOperation.CreateOrderFailed` | Order creation failed | HALT; check account balance/spec validity |
+| `FailedOperation.StatusConflict` | Status conflict | Retry (2x, 10s); wait and retry |
+| `LimitExceeded.ExceedMaxInstanceCount` | Max instance count exceeded | HALT; raise instance quota |
+| `RequestLimitExceeded` | API rate limit | Retry (3x); exponential backoff |
+| `InternalError` | Internal server error | Retry (3x); escalate with RequestId |
+| `InternalError.DBError` | Database internal error | Retry (3x); escalate with RequestId |
+| `InternalError.TaskError` | Task internal error | Retry (3x); check task details |
+| `UnauthorizedOperation` | Unauthorized operation | HALT; check CAM permissions |
 
 ---
 

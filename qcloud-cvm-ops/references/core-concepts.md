@@ -82,16 +82,12 @@ Size codes:
 
 ### Instance Type Matrix (S5 Family)
 
-| Type | vCPU | Memory (GB) | Network (Gbps) | Use Case |
-|------|------|-------------|----------------|----------|
-| S5.SMALL1 | 1 | 1 | 0.5 | Testing |
-| S5.SMALL2 | 1 | 2 | 0.5 | Light web |
-| S5.MEDIUM2 | 2 | 2 | 1.0 | Dev/test |
-| S5.MEDIUM4 | 2 | 4 | 1.0 | Small app |
-| S5.LARGE4 | 4 | 4 | 1.5 | Web server |
-| S5.LARGE8 | 4 | 8 | 1.5 | App server |
-| S5.2XLARGE16 | 8 | 16 | 2.5 | Database |
-| S5.4XLARGE32 | 16 | 32 | 5.0 | Large app |
+Check available instance types via API:
+
+```bash
+# Query all S5 types available in a zone
+tccli cvm DescribeZoneInstanceConfigInfos --Region ap-guangzhou --Zone ap-guangzhou-3 | jq '.Response.InstanceTypeQuotaSet[] | select(.Status=="AVAILABLE" and (.InstanceFamily|test("S5"))) | {InstanceType, Cpu, Memory}'
+```
 
 ---
 
@@ -99,13 +95,13 @@ Size codes:
 
 ### CBS Disk Types
 
-| Type | Code | Performance | Use Case | Price |
-|------|------|-------------|----------|-------|
-| **Premium Cloud** | `CLOUD_PREMIUM` | High throughput, good IOPS | General workloads | Medium |
-| **SSD Cloud** | `CLOUD_SSD` | Ultra-high IOPS | Database, critical | High |
-| **Enhanced SSD** | `CLOUD_HSSD` | Maximum IOPS | High-performance DB | Premium |
-| **Basic Cloud** | `CLOUD_BASIC` | Standard performance | Archive, backup | Low |
-| **Local SSD** | `LOCAL_SSD` | Ultra-fast ephemeral | Temp high-IO | Medium |
+| Type | Code | Performance | Use Case |
+|------|------|-------------|----------|
+| **Premium Cloud** | `CLOUD_PREMIUM` | High throughput, good IOPS | General workloads |
+| **SSD Cloud** | `CLOUD_SSD` | Ultra-high IOPS | Database, critical |
+| **Enhanced SSD** | `CLOUD_HSSD` | Maximum IOPS | High-performance DB |
+| **Basic Cloud** | `CLOUD_BASIC` | Standard performance | Archive, backup |
+| **Local SSD** | `LOCAL_SSD` | Ultra-fast ephemeral | Temp high-IO |
 
 ### CBS Limits
 
@@ -128,26 +124,15 @@ Size codes:
 
 ### Regions (China)
 
-| Region | Code | Zones |
-|--------|------|-------|
-| Guangzhou | `ap-guangzhou` | 1, 2, 3, 4, 6, 7 |
-| Shanghai | `ap-shanghai` | 1, 2, 3, 4, 5 |
-| Beijing | `ap-beijing` | 1, 2, 3, 4, 5, 6, 7 |
-| Chengdu | `ap-chengdu` | 1 |
-| Nanjing | `ap-nanjing` | 1, 2 |
-| Chongqing | `ap-chongqing` | 1 |
+Query via API:
+
+```bash
+tccli cvm DescribeRegions | jq '.Response.RegionSet[] | select(.RegionState=="AVAILABLE")'
+```
 
 ### Regions (International)
 
-| Region | Code | Zones |
-|--------|------|-------|
-| Hong Kong | `ap-hongkong` | 1, 2 |
-| Singapore | `ap-singapore` | 1, 2, 3 |
-| Tokyo | `ap-tokyo` | 1, 2 |
-| Seoul | `ap-seoul` | 1, 2 |
-| Frankfurt | `eu-frankfurt` | 1, 2 |
-| Silicon Valley | `na-siliconvalley` | 1, 2 |
-| Virginia | `na-ashburn` | 1, 2 |
+Same API returns international regions — filter where needed.
 
 ### Zone Selection Criteria
 
@@ -160,13 +145,13 @@ Size codes:
 
 ## 5. Quotas and Limits
 
-### Instance Quotas (Default)
+### Instance Quotas
 
-| Limit | Postpaid | Prepaid |
-|-------|----------|---------|
-| Max instances per region | 50 | 100 |
-| Max instances per zone | 30 | 50 |
-| Max prepaid duration | — | 5 years |
+Query actual account quotas via API:
+
+```bash
+tccli cvm DescribeAccountQuota --Region ap-guangzhou
+```
 
 ### Check Quota
 
@@ -174,13 +159,15 @@ Size codes:
 tccli cvm DescribeAccountQuota --Region ap-guangzhou
 ```
 
-### CBS Quotas
+### CBS Quotas (defaults)
 
 | Limit | Value |
 |-------|-------|
 | Max CBS disks per region | 100 |
 | Max snapshots per region | 64 |
 | Max images per region | 50 |
+
+Instance quotas vary by account type; query with `DescribeAccountQuota`.
 
 ### Request Quota Increase
 

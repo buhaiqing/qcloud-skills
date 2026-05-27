@@ -6,6 +6,12 @@
 # example-config.yaml
 # Tencent Cloud CLB (Load Balancer) Example Configuration
 
+# YAML anchors
+x-defaults:
+  backend_default: &backend_default
+    port: 8080
+    weight: 10
+
 load_balancer:
   name: "my-web-lb"
   type: "OPEN"  # Public network
@@ -34,15 +40,12 @@ listeners:
       http_path: "/health"
 
 backend_servers:
-  - instance_id: "ins-server1"
-    port: 8080
-    weight: 10
-  - instance_id: "ins-server2"
-    port: 8080
-    weight: 10
-  - instance_id: "ins-server3"
-    port: 8080
-    weight: 10
+  - <<: *backend_default
+    instance_id: "ins-server1"
+  - <<: *backend_default
+    instance_id: "ins-server2"
+  - <<: *backend_default
+    instance_id: "ins-server3"
 
 target_group:
   enabled: false
@@ -66,15 +69,21 @@ ux:
       - backend_port
   
   feedback:
-    success_message: "✅ LoadBalancer {{output.loadbalancer_id}} created successfully"
+    success_message: "LoadBalancer {{output.loadbalancer_id}} created successfully"
     progress_indicator: true
-    error_format: "[ERROR] {code}: {message} → {resolution}"
+    error_format: "[ERROR] {code}: {message} -> {resolution}"
 ```
 
 ## High Availability Configuration
 
 ```yaml
 # ha-config.yaml
+# YAML anchors
+x-defaults:
+  backend_ha_default: &backend_ha_default
+    port: 3306
+    weight: 10
+
 load_balancer:
   name: "ha-lb"
   type: "OPEN"
@@ -89,18 +98,15 @@ listeners:
 
 backend_servers:
   # Multi-zone deployment
-  - instance_id: "ins-zone1-a"
+  - <<: *backend_ha_default
+    instance_id: "ins-zone1-a"
     zone: "ap-guangzhou-1"
-    port: 3306
-    weight: 10
-  - instance_id: "ins-zone2-a"
+  - <<: *backend_ha_default
+    instance_id: "ins-zone2-a"
     zone: "ap-guangzhou-2"
-    port: 3306
-    weight: 10
-  - instance_id: "ins-zone3-a"
+  - <<: *backend_ha_default
+    instance_id: "ins-zone3-a"
     zone: "ap-guangzhou-3"
-    port: 3306
-    weight: 10
 
 health_check:
   tcp_check:

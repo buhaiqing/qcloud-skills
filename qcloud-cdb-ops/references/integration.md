@@ -106,7 +106,7 @@ pip install tencentcloud-sdk-python
 
 ```python
 #!/usr/bin/env python3
-"""CDB SDK connection test."""
+# CDB SDK connection test
 import os
 from tencentcloud.common import credential
 from tencentcloud.cdb.v20170320 import cdb_client, models
@@ -261,7 +261,7 @@ output "cdb_vport" {
 
 ```python
 #!/usr/bin/env python3
-"""List all CDB instances across regions with key metadata."""
+# List all CDB instances across regions with key metadata
 import os, json
 from tencentcloud.common import credential
 from tencentcloud.cdb.v20170320 import cdb_client, models
@@ -321,7 +321,7 @@ print(f'Deleted {deleted} old backups')
 
 ```python
 #!/usr/bin/env python3
-"""Audit CDB instance parameters against best practices."""
+# Audit CDB instance parameters against best practices
 import os, json
 from tencentcloud.common import credential
 from tencentcloud.cdb.v20170320 import cdb_client, models

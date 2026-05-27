@@ -101,30 +101,31 @@ prompt_settings:
 ### Threshold Configuration
 
 ```yaml
+# YAML anchors: eliminate duplicate threshold fields (TE-5)
+x-default-thresholds: &default-thresholds
+  high: 90
+  medium: 70
+  low: 50
+
 thresholds:
   # CPU thresholds
   cpu_usage:
-    high: 90      # Alert threshold
-    medium: 70    # Warning threshold
-    low: 50       # Attention threshold
+    <<: *default-thresholds
     
   # Memory thresholds
   mem_usage:
     high: 90
     medium: 75
-    low: 60
+    low: 60       # memory baseline differs from default
     
   # Disk thresholds
   disk_usage:
-    high: 95
-    medium: 80
-    low: 70
+    <<: *default-thresholds
+    high: 95      # disk alert higher than default
     
   # Network thresholds (bandwidth usage %)
   network_usage:
-    high: 90
-    medium: 70
-    low: 50
+    <<: *default-thresholds
 ```
 
 ### Proactive Inspection Settings

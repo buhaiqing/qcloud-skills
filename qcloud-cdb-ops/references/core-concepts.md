@@ -69,26 +69,23 @@ TencentDB for MySQL (CDB) provides a stable, reliable, and elastically scalable 
 
 ### By Specification
 
-| Specification | vCPU | Memory (MB) | Max Connections | IOPS |
-|--------------|------|-------------|-----------------|------|
-| S1.MICRO | 1 | 1000 | 500 | 600 |
-| S1.SMALL | 1 | 2000 | 1000 | 1000 |
-| S1.MEDIUM | 2 | 4000 | 2000 | 2000 |
-| S1.LARGE | 4 | 8000 | 4000 | 4000 |
-| S1.XLARGE | 8 | 16000 | 8000 | 8000 |
-| S1.2XLARGE | 16 | 32000 | 16000 | 16000 |
-| S1.4XLARGE | 32 | 64000 | 32000 | 32000 |
+Query available specifications dynamically:
+
+```bash
+tccli cdb DescribeDBInstanceSpecs
+```
+
+Sample output fields: `SpecName`, `Memory (MB)`, `Volume (GB)`, `MaxConnections`, `IOPS`.
 
 ---
 
 ## 3. Engine Versions
 
-| MySQL Version | Tencent Cloud Support | Notes |
-|--------------|----------------------|-------|
-| MySQL 5.5 | Available | Legacy, upgrade recommended |
-| MySQL 5.6 | Available | Stable |
-| MySQL 5.7 | Available | Widely used, **recommended** |
-| MySQL 8.0 | Available | Latest features, **recommended for new instances** |
+Check supported versions per instance:
+
+```bash
+tccli cdb DescribeSupportedEngineVersions --InstanceId "cdb-xxxxxx"
+```
 
 > **Recommendation:** Use MySQL 8.0 for new instances. Migrate from 5.5/5.6 to 5.7 or 8.0 for better performance and security.
 
@@ -104,12 +101,11 @@ TencentDB for MySQL (CDB) provides a stable, reliable, and elastically scalable 
 
 ### Disk Size Limits
 
-| Version | Min Disk (GB) | Max Disk (GB) |
-|---------|--------------|---------------|
-| MySQL 5.5 | 20 | 1000 |
-| MySQL 5.6 | 20 | 2000 |
-| MySQL 5.7 | 20 | 3000 |
-| MySQL 8.0 | 20 | 3000 |
+Check per-version limits via spec query:
+
+```bash
+tccli cdb DescribeDBInstanceSpecs | python3 -c "import sys,json;d=json.load(sys.stdin);[(print(f'{s[\"SpecName\"]}: {s.get(\"MinDiskSize\",20)}-{s.get(\"MaxDiskSize\",\"?\")}GB')) for s in d.get('Response',{}).get('Items',[])]"
+```
 
 > Disk expansion is online — no restart required. Disk shrinkage is NOT supported.
 
@@ -117,28 +113,40 @@ TencentDB for MySQL (CDB) provides a stable, reliable, and elastically scalable 
 
 ## 5. Regional Availability
 
-CDB is available in all Tencent Cloud regions. Multi-AZ deployment provides automatic failover:
+CDB is available in all Tencent Cloud regions. Query available zones dynamically:
 
-| Region | Zone Count | Multi-AZ Support |
-|--------|-----------|-----------------|
-| Guangzhou (ap-guangzhou) | 3 | Yes |
-| Shanghai (ap-shanghai) | 3 | Yes |
-| Beijing (ap-beijing) | 3 | Yes |
-| Chengdu (ap-chengdu) | 2 | Yes |
-| Singapore (ap-singapore) | 2 | Yes |
+```bash
+tccli cdb DescribeDBInstanceSpecs --Region "ap-guangzhou"
+# The Region flag controls which regional specs are returned
+```
+
+To list all regions and zone counts:
+```bash
+tccli cam DescribeRegions --Product "cdb"
+tccli cam DescribeZones --Region "ap-guangzhou"
+```
 
 ---
 
 ## 6. Quotas and Limits
 
-| Resource | Default Limit |
-|----------|--------------|
-| MySQL instances per account | 80 |
-| Read-only replicas per master | 5 |
-| Databases per instance | 100 |
-| Accounts per instance | 100 |
-| Backup retention (days) | 7-1830 |
-| Backup file size | 200% of instance storage |
+Check account-level quotas dynamically (tencentcloud-sdk-python-cdb required):
+
+```python
+from tencentcloud.cdb.v20170320 import cdb_client, models
+# Use DescribeDBInstanceQuota or check via DescribeDBInstances pagination
+req = models.DescribeDBInstancesRequest()
+req.Limit = 0  # Count only, no items
+resp = client.DescribeDBInstances(req)
+print(f"Current instance count: {resp.TotalCount}")
+```
+
+Key limits to be aware of:
+- Read-only replicas per master: **max 5**
+- Databases per instance: **max 100**
+- Accounts per instance: **max 100**
+- Backup retention: **7-1830 days**
+- Backup file size: **200% of instance storage**
 
 ---
 

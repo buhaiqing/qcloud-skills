@@ -43,7 +43,7 @@ tccli cvm DescribeInstances \
 
 ```python
 def discover_cvm_resources(region: str) -> List[Resource]:
-    """Discover all CVM resources in region"""
+    # Discover all CVM resources in region
     client = cvm_client.CvmClient(cred, region)
     
     resources = []
@@ -136,7 +136,7 @@ tccli monitor GetMonitorData \
 
 ```python
 def collect_metrics_batch(resources: List[Resource], hours: int = 24) -> Dict:
-    """Collect metrics for all resources in batch"""
+    # Collect metrics for all resources in batch
     monitor_client = monitor_client.MonitorClient(cred, region)
     
     end_time = datetime.now()
@@ -229,7 +229,7 @@ thresholds:
 
 ```python
 def detect_anomalies(metrics_data: Dict, thresholds: Dict) -> List[Anomaly]:
-    """Detect anomalies based on thresholds"""
+    # Detect anomalies based on thresholds
     anomalies = []
     
     for instance_id, metrics in metrics_data.items():
@@ -282,7 +282,7 @@ def detect_anomalies(metrics_data: Dict, thresholds: Dict) -> List[Anomaly]:
 
 ```python
 def correlate_and_detect(metrics_data: Dict) -> List[CorrelatedAnomaly]:
-    """Detect correlated anomalies"""
+    # Detect correlated anomalies
     anomalies = []
     
     for instance_id, metrics in metrics_data.items():
@@ -384,7 +384,7 @@ memory_diagnosis:
 
 ```python
 def execute_diagnosis(anomaly: Anomaly, client) -> DiagnosisResult:
-    """Execute diagnosis for detected anomaly"""
+    # Execute diagnosis for detected anomaly
     
     # Get detailed instance info
     instance_info = get_instance_details(client, anomaly.resource_id)
@@ -408,7 +408,7 @@ def execute_diagnosis(anomaly: Anomaly, client) -> DiagnosisResult:
     return diagnosis
 
 def generate_action_plan(anomaly: Anomaly, instance_info: Dict) -> List[str]:
-    """Generate remediation action plan"""
+    # Generate remediation action plan
     plans = {
         'CRITICAL_CPU': [
             '1. Identify top CPU-consuming processes',
@@ -505,7 +505,7 @@ def generate_inspection_report(
     anomalies: List[Anomaly],
     diagnosis_results: List[DiagnosisResult]
 ) -> str:
-    """Generate inspection report in Markdown"""
+    # Generate inspection report in Markdown
     
     report = []
     
@@ -615,44 +615,6 @@ echo "Inspection complete. Report saved to $OUTPUT_DIR"
 ```
 
 ---
-
-## 8. Integration with CVM Skill
-
-Add proactive inspection section to SKILL.md:
-
-```markdown
-## Proactive Inspection
-
-### Daily Inspection Command
-
-```bash
-# Run daily inspection in Cloud Shell
-bash /data/scripts/daily_inspection.sh
-```
-
-### Quick Health Check
-
-```bash
-# Quick check for critical issues
-tccli cvm DescribeInstances --Region ap-guangzhou \
-  --Filters '[{"Name":"instance-status","Values":["SHUTDOWN","TERMINATED"]}]'
-```
-
-### Metrics Review
-
-```bash
-# Review CPU metrics for production instances
-tccli monitor GetMonitorData --Namespace QCE/CVM --MetricName CPUUsage \
-  --Dimensions '[{"Name":"InstanceId","Value":"ins-xxx"}]' \
-  --StartTime "$(date -d '-24 hours' +'%Y-%m-%dT%H:%M:%S+08:00')" \
-  --EndTime "$(date +'%Y-%m-%dT%H:%M:%S+08:00')"
-```
-
-### References
-
-- [Proactive Inspection Template](../qcloud-skill-generator/templates/proactive-inspection.md)
-- [AIOps Best Practices](../qcloud-skill-generator/references/aiops-best-practices.md)
-```
 
 ---
 

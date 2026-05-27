@@ -68,7 +68,7 @@ done
 import statistics
 
 def calculate_cost_baseline(cost_history: List[Dict], days: int = 30) -> Dict:
-    """Calculate cost baseline from history"""
+    # Calculate cost baseline from history
     daily_costs = [c['total_cost'] for c in cost_history[-days:]]
     
     baseline = {
@@ -87,7 +87,7 @@ def calculate_cost_baseline(cost_history: List[Dict], days: int = 30) -> Dict:
 
 ```python
 def detect_cost_anomaly(current_cost: Dict, baseline: Dict) -> Optional[CostAnomaly]:
-    """Detect cost anomaly for single day"""
+    # Detect cost anomaly for single day
     
     ratio = current_cost['total_cost'] / baseline['avg']
     
@@ -148,7 +148,7 @@ def detect_cost_anomaly(current_cost: Dict, baseline: Dict) -> Optional[CostAnom
 
 ```python
 def analyze_right_sizing(instance_metrics: Dict, instance_type: str) -> RightSizingRecommendation:
-    """Analyze instance for right-sizing recommendation"""
+    # Analyze instance for right-sizing recommendation
     
     cpu_avg = instance_metrics['CPUUsage']['avg']
     cpu_max = instance_metrics['CPUUsage']['max']
@@ -179,7 +179,7 @@ def analyze_right_sizing(instance_metrics: Dict, instance_type: str) -> RightSiz
     return recommendation
 
 def get_smaller_instance_type(current_type: str) -> str:
-    """Get smaller instance type recommendation"""
+    # Get smaller instance type recommendation
     type_hierarchy = {
         'S5.4XLARGE32': 'S5.2XLARGE16',
         'S5.2XLARGE16': 'S5.LARGE8',
@@ -245,7 +245,7 @@ def get_smaller_instance_type(current_type: str) -> str:
 
 ```python
 def analyze_ri_eligibility(instance_history: Dict) -> RIRecommendation:
-    """Analyze instance for RI eligibility"""
+    # Analyze instance for RI eligibility
     
     # Calculate running hours per month
     running_hours = calculate_running_hours(instance_history['status_timeline'])
@@ -344,7 +344,7 @@ tccli cbs DescribeDisks \
 
 ```python
 def calculate_idle_cost(idle_resources: List[Dict]) -> IdleCostReport:
-    """Calculate cost of idle resources"""
+    # Calculate cost of idle resources
     
     report = IdleCostReport()
     
@@ -475,7 +475,7 @@ budget_alerts:
 
 ```python
 def check_budget_status(current_cost: float, budget: float, days_remaining: int) -> BudgetStatus:
-    """Check budget status and project end-of-month"""
+    # Check budget status and project end-of-month
     
     # Calculate daily average
     days_elapsed = 30 - days_remaining
@@ -505,42 +505,6 @@ def check_budget_status(current_cost: float, budget: float, days_remaining: int)
 ```
 
 ---
-
-## 8. Integration in CVM Skill
-
-Add FinOps section to SKILL.md:
-
-```markdown
-## FinOps Cost Optimization
-
-### Cost Query
-
-```bash
-# Price inquiry for instance creation
-tccli cvm InquiryPriceRunInstances --InstanceType S5.LARGE4
-```
-
-### Right-Sizing Analysis
-
-```bash
-# Get CPU utilization for right-sizing analysis
-tccli monitor GetMonitorData --Namespace QCE/CVM --MetricName CPUUsage \
-  --Dimensions '[{"Name":"InstanceId","Value":"ins-xxx"}]' \
-  --StartTime "$(date -d '-7 days' +'%Y-%m-%dT%H:%M:%S+08:00')" \
-  --EndTime "$(date +'%Y-%m-%dT%H:%M:%S+08:00')"
-```
-
-### Idle Resource Detection
-
-```bash
-# Find stopped instances (idle > 7d)
-tccli cvm DescribeInstances --Filters '[{"Name":"instance-status","Values":["STOPPED"]}]'
-```
-
-### References
-
-- [FinOps Cost Optimization Module](../qcloud-skill-generator/references/finops-cost-optimization.md)
-```
 
 ---
 

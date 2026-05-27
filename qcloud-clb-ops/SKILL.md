@@ -129,19 +129,24 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - **Timestamps**: ISO 8601 format (e.g., `2026-05-21T10:00:00+08:00`)
 - **Idempotency**: Use unique names for LoadBalancer to avoid conflicts
 
-### Example Response Field Table
+### JSON Path Reference
 
-| Operation | JSON Path | Type | Description |
-|-----------|----------|------|-------------|
-| CreateLoadBalancer | `$.Response.LoadBalancerIds[0]` | string | New LB instance ID |
-| DescribeLoadBalancers | `$.Response.LoadBalancerSet[0].LoadBalancerId` | string | LB instance ID |
-| DescribeLoadBalancers | `$.Response.LoadBalancerSet[0].LoadBalancerName` | string | LB name |
-| DescribeLoadBalancers | `$.Response.LoadBalancerSet[0].Status` | integer | 1=creating, 2=running |
-| DescribeLoadBalancers | `$.Response.LoadBalancerSet[0].LoadBalancerType` | string | OPEN/Internal |
-| CreateListener | `$.Response.ListenerIds[0]` | string | Listener ID |
-| DescribeListeners | `$.Response.ListenerSet[0].ListenerId` | string | Listener ID |
-| DescribeListeners | `$.Response.ListenerSet[0].Protocol` | string | TCP/UDP/HTTP/HTTPS |
-| DescribeTargetHealth | `$.Response.Targets[0].HealthStatus` | string | Health check status |
+Common paths used across operations:
+
+| Path | Description |
+|------|-------------|
+| `$.Response.LoadBalancerIds[0]` | LB instance ID (CreateLoadBalancer) |
+| `$.Response.ListenerIds[0]` | Listener ID (CreateListener) |
+| `$.Response.LoadBalancerSet[0].LoadBalancerId` | LB instance ID (DescribeLoadBalancers) |
+| `$.Response.LoadBalancerSet[0].LoadBalancerName` | LB name |
+| `$.Response.LoadBalancerSet[0].Status` | Status: 1=creating, 2=running |
+| `$.Response.LoadBalancerSet[0].LoadBalancerType` | Type: OPEN/Internal |
+| `$.Response.ListenerSet[0].ListenerId` | Listener ID |
+| `$.Response.ListenerSet[0].Protocol` | Protocol: TCP/UDP/HTTP/HTTPS |
+| `$.Response.Targets[0].HealthStatus` | Health: alive/dead/unknown |
+| `$.Response.Targets[0].InstanceId` | Backend CVM ID |
+| `$.Response.Targets[0].Port` | Backend port |
+| `$.Response.RequestId` | Request tracking ID |
 
 ### Expected State Transitions
 
@@ -277,14 +282,14 @@ done
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Backoff | Agent Action | UX Feedback |
-|--------------|-------------|---------|--------------|-------------|
-| `InvalidParameter.LBIdNotFound` | 0 | — | HALT | `[ERROR] LoadBalancer ID not found` |
-| `ResourceInsufficient` | 0 | — | HALT | `[ERROR] Resource quota exceeded` |
-| `InvalidSecretKey` / `InvalidSecretId` | 0 | — | HALT | `[ERROR] Credentials invalid` |
-| `RequestLimitExceeded` | 3 | exponential | Back off; retry | `⚠️ Rate limit reached` |
-| `InternalError` | 3 | 2s, 4s, 8s | Retry; then HALT | `[ERROR] Internal error` |
-| `FailedOperation.ResourceInOperating` | 3 | 30s | Wait; retry | `⚠️ Resource in operation` |
+| Error pattern | Max retries | Backoff |
+|--------------|-------------|---------|
+| `InvalidParameter.LBIdNotFound` | 0 | — HALT |
+| `ResourceInsufficient` | 0 | — HALT |
+| `InvalidSecretKey` / `InvalidSecretId` | 0 | — HALT |
+| `RequestLimitExceeded` | 3 | exponential backoff |
+| `InternalError` | 3 | 2s, 4s, 8s |
+| `FailedOperation.ResourceInOperating` | 3 | 30s |
 
 ### Operation: Describe LoadBalancers
 
@@ -297,13 +302,13 @@ tccli clb DescribeLoadBalancers --Region {{env.TENCENTCLOUD_REGION}} --LoadBalan
 
 #### Present to User
 
-| Field | Path | Notes |
-|-------|------|-------|
-| ID | `$.Response.LoadBalancerSet[0].LoadBalancerId` | lb-xxx format |
-| Name | `$.Response.LoadBalancerSet[0].LoadBalancerName` | Instance name |
-| VIP | `$.Response.LoadBalancerSet[0].VipIps[0]` | IP address |
-| Status | `$.Response.LoadBalancerSet[0].Status` | 1=creating, 2=running |
-| Type | `$.Response.LoadBalancerSet[0].LoadBalancerType` | OPEN/Internal |
+| Field | Notes |
+|-------|-------|
+| ID | See JSON Path Reference: `$.Response.LoadBalancerSet[0].LoadBalancerId` |
+| Name | See JSON Path Reference: `$.Response.LoadBalancerSet[0].LoadBalancerName` |
+| VIP | `$.Response.LoadBalancerSet[0].VipIps[0]` |
+| Status | See JSON Path Reference: `$.Response.LoadBalancerSet[0].Status` |
+| Type | See JSON Path Reference: `$.Response.LoadBalancerSet[0].LoadBalancerType` |
 
 ### Operation: Create Listener
 
@@ -467,11 +472,11 @@ if __name__ == "__main__":
 
 #### Present to User
 
-| Field | Path | Notes |
-|-------|------|-------|
-| InstanceId | `$.Response.Targets[0].InstanceId` | Backend CVM ID |
-| Port | `$.Response.Targets[0].Port` | Backend port |
-| HealthStatus | `$.Response.Targets[0].HealthStatus` | alive/dead/unknown |
+| Field | Notes |
+|-------|-------|
+| InstanceId | See JSON Path Reference: `$.Response.Targets[0].InstanceId` |
+| Port | See JSON Path Reference: `$.Response.Targets[0].Port` |
+| HealthStatus | See JSON Path Reference: `$.Response.Targets[0].HealthStatus` |
 
 ### Operation: Delete LoadBalancer
 
@@ -546,55 +551,47 @@ Poll DescribeLoadBalancers until LB returns empty or 404.
 
 ## Error Code Reference
 
-### Category Legend
-
-| Category | Retry Policy |
-|----------|-------------|
-| **HALT** | Non-retryable — stop and escalate |
-| **RETRY** | Retryable (3x with exponential backoff) |
-| **FIX** | Input/configuration error — fix and retry |
-
 ### Parameter Validation Errors
 
-| Code | Meaning | Policy | Action |
-|------|---------|--------|--------|
-| `InvalidParameter.LBIdNotFound` | LoadBalancer ID invalid | FIX | Verify LB ID; suggest `DescribeLoadBalancers` |
-| `InvalidParameter.ListenerIdNotFound` | Listener ID invalid | FIX | Verify listener ID |
-| `InvalidParameter.LocationNotFound` | Forwarding rule not found | FIX | Verify rule location/URL |
-| `InvalidParameter.PortCheckFailed` | Port conflict or invalid | FIX | Use different port |
-| `InvalidParameter.ProtocolCheckFailed` | Protocol mismatch | FIX | Check protocol support per CLB type |
-| `InvalidParameter.RegionNotFound` | Region invalid | FIX | Verify region is correct |
-| `InvalidParameter.FormatError` | Parameter format error | FIX | Check parameter format per API spec |
-| `InvalidParameter.InvalidFilter` | Query filter error | FIX | Fix filter parameter structure |
-| `InvalidParameter.RewriteAlreadyExist` | Rewrite rule already exists | FIX | Use different source URL |
-| `InvalidParameter.SomeRewriteNotFound` | Some rewrite rules not found | FIX | Verify rewrite rule IDs |
-| `InvalidParameter.ClientTokenLimitExceeded` | ClientToken expired | FIX | Generate new ClientToken |
-| `InvalidParameterValue.Duplicate` | Duplicate parameter value | FIX | Use unique values |
-| `InvalidParameterValue.InvalidFilter` | Filter input error | FIX | Fix filter name/values |
-| `InvalidParameterValue.Length` | Parameter length error | FIX | Shorten parameter value |
-| `InvalidParameterValue.Range` | Parameter range error | FIX | Adjust value to valid range |
+| Code | Description | Recovery |
+|------|-------------|----------|
+| `InvalidParameter.LBIdNotFound` | LoadBalancer ID invalid | Verify LB ID; suggest `DescribeLoadBalancers` |
+| `InvalidParameter.ListenerIdNotFound` | Listener ID invalid | Verify listener ID |
+| `InvalidParameter.LocationNotFound` | Forwarding rule not found | Verify rule location/URL |
+| `InvalidParameter.PortCheckFailed` | Port conflict or invalid | Use different port |
+| `InvalidParameter.ProtocolCheckFailed` | Protocol mismatch | Check protocol support per CLB type |
+| `InvalidParameter.RegionNotFound` | Region invalid | Verify region is correct |
+| `InvalidParameter.FormatError` | Parameter format error | Check parameter format per API spec |
+| `InvalidParameter.InvalidFilter` | Query filter error | Fix filter parameter structure |
+| `InvalidParameter.RewriteAlreadyExist` | Rewrite rule already exists | Use different source URL |
+| `InvalidParameter.SomeRewriteNotFound` | Some rewrite rules not found | Verify rewrite rule IDs |
+| `InvalidParameter.ClientTokenLimitExceeded` | ClientToken expired | Generate new ClientToken |
+| `InvalidParameterValue.Duplicate` | Duplicate parameter value | Use unique values |
+| `InvalidParameterValue.InvalidFilter` | Filter input error | Fix filter name/values |
+| `InvalidParameterValue.Length` | Parameter length error | Shorten parameter value |
+| `InvalidParameterValue.Range` | Parameter range error | Adjust value to valid range |
 
 ### CLB Status & Operation Errors
 
-| Code | Meaning | Policy | Action |
-|------|---------|--------|--------|
-| `FailedOperation.InvalidLBStatus` | LB status abnormal | RETRY | Wait for LB to stabilize; check `DescribeLoadBalancers` |
-| `FailedOperation.ResourceInOperating` | Resource being operated | RETRY | Wait 30s; retry |
-| `FailedOperation.ResourceInCloning` | Resource being cloned | RETRY | Wait for clone to complete |
-| `FailedOperation.NoListenerInLB` | No listener for operation | FIX | Create listener first |
-| `FailedOperation.EipTrafficCheckRisk` | EIP bandwidth exceeds anti-misoperation threshold | HALT | Disable anti-misoperation in EIP console |
-| `FailedOperation.FrequencyCheckRisk` | Delete frequency too high | HALT | Slow down delete rate |
-| `FailedOperation.TargetNumCheckRisk` | Rule count risk too high | FIX | Pass `ForceDelete=true` |
-| `FailedOperation.TrafficCheckRisk` | Traffic check high risk | FIX | Confirm force delete with `ForceDelete=true` |
+| Code | Description | Recovery |
+|------|-------------|----------|
+| `FailedOperation.InvalidLBStatus` | LB status abnormal | Wait for LB to stabilize; check `DescribeLoadBalancers` |
+| `FailedOperation.ResourceInOperating` | Resource being operated | Wait 30s; retry |
+| `FailedOperation.ResourceInCloning` | Resource being cloned | Wait for clone to complete |
+| `FailedOperation.NoListenerInLB` | No listener for operation | Create listener first |
+| `FailedOperation.EipTrafficCheckRisk` | EIP bandwidth exceeds threshold | Disable anti-misoperation in EIP console |
+| `FailedOperation.FrequencyCheckRisk` | Delete frequency too high | Slow down delete rate |
+| `FailedOperation.TargetNumCheckRisk` | Rule count risk too high | Pass `ForceDelete=true` |
+| `FailedOperation.TrafficCheckRisk` | Traffic check high risk | Confirm force delete with `ForceDelete=true` |
 
 ### Auth & Resource Errors
 
-| Code | Meaning | Policy | Action |
-|------|---------|--------|--------|
-| `AuthFailure` | CAM signature/auth error | HALT | Check CAM policies for CLB |
-| `OperationDenied` | Operation denied | HALT | Check account permissions |
-| `ResourcesSoldOut` | Resources sold out | HALT | Try different region or specification |
-| `InternalError` | Internal server error | RETRY | Transient — retry; escalate if persists |
+| Code | Description | Recovery |
+|------|-------------|----------|
+| `AuthFailure` | CAM signature/auth error | Check CAM policies for CLB |
+| `OperationDenied` | Operation denied | Check account permissions |
+| `ResourcesSoldOut` | Resources sold out | Try different region or specification |
+| `InternalError` | Internal server error | Transient — retry; escalate if persists |
 
 ## Safety Gates (Destructive Operations)
 
