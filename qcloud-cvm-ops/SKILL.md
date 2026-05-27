@@ -41,7 +41,7 @@ metadata:
 
 CVM (Cloud Virtual Machine) is Tencent Cloud's primary compute service providing scalable, high-performance virtual servers. This skill is an **operational runbook** for agents: explicit scope, credential rules, pre-flight checks, **dual-path execution** (official **`tccli` CLI** and **Python SDK fallback**), response validation, and failure recovery. **Do not use the web console as the primary agent execution path**.
 
-> **UX Compliance:** This skill follows the [User Experience Specification](../references/user-experience-spec.md). All operations include onboarding guidance, minimal prompts, smart defaults, clear feedback, and user-friendly error handling.
+> **UX Compliance:** This skill follows the [User Experience Specification](../qcloud-skill-generator/references/user-experience-spec.md). All operations include onboarding guidance, minimal prompts, smart defaults, clear feedback, and user-friendly error handling.
 
 ### CLI applicability (repository policy)
 
@@ -283,10 +283,10 @@ tccli cvm RunInstances \
   --VpcId "{{user.vpc_id}}" \
   --SubnetId "{{user.subnet_id}}" \
   --ClientToken "$(date +%s%N)" \
-  --InstanceChargeType "POSTPAID_BY_HOUR"
+  --InstanceChargeType "POSTPAID_BY_HOUR" > /tmp/response.json
 
 # Capture instance ID from response
-INSTANCE_ID=$(cat /tmp/response.json | jq -r '.Response.InstanceIdSet[0]')
+INSTANCE_ID=$(jq -r '.Response.InstanceIdSet[0]' /tmp/response.json)
 ```
 
 #### Execution — Python SDK (Fallback Path)
@@ -308,7 +308,7 @@ def main():
             os.environ.get("TENCENTCLOUD_SECRET_KEY")
         )
         client = cvm_client.CvmClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-        
+
         req = models.RunInstancesRequest()
         req.Placement = models.Placement()
         req.Placement.Zone = os.environ.get("ZONE", "ap-guangzhou-3")
@@ -320,7 +320,14 @@ def main():
         req.SystemDisk.DiskSize = 50
         req.InstanceChargeType = "POSTPAID_BY_HOUR"
         req.ClientToken = str(int(time.time() * 1000000))
-        
+        # VPC and network configuration
+        req.VpcId = os.environ.get("VPC_ID", "")
+        req.SubnetId = os.environ.get("SUBNET_ID", "")
+        req.SecurityGroupIds = os.environ.get("SECURITY_GROUP_IDS", "").split(",")
+        req.InternetAccessible = models.InternetAccessible()
+        req.InternetAccessible.InternetChargeType = "TRAFFIC_POSTPAID_BY_HOUR"
+        req.InternetAccessible.InternetMaxBandwidthOut = 1
+
         resp = client.RunInstances(req)
         print(json.loads(resp.to_json_string()))
     except TencentCloudSDKException as err:
@@ -373,6 +380,29 @@ tccli cvm DescribeInstances \
   --Offset 0 --Limit 100
 ```
 
+#### Execution — Python SDK (Fallback Path)
+
+```python
+#!/usr/bin/env python3
+from tencentcloud.common import credential
+from tencentcloud.cvm import cvm_client, models
+import os, json
+
+cred = credential.Credential(
+    os.environ.get("TENCENTCLOUD_SECRET_ID"),
+    os.environ.get("TENCENTCLOUD_SECRET_KEY")
+)
+client = cvm_client.CvmClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+req = models.DescribeInstancesRequest()
+req.InstanceIds = [os.environ.get("INSTANCE_ID", "ins-xxx")]
+req.Offset = 0
+req.Limit = 100
+
+resp = client.DescribeInstances(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
 #### Present to User
 
 | Field | Path | Notes |
@@ -404,6 +434,15 @@ tccli cvm StartInstances \
   --InstanceIds "[\"{{user.instance_id}}\"]"
 ```
 
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.StartInstancesRequest()
+req.InstanceIds = ["{{user.instance_id}}"]
+resp = client.StartInstances(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
 #### Validation
 
 Poll until `RUNNING` (5s interval, 120s max).
@@ -425,6 +464,16 @@ tccli cvm StopInstances \
   --StopType "SOFT"  # or "HARD" for forced stop
 ```
 
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.StopInstancesRequest()
+req.InstanceIds = ["{{user.instance_id}}"]
+req.StopType = "SOFT"  # or "HARD"
+resp = client.StopInstances(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
 #### Validation
 
 Poll until `STOPPED`.
@@ -438,6 +487,16 @@ tccli cvm RebootInstances \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
   --InstanceIds "[\"{{user.instance_id}}\"]" \
   --RebootType "SOFT"  # or "HARD"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.RebootInstancesRequest()
+req.InstanceIds = ["{{user.instance_id}}"]
+req.RebootType = "SOFT"  # or "HARD"
+resp = client.RebootInstances(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 ```
 
 ### Operation: TerminateInstances (Delete)
@@ -456,6 +515,15 @@ tccli cvm RebootInstances \
 tccli cvm TerminateInstances \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
   --InstanceIds "[\"{{user.instance_id}}\"]"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.TerminateInstancesRequest()
+req.InstanceIds = ["{{user.instance_id}}"]
+resp = client.TerminateInstances(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 ```
 
 #### Validation
@@ -502,6 +570,8 @@ tccli cvm ResizeInstanceDisks \
 ```
 
 ### Operation: CreateSnapshot (Backup)
+
+> **Note on CBS API Namespace:** The `CreateSnapshot` and disk-related operations below use the CBS (Cloud Block Storage) API namespace (`tccli cbs`) rather than the CVM API. These operations are within CVM scope because CBS disks are directly attached storage for CVM instances and are essential to the instance lifecycle (backup, restore, resize). Standalone CBS management (e.g., creating independent disks not attached to instances) is also covered by this skill since CBS is tightly coupled with CVM operations.
 
 #### Pre-flight
 

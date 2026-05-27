@@ -112,6 +112,7 @@ Every generated skill MUST satisfy these five standards. Use them as a design ch
 ## API and Response Conventions (Agent-Readable)
 
 - **API spec:** https://cloud.tencent.com/document/api/215
+- **Idempotency**: Use `ClientToken` for CreateVpc to avoid duplicate creation on retry
 - **Errors:** Map to `Response.Error.Code` and `Response.Error.Message`
 - **Timestamps:** ISO 8601 format (e.g., `2026-05-21T10:00:00+08:00`)
 
@@ -198,13 +199,20 @@ Every operation: **Pre-flight → Execute (CLI and SDK) → Validate → Recover
 | Quota | Describe quota API | ≤ 5 VPCs default | HALT if quota exceeded |
 | CIDR format | Validate regex | Valid CIDR notation | Ask user for valid CIDR |
 
+**CIDR Validation Example**:
+```bash
+# Validate CIDR format before API call
+echo "{{user.cidr_block}}" | grep -qE '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$' || { echo "Invalid CIDR format"; exit 1; }
+```
+
 #### Execution — CLI (`tccli`) (Primary Path)
 
 ```bash
 tccli vpc CreateVpc \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
   --VpcName "{{user.vpc_name}}" \
-  --CidrBlock "{{user.cidr_block}}"
+  --CidrBlock "{{user.cidr_block}}" \
+  --ClientToken "$(date +%s%N)"
 ```
 
 #### Execution — Python SDK (Fallback Path)
@@ -224,6 +232,7 @@ client = vpc_client.VpcClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
 req = models.CreateVpcRequest()
 req.VpcName = "{{user.vpc_name}}"
 req.CidrBlock = "{{user.cidr_block}}"
+req.ClientToken = str(int(time.time() * 1000000))
 
 resp = client.CreateVpc(req)
 print(json.dumps(resp.to_json_string(), indent=2))
@@ -262,6 +271,27 @@ tccli vpc DescribeVpcs \
   --VpcIds "[\"{{user.vpc_id}}\"]"
 ```
 
+#### Execution — Python SDK (Fallback Path)
+
+```python
+#!/usr/bin/env python3
+from tencentcloud.common import credential
+from tencentcloud.vpc import vpc_client, models
+import os, json
+
+cred = credential.Credential(
+    os.environ.get("TENCENTCLOUD_SECRET_ID"),
+    os.environ.get("TENCENTCLOUD_SECRET_KEY")
+)
+client = vpc_client.VpcClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+req = models.DescribeVpcsRequest()
+req.VpcIds = [os.environ.get("VPC_ID", "vpc-xxx")]
+
+resp = client.DescribeVpcs(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
 #### Present to User
 
 | Field | Path | Notes |
@@ -280,12 +310,39 @@ tccli vpc DescribeVpcs \
 - **MUST** check: no CLB or NAT gateway attached
 - **MUST** obtain explicit user confirmation
 
+**Pre-flight Validation Scripts**:
+```bash
+# Check no CVM instances in VPC subnets
+tccli cvm DescribeInstances \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Filters "Name=vpc-id,Values={{user.vpc_id}}"
+
+# Check no CLB attached to VPC
+tccli clb DescribeLoadBalancers \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Filters "Name=vpc-id,Values={{user.vpc_id}}"
+
+# Check no NAT gateway attached
+tccli vpc DescribeNatGateways \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Filters "Name=vpc-id,Values={{user.vpc_id}}"
+```
+
 #### Execution
 
 ```bash
 tccli vpc DeleteVpc \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
   --VpcId "{{user.vpc_id}}"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.DeleteVpcRequest()
+req.VpcId = "{{user.vpc_id}}"
+resp = client.DeleteVpc(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 ```
 
 #### Post-execution Validation
@@ -314,6 +371,18 @@ tccli vpc CreateSubnet \
   --Zone "{{user.zone}}"
 ```
 
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.CreateSubnetRequest()
+req.VpcId = "{{output.vpc_id}}"
+req.SubnetName = "{{user.subnet_name}}"
+req.CidrBlock = "{{user.subnet_cidr}}"
+req.Zone = "{{user.zone}}"
+resp = client.CreateSubnet(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
 #### Validation
 
 Capture `{{output.subnet_id}}`, poll until `AVAILABLE`.
@@ -325,6 +394,153 @@ Capture `{{output.subnet_id}}`, poll until `AVAILABLE`.
 - **MUST** check: no CVM instances in subnet
 - **MUST** check: subnet not default subnet
 - **MUST** warn: instances will be disconnected
+
+#### Execution — CLI
+
+```bash
+tccli vpc DeleteSubnet \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --SubnetId "{{user.subnet_id}}"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.DeleteSubnetRequest()
+req.SubnetId = "{{user.subnet_id}}"
+resp = client.DeleteSubnet(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
+#### Validation
+
+Poll DescribeSubnets until 404 or empty response (max 60s).
+
+### Operation: Describe Subnets
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| VPC exists | DescribeVpcs | VPC AVAILABLE | HALT; create VPC first |
+
+#### Execution — CLI
+
+```bash
+tccli vpc DescribeSubnets \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --VpcId "{{user.vpc_id}}"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.DescribeSubnetsRequest()
+req.VpcId = "{{user.vpc_id}}"
+req.Offset = 0
+req.Limit = 100
+resp = client.DescribeSubnets(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
+#### Present to User
+
+| Field | Path | Notes |
+|-------|------|-------|
+| Subnet ID | `$.Response.SubnetSet[0].SubnetId` | Primary identifier |
+| Subnet Name | `$.Response.SubnetSet[0].SubnetName` | Display name |
+| CIDR | `$.Response.SubnetSet[0].CidrBlock` | Network range |
+| State | `$.Response.SubnetSet[0].State` | AVAILABLE/CREATING |
+| Zone | `$.Response.SubnetSet[0].Zone` | Availability zone |
+| Available IPs | `$.Response.SubnetSet[0].AvailableIpAddressCount` | Remaining IPs |
+
+### Operation: Create Route Table
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| VPC exists | DescribeVpcs | VPC AVAILABLE | HALT; create VPC first |
+| Route table name unique | DescribeRouteTables | No duplicate name | Use different name |
+
+#### Execution — CLI
+
+```bash
+tccli vpc CreateRouteTable \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --VpcId "{{user.vpc_id}}" \
+  --RouteTableName "{{user.route_table_name}}"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.CreateRouteTableRequest()
+req.VpcId = "{{user.vpc_id}}"
+req.RouteTableName = "{{user.route_table_name}}"
+resp = client.CreateRouteTable(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
+#### Validation
+
+Capture `{{output.route_table_id}}` from `$.Response.RouteTable.RouteTableId`, poll until `AVAILABLE`.
+
+### Operation: Describe Route Tables
+
+#### Execution — CLI
+
+```bash
+tccli vpc DescribeRouteTables \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --RouteTableIds "[\"{{user.route_table_id}}\"]"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.DescribeRouteTablesRequest()
+req.RouteTableIds = ["{{user.route_table_id}}"]
+resp = client.DescribeRouteTables(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
+#### Present to User
+
+| Field | Path | Notes |
+|-------|------|-------|
+| Route Table ID | `$.Response.RouteTableSet[0].RouteTableId` | Primary identifier |
+| Route Table Name | `$.Response.RouteTableSet[0].RouteTableName` | Display name |
+| Routes | `$.Response.RouteTableSet[0].RouteSet` | Route entries list |
+| Association | `$.Response.RouteTableSet[0].AssociationSet` | Associated subnets |
+
+### Operation: Delete Route Table
+
+#### Pre-flight (Safety Gate)
+
+- **MUST** check: no subnets associated with route table
+- **MUST** obtain explicit user confirmation
+
+#### Execution — CLI
+
+```bash
+tccli vpc DeleteRouteTable \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --RouteTableId "{{user.route_table_id}}"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.DeleteRouteTableRequest()
+req.RouteTableId = "{{user.route_table_id}}"
+resp = client.DeleteRouteTable(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
+#### Validation
+
+Poll DescribeRouteTables until 404 or empty response (max 60s).
 
 ---
 
