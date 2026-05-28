@@ -317,25 +317,49 @@ if __name__ == "__main__":
 2. Poll `DescribeInstances` until `Status = 1` (running) or timeout:
 
 ```bash
-# CLI polling
-for i in $(seq 1 60); do
+# CLI polling with adaptive backoff
+# Phase 1: Fast polling (first 5 min) - check every 10s
+# Phase 2: Slow polling (after 5 min) - check every 30s
+# Total timeout: 20 minutes
+for i in $(seq 1 50); do
   STATUS=$(tccli ckafka DescribeInstances --InstanceIds '["{{output.instance_id}}"]' --Region {{env.TENCENTCLOUD_REGION}} | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['Response']['Result'][0]['Status'])")
   [ "$STATUS" = "1" ] && break
-  sleep 10
+  # Adaptive sleep: 10s for first 30 checks (5 min), then 30s
+  if [ $i -le 30 ]; then
+    sleep 10
+  else
+    sleep 30
+  fi
 done
+
+# Check timeout
+if [ "$STATUS" != "1" ]; then
+  echo "[ERROR] Timeout waiting for CKafka instance running status (current: $STATUS)"
+  exit 1
+fi
 ```
 
 ```python
-# SDK polling
+# SDK polling with adaptive backoff
+# Phase 1: Fast polling (first 5 min) - check every 10s
+# Phase 2: Slow polling (after 5 min) - check every 30s
+# Total timeout: 20 minutes
 import time
-for i in range(60):
+
+for i in range(50):
     desc_req = models.DescribeInstancesRequest()
     desc_req.InstanceIds = ["{{output.instance_id}}"]
     resp = client.DescribeInstances(desc_req)
     status = json.loads(resp.to_json_string())["Response"]["Result"][0]["Status"]
     if status == 1:
         break
-    time.sleep(10)
+    # Adaptive sleep: 10s for first 30 checks (5 min), then 30s
+    sleep_time = 10 if i < 30 else 30
+    time.sleep(sleep_time)
+
+# Check timeout
+if status != 1:
+    raise TimeoutError(f"CKafka instance not ready after 20 min (status: {status})")
 ```
 
 3. On success, report `{{output.instance_id}}` and instance details to the user
