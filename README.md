@@ -18,6 +18,9 @@ qcloud-skills/
 ├── qcloud-vpc-ops/            # 虚拟私有云运维技能
 ├── qcloud-cam-ops/            # 访问管理 CAM 运维技能
 ├── qcloud-cdn-ops/            # 内容分发 CDN 运维技能
+├── qcloud-cbs-ops/            # 云硬盘 CBS 运维技能
+├── qcloud-cls-ops/            # 日志服务 CLS 运维技能
+├── qcloud-ckafka-ops/         # 消息队列 CKafka 运维技能
 ├── qcloud-aioops-diagnosis/   # AIOps 智能诊断（跨产品）
 ├── qcloud-proactive-inspection/ # 主动巡检（跨产品）
 ├── qcloud-well-architected-review/ # 卓越架构审查（跨产品）
@@ -68,6 +71,42 @@ qcloud-skills/
 | `references/secops-security-operations.md` | 安全运维 |
 | `references/well-architected-assessment.md` | 卓越架构评估 |
 | `references/aiops-best-practices.md` | AIOps 最佳实践 |
+
+### qcloud-cbs-ops — 云硬盘运维
+
+管理腾讯云 CBS（Cloud Block Storage）云硬盘生命周期，包括创建/删除云硬盘、挂载/卸载到CVM实例、磁盘扩容、快照管理（创建/回滚/删除）、自动快照策略配置等。
+
+| 文件 | 说明 |
+|------|------|
+| `SKILL.md` | 核心技能文档（28 KB） |
+| `assets/eval_queries.json` | 评估查询集 |
+| `references/core-concepts.md` | 核心概念（磁盘类型、状态机、性能指标） |
+| `references/cli-usage.md` | CLI 使用指南 |
+| `references/troubleshooting.md` | 故障排查 |
+
+### qcloud-cls-ops — 日志服务运维
+
+管理腾讯云 CLS（Cloud Log Service）日志服务，包括日志集和日志主题管理、日志索引配置、日志采集配置（机器组+采集规则）、日志查询与分析、下载和投递等。
+
+| 文件 | 说明 |
+|------|------|
+| `SKILL.md` | 核心技能文档（28 KB） |
+| `assets/eval_queries.json` | 评估查询集 |
+| `references/core-concepts.md` | 核心概念（日志集/主题/索引/采集） |
+| `references/cli-usage.md` | CLI 使用指南 |
+| `references/troubleshooting.md` | 故障排查 |
+
+### qcloud-ckafka-ops — 消息队列运维
+
+管理腾讯云 CKafka（Cloud Kafka Service）消息队列实例，包括实例创建/销毁、Topic管理、分区配置、消费者组管理、ACL规则配置、消息生产和消费等。
+
+| 文件 | 说明 |
+|------|------|
+| `SKILL.md` | 核心技能文档（24 KB） |
+| `assets/eval_queries.json` | 评估查询集 |
+| `references/core-concepts.md` | 核心概念（Broker/Topic/Partition/ConsumerGroup） |
+| `references/cli-usage.md` | CLI 使用指南 |
+| `references/troubleshooting.md` | 故障排查 |
 
 ### qcloud-vpc-ops — 虚拟私有云运维
 
