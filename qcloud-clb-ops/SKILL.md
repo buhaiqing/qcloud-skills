@@ -133,20 +133,20 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 
 Common paths used across operations:
 
-| Path | Description |
-|------|-------------|
-| `$.Response.LoadBalancerIds[0]` | LB instance ID (CreateLoadBalancer) |
-| `$.Response.ListenerIds[0]` | Listener ID (CreateListener) |
-| `$.Response.LoadBalancerSet[0].LoadBalancerId` | LB instance ID (DescribeLoadBalancers) |
-| `$.Response.LoadBalancerSet[0].LoadBalancerName` | LB name |
-| `$.Response.LoadBalancerSet[0].Status` | Status: 1=creating, 2=running |
-| `$.Response.LoadBalancerSet[0].LoadBalancerType` | Type: OPEN/Internal |
-| `$.Response.ListenerSet[0].ListenerId` | Listener ID |
-| `$.Response.ListenerSet[0].Protocol` | Protocol: TCP/UDP/HTTP/HTTPS |
-| `$.Response.Targets[0].HealthStatus` | Health: alive/dead/unknown |
-| `$.Response.Targets[0].InstanceId` | Backend CVM ID |
-| `$.Response.Targets[0].Port` | Backend port |
-| `$.Response.RequestId` | Request tracking ID |
+| Path | Description | Example Value |
+|------|-------------|---------------|
+| `$.Response.LoadBalancerIds[0]` | LB instance ID (CreateLoadBalancer) | `lb-12345678` |
+| `$.Response.ListenerIds[0]` | Listener ID (CreateListener) | `lbl-12345678` |
+| `$.Response.LoadBalancerSet[0].LoadBalancerId` | LB instance ID (DescribeLoadBalancers) | `lb-12345678` |
+| `$.Response.LoadBalancerSet[0].LoadBalancerName` | LB name | `prod-api-lb` |
+| `$.Response.LoadBalancerSet[0].Status` | Status: 1=creating, 2=running | `2` |
+| `$.Response.LoadBalancerSet[0].LoadBalancerType` | Type: OPEN/Internal | `OPEN` |
+| `$.Response.ListenerSet[0].ListenerId` | Listener ID | `lbl-12345678` |
+| `$.Response.ListenerSet[0].Protocol` | Protocol: TCP/UDP/HTTP/HTTPS | `HTTPS` |
+| `$.Response.Targets[0].HealthStatus` | Health: alive/dead/unknown | `alive` |
+| `$.Response.Targets[0].InstanceId` | Backend CVM ID | `ins-12345678` |
+| `$.Response.Targets[0].Port` | Backend port | `8080` |
+| `$.Response.RequestId` | Request tracking ID | `abc123def-456g-789h` |
 
 ### Expected State Transitions
 
@@ -282,14 +282,14 @@ done
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Backoff |
-|--------------|-------------|---------|
-| `InvalidParameter.LBIdNotFound` | 0 | — HALT |
-| `ResourceInsufficient` | 0 | — HALT |
-| `InvalidSecretKey` / `InvalidSecretId` | 0 | — HALT |
-| `RequestLimitExceeded` | 3 | exponential backoff |
-| `InternalError` | 3 | 2s, 4s, 8s |
-| `FailedOperation.ResourceInOperating` | 3 | 30s |
+| Error pattern | Max retries | Backoff | Agent Action | UX Feedback |
+|--------------|-------------|---------|--------------|-------------|
+| `InvalidParameter.LBIdNotFound` | 0 | — | HALT | `[ERROR] LoadBalancer ID not found - verify ID and retry` |
+| `ResourceInsufficient` | 0 | — | HALT | `[ERROR] Resource quota exceeded - contact administrator` |
+| `InvalidSecretKey` / `InvalidSecretId` | 0 | — | HALT | `[ERROR] Credentials invalid - check TENCENTCLOUD_SECRET_ID/KEY` |
+| `RequestLimitExceeded` | 3 | exponential | Back off and retry | `⚠️ Rate limit reached - retrying with backoff...` |
+| `InternalError` | 3 | 2s, 4s, 8s | Retry then HALT | `[ERROR] Internal server error - retrying...` |
+| `FailedOperation.ResourceInOperating` | 3 | 30s | Wait and retry | `⚠️ Resource busy - waiting 30s before retry...` |
 
 ### Operation: Describe LoadBalancers
 

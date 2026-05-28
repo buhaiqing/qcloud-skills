@@ -190,7 +190,23 @@ This report presents the final recommendations for cloud resource analysis skill
 
 ## Appendix
 
-### A. Scoring Reference
+### A. Scoring Dimensions & Weights
+
+The weighted score is calculated across 5 dimensions:
+
+| Dimension | Weight | Description |
+|-----------|--------|-------------|
+| **Business Value** | 30% | Importance to daily operations and business continuity |
+| **Usage Frequency** | 25% | How often the tool is called in real-world scenarios |
+| **Complexity** | 20% | Development difficulty (higher = more valuable to encapsulate as a skill) |
+| **Synergy Value** | 15% | Coordination potential with other existing skills |
+| **Data Richness** | 10% | Completeness and actionability of tool return data |
+
+```
+Weighted Score = (Business × 0.30) + (Frequency × 0.25) + (Complexity × 0.20) + (Synergy × 0.15) + (Richness × 0.10)
+```
+
+### B. Score Range Reference
 
 | Score | Description |
 |-------|-------------|
@@ -200,7 +216,7 @@ This report presents the final recommendations for cloud resource analysis skill
 | 3-4 | Poor - Limited usefulness |
 | 1-2 | Critical - Major gaps |
 
-### B. Priority Definitions
+### C. Priority Definitions
 
 | Priority | Score Range | Timeline | Action |
 |----------|-------------|----------|--------|
@@ -209,7 +225,7 @@ This report presents the final recommendations for cloud resource analysis skill
 | **P2** | 5.0 - 5.9 | 2-3 months | Add to backlog |
 | **P3** | < 5.0 | As needed | Integrate into existing skills |
 
-### C. Related Documents
+### D. Related Documents
 
 - [Priority Matrix](./priority-matrix.md) - Detailed scoring breakdown and analysis
 - [Assessment Analysis](../assessment/) - Original tool assessment data
