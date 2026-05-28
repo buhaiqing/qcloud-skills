@@ -202,6 +202,7 @@ tccli tke DescribeClusters --Region {{env.TENCENTCLOUD_REGION}} --Offset 0 --Lim
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.1 | 2026-05-28 | Update K8s version to 1.30.0; Fix polling script timeout handling; Change container runtime to containerd; Add TCR integration guide; Clarify NodePoolId extraction |
 | 1.0.0 | 2026-05-21 | Initial release — cluster lifecycle, node pools, addons, dual-path |
 
 ---
@@ -229,13 +230,13 @@ tccli tke CreateCluster \
   --ClusterType "MANAGED_TKE" \
   --ClusterName "{{user.cluster_name}}" \
   --ClusterDescription "Managed TKE cluster" \
-  --ClusterVersion "1.28.3" \
+  --ClusterVersion "1.30.0" \
   --ClusterOs "tlinux3.1x86_64" \
   --ClusterOsType "CUSTOM" \
   --VpcId "{{user.vpc_id}}" \
   --SubnetId "{{user.subnet_id}}" \
   --SecurityGroup "{{user.security_group_id}}" \
-  --ContainerRuntime "docker" \
+  --ContainerRuntime "containerd" \
   --NodeNameMode "{{user.cluster_name}}-%i" \
   --ClusterLevel "L5" \
   --Region {{env.TENCENTCLOUD_REGION}}
@@ -262,7 +263,7 @@ def main():
         req.ClusterType = "MANAGED_TKE"
         req.ClusterName = os.environ.get("CLUSTER_NAME")
         req.ClusterOs = "tlinux3.1x86_64"
-        req.ClusterVersion = "1.28.3"
+        req.ClusterVersion = "1.30.0"
         req.VpcId = os.environ.get("VPC_ID")
         req.SubnetId = os.environ.get("SUBNET_ID")
         resp = client.CreateCluster(req)
@@ -285,10 +286,40 @@ for i in $(seq 1 60); do
   [ "$STATUS" = "Running" ] && break
   sleep 10
 done
+# Check timeout
+if [ "$STATUS" != "Running" ]; then
+  echo "[ERROR] Timeout waiting for cluster Running status (current: $STATUS)"
+  exit 1
+fi
 ```
 
 3. Report cluster ID and endpoints to user
 4. On failure, go to **Failure Recovery**
+
+#### TCR Integration (Optional)
+
+If using **Tencent Container Registry (TCR)** for container images:
+
+```bash
+# Associate TCR instance with cluster
+tccli tke EnableClusterAudit \
+  --ClusterId "{{output.cluster_id}}" \
+  --Region {{env.TENCENTCLOUD_REGION}}
+
+# Configure image pull secrets for TCR private registry
+tccli tke DescribeClusterSecurity \
+  --ClusterId "{{output.cluster_id}}" \
+  --Region {{env.TENCENTCLOUD_REGION}} > /tmp/kubeconfig.yaml
+
+# Set image pull secret in kubeconfig (manual step shown)
+kubectl --kubeconfig=/tmp/kubeconfig.yaml create secret docker-registry tcr-secret \
+  --docker-server={{user.tcr_registry}} \
+  --docker-username={{user.tcr_username}} \
+  --docker-password={{user.tcr_password}} \
+  --docker-email={{user.email}}
+```
+
+**Note:** For full TCR operations, use `qcloud-tcr-ops` skill.
 
 #### Failure Recovery
 
@@ -385,7 +416,14 @@ print(json.dumps(resp.to_json_string(), indent=2))
 
 #### Post-execution Validation
 
-1. Read `{{output.node_pool_id}}` from `$.Response.NodePoolId`
+1. Read `{{output.node_pool_id}}` from CreateClusterAsGroup response:
+   ```bash
+   NODE_POOL_ID=$(tccli tke CreateClusterAsGroup ... | jq -r '.Response.NodePoolId')
+   ```
+   Or from Python SDK:
+   ```python
+   output.node_pool_id = resp.NodePoolId  # e.g., "np-xxxxxxxx"
+   ```
 2. Poll DescribeClusterAsGroups until NodePoolStatus = `Running` (max 300s)
 3. Verify node count matches MinNum
 
