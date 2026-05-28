@@ -21,6 +21,7 @@ qcloud-skills/
 ├── qcloud-cbs-ops/            # 云硬盘 CBS 运维技能
 ├── qcloud-cls-ops/            # 日志服务 CLS 运维技能
 ├── qcloud-ckafka-ops/         # 消息队列 CKafka 运维技能
+├── qcloud-scf-ops/            # 云函数 SCF 运维技能
 ├── qcloud-aioops-diagnosis/   # AIOps 智能诊断（跨产品）
 ├── qcloud-proactive-inspection/ # 主动巡检（跨产品）
 ├── qcloud-well-architected-review/ # 卓越架构审查（跨产品）
