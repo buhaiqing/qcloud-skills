@@ -1,0 +1,180 @@
+# Example Configurations — TencentDB for MongoDB
+
+# Shared threshold defaults (YAML anchors)
+x-default-thresholds: &default-thresholds
+  disk_usage_warning: 80
+  disk_usage_critical: 90
+  cpu_usage_warning: 80
+  conn_usage_warning: 80
+  mem_usage_warning: 80
+
+---
+# 1. Basic Replica Set Instance
+# 3-node replica set for development or light production
+mongodb-instance:
+  basic-replica-set:
+    description: "3-node replica set, 4GB RAM, 10GB disk, Cloud Disk edition"
+    instance_name: "my-mongo-replica"
+    cluster_type: 0                    # 0=replica set, 1=sharded cluster
+    node_num: 3                        # 1 PRIMARY + 2 SECONDARY
+    memory_gb: 4                       # 4GB RAM
+    storage_gb: 10                     # 10GB disk
+    mongo_version: "MONGO_60_WT"      # MongoDB 6.0
+    machine_type: "HCD"               # Cloud Disk Edition
+    zone: "ap-guangzhou-3"
+    pay_mode: "postpaid"              # 按量计费
+    thresholds:
+      <<: *default-thresholds
+      slave_delay_warning: 30          # Seconds
+
+---
+# 2. Production Sharded Cluster
+# 2 shards × 3 nodes each for high throughput
+mongodb-instance:
+  production-sharded-cluster:
+    description: "2-shard cluster, 16GB RAM per shard, 100GB disk, High IO"
+    instance_name: "my-mongo-sharded-prod"
+    cluster_type: 1                    # Sharded cluster
+    shard_count: 2
+    nodes_per_shard: 3
+    memory_gb: 16
+    storage_gb: 100
+    mongo_version: "MONGO_70_WT"
+    machine_type: "HIO10G"            # High IO 10 Gigabit
+    zone: "ap-guangzhou-3"
+    pay_mode: "prepaid"               # 包年包月
+    period_months: 12
+    thresholds:
+      <<: *default-thresholds
+      slave_delay_warning: 10
+      oplog_reserved_time_warning: 4   # Hours
+
+---
+# 3. Multi-AZ Replica Set
+# 3 nodes across 3 AZs for high availability
+mongodb-instance:
+  multi-az-replica-set:
+    description: "3-node multi-AZ replica set for HA"
+    instance_name: "my-mongo-ha"
+    cluster_type: 0
+    node_num: 3
+    zones: ["ap-guangzhou-3", "ap-guangzhou-4", "ap-guangzhou-6"]
+    node_roles:
+      - zone: "ap-guangzhou-3"
+        role: "PRIMARY"
+      - zone: "ap-guangzhou-4"
+        role: "SECONDARY"
+      - zone: "ap-guangzhou-6"
+        role: "SECONDARY"
+    memory_gb: 8
+    storage_gb: 50
+    mongo_version: "MONGO_60_WT"
+    machine_type: "HCD"
+    pay_mode: "prepaid"
+    period_months: 24
+
+---
+# 4. Instance with Security and Backup Configuration
+mongodb-instance:
+  secure-backup-instance:
+    description: "Production instance with backup rules, SSL, deletion protection"
+    instance_name: "my-mongo-secure"
+    cluster_type: 0
+    node_num: 3
+    memory_gb: 8
+    storage_gb: 20
+    mongo_version: "MONGO_60_WT"
+    machine_type: "HCD"
+    zone: "ap-guangzhou-3"
+    # Backup rules
+    backup:
+      auto_backup: true
+      backup_type: 0                   # 0=auto, 1=manual
+      backup_time: "01:00-02:00"      # Daily backup window
+      retention_days: 7               # Keep 7 days of backups
+    # Security
+    security:
+      ssl_enabled: true
+      deletion_protection: true
+      audit_enabled: true
+      audit_log_retention_days: 30
+    # Network
+    network:
+      vpc_id: "vpc-xxxxx"
+      subnet_id: "subnet-xxxxx"
+      public_access: false
+
+---
+# 5. Parameter Tuning Configuration
+mongodb-instance:
+  parameter-tuning-config:
+    description: "Parameter template for performance tuning"
+    instance_name: "my-mongo-tuned"
+    cluster_type: 0
+    node_num: 3
+    memory_gb: 16
+    storage_gb: 50
+    mongo_version: "MONGO_60_WT"
+    machine_type: "HCD"
+    zone: "ap-guangzhou-3"
+    parameters:
+      operationProfiling.slowOpThresholdMs: 100     # Slow query threshold
+      net.messageMaxBytes: 16777216                  # 16MB max message size
+      net.maxIncomingConnections: 1000              # Max connections
+      # Oplog size: 10% of disk for replica sets
+      # Set via disk allocation, not parameter
+    # Note: oplog size is configured at creation via storage allocation ratio
+
+---
+# 6. Monitoring Alarm Configuration
+mongodb-alarms:
+  instance: "cmgo-xxxxx"  # Target instance ID
+
+  alarm-policies:
+    disk-usage-high:
+      metric: "ClusterDiskUsage"
+      threshold: 80
+      unit: "%"
+      evaluation_periods: 2        # 2 consecutive periods
+      severity: "warning"
+      notification: "notify-ops-group"
+
+    disk-usage-critical:
+      metric: "ClusterDiskUsage"
+      threshold: 90
+      unit: "%"
+      evaluation_periods: 1
+      severity: "critical"
+      notification: "notify-oncall"
+
+    cpu-high:
+      metric: "MonogdMaxCpuUsage"
+      threshold: 80
+      unit: "%"
+      evaluation_periods: 3
+      severity: "warning"
+      notification: "notify-ops-group"
+
+    slave-delay:
+      metric: "SlaveDelay"
+      threshold: 60
+      unit: "s"
+      evaluation_periods: 2
+      severity: "warning"
+      notification: "notify-dba"
+
+    oplog-low:
+      metric: "OplogReservedTime"
+      threshold: 2
+      unit: "h"
+      evaluation_periods: 1
+      severity: "critical"
+      notification: "notify-dba"
+
+    connection-high:
+      metric: "Connper"
+      threshold: 80
+      unit: "%"
+      evaluation_periods: 2
+      severity: "warning"
+      notification: "notify-ops-group"
