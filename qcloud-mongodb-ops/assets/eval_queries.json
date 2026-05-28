@@ -1,0 +1,102 @@
+[
+  {
+    "query": "帮我创建一个MongoDB实例，4核8G，副本集",
+    "should_trigger": true,
+    "reason": "Explicit MongoDB creation request in Chinese"
+  },
+  {
+    "query": "查看我的MongoDB实例列表",
+    "should_trigger": true,
+    "reason": "MongoDB list query"
+  },
+  {
+    "query": "我的MongoDB连不上，帮我排查",
+    "should_trigger": true,
+    "reason": "MongoDB connection troubleshooting"
+  },
+  {
+    "query": "给MongoDB做个备份",
+    "should_trigger": true,
+    "reason": "MongoDB backup operation"
+  },
+  {
+    "query": "MongoDB慢查询太多，查一下慢日志",
+    "should_trigger": true,
+    "reason": "MongoDB slow log diagnosis"
+  },
+  {
+    "query": "MongoDB实例扩容，升配到8核16G",
+    "should_trigger": true,
+    "reason": "MongoDB spec modification"
+  },
+  {
+    "query": "查看MongoDB的SSL状态",
+    "should_trigger": true,
+    "reason": "MongoDB SSL management"
+  },
+  {
+    "query": "tccli mongodb DescribeDBInstances",
+    "should_trigger": true,
+    "reason": "CLI command suggests MongoDB skill"
+  },
+  {
+    "query": "List my TencentDB MongoDB instances",
+    "should_trigger": true,
+    "reason": "English MongoDB query"
+  },
+  {
+    "query": "MongoDB实例被隔离了怎么恢复",
+    "should_trigger": true,
+    "reason": "MongoDB instance recovery"
+  },
+  {
+    "query": "查看我的CVM实例列表",
+    "should_trigger": false,
+    "reason": "CVM not MongoDB"
+  },
+  {
+    "query": "创建一台云服务器",
+    "should_trigger": false,
+    "reason": "CVM creation, not MongoDB"
+  },
+  {
+    "query": "检查腾讯云账户余额",
+    "should_trigger": false,
+    "reason": "Billing operation, different skill"
+  },
+  {
+    "query": "给Redis实例做个备份",
+    "should_trigger": false,
+    "reason": "Redis operation, different skill"
+  },
+  {
+    "query": "配置CLB负载均衡",
+    "should_trigger": false,
+    "reason": "CLB operation, different skill"
+  },
+  {
+    "query": "修改VPC路由表",
+    "should_trigger": false,
+    "reason": "VPC operation, different skill"
+  },
+  {
+    "query": "我的MySQL数据库连不上",
+    "should_trigger": false,
+    "reason": "MySQL (CDB) operation, different skill"
+  },
+  {
+    "query": "帮我写一个MongoDB的查询语句",
+    "should_trigger": false,
+    "reason": "Query writing, not cloud operations"
+  },
+  {
+    "query": "Kubernetes部署MongoDB集群",
+    "should_trigger": false,
+    "reason": "Self-hosted MongoDB, not Tencent Cloud"
+  },
+  {
+    "query": "给COS存储桶设置权限",
+    "should_trigger": false,
+    "reason": "COS operation, different skill"
+  }
+]
