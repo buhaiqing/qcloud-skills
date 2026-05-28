@@ -15,8 +15,8 @@ The Reliability pillar ensures your Tencent Cloud architecture can withstand fai
 **CLI pattern:**
 ```bash
 # Check CVM AZ distribution
-tccli cvm DescribeInstances --Region ap-guangzhou \
-  --Filter '{"Name":"zone","Values":[]}' \
+tccli cvm DescribeInstances --Region {{env.TENCENTCLOUD_REGION}} \
+  --Filter '{"Name":"zone","Values":["ap-guangzhou-1","ap-guangzhou-2"]}' \
   | jq '.InstanceSet[] | {InstanceId, Zone}' | jq -s 'group_by(.Zone) | map({zone: .[0].Zone, count: length})'
 ```
 

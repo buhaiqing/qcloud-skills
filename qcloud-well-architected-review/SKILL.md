@@ -11,15 +11,24 @@ description: >-
   Not for live API execution against cloud resources unless paired with a
   product-specific ops skill.
 license: MIT
-compatibility: >-
-  Tencent Cloud CLI (`tccli`), Python 3.8+ runtime for SDK fallback,
-  valid API credentials, network access to Tencent Cloud endpoints.
+type: cross-cutting-assessment
+compatibility:
+  - tccli >= 3.0
+  - python >= 3.8
+  - tencentcloud-api-credentials
 metadata:
   author: qcloud
   version: "1.0.0"
   last_updated: "2026-05-21"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
-  type: cross-cutting-assessment
+  tags:
+    - tencent-cloud
+    - well-architected
+    - assessment
+    - architecture-review
+  requirements:
+    - tccli
+    - jq
   python_version_minimum: "3.8"
   api_profile: "Tencent Cloud Well-Architected Framework (multi-product)"
   cli_applicability: "cli-only"
@@ -126,6 +135,38 @@ Map findings to actionable items with:
 - Severity (Critical/High/Medium/Low)
 - Effort estimate (quick fix / medium / major change)
 - Documentation links
+
+## Overall Architecture Score
+
+Calculate the weighted overall architecture score from four pillar scores:
+
+```
+overall_score = (reliability * 0.30) + (security * 0.30) + (cost * 0.20) + (efficiency * 0.20)
+```
+
+| Pillar | Weight | Why |
+|--------|--------|-----|
+| Reliability | 30% | Foundation of any architecture |
+| Security | 30% | Critical for compliance and trust |
+| Cost | 20% | Important but secondary to stability |
+| Efficiency | 20% | Optimization after fundamentals |
+
+### Score Interpretation
+
+| Overall Score | Rating | Action |
+|---------------|--------|--------|
+| 90-100 | Excellent | Architecture is well-optimized |
+| 80-89 | Good | Minor improvements recommended |
+| 70-79 | Fair | Significant issues to address |
+| 60-69 | Poor | Major architectural changes needed |
+| < 60 | Critical | Immediate remediation required |
+
+### Priority When Pillars Conflict
+
+When recommendations from different pillars conflict:
+1. **Security > Reliability > Cost > Efficiency**
+2. Security issues are always prioritized
+3. Reliability issues take precedence over cost optimization
 
 ## Delegation Matrix
 
