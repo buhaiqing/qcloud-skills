@@ -1,0 +1,54 @@
+# AGSX Reference Configuration
+# Use with: tencentcloud-sdk-python-ags >= 3.0.1300
+
+credentials:
+  # Source from environment, never hardcode
+  secret_id_env: TENCENTCLOUD_SECRET_ID
+  secret_key_env: TENCENTCLOUD_SECRET_KEY
+
+region: ap-guangzhou
+endpoint: ags.tencentcloudapi.com
+api_version: "2025-09-20"
+
+defaults:
+  e2b_domain: ap-guangzhou.tencentags.com
+  e2b_api_key_env: E2B_API_KEY
+
+sandbox_tools:
+  - tool_name: code-interpreter-prod
+    tool_type: CodeSandbox
+    image_id: img-default-python311
+    timeout: 3600
+    cpu_spec: 2
+    memory_spec: 4096
+    warm_count: 5
+    logging:
+      enabled: true
+      logset_id: logset-xxxxxxxx
+      topic_id: topic-xxxxxxxx
+
+  - tool_name: browser-prod
+    tool_type: BrowserSandbox
+    image_id: img-default-browser
+    timeout: 1800
+    cpu_spec: 4
+    memory_spec: 8192
+    warm_count: 2
+
+safety:
+  require_confirmation_for:
+    - DeleteSandboxTool
+    - StopSandboxInstance
+    - DeleteAPIKey
+  mask_credentials_in_logs: true
+
+monitoring:
+  alerts:
+    - name: high_startup_latency
+      metric: StartupLatency
+      threshold_p95_ms: 2000
+      duration_min: 5
+    - name: instance_error_rate
+      metric: InstanceErrors
+      threshold_ratio: 0.05
+      duration_min: 5
