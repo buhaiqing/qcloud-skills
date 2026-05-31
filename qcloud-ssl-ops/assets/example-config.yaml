@@ -1,0 +1,57 @@
+# SSL certificate configuration example
+# YAML anchors to eliminate duplicate fields (TE-5)
+
+x-certificate-config: &cert-config
+  CertificateType: "CA"
+  CertificateUse: "SSL"
+
+x-domain-config: &domain-config
+  Domain: "example.com"
+  DvAuthMethod: "DNS"
+
+# Upload certificate from files
+uploaded-certificate:
+  <<: *cert-config
+  Alias: "my-external-cert"
+  CertificatePublicKey: "-----BEGIN CERTIFICATE-----\n..."
+  CertificatePrivateKey: "-----BEGIN PRIVATE KEY-----\n..."
+
+# Apply for free certificate
+free-certificate:
+  <<: *domain-config
+  ProductType: "FREE"
+  ValidityPeriod: 12
+  ContactEmail: "admin@example.com"
+  PackageType: "FreeSSL"
+
+# Wildcard certificate (paid)
+wildcard-certificate:
+  <<: *cert-config
+  Alias: "wildcard-prod"
+  Domain: "*.example.com"
+  ProductType: "WILDCARD"
+  ValidityPeriod: 24
+
+# Multi-domain (SAN) certificate
+multi-domain-certificate:
+  <<: *cert-config
+  Alias: "multi-domain-app"
+  ProductType: "OV"
+  Domains:
+    - "app.example.com"
+    - "api.example.com"
+    - "admin.example.com"
+
+# Deployment configuration
+deploy-config:
+  CertificateId: "xxxxx"
+  ResourceType: "cdn"
+  InstanceIdList:
+    - "cdn-xxxxx"
+
+# Monitoring thresholds
+expiry-thresholds:
+  info: 90
+  warning: 30
+  critical: 14
+  emergency: 7

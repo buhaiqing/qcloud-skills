@@ -1,0 +1,28 @@
+[
+  {"query": "Upload a certificate for my domain example.com", "should_trigger": true},
+  {"query": "List all my SSL certificates", "should_trigger": true},
+  {"query": "Show me details for certificate xxxxx", "should_trigger": true},
+  {"query": "Delete certificate xxxxx that's no longer in use", "should_trigger": true},
+  {"query": "Deploy my SSL cert to CDN", "should_trigger": true},
+  {"query": "Apply for a free SSL certificate for example.com", "should_trigger": true},
+  {"query": "Check when my SSL certificate expires", "should_trigger": true},
+  {"query": "Download the certificate for nginx", "should_trigger": true},
+  {"query": "Complete domain verification for certificate xxxxx", "should_trigger": true},
+  {"query": "Rename my certificate to production-cert", "should_trigger": true},
+  {"query": "Deploy certificate to CLB listener", "should_trigger": true},
+  {"query": "Renew my expiring SSL certificate", "should_trigger": true},
+  {"query": "Enable HTTPS on my CDN with SSL cert", "should_trigger": true},
+  {"query": "Check the status of my SSL certificate", "should_trigger": true},
+  {"query": "Submit certificate info for paid OV cert", "should_trigger": true},
+
+  {"query": "Create a VPC in ap-guangzhou", "should_trigger": false},
+  {"query": "Check my account bill", "should_trigger": false},
+  {"query": "Configure CAM policy for CVM access", "should_trigger": false},
+  {"query": "Create a MySQL instance", "should_trigger": false},
+  {"query": "Set up monitoring alarm for CPU", "should_trigger": false},
+  {"query": "How to configure nginx SSL?", "should_trigger": false},
+  {"query": "Create a Redis cluster", "should_trigger": false},
+  {"query": "Generate a self-signed certificate with openssl", "should_trigger": false},
+  {"query": "Set up DNS records for my domain", "should_trigger": false},
+  {"query": "Install tccli on Ubuntu", "should_trigger": false}
+]

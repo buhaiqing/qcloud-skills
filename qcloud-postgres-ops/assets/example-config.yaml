@@ -1,0 +1,69 @@
+# PostgreSQL instance configuration example
+# YAML anchors to eliminate duplicate fields (TE-5)
+
+x-default-config: &default-config
+  AutoVoucher: 1
+  ProjectId: 0
+
+x-postgresql-version: &pg-version
+  DBVersion: "16"
+
+x-node-config: &node-config
+  DBNodeSet:
+    - Role: Primary
+      Zone: "ap-guangzhou-3"
+    - Role: Standby
+      Zone: "ap-guangzhou-3"
+
+# Production instance (prepaid, 4GB memory, 100GB storage)
+production-instance:
+  <<: [*default-config, *pg-version, *node-config]
+  DBInstanceName: "pg-production"
+  Memory: 8
+  Storage: 200
+  Period: 12
+  DBInstanceCount: 1
+  InstanceChargeType: "prepaid"
+
+# Development instance (postpaid, 2GB memory, 50GB storage)
+development-instance:
+  <<: [*default-config, *pg-version, *node-config]
+  DBInstanceName: "pg-development"
+  Memory: 2
+  Storage: 50
+  DBInstanceCount: 1
+  InstanceChargeType: "postpaid"
+
+# Backup configuration
+backup-config:
+  DBInstanceId: "postgres-xxxxx"
+  BackupType: "physical"
+  RetentionPeriod: 7
+
+# Parameter tuning (high-performance)
+high-performance-params:
+  max_connections: 500
+  shared_buffers: 524288   # KB (512MB)
+  work_mem: 16384          # KB (16MB)
+  maintenance_work_mem: 65536  # KB (64MB)
+  effective_cache_size: 1048576 # KB (1GB)
+  log_min_duration_statement: 1000  # ms
+
+# Monitoring thresholds
+thresholds:
+  cpu_usage:
+    high: 90
+    medium: 70
+    low: 50
+  mem_usage:
+    high: 90
+    medium: 75
+    low: 60
+  disk_usage:
+    high: 85
+    medium: 70
+    low: 50
+  connections:
+    high: 80
+    medium: 60
+    low: 40

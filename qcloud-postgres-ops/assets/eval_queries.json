@@ -1,0 +1,28 @@
+[
+  {"query": "Create a PostgreSQL instance with 4GB memory in Guangzhou", "should_trigger": true},
+  {"query": "I need to create a TencentDB for PostgreSQL database", "should_trigger": true},
+  {"query": "Show me all my PostgreSQL instances", "should_trigger": true},
+  {"query": "My PG is running slow, check the slow queries", "should_trigger": true},
+  {"query": "Backup my postgres instance postgres-abc123", "should_trigger": true},
+  {"query": "Restore PostgreSQL from backup", "should_trigger": true},
+  {"query": "Enable SSL on my PostgreSQL instance", "should_trigger": true},
+  {"query": "Upgrade my PG instance to 8GB memory", "should_trigger": true},
+  {"query": "Delete PostgreSQL instance postgres-abc123", "should_trigger": true},
+  {"query": "Check the disk space on my postgres database", "should_trigger": true},
+  {"query": "Reset the password for my PostgreSQL account", "should_trigger": true},
+  {"query": "Create a read-only replica for my PG instance", "should_trigger": true},
+  {"query": "List available PostgreSQL versions", "should_trigger": true},
+  {"query": "Modify parameters on my postgres instance", "should_trigger": true},
+  {"query": "Migrate data to TencentDB PostgreSQL", "should_trigger": true},
+
+  {"query": "Check my account bill for last month", "should_trigger": false},
+  {"query": "Create a VPC in ap-guangzhou", "should_trigger": false},
+  {"query": "How do I SELECT all rows from a table?", "should_trigger": false},
+  {"query": "Create a MySQL instance", "should_trigger": false},
+  {"query": "Configure a load balancer", "should_trigger": false},
+  {"query": "Install PostgreSQL on a CVM instance", "should_trigger": false},
+  {"query": "Set up a CAM policy for object storage", "should_trigger": false},
+  {"query": "How to do VACUUM FULL in PostgreSQL?", "should_trigger": false},
+  {"query": "Create a Redis cache cluster", "should_trigger": false},
+  {"query": "Monitor my CVM instances", "should_trigger": false}
+]
