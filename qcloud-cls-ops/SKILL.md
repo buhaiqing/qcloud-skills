@@ -83,6 +83,12 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - Task keywords: create logset, create topic, search logs, query logs, log collection, log agent, ship logs, log analysis, log retention, index fields
 - User asks to deploy, configure, troubleshoot, or monitor CLS **via API, SDK, CLI, or automation**
 - User describes log aggregation, centralized logging, or log analysis scenarios without naming the product
+- User asks to **analyze COS access logs** — troubleshoot object access failures, audit operations, identify security threats, analyze request performance, or review cost/storage distribution
+- Task involves **importing COS data into CLS** for further analysis
+- Keywords: COS log analysis, cos access log, COS 访问日志分析, audit COS operations, analyze COS requests, COS 审计
+- User asks to **analyze COS access logs** — audit trail, troubleshooting (e.g., why an object is inaccessible), security analysis (anomalous IPs), or performance analysis (slow requests)
+- User describes importing COS data into CLS for log analysis
+- Keywords: COS access log, COS 访问日志, COS审计, COS分析, cos log analysis, import COS data, monitoring COS access
 
 ### SHOULD NOT Use This Skill When
 
@@ -100,8 +106,12 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - CLS collection depends on CVM: verify CVM instances exist via `qcloud-cvm-ops` before creating machine groups
 - CLS shipping to COS requires COS bucket: verify bucket exists via `qcloud-cos-ops` before CreateShipper
 - CLS shipping to CKafka requires CKafka topic: verify topic exists via `qcloud-ckafka-ops` before CreateShipper
+- **COS access log import requires COS bucket**: verify bucket exists and access logging is enabled via `qcloud-cos-ops` before CreateCosRecharge
+- **COS access log analysis**: delegate COS bucket operations to `qcloud-cos-ops`; this skill handles CLS-side import and analysis
 - TKE container logs can be collected to CLS: TKE skill creates collection config, this skill manages CLS backend
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs
+- COS access log analysis requires enabling COS logging first: delegate to `qcloud-cos-ops` to verify/enable bucket logging before importing
+- COS import task (`CreateCosRecharge`) depends on COS bucket: verify bucket exists via `qcloud-cos-ops` before creating import task
 
 ## Variable Convention (Agent-Readable)
 
@@ -120,6 +130,11 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 | `{{user.config_id}}` | User-supplied collection config ID | Ask once; reuse |
 | `{{user.search_query}}` | User-supplied log search query (SQL syntax) | Ask once; reuse |
 | `{{user.time_range}}` | User-supplied time range for log search | Ask once; default to last 1 hour |
+| `{{user.cos_bucket}}` | COS bucket name with access logs | Ask once; validate naming |
+| `{{user.cos_region}}` | COS bucket region (e.g., ap-guangzhou) | Ask once; default to env region |
+| `{{user.cos_prefix}}` | COS log file prefix (e.g., `my-log/`) | Ask once; use root if empty |
+| `{{user.cos_recharge_name}}` | COS import task name | Auto-generate if not provided |
+| `{{output.cos_recharge_id}}` | From CreateCosRecharge response | Parse `$.Response.TaskId` or recharge ID |
 | `{{output.logset_id}}` | From CreateLogset response | Parse `$.Response.LogsetId` |
 | `{{output.topic_id}}` | From CreateTopic response | Parse `$.Response.TopicId` |
 | `{{output.request_id}}` | From any API response | Parse `$.Response.RequestId` for tracking |
@@ -258,12 +273,15 @@ tccli cls DescribeLogsets --Region ap-guangzhou
 | CreateConfig | Create log collection configuration | Medium | Low |
 | CreateShipper | Ship logs to COS/CKafka | Medium | Low |
 | CreateAlarm | Create log-based alarm rule | Medium | Low |
+| ImportCOSAccessLogs | Import COS access logs to CLS for analysis | Medium | Low |
+| COSAccessLogAnalysis | Analyze COS access logs — audit, troubleshooting, performance | Medium | None |
 
 ## Changelog
 
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-28 | Initial skill with CreateLogset, CreateTopic, CreateIndex, SearchLog, CreateMachineGroup, CreateConfig, Delete operations |
+| 1.1.0 | 2026-05-31 | Add ImportCOSAccessLogs and COSAccessLogAnalysis operations; add cos-log-analysis.md reference |
 
 ---
 
@@ -822,7 +840,291 @@ tccli cls DescribeConfigs \
 
 ---
 
+### Operation: ImportCOSAccessLogs (Import COS Access Logs to CLS)
+
+Import COS access logs into CLS for search and analysis. COS must have access logging enabled on the source bucket — logs are stored in a target bucket, then imported into CLS via `CreateCosRecharge`.
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| CLI install | `tccli cls help CreateCosRecharge` | Exit 0 | Install: `pip install tccli` |
+| Credentials | Check `TENCENTCLOUD_SECRET_ID/KEY` env | Non-empty | HALT; configure env |
+| COS bucket exists | Delegate to `qcloud-cos-ops` DescribeBuckets | Bucket exists | HALT; verify bucket |
+| COS logging enabled | Check via COS console or `tccli cos GetBucketLogging` | Logging enabled | Guide user to enable COS access logging |
+| CLS topic exists | `tccli cls DescribeTopics --TopicId {{user.topic_id}}` | Topic found | HALT; create topic first |
+| No duplicate recharge | `tccli cls DescribeCosRecharges --TopicId {{user.topic_id}}` | No existing task | Warn; confirm overwrite |
+
+#### Execution — CLI (`tccli`) (Primary Path)
+
+```bash
+# Preview COS import information before creating the task
+tccli cls SearchCosRechargeInfo \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --TopicId "{{user.topic_id}}" \
+  --Bucket "{{user.cos_bucket}}" \
+  --BucketRegion "{{user.cos_region}}" \
+  --LogType "minimalist_log" \
+  --Prefix "{{user.cos_prefix}}"
+
+# Create COS import task
+tccli cls CreateCosRecharge \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --TopicId "{{user.topic_id}}" \
+  --Bucket "{{user.cos_bucket}}" \
+  --BucketRegion "{{user.cos_region}}" \
+  --LogType "minimalist_log" \
+  --Prefix "{{user.cos_prefix}}" \
+  --TaskName "{{user.cos_recharge_name}}" \
+  --Enable 1 > /tmp/response.json
+
+# Capture recharge ID
+RECHARGE_ID=$(jq -r '.Response.TaskId // .Response.RechargeId' /tmp/response.json)
+echo "Created COS import task: $RECHARGE_ID"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+#!/usr/bin/env python3
+"""
+SDK fallback for CreateCosRecharge when CLI is unavailable
+"""
+import os, json
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.cls import cls_client, models
+
+def main():
+    try:
+        cred = credential.Credential(
+            os.environ.get("TENCENTCLOUD_SECRET_ID"),
+            os.environ.get("TENCENTCLOUD_SECRET_KEY")
+        )
+        client = cls_client.ClsClient(cred, os.environ.get("TENCENTCLOUD_REGION", "ap-guangzhou"))
+
+        req = models.CreateCosRechargeRequest()
+        req.TopicId = os.environ.get("TOPIC_ID")
+        req.Bucket = os.environ.get("COS_BUCKET")
+        req.BucketRegion = os.environ.get("COS_REGION", os.environ.get("TENCENTCLOUD_REGION"))
+        req.LogType = os.environ.get("LOG_TYPE", "minimalist_log")
+        req.Prefix = os.environ.get("COS_PREFIX", "")
+        req.TaskName = os.environ.get("TASK_NAME", "cos-log-import")
+        req.Enable = 1
+
+        resp = client.CreateCosRecharge(req)
+        result = json.loads(resp.to_json_string())
+        print(json.dumps(result, indent=2))
+        recharge_id = result.get('Response', {}).get('TaskId') or result.get('Response', {}).get('RechargeId')
+        print(f"\n✅ COS import task created: {recharge_id}")
+    except TencentCloudSDKException as err:
+        print(f"[ERROR] {err}")
+
+if __name__ == "__main__":
+    main()
+```
+
+#### Post-execution Validation
+
+1. Capture `{{output.cos_recharge_id}}` from response
+2. Verify import task is active:
+
+```bash
+tccli cls DescribeCosRecharges \
+  --Region {{env.TENCENTCLOUD_REGION}} \
+  --TopicId "{{user.topic_id}}"
+```
+
+3. Wait 1-2 minutes for initial log ingestion
+4. Verify logs are available:
+
+```bash
+tccli cls SearchLog \
+  --Region {{env.TENCENTCLOUD_REGION}} \
+  --TopicId "{{user.topic_id}}" \
+  --From $(date -d '10 minutes ago' +%s) \
+  --To $(date +%s) \
+  --Query '*' \
+  --Limit 5
+```
+
+#### Failure Recovery
+
+| Error pattern | Retry Strategy | Recovery |
+|--------------|----------------|----------|
+| `InvalidParameter.Bucket` | 0 | Verify COS bucket name and region |
+| `InvalidParameter.TopicId` | 0 | HALT; verify CLS topic ID |
+| `ResourceNotFound.BucketNotExist` | 0 | HALT; COS bucket does not exist |
+| `ResourceNotFound.TopicNotExist` | 0 | HALT; CLS topic not found |
+| `ResourceInUse.CosRechargeAlreadyExist` | 0 | Import task exists; use ModifyCosRecharge or delete first |
+| `QuotaExceeded.CosRecharge` | 0 | HALT; too many import tasks per topic |
+| `RequestLimitExceeded` | 3, exp backoff | Back off and retry |
+| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
+
+---
+
+### Operation: COSAccessLogAnalysis (Analyze COS Access Logs)
+
+Multi-step analysis of COS access logs imported into CLS. Covers troubleshooting, audit, security, and performance scenarios.
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| COS logs imported | `tccli cls DescribeCosRecharges --TopicId {{user.topic_id}}` | Import task exists | Run ImportCOSAccessLogs first |
+| Index configured | `tccli cls DescribeIndex --TopicId {{user.topic_id}}` | Index exists | Create COS log index (see cos-log-analysis.md) |
+| Recent data | `SearchLog` with 5-min window | Results found | Wait for log ingestion (may take 2-5 min) |
+| Time range | Parse user intent | Valid time range | Default to last 24h |
+
+#### Execution Flow
+
+**Step 1: Determine analysis scenario from user intent**
+
+Classify the user's request into one of these scenarios:
+
+| Scenario | User Keywords | Primary Fields |
+|----------|--------------|----------------|
+| Troubleshooting | "can't access", "object not found", "404 error" | `reqPath`, `resHttpCode`, `resErrorCode` |
+| Audit | "who deleted", "who modified", "audit trail" | `eventName`, `requester`, `eventTime` |
+| Security | "anomalous IP", "brute force", "suspicious" | `remoteIp`, `resHttpCode`, `requester` |
+| Performance | "slow requests", "high latency", "timeout" | `resTotalTime`, `eventName` |
+| Cost | "infrequent access", "cost optimization" | `reqPath`, `storageClass`, access count |
+| General | No specific intent | Show overview dashboard |
+
+**Step 2: Execute scenario-specific analysis**
+
+> Full query templates and field definitions are in [references/cos-log-analysis.md](references/cos-log-analysis.md).
+
+##### Scenario A: Troubleshooting
+
+```bash
+# Search by object path
+tccli cls SearchLog \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --TopicId "{{user.topic_id}}" \
+  --From $(date -d '{{user.time_range}}' +%s) \
+  --To $(date +%s) \
+  --Query 'reqPath:"{{user.req_path}}"' \
+  --Limit 100
+
+# Aggregate by HTTP status code
+# resHttpCode aggregation requires SQL analysis in console
+# CLI alternative: SearchLog with query='reqPath:"/path" AND resHttpCode:*'
+```
+
+##### Scenario B: Audit Trail
+
+```bash
+# Search for delete events on a specific path
+tccli cls SearchLog \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --TopicId "{{user.topic_id}}" \
+  --From $(date -d '{{user.time_range}}' +%s) \
+  --To $(date +%s) \
+  --Query 'eventName:DeleteObject AND reqPath:"{{user.req_path}}"' \
+  --Limit 50
+
+# Search all delete events in a bucket
+tccli cls SearchLog \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --TopicId "{{user.topic_id}}" \
+  --From $(date -d '{{user.time_range}}' +%s) \
+  --To $(date +%s) \
+  --Query 'eventName:DeleteObject AND bucketName:{{user.cos_bucket}}' \
+  --Limit 200
+```
+
+##### Scenario C: Security Analysis
+
+```bash
+# Top requesting IPs
+tccli cls SearchLog \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --TopicId "{{user.topic_id}}" \
+  --From $(date -d '{{user.time_range}}' +%s) \
+  --To $(date +%s) \
+  --Query 'resHttpCode:403 OR resHttpCode:404' \
+  --Limit 200
+
+# Anonymous access attempts
+tccli cls SearchLog \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --TopicId "{{user.topic_id}}" \
+  --From $(date -d '{{user.time_range}}' +%s) \
+  --To $(date +%s) \
+  --Query 'requester:- AND resHttpCode:403' \
+  --Limit 100
+```
+
+##### Scenario D: Performance Analysis
+
+```bash
+# Slow requests (resTotalTime > 1000ms)
+tccli cls SearchLog \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --TopicId "{{user.topic_id}}" \
+  --From $(date -d '{{user.time_range}}' +%s) \
+  --To $(date +%s) \
+  --Query 'resTotalTime:>1000' \
+  --Limit 100 \
+  --Sort desc
+```
+
+**Step 3: Present results to user**
+
+| Scenario | Key Insights to Present |
+|----------|------------------------|
+| Troubleshooting | Show matching log count by resHttpCode; highlight 4xx/5xx; show latest error events |
+| Audit | Show who (requester), when (eventTime), what eventName, source IP |
+| Security | Show top IPs by error count; flag IPs with >100 errors; identify scan patterns |
+| Performance | Show top 10 slowest requests; average latency by eventName |
+| Cost | Show least-accessed objects; recommend storage class transitions |
+
+Format results as structured Markdown tables:
+
+```
+### COS Access Log Analysis Results
+
+**Scenario**: Troubleshooting — Object `/folder/text.txt` access failure
+
+**Time Range**: Last 7 days
+**Total Requests**: 142 | **Errors**: 8 (5.6%)
+
+| resHttpCode | Count | Interpretation |
+|-------------|-------|----------------|
+| 200 | 134 | Success |
+| 403 | 5 | Access Denied — check bucket policy |
+| 404 | 3 | NoSuchKey — object may have been deleted |
+
+**Latest Errors**:
+| Time | Event | IP | Error Code | Requester |
+|------|-------|----|------------|-----------|
+| 2026-05-30T10:00Z | GetObject | 192.168.1.1 | AccessDenied | 100012345678:subuser |
+```
+
+#### Failure Recovery
+
+| Error pattern | Retry Strategy | Recovery |
+|--------------|----------------|----------|
+| No data in time range | 0 | Expand time range or wait for COS import to complete |
+| Index not found | 0 | HALT; create COS log index first (see cos-log-analysis.md) |
+| Import task not found | 0 | HALT; run ImportCOSAccessLogs first |
+| `InvalidParameter.QuerySyntax` | 0 | Fix query syntax; test with simple `*` first |
+| `LimitExceeded.SearchTimeRange` | 0 | Reduce time range (max 31 days) |
+
+#### Present to User
+
+**Always** include:
+1. Analysis scenario name
+2. Time range examined
+3. Summary statistics (total requests, error count, error rate)
+4. Categorized findings with actionable insights
+5. Reference to [cos-log-analysis.md](references/cos-log-analysis.md) for detailed queries
+
+---
+
 ## Error Code Reference
+
 
 | Error Code | Description | Retry | Agent Action | User Message |
 |------------|-------------|-------|--------------|--------------|
@@ -843,6 +1145,10 @@ tccli cls DescribeConfigs \
 | `OperationConflict` | Concurrent operation conflict | 3 | Wait; retry | `⚠️ Operation in progress → Waiting...` |
 | `InternalError` | Internal server error | 3 | Retry; HALT if persists | `[ERROR] Internal error → Retry → Escalate` |
 | `UnauthorizedOperation` | Permission denied | 0 | HALT; check CAM permissions | `[ERROR] Permission denied → Check CAM` |
+| `InvalidParameter.Bucket` | COS bucket parameter invalid | 0 | Verify bucket name and region | `[ERROR] Invalid COS bucket → Verify name/region` |
+| `ResourceNotFound.BucketNotExist` | COS bucket not found | 0 | HALT; verify bucket exists | `[ERROR] COS bucket not found → Verify bucket` |
+| `ResourceInUse.CosRechargeAlreadyExist` | COS import task exists | 0 | Use ModifyCosRecharge or delete first | `[ERROR] Import task exists → Modify or delete first` |
+| `QuotaExceeded.CosRecharge` | COS import task quota reached | 0 | HALT; delete unused import tasks | `[ERROR] Import task quota exceeded → Clean up tasks` |
 
 ## Safety Gates
 
@@ -908,6 +1214,7 @@ Proceed? (yes/no)
 |------|-------------|
 | [references/cli-usage.md](references/cli-usage.md) | Complete tccli command reference for CLS |
 | [references/core-concepts.md](references/core-concepts.md) | CLS architecture: Logset, Topic, Index, MachineGroup, Config |
+| [references/cos-log-analysis.md](references/cos-log-analysis.md) | COS access log analysis — fields, scenarios, query templates |
 | [references/troubleshooting.md](references/troubleshooting.md) | Common issues and solutions |
 | [references/integration.md](references/integration.md) | SDK setup, Cloud Shell, automation patterns |
 | [references/well-architected-assessment.md](references/well-architected-assessment.md) | Architecture review checklist |

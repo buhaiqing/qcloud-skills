@@ -78,6 +78,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - Task involves **Listeners** (TCP/UDP/HTTP/HTTPS) (CreateListener, DescribeListeners, ModifyListener, DeleteListener)
 - Task involves **Backend Servers/Targets** (RegisterTargets, DeregisterTargets, DescribeTargetHealth, ModifyTargetWeight)
 - Task involves **Target Groups** (CreateTargetGroup, DescribeTargetGroups, RegisterTargetGroupInstances)
+- Task involves **CLB access log analysis via CLS** — bandwidth cost, error diagnosis, slow request analysis, traffic pattern, SSL security, client anomaly detection (see `references/clb-log-analysis.md`)
 - Task keywords: traffic distribution, load balancing, listener, backend server, health check, SSL certificate, VIP, cross-region, Anycast
 - User asks to deploy, configure, troubleshoot, or monitor CLB **via API, SDK, CLI, or automation**
 - User describes traffic issues (connection failures, backend health problems, SSL errors) without naming product
@@ -96,6 +97,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - CLB depends on VPC: verify VPC/Subnet exist via `qcloud-vpc-ops` before CreateLoadBalancer
 - CLB backend servers are CVM instances: use `qcloud-cvm-ops` to verify instance existence and status before RegisterTargets
 - SSL certificates for HTTPS listeners: verify certificate exists via SSL service or CAM
+- CLB access log analysis (FinOps/AiOps): delegate to `qcloud-cls-ops` for CLS log search and aggregation queries; reference `clb-log-analysis.md` for query templates
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs
 
 ## Variable Convention (Agent-Readable)

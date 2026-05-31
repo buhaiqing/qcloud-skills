@@ -49,6 +49,7 @@ tccli clb help
 | Security Groups | `qcloud-vpc-ops` | Optional for LB security |
 | SSL Certificates | `qcloud-ssl-ops` | Required for HTTPS listeners |
 | Monitoring | `qcloud-monitor-ops` | CLB metrics namespace |
+| Log Analysis | `qcloud-cls-ops` | CLB access log query & analysis |
 
 ### Integration Flow
 
@@ -128,7 +129,27 @@ Namespace: QCE/LB_PUBLIC
 Dimension: LoadBalancerId
 Metrics: ClientConnum, TrafficOut, HealthStatus
 ```
+
+### CLB → CLS
+
+For CLB access log analysis (FinOps / AiOps):
+
 ```
+Trigger: Need to analyze CLB access logs for cost optimization or error diagnosis
+Delegate: qcloud-cls-ops
+Context:
+  - TopicId: [topic-xxx] (CLB log topic)
+  - TimeRange: [start_time] to [end_time]
+  - LB VIP: [vip]
+  - Query Purpose: bandwidth analysis / error diagnosis / slow request / anomaly detection
+
+CLS Action:
+  - SearchLog with structured queries
+  - Return aggregation results (status distribution, URI TOP, backend stats)
+  - Provide time-series trends
+```
+
+Reference: [clb-log-analysis.md](clb-log-analysis.md) for complete query templates
 
 ---
 
