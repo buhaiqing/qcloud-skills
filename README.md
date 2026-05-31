@@ -22,7 +22,7 @@ qcloud-skills/
 ├── qcloud-cls-ops/            # 日志服务 CLS 运维技能
 ├── qcloud-ckafka-ops/         # 消息队列 CKafka 运维技能
 ├── qcloud-scf-ops/            # 云函数 SCF 运维技能
-├── qcloud-aioops-diagnosis/   # AIOps 智能诊断（跨产品）
+├── qcloud-aiops-diagnosis/   # AIOps 智能诊断（跨产品）
 ├── qcloud-proactive-inspection/ # 主动巡检（跨产品）
 ├── qcloud-well-architected-review/ # 卓越架构审查（跨产品）
 ├── README.md
@@ -72,6 +72,7 @@ qcloud-skills/
 | `references/secops-security-operations.md` | 安全运维 |
 | `references/well-architected-assessment.md` | 卓越架构评估 |
 | `references/aiops-best-practices.md` | AIOps 最佳实践 |
+| `references/clb-log-analysis.md` | CLB × CLS 日志分析（FinOps + AiOps） |
 
 ### qcloud-cbs-ops — 云硬盘运维
 
@@ -308,7 +309,7 @@ qcloud-skills/
 | `assets/eval_queries.json` | 评估查询集 |
 | `assets/example-config.yaml` | 示例配置 |
 
-### qcloud-aioops-diagnosis — AIOps 智能诊断（跨产品）
+### qcloud-aiops-diagnosis — AIOps 智能诊断（跨产品）
 
 三维优化框架（故障诊断→根因定位→快速恢复）的智能诊断引擎，支持多指标关联分析、日志模式识别、告警风暴处理和诊断决策树。
 

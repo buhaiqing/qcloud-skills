@@ -33,5 +33,5 @@ client = cdn_client.CdnClient(cred, "ap-guangzhou")
 | Origin is CVM | qcloud-cvm-ops | CVM health, security groups, performance |
 | Origin is CLB | qcloud-clb-ops | CLB health checks, backend servers |
 | HTTPS certificate | qcloud-cam-ops | Certificate upload to CAM, CertId management |
-| Traffic anomalies | qcloud-aioops-diagnosis | Intelligent traffic pattern analysis |
+| Traffic anomalies | qcloud-aiops-diagnosis | Intelligent traffic pattern analysis |
 | Architecture review | qcloud-well-architected-review | Multi-CDN, cache safety, HTTPS automation |

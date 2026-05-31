@@ -7,7 +7,7 @@ description: >-
   "排查潜在风险", "compliance audit", or any scenario requiring systematic
   Discovery → Collection → Detection → Diagnosis → Report workflow across
   CVM, Redis, CDB, ES, TKE, CLB, VPC, COS products. Not for reactive
-  incident response (use qcloud-aioops-diagnosis) or live resource CRUD
+  incident response (use qcloud-aiops-diagnosis) or live resource CRUD
   (use product-specific ops skills).
 license: MIT
 compatibility: >-
@@ -63,7 +63,7 @@ It enables agents to systematically inspect Tencent Cloud resources for potentia
 - Risk identification: "有哪些潜在风险"
 
 ### SHOULD NOT Use This Skill When
-- Active incident response → delegate to qcloud-aioops-diagnosis
+- Active incident response → delegate to qcloud-aiops-diagnosis
 - Architecture design review → delegate to qcloud-well-architected-review
 - Resource CRUD operations → delegate to product-specific ops skill
 - Single resource troubleshooting → use product-specific skill directly

@@ -1,5 +1,5 @@
 ---
-name: qcloud-aioops-diagnosis
+name: qcloud-aiops-diagnosis
 description: >-
   Use when the user needs intelligent diagnosis, root cause analysis, or anomaly
   detection for Tencent Cloud resources — CPU/memory spikes, connection failures,
