@@ -36,6 +36,8 @@ metadata:
     Assessment uses Describe* operations across all Tencent Cloud products
     via `tccli` for resource enumeration, configuration review, and
     compliance verification. No write operations performed.
+  related_skills:
+    - qcloud-finops-ops   # 反向：架构评估的成本优化维度可与 finops 协同（well-architected 提供 TCO 视角，finops 提供实时账单）
   environment:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
@@ -75,7 +77,8 @@ Every assessment follows the **Discover → Evaluate → Report → Recommend** 
 
 ### SHOULD NOT Use This Skill When
 - User needs live resource CRUD operations → delegate to product-specific ops skill
-- User asks about billing/account management → use dedicated billing tools
+- User asks about billing/账单查询/费用明细/成本分摊 → delegate to `qcloud-finops-ops`
+- 协同场景：`qcloud-finops-ops` 提供实时账单数据，本 skill 的成本优化评估可结合该数据生成 TCO 指标；本 skill 架构评估发现的高成本架构模式可反馈给 finops 持续监控
 - User needs VPC/CLB/CAM configuration changes → delegate to qcloud-vpc-ops, qcloud-clb-ops, qcloud-cam-ops
 
 ## Variables

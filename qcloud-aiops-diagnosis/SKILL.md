@@ -30,6 +30,8 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  related_skills:
+    - qcloud-finops-ops   # 反向：异常账单根因分析可与本 skill 协同（finops 触发，aiops 提供多指标诊断）
 ---
 
 # Tencent Cloud AIOps Diagnosis Skill
@@ -66,7 +68,8 @@ Symptom Detection → Metric Analysis → Log Correlation → Diagnosis Conclusi
 ### SHOULD NOT Use This Skill When
 - User needs resource CRUD → delegate to product-specific ops skill
 - User asks about architecture design → delegate to qcloud-well-architected-review
-- User requests cost analysis → delegate to FinOps tools
+- User requests cost analysis / 异常账单根因 → delegate to `qcloud-finops-ops`
+- 协同场景：`qcloud-finops-ops` 触发异常检测后，可调用本 skill 做多指标根因分析（CPU 飙高 + 账单上涨的联合诊断）
 - Single known issue with documented fix → use product troubleshooting directly
 
 ## Variables

@@ -30,6 +30,8 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  related_skills:
+    - qcloud-finops-ops   # 反向：监控指标 + 告警通道是 FinOps 异常检测 + 成本告警的基础
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).
@@ -88,7 +90,7 @@ Every generated skill MUST satisfy these five standards:
   - CLB → `qcloud-clb-ops`
   - MySQL → `qcloud-mysql-ops`
   - VPC → `qcloud-vpc-ops`
-- Task is purely billing → `qcloud-billing-ops` (when present)
+- Task is purely billing/FinOps/cost analysis → `qcloud-finops-ops` (when present)
 - Task is CAM only → `qcloud-cam-ops` (when present)
 - User wants **console-only** → state limitation; no undocumented HTTP steps
 

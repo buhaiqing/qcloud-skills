@@ -1,0 +1,472 @@
+# qcloud-finops-ops 配置文件模板
+# =============================================================================
+# 通过 TENCENTCLOUD_FINOPS_CONFIG 环境变量指向本文件
+# 例：export TENCENTCLOUD_FINOPS_CONFIG=/etc/qcloud-finops/config.yaml
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. 凭证配置
+# -----------------------------------------------------------------------------
+credentials:
+  # 模式：single（单账号，默认）| multi（多账号，预留）
+  mode: single
+
+  # 单账号配置（mode=single 时生效）
+  single:
+    # 留空则从环境变量读取 TENCENTCLOUD_SECRET_ID
+    secret_id: ${TENCENTCLOUD_SECRET_ID}
+    # 留空则从环境变量读取 TENCENTCLOUD_SECRET_KEY
+    secret_key: ${TENCENTCLOUD_SECRET_KEY}
+    # 留空则从环境变量读取 TENCENTCLOUD_REGION
+    region: ${TENCENTCLOUD_REGION}
+
+  # 多账号配置（mode=multi 时启用，当前版本不读取，仅预留）
+  # 启用条件：
+  #   1. 主账号已通过 qcloud-cam-ops 创建 FinOpsReadOnly 角色
+  #   2. 子账号已信任主账号的 role-arn
+  #   3. 主账号 CAM 策略含 sts:AssumeRole
+  # multi:
+  #   primary:
+  #     secret_id: ${TENCENTCLOUD_SECRET_ID}
+  #     secret_key: ${TENCENTCLOUD_SECRET_KEY}
+  #   sub_accounts:
+  #     - account_id: "1000xxxxxxxxx"
+  #       assume_role_arn: "qcs::cam::uin/1000xxxxxxxxx:roleName/FinOpsReadOnly"
+  #       alias: "业务账号A"
+  #       enabled: true
+  #     - account_id: "1000yyyyyyyyy"
+  #       assume_role_arn: "qcs::cam::uin/1000yyyyyyyyy:roleName/FinOpsReadOnly"
+  #       alias: "业务账号B"
+  #       enabled: true
+
+# -----------------------------------------------------------------------------
+# 2. 异常检测配置
+# -----------------------------------------------------------------------------
+# 详见 references/finops-methodology.md §2
+anomaly_detection:
+  enabled: true
+
+  # 维度 ii：滚动对比（过去 N 月均值）
+  rolling:
+    enabled: true
+    history_months: 3           # 历史窗口（推荐 3）
+    threshold: 0.20             # 偏差阈值 20%（默认）
+    # 算法：ii_ratio = (current - mean(history)) / mean(history)
+    #      ii_violated = ii_ratio > threshold
+
+  # 维度 iii：预算对比
+  budget:
+    enabled: true
+    threshold: 0.80             # 已使用预算 80% 触发（默认）
+    # 算法：iii_ratio = current / budget.amount
+    #      iii_violated = iii_ratio > threshold
+
+  # 维度 i：同期对比（可选，默认关闭）
+  # 适合业务稳定型
+  year_over_year:
+    enabled: false
+    threshold: 0.30             # 同比 30% 触发
+
+  # 置信度规则
+  confidence:
+    # 至少一个维度违反 → MEDIUM
+    # 两个维度同时违反 → HIGH
+    # MEDIUM 触发告警，HIGH 触发告警 + 自动派发巡检
+    auto_dispatch_on: HIGH      # 自动派发巡检的最低置信度
+
+# -----------------------------------------------------------------------------
+# 3. 预算配置
+# -----------------------------------------------------------------------------
+# 详见 references/finops-methodology.md §5
+budgets:
+  # 3.1 全账号月度总预算
+  - name: "全账号月度预算"
+    type: total                 # total / product / project / tag
+    amount: 100000              # CNY
+    currency: CNY
+    month: "2026-06"            # YYYY-MM；可省略表示当前月
+    recurrence: monthly         # monthly / quarterly / yearly / one-time
+    thresholds:
+      warn: 0.80                # 80% 通知 owner
+      critical: 1.00            # 100% 通知 owner + 财务
+      freeze: 1.20              # 120% 冻结新增资源（可选）
+    owner: "finops-team@company.com"
+    notify_channels: ["email", "wecom"]
+
+  # 3.2 按产品分摊预算
+  - name: "CVM 月度预算"
+    type: product
+    product_code: "cvm"         # 腾讯云产品 code
+    amount: 50000
+    recurrence: monthly
+    thresholds:
+      warn: 0.80
+      critical: 1.00
+    owner: "compute-team@company.com"
+    notify_channels: ["email", "dingtalk"]
+
+  - name: "CDB 月度预算"
+    type: product
+    product_code: "cdb"
+    amount: 30000
+    recurrence: monthly
+    thresholds:
+      warn: 0.80
+      critical: 1.00
+    owner: "dba-team@company.com"
+    notify_channels: ["email", "dingtalk"]
+
+  - name: "COS 月度预算"
+    type: product
+    product_code: "cos"
+    amount: 15000
+    recurrence: monthly
+    thresholds:
+      warn: 0.80
+      critical: 1.00
+    owner: "storage-team@company.com"
+    notify_channels: ["email"]
+
+  # 3.3 按业务线 Tag 分摊预算
+  - name: "电商业务线预算"
+    type: tag
+    tag_key: "business-line"
+    tag_value: "电商"
+    amount: 80000
+    recurrence: monthly
+    thresholds:
+      warn: 0.80
+      critical: 1.00
+    owner: "ecommerce-lead@company.com"
+    notify_channels: ["email", "wecom", "sms"]
+
+  - name: "数据业务线预算"
+    type: tag
+    tag_key: "business-line"
+    tag_value: "数据"
+    amount: 40000
+    recurrence: monthly
+    thresholds:
+      warn: 0.80
+      critical: 1.00
+    owner: "data-lead@company.com"
+    notify_channels: ["email", "wecom"]
+
+  # 3.4 按项目代码分摊预算
+  - name: "项目 Project-Alpha 预算"
+    type: tag
+    tag_key: "project-code"
+    tag_value: "Project-Alpha"
+    amount: 20000
+    recurrence: monthly
+    thresholds:
+      warn: 0.80
+      critical: 1.00
+    owner: "alpha-pm@company.com"
+    notify_channels: ["email"]
+
+# -----------------------------------------------------------------------------
+# 4. 告警通道配置
+# -----------------------------------------------------------------------------
+# 详见 references/setup-and-permissions.md §2.3
+# 告警通道委托 qcloud-monitor-ops 创建
+notify_channels:
+  email:
+    enabled: true
+    recipients:
+      - "finops-team@company.com"
+      - "cfo@company.com"
+
+  sms:
+    enabled: false              # 默认关闭（成本考虑）
+    recipients:
+      - "+8613800000000"
+
+  wecom:                        # 企业微信
+    enabled: true
+    webhook_url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx"
+    at_mobiles:
+      - "+8613800000000"
+    at_all: false
+
+  dingtalk:                     # 钉钉
+    enabled: true
+    webhook_url: "https://oapi.dingtalk.com/robot/send?access_token=xxx"
+    secret: "SECxxx"            # 加签密钥（可选）
+    at_mobiles:
+      - "+8613800000000"
+
+  feishu:                       # 飞书
+    enabled: false
+    webhook_url: "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+    at_user_ids:
+      - "ou_xxx"
+
+  # 告警消息模板
+  message_template:
+    title: "[FinOps 告警] {alert_type} - {confidence} 置信度"
+    body: |
+      **告警类型**：{alert_type}
+      **置信度**：{confidence}
+      **时间**：{timestamp}
+      **详情**：
+      {details}
+
+      **建议动作**：
+      {recommendations}
+
+# -----------------------------------------------------------------------------
+# 5. 标签映射配置
+# -----------------------------------------------------------------------------
+# 用于成本分摊（模块 3）
+# 详见 references/finops-methodology.md §5.3
+tag_mappings:
+  # 5.1 标准标签维度
+  business-line:                # 业务线
+    description: "业务线归属"
+    required: true
+    values:
+      - "电商"
+      - "数据"
+      - "广告"
+      - "基础设施"
+      - "其他"
+
+  dept:                         # 部门
+    description: "部门归属"
+    required: true
+    values:
+      - "研发部"
+      - "产品部"
+      - "运维部"
+      - "数据部"
+      - "财务部"
+
+  env:                          # 环境
+    description: "部署环境"
+    required: true
+    values:
+      - "dev"
+      - "staging"
+      - "prod"
+
+  project-code:                 # 项目代码
+    description: "项目代码"
+    required: false
+    # values 不限（用户自填）
+
+  cost-center:                  # 成本中心
+    description: "成本中心编码"
+    required: false
+
+  # 5.2 自动打标规则（可选）
+  auto_tagging:
+    enabled: false
+    # 按资源名自动打 Tag
+    # 例：CVM 名称包含 "ecommerce" → 自动打 business-line=电商
+    rules:
+      - pattern: ".*-ecommerce-.*"
+        tags:
+          business-line: "电商"
+      - pattern: ".*-data-.*"
+        tags:
+          business-line: "数据"
+
+# -----------------------------------------------------------------------------
+# 6. 优化建议配置
+# -----------------------------------------------------------------------------
+# 详见 references/finops-methodology.md §3
+optimization:
+  enabled: true
+
+  # 闲置资源识别阈值
+  idle_detection:
+    cvm:
+      cpu_threshold: 0.05        # CPU < 5%
+      duration_days: 7
+      enabled: true
+
+    clb:
+      connection_threshold: 10   # 连接数 < 10
+      duration_days: 7
+      enabled: true
+
+    cdb:
+      connection_ratio: 0.20      # 连接数 / 规格上限 < 20%
+      duration_days: 7
+      enabled: true
+
+    redis:
+      memory_ratio: 0.30          # 内存使用率 < 30%
+      duration_days: 7
+      enabled: true
+
+    cos:
+      access_days: 30             # 30 天未访问
+      enabled: true
+
+  # 优化建议输出配置
+  output:
+    include_low_risk: true       # 包含低风险建议
+    include_medium_risk: true    # 包含中风险建议
+    include_high_risk: false     # 不包含高风险（需人工深度评估）
+    min_savings_threshold: 100   # 最低月节省金额（CNY），低于此不推荐
+    require_owner_approval: true # 必须有审批 owner 才输出
+
+  # ROI 计算参数
+  roi:
+    engineer_hourly_rate: 200    # 工程师时薪 CNY
+    max_recommendations: 10      # 每次最多推荐 10 条
+
+# -----------------------------------------------------------------------------
+# 7. 报告配置
+# -----------------------------------------------------------------------------
+# 详见 references/reports/*.md
+reports:
+  # 7.1 月度报告
+  monthly:
+    enabled: true
+    schedule: "0 0 1 1 * *"      # 每月 1 日 00:00（cron 格式）
+    template: "references/reports/monthly-bill-template.md"
+    output_dir: "./reports/monthly/"
+    formats:                     # 输出格式
+      - markdown
+      - csv
+      - json
+    recipients:
+      - "finops-team@company.com"
+      - "cfo@company.com"
+
+  # 7.2 季度复盘
+  quarterly:
+    enabled: true
+    schedule: "0 0 1 1 1,4,7,10 *" # 每季首月 1 日
+    template: "references/reports/quarterly-review-template.md"
+    output_dir: "./reports/quarterly/"
+    formats:
+      - markdown
+      - csv
+    recipients:
+      - "finops-team@company.com"
+      - "cfo@company.com"
+      - "ceo@company.com"
+
+  # 7.3 自定义查询
+  custom:
+    enabled: true
+    # 无固定 schedule，按需触发
+
+# -----------------------------------------------------------------------------
+# 8. 性能与限流
+# -----------------------------------------------------------------------------
+performance:
+  # 并发控制
+  max_workers: 5                # 并行 API 调用数
+  request_timeout: 30           # 单次请求超时（秒）
+
+  # 限流退避
+  retry:
+    max_attempts: 3
+    initial_backoff: 1          # 初始退避（秒）
+    backoff_multiplier: 2       # 指数退避倍数
+    max_backoff: 30             # 最大退避（秒）
+
+  # 分页
+  pagination:
+    default_page_size: 1000      # 单页大小（最大 1000）
+    max_pages: 100               # 最大页数（防止无限循环）
+
+  # 缓存
+  cache:
+    enabled: true
+    ttl_seconds: 300             # 5 分钟缓存
+    cache_dir: "./.cache/finops/"
+
+# -----------------------------------------------------------------------------
+# 9. 日志与审计
+# -----------------------------------------------------------------------------
+logging:
+  level: "INFO"                 # DEBUG / INFO / WARNING / ERROR
+  output: "stdout"              # stdout / file
+  file_path: "./logs/finops.log"
+  rotation: "daily"             # daily / weekly / monthly
+  retention_days: 90
+
+  audit:
+    enabled: true
+    # 所有 API 调用记录到审计日志
+    # 字段：timestamp, user, action, params, response
+    output: "tencent-cloud-audit"  # 委托给 CloudAudit
+    # 或本地备份
+    # output: "file"
+    # file_path: "./logs/audit.log"
+
+# -----------------------------------------------------------------------------
+# 10. （预留）多云扩展
+# -----------------------------------------------------------------------------
+# 当前版本不实现，仅预留扩展位
+multi_cloud:
+  enabled: false                # 启用多云账单整合（false = 仅腾讯云）
+  # 未来启用时：
+  # aliyun:
+  #   access_key: ${ALIYUN_ACCESS_KEY}
+  #   secret_key: ${ALIYUN_SECRET_KEY}
+  #   enabled: true
+  # aws:
+  #   access_key: ${AWS_ACCESS_KEY}
+  #   secret_key: ${AWS_SECRET_KEY}
+  #   region: us-east-1
+  #   enabled: true
+  # huawei:
+  #   access_key: ${HUAWEI_ACCESS_KEY}
+  #   secret_key: ${HUAWEI_SECRET_KEY}
+  #   enabled: true
+
+# -----------------------------------------------------------------------------
+# 11. 联动 Skill 配置
+# -----------------------------------------------------------------------------
+# 详见 SKILL.md 模块 8
+linked_skills:
+  monitor:
+    enabled: true
+    # 委托给 qcloud-monitor-ops
+    # 用途：拉监控指标、创建告警通道
+
+  proactive_inspection:
+    enabled: true
+    # 委托给 qcloud-proactive-inspection
+    # 用途：异常账单自动派发巡检
+    dispatch_on_confidence: "HIGH"   # HIGH 置信度才自动派发
+
+  aiops_diagnosis:
+    enabled: true
+    # 协同 qcloud-aiops-diagnosis
+    # 用途：异常根因分析
+
+  well_architected:
+    enabled: true
+    # 协同 qcloud-well-architected-review
+    # 用途：架构评估含 TCO 维度
+
+  product_skills:
+    enabled: true
+    # 23 个产品 skill 全部启用（只读元数据）
+    # 用途：成本归因维度（资源规格/标签/状态）
+
+# -----------------------------------------------------------------------------
+# 12. 安全配置
+# -----------------------------------------------------------------------------
+security:
+  # 凭证安全
+  secret_rotation_days: 90      # SecretKey 轮换周期
+  enforce_ip_whitelist: false   # 是否强制 IP 白名单
+
+  # 数据脱敏
+  data_masking:
+    enabled: true
+    mask_secret_key_in_logs: true
+    mask_user_id_in_reports: false
+
+  # 审计
+  enable_audit_log: true
+  audit_retention_days: 365     # 审计日志保留 1 年

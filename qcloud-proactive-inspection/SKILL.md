@@ -31,6 +31,8 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  related_skills:
+    - qcloud-finops-ops   # 反向：finops 异常检测（HIGH 置信度）可自动派发巡检工单到本 skill
 ---
 
 # Tencent Cloud Proactive Inspection Skill
@@ -67,6 +69,7 @@ It enables agents to systematically inspect Tencent Cloud resources for potentia
 - Architecture design review → delegate to qcloud-well-architected-review
 - Resource CRUD operations → delegate to product-specific ops skill
 - Single resource troubleshooting → use product-specific skill directly
+- 协同场景：`qcloud-finops-ops` 检测到 HIGH 置信度账单异常时，自动派发巡检工单到本 skill；本 skill 巡检清单内置"账单检查"项
 
 ## Variables
 

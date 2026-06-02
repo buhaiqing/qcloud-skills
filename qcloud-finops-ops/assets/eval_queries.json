@@ -1,0 +1,314 @@
+{
+  "skill": "qcloud-finops-ops",
+  "version": "1.0.0",
+  "description": "意图分类测试集。should_trigger=true 表示应触发本 Skill（FinOps 场景），false 表示应路由到其他 Skill 或不触发。",
+  "notes": [
+    "本测试集用于验证 Agent 能否正确识别 FinOps 相关 query 并路由到 qcloud-finops-ops。",
+    "should_trigger=true 的 query 应被路由到本 Skill 处理。",
+    "should_trigger=false 的 query 应被路由到其他 skill（如 qcloud-monitor-ops、qcloud-cam-ops、产品 skill 等）或不触发任何 skill。",
+    "expected_module 标注本 Skill 内部应路由到哪个模块（仅对 should_trigger=true 适用）。"
+  ],
+  "test_cases": [
+    {
+      "id": "finops-001",
+      "query": "本月账单花了多少钱",
+      "should_trigger": true,
+      "expected_module": "module-1",
+      "description": "模块 1：账单汇总 - 最常见查询"
+    },
+    {
+      "id": "finops-002",
+      "query": "查一下 2026 年 5 月的账单汇总",
+      "should_trigger": true,
+      "expected_module": "module-1",
+      "description": "模块 1：指定月份账单"
+    },
+    {
+      "id": "finops-003",
+      "query": "按产品汇总本月账单",
+      "should_trigger": true,
+      "expected_module": "module-1",
+      "description": "模块 1：按产品维度"
+    },
+    {
+      "id": "finops-004",
+      "query": "给我看看上个月各项目的费用分布",
+      "should_trigger": true,
+      "expected_module": "module-1",
+      "description": "模块 1：按项目维度"
+    },
+    {
+      "id": "finops-005",
+      "query": "拉一下资源级别的账单明细 cvm-abc123 这个实例",
+      "should_trigger": true,
+      "expected_module": "module-1",
+      "description": "模块 1：资源级账单"
+    },
+    {
+      "id": "finops-006",
+      "query": "L3 级别的账单流水怎么查",
+      "should_trigger": true,
+      "expected_module": "module-1",
+      "description": "模块 1：账单明细 L3 层级"
+    },
+    {
+      "id": "finops-007",
+      "query": "账户余额还有多少",
+      "should_trigger": true,
+      "expected_module": "module-2",
+      "description": "模块 2：账户余额"
+    },
+    {
+      "id": "finops-008",
+      "query": "可用金还剩多少，冻结了多少",
+      "should_trigger": true,
+      "expected_module": "module-2",
+      "description": "模块 2：余额明细"
+    },
+    {
+      "id": "finops-009",
+      "query": "我有哪些未支付的订单",
+      "should_trigger": true,
+      "expected_module": "module-2",
+      "description": "模块 2：订单管理"
+    },
+    {
+      "id": "finops-010",
+      "query": "未使用的代金券列一下",
+      "should_trigger": true,
+      "expected_module": "module-2",
+      "description": "模块 2：代金券"
+    },
+    {
+      "id": "finops-011",
+      "query": "2026 年 5 月的收支明细",
+      "should_trigger": true,
+      "expected_module": "module-2",
+      "description": "模块 2：收支明细"
+    },
+    {
+      "id": "finops-012",
+      "query": "按部门分摊本月账单费用",
+      "should_trigger": true,
+      "expected_module": "module-3",
+      "description": "模块 3：按 Tag 分摊"
+    },
+    {
+      "id": "finops-013",
+      "query": "电商业务线这个月花了多少",
+      "should_trigger": true,
+      "expected_module": "module-3",
+      "description": "模块 3：按业务线 Tag"
+    },
+    {
+      "id": "finops-014",
+      "query": "生产环境的资源成本是多少",
+      "should_trigger": true,
+      "expected_module": "module-3",
+      "description": "模块 3：按环境 Tag"
+    },
+    {
+      "id": "finops-015",
+      "query": "CDN 资源包用了多少了",
+      "should_trigger": true,
+      "expected_module": "module-3",
+      "description": "模块 3：资源包使用率"
+    },
+    {
+      "id": "finops-016",
+      "query": "给本月设个 10 万的预算",
+      "should_trigger": true,
+      "expected_module": "module-4",
+      "description": "模块 4：预算设定"
+    },
+    {
+      "id": "finops-017",
+      "query": "本月预算执行率多少",
+      "should_trigger": true,
+      "expected_module": "module-4",
+      "description": "模块 4：预算执行率查询"
+    },
+    {
+      "id": "finops-018",
+      "query": "设置费用告警，超过预算 80% 通知我",
+      "should_trigger": true,
+      "expected_module": "module-4",
+      "description": "模块 4：预算告警（联动 monitor）"
+    },
+    {
+      "id": "finops-019",
+      "query": "这个月账单异常，比上个月涨了不少",
+      "should_trigger": true,
+      "expected_module": "module-4",
+      "description": "模块 4：异常检测（ii 维度）"
+    },
+    {
+      "id": "finops-020",
+      "query": "检测一下本月费用是否超出预算",
+      "should_trigger": true,
+      "expected_module": "module-4",
+      "description": "模块 4：异常检测（iii 维度）"
+    },
+    {
+      "id": "finops-021",
+      "query": "有哪些闲置的 CVM 可以降配",
+      "should_trigger": true,
+      "expected_module": "module-5",
+      "description": "模块 5：闲置资源优化（联动 cvm）"
+    },
+    {
+      "id": "finops-022",
+      "query": "帮我看下哪些 COS bucket 可以转归档存储",
+      "should_trigger": true,
+      "expected_module": "module-5",
+      "description": "模块 5：存储分层优化"
+    },
+    {
+      "id": "finops-023",
+      "query": "资源包推荐下，看哪些能省钱",
+      "should_trigger": true,
+      "expected_module": "module-5",
+      "description": "模块 5：资源包推荐"
+    },
+    {
+      "id": "finops-024",
+      "query": "测试环境的实例都改成按量计费",
+      "should_trigger": true,
+      "expected_module": "module-5",
+      "description": "模块 5：计费模式转换"
+    },
+    {
+      "id": "finops-025",
+      "query": "生成本月账单报告",
+      "should_trigger": true,
+      "expected_module": "module-7",
+      "description": "模块 7：月度报告"
+    },
+    {
+      "id": "finops-026",
+      "query": "出个月度 FinOps 复盘",
+      "should_trigger": true,
+      "expected_module": "module-7",
+      "description": "模块 7：月度报告（FinOps 视角）"
+    },
+    {
+      "id": "finops-027",
+      "query": "2026 Q2 季度成本回顾报告",
+      "should_trigger": true,
+      "expected_module": "module-7",
+      "description": "模块 7：季度复盘"
+    },
+    {
+      "id": "finops-028",
+      "query": "为什么这个月 CVM 账单涨了 50%",
+      "should_trigger": true,
+      "expected_module": "module-8",
+      "description": "模块 8：异常根因分析（联动 cvm）"
+    },
+    {
+      "id": "finops-029",
+      "query": "CDB 异常账单分析，看是哪台实例的问题",
+      "should_trigger": true,
+      "expected_module": "module-8",
+      "description": "模块 8：产品级根因（联动 cdb）"
+    },
+    {
+      "id": "finops-030",
+      "query": "检查本月账单是否有异常",
+      "should_trigger": true,
+      "expected_module": "module-8",
+      "description": "模块 8：异常检测入口"
+    },
+    {
+      "id": "finops-031",
+      "query": "综合分析本月账单：异常检测 + Top 5 优化建议 + 月度报告",
+      "should_trigger": true,
+      "expected_module": "module-4+5+7",
+      "description": "复杂多意图：异常 + 优化 + 报告"
+    },
+    {
+      "id": "finops-032",
+      "query": "阿里云账单对一下",
+      "should_trigger": false,
+      "expected_skill": "none-or-multi-cloud-tool",
+      "description": "反例：多云账单不在本 Skill 范围"
+    },
+    {
+      "id": "finops-033",
+      "query": "AWS 这个月的费用",
+      "should_trigger": false,
+      "expected_skill": "none-or-multi-cloud-tool",
+      "description": "反例：AWS 账单不在本 Skill 范围"
+    },
+    {
+      "id": "finops-034",
+      "query": "cvm-abc123 实例重启一下",
+      "should_trigger": false,
+      "expected_skill": "qcloud-cvm-ops",
+      "description": "反例：资源 CRUD 应 delegate 到产品 skill"
+    },
+    {
+      "id": "finops-035",
+      "query": "检查 CVM 的 CPU 使用率",
+      "should_trigger": false,
+      "expected_skill": "qcloud-monitor-ops",
+      "description": "反例：实时监控指标应 delegate 到 monitor skill"
+    },
+    {
+      "id": "finops-036",
+      "query": "创建 CAM 子账号",
+      "should_trigger": false,
+      "expected_skill": "qcloud-cam-ops",
+      "description": "反例：账号权限管理属于 CAM skill"
+    },
+    {
+      "id": "finops-037",
+      "query": "API 密钥轮换",
+      "should_trigger": false,
+      "expected_skill": "qcloud-cam-ops",
+      "description": "反例：密钥管理属于 CAM skill"
+    },
+    {
+      "id": "finops-038",
+      "query": "采购 3 台 8C16G 的 CVM",
+      "should_trigger": false,
+      "expected_skill": "qcloud-cvm-ops",
+      "description": "反例：资源采购是 CVM skill，本 Skill 只出成本建议"
+    },
+    {
+      "id": "finops-039",
+      "query": "Redis 实例降配到 2G",
+      "should_trigger": false,
+      "expected_skill": "qcloud-redis-ops",
+      "description": "反例：实际降配操作属于产品 skill，本 Skill 只生成建议"
+    },
+    {
+      "id": "finops-040",
+      "query": "本月发票开了几张",
+      "should_trigger": false,
+      "expected_skill": "none-or-finance-system",
+      "description": "反例：发票管理超出 FinOps 范围"
+    },
+    {
+      "id": "finops-041",
+      "query": "报销流程怎么走",
+      "should_trigger": false,
+      "expected_skill": "none-or-finance-system",
+      "description": "反例：企业财务流程超出范围"
+    },
+    {
+      "id": "finops-042",
+      "query": "按月、按产品、按地域三个维度交叉分析本月成本",
+      "should_trigger": true,
+      "expected_module": "module-1+3",
+      "description": "复杂多意图：多维交叉分析"
+    },
+    {
+      "id": "finops-043",
+      "query": "出本月账单 + 设置预算告警 + 推算下月预测",
+      "should_trigger": true,
+      "expected_module": "module-7+4",
+      "description": "复杂多意图：报告 + 预算 + 预测"
+    }
+  ]
+}
