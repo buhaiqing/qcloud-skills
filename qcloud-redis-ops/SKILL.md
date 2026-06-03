@@ -14,8 +14,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-21"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/239"
@@ -196,6 +196,7 @@ tccli redis DescribeInstanceList --Region {{env.TENCENTCLOUD_REGION}} --Offset 0
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial release — lifecycle, backup/restore, upgrade, renewal, dual-path |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 Redis-specific safety rules incl. instance-destroy/isolate, FLUSHALL data-plane audit blind spot, spec-change eviction, password no-recovery, backup export security), `references/prompt-templates.md`. `max_iter=2` per AGENTS.md §8 |
 
 ---
 
@@ -433,6 +434,32 @@ Every **IsolateInstance** and **CleanInstance** operation MUST have:
 2. **Pre-operation backup reminder** — CreateInstance backup or manual export
 3. **Status verification** — confirm instance is in correct state before operation
 4. **Post-operation validation** — poll until target state achieved
+
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **2** | per-skill override |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 Redis-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### Redis-specific safety rules (rubric §4)
+
+1. `DestroyInstances` / `IsolateInstance` — ID + Name echo; warn recycle-bin window; confirm
+2. `ClearInstance` (FLUSHALL/FLUSHDB) — warn ALL keys removed; warn invisible to CloudAudit; literal confirm
+3. `ModifyInstanceSpec` / `UpgradeInstance` — warn failover + downtime; for reduction warn eviction; confirm
+4. `ResetPassword` — warn immediate effect + connections closed; no-recovery for `default`; confirm
+5. `BackupDownload` — warn sensitive data content; check output path security; confirm
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+
+---
 
 ## Output Schema
 

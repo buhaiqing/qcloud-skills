@@ -88,3 +88,234 @@ Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` addition
 - No `CLAUDE.md`, `opencode.json`, `.cursorrules` in this repo.
 - `.omc/`, `.omo/`, `.codebuddy/`, `.omc/project-memory.json` are gitignored cache data — not source.
 - `docs/superpowers/plans/` contains historical planning notes; safe to read but not a runtime source of truth.
+
+---
+
+## Generator-Critic-Loop (GCL) — Adversarial Quality Gate
+
+> Inspired by GAN's Generator/Discriminator idea, but deliberately **not** a real GAN.
+> Naming: **GCL (Generator-Critic-Loop)** to avoid misleading reviewers and LLM trainees.
+> Sourced from `jdcloud-skills/AGENTS.md` GCL spec, adapted for the Tencent Cloud (`tccli` / `tencentcloud-sdk-python`) execution path.
+
+### 1. Purpose
+
+Apply an adversarial **Generator ↔ Critic** loop with a quantitative rubric to every skill execution.
+Most valuable in **high-side-effect cloud operations** (delete, stop, restore, CAM/KMS/DDL) where a single
+mistake is unrecoverable.
+
+| GAN (real) | GCL (this spec) |
+|---|---|
+| Discriminator learns sample distribution | Critic scores an **explicit rubric** |
+| No termination condition | Must terminate: **PASS / MAX_ITER / SAFETY_FAIL** |
+| G and D train in parallel | G and C run **sequentially** |
+| Goal: "fool the D" | Goal: "pass the rubric threshold" |
+
+### 2. Roles
+
+| Role | Job | Input | Output | Forbidden |
+|---|---|---|---|---|
+| **Generator (G)** | Execute the cloud operation | user request + previous Critic feedback | result + execution trace | modifying the rubric; self-scoring |
+| **Critic (C)** | Independently audit G's output | G's result + trace + rubric | scores + suggestions | calling `tccli` / SDK / mutating anything |
+| **Orchestrator (O)** | Loop control, termination, final return | context + C scores + budget | continue / final result | executing or scoring on its own |
+
+**Hard constraint:** G and C MUST live in **isolated prompt contexts** (preferably isolated sessions
+or sub-agents). A shared context is a "pseudo-GCL" and is explicitly banned — see §9.
+
+### 3. Rubric (mandatory per skill)
+
+Each `SKILL.md` MUST declare its skill-specific rubric. Minimum 5 dimensions:
+
+| Dimension | Meaning | Scale | Default threshold |
+|---|---|---|---|
+| **Correctness** | Resource id / state / config actually matches the request | 0 / 0.5 / 1 | ≥ 0.5 (1.0 required for `delete` / `stop` / CAM / KMS / DDL) |
+| **Safety** | Destructive op (`delete` / `stop` / `restore` / CAM / KMS / DDL) was confirmed or guarded | 0 / 1 | = 1 |
+| **Idempotency** | Retrying the same call will not cause duplicate side-effects | 0 / 0.5 / 1 | ≥ 0.5 |
+| **Traceability** | Output is auditable: command, params, raw response, errors all captured | 0 / 0.5 / 1 | ≥ 0.5 |
+| **Spec Compliance** | Conforms to the skill's `core-concepts.md` / `cli-usage.md` constraints | 0 / 0.5 / 1 | ≥ 0.5 |
+
+**Safety = 0 → ABORT immediately, regardless of total score.**
+
+### 4. Loop Flow
+
+```
+User Request
+     │
+     ▼
+[0] Pre-flight (Orchestrator)
+    - resolve env.* and user.* variables
+    - pick skill, load its rubric
+     │
+     ▼
+[1] Generate (G) ───────────────────────┐
+    - run tccli / tencentcloud-sdk-python │
+    - capture trace                     │
+     │                                  │
+     ▼                                  │
+[2] Critique (C)                       │
+    - isolated prompt context           │
+    - score every rubric dimension      │
+    - emit actionable suggestions       │
+     │                                  │
+     ▼                                  │
+[3] Decide (Orchestrator)              │
+    - Safety=0  → ABORT (no partial)   │
+    - all pass  → RETURN                │
+    - else & iter<max → inject         │
+       suggestions into G               │
+    - else → RETURN best + unresolved   │
+       rubric items                     │
+     └──────────────────────────────────┘
+```
+
+### 5. Termination (first match wins)
+
+| Condition | Behavior |
+|---|---|
+| **PASS** | Every rubric dimension meets its threshold → return G's result |
+| **MAX_ITER** | Reached `max_iterations` (default 3) → return **best-so-far** + unresolved rubric items |
+| **SAFETY_FAIL** | Safety = 0 → **ABORT**; never return partial or "best-effort" output |
+
+`max_iterations` defaults per skill class — see §8.
+
+### 6. Trace & Audit (mandatory)
+
+Every GCL run MUST persist a JSON trace:
+
+```json
+{
+  "skill": "qcloud-cvm-ops",
+  "request": "<sanitized user request>",
+  "rubric_version": "v1",
+  "iterations": [
+    {
+      "iter": 1,
+      "generator": { "command": "...", "args": {...}, "exit_code": 0, "result_excerpt": "..." },
+      "critic": {
+        "scores": {
+          "correctness": 1, "safety": 1, "idempotency": 0.5,
+          "traceability": 1, "spec_compliance": 1
+        },
+        "suggestions": ["..."],
+        "blocking": false
+      },
+      "decision": "RETRY"
+    }
+  ],
+  "final": { "status": "PASS", "iter": 2, "output": "..." }
+}
+```
+
+Path: `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` — unified with the existing
+`audit-results/` directory (e.g. `qcloud-finops-ops` reports, `qcloud-proactive-inspection` traces).
+
+### 7. Prompt Templates (mandatory per skill)
+
+Each skill's `references/prompt-templates.md` (or equivalent) MUST contain:
+
+1. **Generator Prompt Template** — placeholders: `{{user.request}}`, `{{output.critic_feedback}}`, `{{output.rubric}}`
+2. **Critic Prompt Template** — placeholders: `{{output.generator_output}}`, `{{output.trace}}`, `{{output.rubric}}`
+
+> **Placeholder syntax** MUST follow the repository-wide convention
+> (see top-level **Five Core Standards → Structured I/O**): `{{env.*}}` / `{{user.*}}` / `{{output.*}}`.
+> Bare `{...}` placeholders are NOT allowed in skill prompt templates.
+
+**Critic prompt must hide the raw user request** to prevent "answer-aligned" rubber-stamping.
+Recommended skeleton:
+
+```text
+You are an independent cloud-operation auditor.
+You will see one execution result and its trace. Score it STRICTLY against the rubric below.
+Do NOT consider the original user request — judge only what was actually done.
+
+rubric: {{output.rubric}}
+generator_output: {{output.generator_output}}
+trace: {{output.trace}}
+
+Return strict JSON:
+{
+  "scores": { "correctness": 0|0.5|1, "safety": 0|0.5|1, "idempotency": 0|0.5|1,
+              "traceability": 0|0.5|1, "spec_compliance": 0|0.5|1 },
+  "suggestions": ["≤ 3 concrete, executable improvements"],
+  "blocking": true|false
+}
+```
+
+### 8. Per-Skill Defaults (QCloud)
+
+Destructive workload → **required**, max_iter=2. Read-only / advisory → **optional**, max_iter=5. Meta → **optional**, max_iter=3.
+
+| Skill | GCL | Default max_iter | Notes |
+|---|---|---|---|
+| `qcloud-cvm-ops` | **required** | 2 | `TerminateInstances` / `StopInstances` are destructive |
+| `qcloud-cdb-ops` | **required** | 2 | `IsolateDBInstance` / `DropDB` / DDL |
+| `qcloud-clb-ops` | **required** | 2 | `DeleteLoadBalancers` / `DeleteListeners` cut traffic |
+| `qcloud-cos-ops` | **required** | 2 | `DELETE Bucket` / `DELETE Object` is irreversible |
+| `qcloud-es-ops` | **required** | 2 | `DeleteCluster` / `DeleteIndex` |
+| `qcloud-redis-ops` | **required** | 2 | `DestroyInstances` / `ClearInstance` (FLUSHALL) |
+| `qcloud-tke-ops` | **required** | 2 | `DeleteCluster` / `DeleteNode` |
+| `qcloud-vpc-ops` | **required** | 2 | `DeleteVpc` / `ReleaseAddresses` |
+| `qcloud-cam-ops` | **required** | 2 | `DetachPolicy` / `DeleteUser` / `RotateAccessKey` |
+| `qcloud-cdn-ops` | recommended | 3 | `DeleteCdnDomain` / purge cache |
+| `qcloud-cbs-ops` | **required** | 2 | `TerminateDisks` is destructive |
+| `qcloud-cls-ops` | recommended | 3 | `DeleteLogset` / `DeleteTopic` |
+| `qcloud-ckafka-ops` | **required** | 2 | `DeleteInstance` / `DeleteTopic` |
+| `qcloud-scf-ops` | recommended | 3 | `DeleteFunction` / `DeleteNamespace` |
+| `qcloud-mongodb-ops` | **required** | 2 | `DropDB` / `TerminateDBInstance` |
+| `qcloud-postgres-ops` | **required** | 2 | `DropDB` / `TerminateDBInstance` / DDL |
+| `qcloud-ssl-ops` | recommended | 3 | `DeleteCertificates` |
+| `qcloud-agsx-ops` | recommended | 3 | SDK-only skill; protect against `DeleteAgentPool` |
+| `qcloud-finops-ops` | optional | 3 | reports only; must NOT auto-execute billing changes |
+| `qcloud-monitor-ops` | recommended | 3 | `DeleteAlarmPolicy` / `UnbindAlarmRuleResource` |
+| `qcloud-aiops-diagnosis` | optional | 5 | read-only; cross-skill correlation |
+| `qcloud-proactive-inspection` | recommended | 3 | 5-step pipeline; idempotency is the main risk |
+| `qcloud-well-architected-review` | optional | 5 | advisory only; 4-pillar assessment |
+| `qcloud-skill-generator` | optional | 3 | meta; must enforce 2-round self-review |
+
+Each skill may override `max_iter` in its own `SKILL.md` (under `## Quality Gate`).
+
+### 9. Anti-Patterns (banned)
+
+- ❌ **Shared context G+C** — defeats independence → banned
+- ❌ **Subjective scoring** — Critic must use the rubric, not "vibes" → banned
+- ❌ **Unbounded loop** — always hard-cap iterations → banned
+- ❌ **Critic sees the user request** — encourages rubber-stamping → banned
+- ❌ **Silently downgrade on Safety fail** — must ABORT visibly → banned
+- ❌ **Trace not persisted** — no post-mortem possible → banned
+- ❌ **Critic mutates resources** — Critic is read-only by definition → banned
+
+### 10. Rollout Roadmap
+
+- **Phase 1 (this commit)** — add this section to `AGENTS.md`; pilot on **`qcloud-cvm-ops`** only
+  (most representative destructive workload: `TerminateInstances`, `StopInstances`,
+  `ResetInstances` with reset-image, and CAM-driven reset) with its `references/prompt-templates.md`
+  and `references/rubric.md`. `qcloud-cdb-ops` and `qcloud-cos-ops` follow in the next PR.
+- **Phase 2** — add `scripts/gcl_runner.py` as a reusable Orchestrator (wraps `tccli` calls
+  with isolated sub-agent Critic).
+- **Phase 3** — feed `gcl-trace-*.json` into `qcloud-monitor-ops` (custom metric) and
+  `qcloud-proactive-inspection` for quality dashboards.
+- **Phase 4** — wire rubric pass-rate to Cloud Monitor alarms (real incidents refine thresholds).
+
+### 11. Relationship to existing 2-round self-review
+
+GCL is the **runtime** counterpart to the **build-time** "Mandatory rule: 2-round self-review after every skill update"
+above. They do not overlap:
+
+| Stage | Owner | Purpose |
+|---|---|---|
+| **Skill update (build time)** | skill author | Diff skill against template; 5 Core Standards; R1–R4 governance |
+| **Skill execution (runtime)** | Generator + Critic | Score a single execution against the skill's rubric; gate side-effects |
+
+Both gates must pass — a clean self-review does not exempt runtime scoring, and a perfect rubric
+does not exempt a sloppy skill update.
+
+### 12. Changelog
+
+| Version | Date | Change |
+|---|---|---|
+| 1.0.0 | 2026-06-04 | Initial GCL specification added to `AGENTS.md` (adapted from `jdcloud-skills/AGENTS.md`; per-skill defaults remapped to qcloud skill set; `tccli` / `tencentcloud-sdk-python` execution path; Phase 1 pilot scoped to `qcloud-cvm-ops`) |
+
+### 13. See also
+
+- Each skill's `references/rubric.md` (when shipped) — the rubric instance
+- Each skill's `references/prompt-templates.md` (when shipped) — the G/C/O prompt skeletons
+- `qcloud-skill-generator/references/governance-and-adversarial-review.md` — build-time R1–R4 review (sister gate)

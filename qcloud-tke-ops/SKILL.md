@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-21"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/457"
@@ -204,6 +204,7 @@ tccli tke DescribeClusters --Region {{env.TENCENTCLOUD_REGION}} --Offset 0 --Lim
 |---------|------|---------|
 | 1.0.1 | 2026-05-28 | Update K8s version to 1.30.0; Fix polling script timeout handling; Change container runtime to containerd; Add TCR integration guide; Clarify NodePoolId extraction |
 | 1.0.0 | 2026-05-21 | Initial release — cluster lifecycle, node pools, addons, dual-path |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 TKE-specific safety rules incl. cluster-delete cascade, node-drain PDB guard, version-upgrade addon compat, public-endpoint security), `references/prompt-templates.md` (Generator + Critic + Orchestrator). `max_iter=2` per AGENTS.md §8 |
 
 ---
 
@@ -537,6 +538,41 @@ Every **DeleteCluster** or irreversible operation MUST have:
 2. **Pre-backup reminder** — export namespace YAML, PVC data, CRDs before deletion
 3. **Dependency check** — warn if cluster has running pods/services
 4. **Post-delete verification** — poll until absent or NotFound (max 600s)
+
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **2** | per-skill override |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 TKE-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? |
+|---|---|
+| Destructive: `DeleteCluster`, `DeleteNode`, `DrainNode` | **yes** |
+| Sensitive mutating: `UpdateClusterVersion`, `ModifyClusterAttribute`, `CreateClusterEndpoint` | **yes** |
+| Mutating: `CreateCluster`, `AddNodeToPool`, `InstallAddon`, `DeleteAddon` | **yes** |
+| Read-only: `DescribeClusters`, `DescribeClusterInstances`, `DescribeAddon` | optional |
+
+### TKE-specific safety rules (rubric §4)
+
+1. `DeleteCluster` — ID + Name echo; workload cascade warning (PVCs, CRDs, all namespaces); YAML export prompt
+2. `DeleteNode` / `DrainNode` — node count check (>50% refuse); PDB check for critical namespaces
+3. `AddNodeToPool` (batch) — capacity check; confirmation when >10% scale-up
+4. `UpdateClusterVersion` — show current → target; warn one-directional; surface addon compatibility; reject minor-version skip
+5. `ModifyClusterAttribute` / `CreateClusterEndpoint` — public endpoint security warning; current status display
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+
+---
 
 ## Output Schema
 

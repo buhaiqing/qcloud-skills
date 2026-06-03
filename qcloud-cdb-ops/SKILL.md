@@ -17,8 +17,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-21"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "2017-03-20 - https://cloud.tencent.com/document/api/236"
@@ -180,6 +180,7 @@ tccli cdb DescribeDBInstances --Region {{env.TENCENTCLOUD_REGION}} --Limit 10
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial API/SDK-oriented template with tccli CLI support |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CDB-specific safety rules incl. `ModifyAccountPrivileges` `Host=%` guard), `references/prompt-templates.md` (Generator + Critic + Orchestrator, isolated-context enforcement, password + Host='%' hygiene, SQL data-plane out-of-scope guard). `max_iter=2` per AGENTS.md §8 |
 
 ---
 
@@ -771,6 +772,74 @@ Every **IsolateDBInstance**, **DeleteBackups**, **DeleteAccounts**, or **irrever
 2. **Pre-backup reminder** (backup before isolate/delete)
 3. **Dependency check** (warn if instance has active connections or dependent read replicas)
 4. **Post-delete verification** (poll until status confirms operation)
+
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
+is a **runtime** scoring layer that audits each CDB execution against an explicit
+rubric, in addition to the build-time **Safety Gates** above and the build-time
+**2-round self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **2** | per-skill override (matches AGENTS.md §8 default for `qcloud-cdb-ops`) |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CDB-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Destructive: `IsolateDBInstance`, `ReleaseIsolatedDBInstances`, `DeleteBackups`, `DeleteAccounts`, `CreateCloneInstance` (over-spec restore) | **yes** | Irreversible or near-irreversible; needs scoring |
+| Sensitive mutating: `ModifyAccountPrivileges` (esp. `GRANT ALL`), `UpgradeDBInstanceEngineVersion`, `ModifyInstanceParam` (params requiring restart), `SwitchDBInstanceMasterSlave` | **yes** | Privilege / version / failover risk; needs scoring |
+| Mutating: `CreateDBInstance`, `CreateDBInstanceHour`, `UpgradeDBInstance`, `RestartDBInstances`, `CreateBackup`, `CreateAccounts`, `ModifyAccountPassword`, `OpenWanService` / `CloseWanService`, `OpenSSL` / `CloseSSL` | **yes** | Cost / state-change / security risk; needs scoring |
+| Read-only: `DescribeDBInstances`, `DescribeBackups`, `DescribeAccounts`, `DescribeInstanceParams`, `DescribeSlowLogData` | optional (max_iter=1, no hard abort) | Polling tails are part of the parent op's trace |
+| **Out of scope**: SQL execution against a CDB instance via MySQL wire protocol (`DROP DATABASE`, `TRUNCATE`, raw `UPDATE`) | **HALT** | This skill does not own the data plane. GCL pilot covers Tencent Cloud CDB API ops only |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** OR any rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result). Password leak in trace is also an unconditional ABORT.
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
+
+### CDB-specific safety rules (rubric §4)
+
+The Critic checks 5 CDB-specific rules independently of which operation ran:
+
+1. `IsolateDBInstance` (any, batch or single) — ID+Name echo, explicit confirmation, retention-window warning (postpaid: 1 day, prepaid: 7 days), dependency check (read-only replicas, DR instance), `--DryRun` for batch
+2. `CreateCloneInstance` / restore from backup — source backup named + `DescribeBackups` re-confirms; explicit confirmation that the action CREATES A NEW INSTANCE; new `Spec` ≥ source; new instance name distinct from source
+3. `DeleteBackups` — backup IDs + names + retention-day math surfaced; block on the ONLY remaining backup if `IsolateDBInstance` is in-flight
+4. `DeleteAccounts` — account `User`+`Host` echoed; dependency check on active connections (`RealSession` metric); explicit confirmation; block if account is the only `GRANT OPTION` source
+5. `ModifyAccountPrivileges` (esp. `GRANT ALL` / root-level revoke) — BEFORE/AFTER privilege diff; explicit re-confirmation for `GRANT ALL`, `GRANT SUPER`, `GRANT ALL ON *.*`, or any revoke stripping root-level grants; `Host` field explicit (no silent `%`)
+
+Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+
+### Worked example — `DeleteBackups` (last backup while isolate in flight)
+
+| Dimension | Score |
+|---|---|
+| Correctness | 0.5 (backups were deleted, but gate should have caught the situation) |
+| **Safety** | **0** (rule 3 violated) |
+| Idempotency | 1 |
+| Traceability | 1 |
+| Spec Compliance | 1 |
+
+`decision: ABORT`. Recovery suggestion emitted: check TencentDB recycle bin; if within window, file a Tencent Cloud support ticket; add a "do not delete last backup while isolate in flight" guard to the skill's pre-flight.
+
+See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `IsolateDBInstance` and RETRY on `ModifyAccountPrivileges`).
+
+### Sibling — CVM Quality Gate
+
+The CVM Quality Gate uses the same 5-dimension backbone and the same G/C/O prompt
+architecture, with a different §4 rule set (CVM: `TerminateInstances` / HARD-stop /
+`ResizeInstanceDisks` / `RunInstances` / `ResetInstances`). See
+[`qcloud-cvm-ops/SKILL.md` §Quality Gate](../cvm-ops/SKILL.md#quality-gate-gcl) for
+contrast.
 
 ---
 

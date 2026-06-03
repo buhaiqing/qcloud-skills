@@ -15,7 +15,7 @@ compatibility: >-
   log analysis, valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
+  version: "1.1.0"
   last_updated: "2026-05-21"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   type: cross-cutting-diagnosis
@@ -142,6 +142,37 @@ Provide prioritized recovery actions with effort estimates.
 | Single-metric tunnel vision | Only looking at CPU | Always correlate 3+ metrics |
 | Alarm fatigue | Treating all alarms equally | Categorize, deduplicate, prioritize |
 | Missing time context | Analyzing logs without time window | Always use {{user.time_range}} |
+
+---
+
+## Changelog
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-05-21 | Initial release — multi-metric correlation, root cause analysis, anomaly detection |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 rules: confidence disclosure, read-only cross-skill, time-range correlation, data recency, recommendation boundary), `references/prompt-templates.md`. `max_iter=5` per AGENTS.md §8 |
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **optional** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **5** | per-skill override |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 rules (read-only skill) |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### Safety rules (rubric §4)
+
+1. **Confidence disclosure** — surface HIGH/MEDIUM/LOW for each finding; no correlation-as-causation
+2. **Read-only cross-skill** — no mutations; confirm read-only in trace
+3. **Time-range correlation** — surface diagnosis window; warn non-overlapping windows
+4. **Data recency** — surface last-updated time; warn stale data
+5. **Recommendation boundary** — prefix "RECOMMENDATION (not execution)"; delegate to product skill
+
+**Read-only skill.** No hard ABORT on Safety=0 (no destructive ops).
 
 ---
 

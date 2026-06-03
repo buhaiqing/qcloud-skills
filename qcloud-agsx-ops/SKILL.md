@@ -8,8 +8,8 @@ compatibility: >-
   valid API credentials, network access to ags.tencentcloudapi.com.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-28"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "2025-09-20"
@@ -602,6 +602,30 @@ Every **Delete**, **Terminate**, or **irreversible** operation MUST have:
 
 ---
 
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **recommended** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-agsx-ops`) |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 AGSX-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### AGSX-specific safety rules (rubric §4)
+
+1. `DeleteAgentPool` / `TerminateAgentPool` — pool ID + Name + agent count echo; cascade warning; confirm
+2. `DeleteAgent` (active) — agent ID + status echo; check pending executions; confirm
+3. `TerminateAgentExecution` — execution ID + agent ID echo; warn no-rollback; confirm
+4. `UpdateAgentPoolConfig` — BEFORE/AFTER diff; warn capacity/timeout kills in-flight agents; confirm per field
+5. `CreateAgentPool` / `CreateAgent` — surface cost + quota; warn compute-heavy billing; confirm
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+
+---
+
 ## Output Schema
 
 All responses follow Tencent Cloud API structure:
@@ -637,3 +661,4 @@ Error responses:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-28 | Initial skill generated from qcloud-skill-generator template |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 AGSX-specific safety rules incl. agent-pool cascade, active-agent deletion, force-termination no-rollback, pool config disruption, provisioning cost), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |

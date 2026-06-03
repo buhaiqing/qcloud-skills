@@ -15,8 +15,8 @@ compatibility: >-
   Tencent Cloud CAM endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-21"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/598"
@@ -86,6 +86,13 @@ CAM (Cloud Access Management) is Tencent Cloud's identity and access management 
 | 4 | **Complete Failure Strategies** | AuthFailure handling, rate limits, policy version conflicts |
 | 5 | **Absolute Single Responsibility** | One product (CAM), primary resource = Policy/User/Role |
 
+## Changelog
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-05-21 | Initial release — policy/user/group/role/API key/SSO operations |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CAM-specific safety rules incl. user-delete key audit, policy-delete principal check, trust policy amplification, over-permissive policy guard), `references/prompt-templates.md`. `max_iter=2` per AGENTS.md §8 |
+
 ## Safety Gates
 
 **DESTRUCTIVE CONFIRMATION REQUIRED before:**
@@ -98,6 +105,32 @@ CAM (Cloud Access Management) is Tencent Cloud's identity and access management 
 **Policy version safety:**
 - Always use CreatePolicyVersion → SetDefaultPolicyVersion (not direct UpdatePolicy)
 - Document rollback: revert to previous version via SetDefaultPolicyVersion
+
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **2** | per-skill override |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CAM-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### CAM-specific safety rules (rubric §4)
+
+1. `DeleteUser` — list attached policies + groups + API keys; warn active key breakage; confirm
+2. `DeletePolicy` — list attached principals; warn permission-breaking; confirm
+3. `DeleteApiKey` — check last-used status; warn pipeline breakage; confirm
+4. `UpdateAssumeRolePolicy` — BEFORE/AFTER diff; warn `Principal=*` amplification; confirm
+5. `AttachUserPolicy` / `AttachRolePolicy` / `CreatePolicy` — warn `Action=*`+`Resource=*` AdminAccess; warn `cam:*` privilege escalation; confirm
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+
+---
 
 ## Execution Flows
 

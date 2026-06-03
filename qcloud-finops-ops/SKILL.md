@@ -240,6 +240,38 @@ tccli voucher DescribeVoucherList --Status "unused" --Limit 100
 
 → API 校对清单与错误码见 `references/api-cross-check.md`
 
+## Changelog
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 FinOps-specific safety rules: billing data privacy, no-auto-execute constraint, tag attribution timing, idle detection accuracy, cross-skill delegation), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
+
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **optional** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-finops-ops`) |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 FinOps-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### FinOps-specific rules (rubric §4)
+
+1. **Billing data privacy** — mask account IDs, invoice URLs, contacts in trace; no raw output
+2. **No auto-execute** — recommend only; delegate execution to product skills
+3. **Tag attribution timing** — warn future-only; confirm
+4. **Idle detection accuracy** — warn CLS query latency; verify before action
+5. **Resource recommendation delegation** — do NOT auto-execute; cross-skill handoff only
+
+**This is a read-only/advisory skill.** Safety=0 does NOT trigger ABORT (no destructive ops).
+
+---
+
 ## 相关 Skill 索引
 
 | Skill | 关系 |

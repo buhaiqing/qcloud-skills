@@ -16,8 +16,8 @@ compatibility: >-
   Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-21"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   type: cross-cutting-inspection
   python_version_minimum: "3.8"
@@ -157,6 +157,37 @@ Default thresholds (override via `{{user.thresholds}}`):
 | Threshold fatigue | Too many false positives | Use sustained thresholds, not instant |
 | Report without action | Listing problems without fixes | Every finding must have remediation |
 | One-time inspection | Not establishing regularity | Recommend inspection schedule |
+
+---
+
+## Changelog
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-05-21 | Initial release — 5-step inspection pipeline (Discovery → Collection → Detection → Diagnosis → Report) |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 rules: run idempotency, read-only collection, credential safety, snapshot timing, report path security), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **recommended** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **3** | per-skill override |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### Safety rules (rubric §4)
+
+1. **Run idempotency** — check duplicate scope/time within 1h; track inspection ID
+2. **Read-only collection** — no mutations; no alarm/notification triggers
+3. **Credential safety** — mask secrets in report output
+4. **Snapshot clarity** — surface time range; add "state as of <timestamp>"
+5. **Report path security** — no world-readable paths; no public upload without confirmation
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ---
 

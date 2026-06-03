@@ -16,8 +16,8 @@ compatibility: >-
   Tencent Cloud CDN endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-21"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/228"
@@ -87,6 +87,13 @@ CDN (Content Delivery Network) is Tencent Cloud's content delivery service provi
 | 4 | **Complete Failure Strategies** | Domain validation failures, cache purge limits, origin errors |
 | 5 | **Absolute Single Responsibility** | One product (CDN), primary resource = Domain |
 
+## Changelog
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-05-21 | Initial release — CDN domain management, cache purge, config update |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CDN-specific safety rules incl. domain-deletion CNAME break, wildcard `/*` purge mass flush, origin config change, preload origin cost), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
+
 ## Safety Gates
 
 **DESTRUCTIVE CONFIRMATION REQUIRED before:**
@@ -98,6 +105,32 @@ CDN (Content Delivery Network) is Tencent Cloud's content delivery service provi
 - `PurgeUrlsCache` = Delete specific cached URLs (immediate effect)
 - `PurgePathCache` = Directory-level purge (broad impact)
 - `PushUrlsCache` = Pre-warm cache (proactive, no risk)
+
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **recommended** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-cdn-ops`) |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CDN-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### CDN-specific safety rules (rubric §4)
+
+1. `DeleteCdnDomain` — domain + CNAME echo; warn CDN stop; list origin config; literal confirm
+2. `PurgeUrlsCache` with `/*` — warn ALL content cleared; surface cache hit ratio; recurse-confirm
+3. `PurgePathCache` — path echo; warn broad impact; root path → recurse-confirm
+4. `UpdateDomainConfig` — BEFORE/AFTER diff; warn origin/SSL mismatch; confirm per field
+5. `PushUrlsCache` (preload) — URL list + size echo; warn large preload origin cost; confirm
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+
+---
 
 ## Execution Flows
 

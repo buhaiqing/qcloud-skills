@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-28"
+  version: "1.2.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/614"
@@ -282,6 +282,7 @@ tccli cls DescribeLogsets --Region ap-guangzhou
 |---------|------|---------|
 | 1.0.0 | 2026-05-28 | Initial skill with CreateLogset, CreateTopic, CreateIndex, SearchLog, CreateMachineGroup, CreateConfig, Delete operations |
 | 1.1.0 | 2026-05-31 | Add ImportCOSAccessLogs and COSAccessLogAnalysis operations; add cos-log-analysis.md reference |
+| 1.2.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CLS-specific safety rules incl. logset cascade delete, topic data loss, index removal unsearchable, machine group collection stop, config change gap), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
 
 ---
 
@@ -1207,6 +1208,32 @@ Existing logs will remain but cannot be searched until index is recreated.
 
 Proceed? (yes/no)
 ```
+
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **recommended** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-cls-ops`) |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CLS-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### CLS-specific safety rules (rubric §4)
+
+1. `DeleteLogset` — logset ID + Name + topic count echo; list topics; warn cascade; literal confirm
+2. `DeleteTopic` — topic ID + Name + data size echo; warn data loss; check shipping tasks; confirm
+3. `DeleteIndex` — index ID + Topic ID echo; warn data unsearchable; warn re-index cost; confirm
+4. `DeleteMachineGroup` / `DeleteConfigAttachment` — warn collection stop; check agents; confirm
+5. `ModifyConfig` — BEFORE/AFTER diff; warn apply delay + collection gap; confirm per field
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+
+---
 
 ## Reference Directory
 

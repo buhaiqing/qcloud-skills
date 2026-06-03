@@ -16,8 +16,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-21"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/214"
@@ -203,6 +203,7 @@ tccli clb DescribeLoadBalancers --Region {{env.TENCENTCLOUD_REGION}}
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial CLB skill with dual-path CLI/SDK support |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CLB-specific safety rules incl. listener-delete traffic cut, mass-deregister drain, Internet↔Internal flip guard), `references/prompt-templates.md` (Generator + Critic + Orchestrator, isolated-context enforcement). `max_iter=2` per AGENTS.md §8 |
 
 ---
 
@@ -602,6 +603,60 @@ Every **Delete**, **Deregister**, or **irreversible** operation MUST have:
 1. **Explicit user confirmation** with resource identifier displayed
 2. **Warning about dependent resources** (listeners, backend bindings)
 3. **Post-delete verification** (poll until 404 or deleted state)
+
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
+is a **runtime** scoring layer that audits each CLB execution against an explicit
+rubric, in addition to the build-time **Safety Gates** above and the build-time
+**2-round self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **2** | per-skill override (matches AGENTS.md §8 default for `qcloud-clb-ops`) |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CLB-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Destructive: `DeleteLoadBalancers`, `DeleteListeners`, `DeregisterTargets` (batch > 50%) | **yes** | Irreversible; live-traffic cut; needs scoring |
+| Sensitive mutating: `ModifyLoadBalancerAttributes` (Internet↔Internal flip), `ModifyListener` (protocol/port), `ModifyRule` (production domain/URL) | **yes** | Configuration drift / security risk; needs scoring |
+| Mutating: `CreateLoadBalancer`, `CreateListener`, `RegisterTargets`, `CreateRule`, `ModifyTargetPort`, `ModifyTargetWeight` | **yes** | Cost / state-change risk; needs scoring |
+| Read-only: `DescribeLoadBalancers`, `DescribeListeners`, `DescribeTargets`, `DescribeTaskStatus` | optional (max_iter=1, no hard abort) | Polling tails are part of the parent op's trace |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** OR any rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result). Internet↔Internal flip without diff ⇒ ABORT. Mass deregister without drain ⇒ ABORT.
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
+
+### CLB-specific safety rules (rubric §4)
+
+1. `DeleteLoadBalancers` (any) — LB ID + Name echo; listener / target-binding / replication dependency check; `--DryRun` for batch; warn atomicity
+2. `DeleteListeners` (single or batch) — listener ID + protocol + port echoed; "traffic on port X cut immediately"; HTTPS cert detachment warning; rules count
+3. `DeregisterTargets` batch > 50% — DRAIN guard: require `ConnectionDrainTimeout ≥ 30s`; surface `CurrConnections`; recurse-confirm
+4. `ModifyLoadBalancerAttributes` switching Internet↔Internal — BEFORE/AFTER diff (type / IP version / accessibility); warn public IP release/acquisition; recurse-confirm
+5. `RegisterTargets` (any) — verify each target `InstanceState == RUNNING`; reject cross-VPC without peer; surface weight=0 as hidden config error
+
+### Sibling — CVM / CDB / COS / CLB Quality Gates
+
+| Skill | §4 Distinctive rules |
+|---|---|
+| `qcloud-cvm-ops` | instances, disks, re-image |
+| `qcloud-cdb-ops` | accounts, privileges, SQL data-plane boundary |
+| `qcloud-cos-ops` | versioning, public ACL, cold transition, batch delete |
+| `qcloud-clb-ops` (this) | listener traffic-cut, mass drain, direction flip, non-running target reject |
+
+See [`references/rubric.md`](references/rubric.md) §6 for worked examples.
+
+---
 
 ## Output Schema
 

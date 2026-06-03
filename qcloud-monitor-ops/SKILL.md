@@ -16,8 +16,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-21"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/248"
@@ -61,6 +61,13 @@ Every generated skill MUST satisfy these five standards:
 | 3 | **Explicit Actionable Steps** | Pre-flight → Execute → Validate → Recover, numbered imperative steps |
 | 4 | **Complete Failure Strategies** | Error taxonomy ≥ 12 codes; HALT vs retry per error |
 | 5 | **Absolute Single Responsibility** | One product (Monitor), resources (AlarmPolicy, Metric); product ops delegated |
+
+## Changelog
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-05-21 | Initial release — alarm policy CRUD, metric query, dashboard, troubleshooting |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 Monitor-specific safety rules incl. alarm-policy deletion silent incident, unbinding coverage loss, threshold drift, notice template silence, default policy reach), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
 
 ### Well-Architected Framework Integration
 
@@ -427,6 +434,32 @@ Five-step flow per [Proactive Inspection Template](../qcloud-skill-generator/tem
 | `ResourceNotFound.NotExistTask` | Task does not exist | FIX — verify task ID |
 | `ResourcesSoldOut` | Resources sold out | HALT — choose another specification or region |
 | `OperationDenied` | Operation denied | HALT — check operation permissions |
+
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **recommended** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-monitor-ops`) |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 Monitor-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### Monitor-specific safety rules (rubric §4)
+
+1. `DeleteAlarmPolicy` — policy ID + Name + bound resource count echo; warn alert silence; literal confirm
+2. `UnbindAlarmRuleResource` — policy + resource ID echo; warn coverage loss; confirm
+3. `ModifyAlarmPolicy` (condition) — BEFORE/AFTER diff; warn threshold drift; confirm per field
+4. `DeleteAlarmNotices` — notice template + type echo; list referencing policies; warn notification silence; confirm
+5. `SetDefaultAlarmPolicy` / auto-remediation — warn default applies to ALL future resources; confirm
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+
+---
 
 ## Reference Directory
 

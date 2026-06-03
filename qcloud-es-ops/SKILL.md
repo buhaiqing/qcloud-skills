@@ -16,8 +16,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-21"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "2018-04-16 - https://cloud.tencent.com/document/api/845"
@@ -174,6 +174,7 @@ tccli es DescribeInstances --Region {{env.TENCENTCLOUD_REGION}} --Limit 10
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial API/SDK-oriented template with tccli CLI support |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 ES-specific safety rules incl. cluster-delete irreversible, index-delete ILM awareness, config-change stability risk, password no-recovery, version-upgrade plugin compat), `references/prompt-templates.md`. `max_iter=2` per AGENTS.md §8 |
 
 ---
 
@@ -529,6 +530,30 @@ Every **DeleteInstance**, **DeleteIndex**, **DeleteClusterSnapshot**, or **irrev
 2. **Pre-backup reminder** (snapshot before destroy)
 3. **Dependency check** (warn if cluster has active indices)
 4. **Post-delete verification** (poll until ResourceNotFound)
+
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **2** | per-skill override |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 ES-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### ES-specific safety rules (rubric §4)
+
+1. `DeleteInstance` / `DeleteCluster` — ID + Name + index count echo; warn irreversible; confirm
+2. `DeleteIndex` / `DeleteDataStream` — warn ILM policy awareness; no batch-drop
+3. `UpdateInstanceSettings` / `ModifyClusterConfig` — config diff; warn stability risk; confirm per change
+4. `ResetPassword` / `ModifyAccountPassword` — warn immediate effect; no-recovery for `elastic`; confirm
+5. `UpgradeElasticsearchVersion` — show current → target; warn one-directional; plugin compat check; confirm
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ---
 

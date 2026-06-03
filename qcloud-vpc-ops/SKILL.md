@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-21"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "2024-01-01 - https://cloud.tencent.com/document/api/215"
@@ -186,6 +186,7 @@ tccli vpc CreateVpc --Region ap-guangzhou --VpcName "my-vpc" --CidrBlock "10.0.0
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial VPC skill with dual-path execution |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 VPC-specific safety rules incl. VPC cascade delete, subnet resource dependency, EIP bound-release, route blackhole, SG rule loss), `references/prompt-templates.md`. `max_iter=2` per AGENTS.md §8 |
 
 ---
 
@@ -610,6 +611,32 @@ Every **Delete VPC/Subnet** MUST have:
 2. Dependency check (instances, CLB, NAT gateway)
 3. Pre-warning about impact
 4. Post-delete verification (poll until 404)
+
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **2** | per-skill override |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 VPC-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### VPC-specific safety rules (rubric §4)
+
+1. `DeleteVpc` — enumerate subnets/SGs/resources; warn cascade; literal confirm
+2. `DeleteSubnet` — check running resources; warn connectivity loss; confirm with ID
+3. `ReleaseAddresses` (EIP) — check bound resource; warn public connectivity loss; confirm per EIP
+4. `DeleteRouteTable` / `DeleteRoutes` — list entries; warn default route drop = internet outage; confirm
+5. `DeleteSecurityGroup` — enumerate bound instances; warn rule loss; confirm
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+
+---
 
 ## Output Schema
 

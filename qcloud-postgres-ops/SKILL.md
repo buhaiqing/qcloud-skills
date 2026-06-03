@@ -18,8 +18,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-31"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/409 — 2017-03-12"
@@ -635,6 +635,32 @@ Every **Delete**, **Isolate**, or **irreversible** operation MUST have:
 3. **Deletion protection check** — verify status before delete
 4. **Post-delete verification** — poll describe until status=deleted or 404
 
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **2** | per-skill override |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 PG-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### PostgreSQL-specific safety rules (rubric §4)
+
+1. `IsolateDBInstance` / `TerminateInstances` — ID + Name echo; warn recycle-bin window; check deletion protection
+2. `DropDatabase` / `DropTable` — DB/table name echo; warn CASCADE effect; no batch-drop
+3. `ModifyDBInstanceSpec` — warn restart + downtime; surface disk usage; storage reduction not supported
+4. `ResetPassword` / `ModifyAccountPassword` — warn immediate effect + connection drop; no-recovery for `postgres`
+5. `CreateAccount` (wildcard host) — surface account + host pattern; warn `Host=%` open access; confirm
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+
+---
+
 ## Output Schema
 
 All responses follow Tencent Cloud API structure:
@@ -679,6 +705,7 @@ Error responses:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-31 | Initial release — PostgreSQL instance lifecycle, backup/restore, accounts, parameters, slow logs, SSL, read-only replicas, security groups |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 PG-specific safety rules incl. instance-isolate/terminate, data-plane drop guard, spec-change restart, root password no-recovery, wildcard host account), `references/prompt-templates.md`. `max_iter=2` per AGENTS.md §8 |
 
 ## Reference Directory
 

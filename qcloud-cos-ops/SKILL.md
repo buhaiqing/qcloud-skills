@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud COS endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-21"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "2024-01-01 - https://cloud.tencent.com/document/api/436"
@@ -129,6 +129,13 @@ coscmd download /bucket-name/path/file.txt ./local-file.txt
 | DeleteObject | Delete object | **High** |
 | PutBucketLifecycle | Set lifecycle rules | Medium |
 | **FinOpsAnalysis** | **Full COS cost analysis via CLS: storage/request/traffic cost, idle detection, anomaly detection, trend prediction, report** | **None** |
+
+## Changelog
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-05-21 | Initial skill with bucket/object operations, lifecycle/ACL/versioning configuration, FinOpsAnalysis via CLS |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 COS-specific safety rules incl. versioning soft-delete, public ACL, broad-prefix cold transition, batch-delete DryRun), `references/prompt-templates.md` (Generator + Critic + Orchestrator, isolated-context enforcement, secret-content + public-ACL hygiene, FinOpsAnalysis read-only variant). `max_iter=2` per AGENTS.md §8 |
 
 ## Execution Flows
 
@@ -735,6 +742,77 @@ Every **DeleteBucket/DeleteObject** MUST have:
 2. Impact warning (objects will be lost)
 3. Empty check for bucket deletion
 4. Post-delete verification (poll until 404)
+
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
+is a **runtime** scoring layer that audits each COS execution against an explicit
+rubric, in addition to the build-time **Safety Gates** above and the build-time
+**2-round self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **2** | per-skill override (matches AGENTS.md §8 default for `qcloud-cos-ops`) |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 COS-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Destructive bucket: `DeleteBucket` (must enumerate live + non-current + DeleteMarkers + incomplete multipart) | **yes** | Irreversible; needs scoring |
+| Destructive object: `DeleteObject` (single & batch) on versioning-enabled bucket | **yes** | Soft-delete trap; needs scoring |
+| Sensitive mutating: `PutBucketACL` (`public-read` / `public-read-write`), `PutBucketLifecycle` (transition to `ARCHIVE` / `DEEP_ARCHIVE` or `Expiration`) | **yes** | Exfil / cold-transition risk; needs scoring |
+| Mutating: `PutBucket`, `PutObject`, multipart `MultiUpload`, `PutBucketPolicy`, `PutBucketCORS`, `PutBucketVersioning`, `PutBucketReplication` | **yes** | Cost / state-change / security risk; needs scoring |
+| Read-only: `GetBucket`, `ListObjects`, `HeadObject`, `GetBucketACL`, `GetBucketLifecycle` | optional (max_iter=1, no hard abort) | Polling tails are part of the parent op's trace |
+| `FinOpsAnalysis` (read-only, 5 phases) | optional (max_iter=5, no ABORT) | Read-only; lighter scoring per `prompt-templates.md` §4 |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** OR any rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result). Secret-content leak in trace is also an unconditional ABORT.
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
+
+### COS-specific safety rules (rubric §4)
+
+The Critic checks 5 COS-specific rules independently of which operation ran:
+
+1. `DeleteObject` on a **versioning-enabled** bucket — surface versioning status via `GetBucketVersioning`; require `VersionId` for hard delete OR explicit acknowledgement of `DeleteMarker` semantics; warn on `Status=Suspended`
+2. `DeleteBucket` — enumerate live objects + non-current versions + DeleteMarkers + incomplete multipart uploads; surface ACL/bucket-policy/CORS/replication dependencies; explicit confirmation with all four counts
+3. `PutBucketACL` with `public-read` / `public-read-write` — surface full object key listing; require user to confirm no key contains credentials / PII / private keys; warn ACL applies to ALL objects including pre-existing ones
+4. `PutBucketLifecycle` with `Transition → ARCHIVE` / `DEEP_ARCHIVE` (or `Expiration`) — show BEFORE/AFTER rule diff; require re-confirmation when prefix is broad AND target is cold; require non-zero `Expiration.Days`
+5. Batch delete: `coscmd delete -r`, `coscmd delete -f prefix/`, multi-object API with count > 1000 — MUST run `--dry-run` first and surface count + sample keys; require literal "yes, delete <count> objects" recurse-confirm; block if count > 10000 unless explicit `--force-bulk` rationale
+
+Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+
+### Worked example — `PutBucketACL public-read` (silent)
+
+| Dimension | Score |
+|---|---|
+| Correctness | 1 (ACL applied) |
+| **Safety** | **0** (rule 3 violated — object enumeration not surfaced; `keys/` and `db-dumps/` likely exposed) |
+| Idempotency | 1 |
+| Traceability | 1 |
+| Spec Compliance | 1 |
+
+`decision: ABORT`. Recovery suggestion emitted: re-read all object keys via `ListObjects`; identify any sensitive prefixes; decide whether to (a) rotate credentials / PII if exposure is suspected, then (b) revert ACL to `private`; (c) use `PutBucketPolicy` for scoped public access to the docs prefix only.
+
+See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `DeleteObject` and RETRY on `PutBucketLifecycle`).
+
+### Sibling — CVM & CDB Quality Gates
+
+| Skill | Backbone | Distinctive §4 rule |
+|---|---|---|
+| [`qcloud-cvm-ops`](../cvm-ops/SKILL.md#quality-gate-gcl) | 5 dimensions + G/C/O | compute (instances, disks, re-image) |
+| [`qcloud-cdb-ops`](../cdb-ops/SKILL.md#quality-gate-gcl) | 5 dimensions + G/C/O | database (accounts, privileges, data-plane boundary) |
+| `qcloud-cos-ops` (this skill) | 5 dimensions + G/C/O | object storage (versioning, public ACL, cold transition, batch delete) |
+
+---
 
 ## Output Schema
 

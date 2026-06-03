@@ -17,8 +17,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-29"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/240 — 2019-07-25"
@@ -671,6 +671,32 @@ Every **Delete**, **Terminate**, **Isolate**, **Offline**, or **irreversible** o
 4. **Deletion protection check** — verify via `SetDBInstanceDeletionProtection` status
 5. **Post-delete verification** — poll describe until status=-2 or 404
 
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **2** | per-skill override |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 MongoDB-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### MongoDB-specific safety rules (rubric §4)
+
+1. `IsolateDBInstance` / `DestroyDBInstance` — ID + Name echo; warn recycle-bin window (7d); check deletion protection
+2. `DropDatabase` / `DropCollection` — DB/collection name echo; warn irreversible; no batch-drop
+3. `ModifyDBInstanceSpec` — warn restart + downtime; for downgrade surface MemoryUsage; confirm
+4. `ModifyAccountPassword` — warn immediate effect; no-recovery-path for root; confirm with account name
+5. `ModifySecurityGroup` / network change — warn client lockout; for VPC change warn endpoint IP change
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+
+---
+
 ## Output Schema
 
 All responses follow Tencent Cloud API structure:
@@ -716,6 +742,7 @@ Error responses:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-29 | Initial release — MongoDB instance lifecycle, backup/restore, accounts, parameters, slow logs, SSL, audit, security groups |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 MongoDB-specific safety rules incl. instance-isolate/destroy, database/collection drop, spec-change OOM risk, password change no-recovery, security group lockout), `references/prompt-templates.md`. `max_iter=2` per AGENTS.md §8 |
 
 ## Reference Directory
 

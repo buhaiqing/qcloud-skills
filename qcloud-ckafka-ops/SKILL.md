@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-28"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/597"
@@ -218,6 +218,7 @@ tccli ckafka DescribeInstances --Region {{env.TENCENTCLOUD_REGION}} --Limit 10
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-28 | Initial API/SDK-oriented template with tccli CLI support |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CKafka-specific safety rules incl. instance-delete cascade, topic-delete offset loss, partition rebalancing, broker-config retention drop, ACL open-access guard), `references/prompt-templates.md` (Generator + Critic + Orchestrator). `max_iter=2` per AGENTS.md §8 |
 
 ---
 
@@ -702,6 +703,30 @@ tccli ckafka DescribeTopicSubscribeGroup \
   --InstanceId "{{user.instance_id}}" \
   --TopicName "{{user.topic_name}}"
 ```
+
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **2** | per-skill override |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CKafka-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### CKafka-specific safety rules (rubric §4)
+
+1. `DeleteInstance` — instance ID + Name echo; list topics + consumer groups before commit; literal confirm
+2. `DeleteTopic` — topic + partition + active consumer groups echo; confirm with topic name
+3. `ModifyTopic` (partition change) — warn one-directional; surface rebalancing impact; confirm if >2×
+4. `ModifyInstanceAttributes` (retention/config) — echo current → new; warn retention timing; warn CleanUpPolicy irreversibility
+5. `CreateAcl` / `DeleteAcl` — surface ACL rule; warn `Host=*` + `ALL` open access; warn last-rule lockout
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ---
 

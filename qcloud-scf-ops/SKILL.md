@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-28"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/583"
@@ -212,6 +212,7 @@ tccli scf ListFunctions --Region {{env.TENCENTCLOUD_REGION}} --Namespace default
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-28 | Initial release — function lifecycle, triggers, layers, versions, dual-path |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 SCF-specific safety rules incl. function-delete cascade, trigger disruption, namespace/layer cascade, code update env var overwrite, invocation side effects), `references/prompt-templates.md`. `max_iter=2` per AGENTS.md §8 |
 
 ---
 
@@ -636,6 +637,32 @@ Every **DeleteFunction** or irreversible operation MUST have:
 2. **Pre-check** — verify no active aliases or triggers depend on this function
 3. **Dependency check** — warn if triggers will be affected
 4. **Post-delete verification** — poll until NotFound (max 60s)
+
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **recommended** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-scf-ops`) |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 SCF-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### SCF-specific safety rules (rubric §4)
+
+1. `DeleteFunction` — function name + namespace + version/trigger count echo; cascade warning; confirm
+2. `DeleteFunctionTriggers` — trigger type + name + ARN echo; warn service disruption; confirm
+3. `DeleteNamespace` / `DeleteLayerVersion` — list dependents; warn cold-start failure; confirm
+4. `UpdateFunctionCode` / `UpdateFunctionConfiguration` — BEFORE/AFTER diff; warn env var overwrite; confirm
+5. `InvokeFunction` (side effects) — warn live execution; confirm for Event type
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+
+---
 
 ## Output Schema
 

@@ -18,8 +18,8 @@ compatibility:
   - tencentcloud-api-credentials
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-21"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   tags:
     - tencent-cloud
@@ -192,6 +192,37 @@ When recommendations from different pillars conflict:
 | Vague scores | Saying "looks good" without metrics | Use structured scoring per pillar |
 | Missing recommendations | Listing problems without solutions | Every finding must have actionable fix |
 | Over-assessing | Reviewing everything when user only asked for cost | Honor user scope preference |
+
+---
+
+## Changelog
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-05-21 | Initial release — 4-pillar assessment (Reliability, Security, Cost, Efficiency), delegation matrix |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 rules: scope clarity, read-only collection, confidence disclosure, cross-pillar consistency, delegation matrix respect), `references/prompt-templates.md`. `max_iter=5` per AGENTS.md §8 |
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **optional** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **5** | per-skill override |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 rules (advisory skill) |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### Safety rules (rubric §4)
+
+1. **Scope clarity** — surface assessment scope; mark skipped pillars as "NOT ASSESSED"
+2. **Read-only collection** — no mutations; confirm read-only delegation
+3. **No false certainty** — surface confidence; caveat for incomplete data
+4. **Cross-pillar consistency** — surface conflicting recommendations; flag trade-offs
+5. **Delegation matrix respect** — reject out-of-matrix skills; recommend re-run after addition
+
+**Advisory/read-only skill.** No hard ABORT on Safety=0 (no destructive ops).
 
 ---
 

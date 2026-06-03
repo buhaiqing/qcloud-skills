@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-31"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/400 — 2019-12-05"
@@ -474,6 +474,32 @@ Every **Delete** or **irreversible** operation MUST have:
 2. **Deployment check** — verify if certificate is in use by other resources
 3. **Post-delete verification** — confirm certificate no longer listed
 
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **recommended** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-ssl-ops`) |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 SSL-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### SSL-specific safety rules (rubric §4)
+
+1. `DeleteCertificate` — cert ID + domain + deploy status echo; list deployed resources; literal confirm
+2. `DeployCertificateInstance` — show target resource; warn replace; surface current cert; confirm
+3. `ReplaceCertificate` — BEFORE/AFTER diff; warn immediate; check domain match; confirm
+4. `ApplyCertificate` — show domain + validation method; warn DV/OV timing; check DNS access; confirm
+5. `UploadCertificate` — show cert info; warn incomplete chain; reject < 2048-bit key; confirm
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+
+---
+
 ## Output Schema
 
 All responses follow Tencent Cloud API structure:
@@ -517,6 +543,7 @@ Error responses:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-31 | Initial release — SSL certificate upload, describe, delete, deploy, download, apply, domain verification |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 SSL-specific safety rules incl. cert-deletion with deployed resources, wrong-resource deploy, cert-apply DNS readiness, upload chain validation), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
 
 ## Reference Directory
 

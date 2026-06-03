@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-28"
+  version: "1.1.0"
+  last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/362"
@@ -267,6 +267,7 @@ tccli cbs DescribeDisks --Region ap-guangzhou --Limit 100
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-28 | Initial skill with CreateDisks, AttachDisks, DetachDisks, ResizeDisk, CreateSnapshot, DeleteSnapshots, dual-path execution |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CBS-specific safety rules incl. disk-destroy irreversibility, detach-without-unmount guard, resize-shrink rejection, snapshot-chain warning, DeleteWithInstance toggle guard), `references/prompt-templates.md` (Generator + Critic + Orchestrator). `max_iter=2` per AGENTS.md §8 |
 
 ---
 
@@ -931,6 +932,30 @@ Every **DeleteSnapshots**, **DetachDisks**, **ResizeDisk**, or **irreversible** 
 2. **Pre-backup reminder** (snapshot suggestion before destructive operations)
 3. **Dependency check** (verify disk not in use, not being backed up)
 4. **Post-operation verification** (poll until target state reached)
+
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **2** | per-skill override |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CBS-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### CBS-specific safety rules (rubric §4)
+
+1. `TerminateDisks` (destroy) — ID + Name + Size echo; warn irreversible; surface `DeleteWithInstance` flag
+2. `DetachDisks` — warn running CVM data corruption risk without unmount
+3. `ResizeDisk` — EXPAND ONLY; reject shrink before API call
+4. `DeleteSnapshots` — snapshot-chain invalidation warning; `--DryRun` for batch
+5. `ModifyDiskAttributes` — `DeleteWithInstance` toggle warning; echo attributes per change
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ---
 
