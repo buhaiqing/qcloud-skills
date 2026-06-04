@@ -54,7 +54,7 @@ TKE depends on other Tencent Cloud services:
 
 | Resource | Default Limit | Notes |
 |----------|---------------|-------|
-| Clusters per account | 50 | Can request quota increase |
+| Clusters per account | 50 | `tccli tke DescribeUserQuota` 查询最新配额 |
 | Node pools per cluster | 50 | |
 | Nodes per cluster | 500 | For large clusters, contact support |
 | Pods per node (VPC-CNI) | 256 | Limited by subnet IP range |
@@ -63,6 +63,8 @@ TKE depends on other Tencent Cloud services:
 | Clusters per region | Varies | Check DescribeUserQuota |
 
 ## Supported Regions
+
+> 完整区域列表: `tccli cvm DescribeRegions`（TKE 兼容 CVM 区域）
 
 | Region | Code | TKE Available |
 |--------|------|---------------|
@@ -80,6 +82,8 @@ TKE depends on other Tencent Cloud services:
 | Virginia | `na-ashburn` | ✓ |
 
 ## Node OS Options
+
+> 最新镜像列表: `tccli tke DescribeClusterAsGroupOption`
 
 | OS | Identifier | Notes |
 |----|------------|-------|
@@ -112,12 +116,15 @@ Node pools support horizontal auto-scaling based on pod pending events or custom
 
 ## Kubernetes Version Support
 
+> 获取最新版本列表: `tccli tke DescribeClusterAsGroupOption`
+
 | K8s Version | TKE Support | Notes |
 |-------------|-------------|-------|
-| 1.32 | Latest | Recommended for new clusters |
-| 1.30 | Stable | Widely used |
-| 1.28 | LTS | End of approaching support |
-| 1.26 | Maintenance | Plan upgrade |
+| 1.34 | Latest (preview) | Early adopter — check addon compatibility |
+| 1.32 | Latest (stable) | Recommended for new clusters |
+| 1.30 | Stable / LTS | Widely used, recommended for production |
+| 1.28 | Maintenance | Plan upgrade to 1.30+ soon |
+| 1.26 | Deprecated | Upgrade immediately |
 
 > Check official TKE documentation for current supported versions.
 

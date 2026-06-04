@@ -84,7 +84,7 @@ req.ClusterVersion = "1.30.0"        # Optional: K8s version
 req.ClusterOsType = "CUSTOM"         # Optional: OS type
 req.VpcId = "vpc-xxxxx"              # Required: VPC ID
 req.SubnetId = "subnet-xxxxx"        # Required: Subnet ID
-req.ContainerRuntime = "docker"      # Optional: container runtime
+req.ContainerRuntime = "containerd"  # Optional: container runtime (containerd is default/recommended)
 req.NodeNameMode = "mycluster-%i"    # Optional: node naming pattern
 req.ClusterLevel = "L5"              # Optional: cluster tier
 ```

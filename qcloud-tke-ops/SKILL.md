@@ -15,7 +15,7 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.1.0"
+  version: "1.2.0"
   last_updated: "2026-06-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
@@ -202,9 +202,10 @@ tccli tke DescribeClusters --Region {{env.TENCENTCLOUD_REGION}} --Offset 0 --Lim
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.2.0 | 2026-06-04 | Added 4 missing execution flows: UpdateClusterVersion, DeleteNode/DrainNode, AddNodeToPool (batch scale), ModifyClusterAttribute/CreateClusterEndpoint — with full pre-flight safety gates per rubric §4; Fixed DeleteCluster pre-flight check to use API path; Fixed container runtime inconsistency; Added 18 eval_queries test cases |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 TKE-specific safety rules incl. cluster-delete cascade, node-drain PDB guard, version-upgrade addon compat, public-endpoint security), `references/prompt-templates.md` (Generator + Critic + Orchestrator). `max_iter=2` per AGENTS.md §8 |
 | 1.0.1 | 2026-05-28 | Update K8s version to 1.30.0; Fix polling script timeout handling; Change container runtime to containerd; Add TCR integration guide; Clarify NodePoolId extraction |
 | 1.0.0 | 2026-05-21 | Initial release — cluster lifecycle, node pools, addons, dual-path |
-| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 TKE-specific safety rules incl. cluster-delete cascade, node-drain PDB guard, version-upgrade addon compat, public-endpoint security), `references/prompt-templates.md` (Generator + Critic + Orchestrator). `max_iter=2` per AGENTS.md §8 |
 
 ---
 
@@ -212,321 +213,134 @@ tccli tke DescribeClusters --Region {{env.TENCENTCLOUD_REGION}} --Offset 0 --Lim
 
 ### Operation: CreateCluster
 
-#### Pre-flight Checks
+**Pre-flight**: 检查 CLI/SDK、Credentials、VPC/Subnet/SG 是否存在、Quota — 完整检查表见 [references/cli-usage.md](references/cli-usage.md) §Pre-flight。
+**CLI**: `tccli tke CreateCluster ...` — 完整命令见 [references/cli-usage.md](references/cli-usage.md) §CreateCluster。
+**SDK**: 示例见 [references/api-sdk-usage.md](references/api-sdk-usage.md) §CreateCluster。
+**验证**: 轮询 DescribeClusters 直到 ClusterStatus = Running (max 600s)。
+**错误处理**: 见 [通用错误表](#error-code-reference-tke-specific) + `ResourceInsufficient.Vpc` → HALT。
 
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| CLI installed | `tccli tke help CreateCluster` | Exit code 0 | Document CLI install |
-| SDK available | `python3 -c "from tencentcloud.tke import tke_client"` | No ImportError | `pip install tencentcloud-sdk-python-tke` |
-| Credentials | Check env vars | Non-empty values | HALT; user configures |
-| VPC exists | `tccli vpc DescribeVpcs --VpcId {{user.vpc_id}}` | VPC in Available state | Delegate to `qcloud-vpc-ops` |
-| Subnet exists | `tccli vpc DescribeSubnets --SubnetIds {{user.subnet_id}}` | Subnet exists | Delegate to `qcloud-vpc-ops` |
-| SecurityGroup | `tccli vpc DescribeSecurityGroups --SecurityGroupIds {{user.security_group_id}}` | Security group exists | Delegate to `qcloud-vpc-ops` |
-| Quota | `tccli tke DescribeUserQuota` | Sufficient cluster quota | HALT; user raises quota |
-
-#### Execution — CLI (`tccli`) (Primary Path)
-
-```bash
-tccli tke CreateCluster \
-  --ClusterType "MANAGED_TKE" \
-  --ClusterName "{{user.cluster_name}}" \
-  --ClusterDescription "Managed TKE cluster" \
-  --ClusterVersion "1.30.0" \
-  --ClusterOs "tlinux3.1x86_64" \
-  --ClusterOsType "CUSTOM" \
-  --VpcId "{{user.vpc_id}}" \
-  --SubnetId "{{user.subnet_id}}" \
-  --SecurityGroup "{{user.security_group_id}}" \
-  --ContainerRuntime "containerd" \
-  --NodeNameMode "{{user.cluster_name}}-%i" \
-  --ClusterLevel "L5" \
-  --Region {{env.TENCENTCLOUD_REGION}}
-```
-
-#### Execution — Python SDK (Fallback Path)
-
-```python
-#!/usr/bin/env python3
-"""SDK fallback: TKE CreateCluster"""
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.tke import tke_client, models
-
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = tke_client.TkeClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-        req = models.CreateClusterRequest()
-        req.ClusterType = "MANAGED_TKE"
-        req.ClusterName = os.environ.get("CLUSTER_NAME")
-        req.ClusterOs = "tlinux3.1x86_64"
-        req.ClusterVersion = "1.30.0"
-        req.VpcId = os.environ.get("VPC_ID")
-        req.SubnetId = os.environ.get("SUBNET_ID")
-        resp = client.CreateCluster(req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
-```
-
-#### Post-execution Validation
-
-1. Read `{{output.cluster_id}}` from `$.Response.ClusterId`
-2. Poll DescribeClusters until ClusterStatus = `Running` or timeout (600s):
-
-```bash
-for i in $(seq 1 60); do
-  STATUS=$(tccli tke DescribeClusters --Region {{env.TENCENTCLOUD_REGION}} --ClusterId "{{output.cluster_id}}" | jq -r '.Response.Clusters[0].ClusterStatus')
-  [ "$STATUS" = "Running" ] && break
-  sleep 10
-done
-# Check timeout
-if [ "$STATUS" != "Running" ]; then
-  echo "[ERROR] Timeout waiting for cluster Running status (current: $STATUS)"
-  exit 1
-fi
-```
-
-3. Report cluster ID and endpoints to user
-4. On failure, go to **Failure Recovery**
-
-#### TCR Integration (Optional)
-
-If using **Tencent Container Registry (TCR)** for container images:
-
-```bash
-# Associate TCR instance with cluster
-tccli tke EnableClusterAudit \
-  --ClusterId "{{output.cluster_id}}" \
-  --Region {{env.TENCENTCLOUD_REGION}}
-
-# Configure image pull secrets for TCR private registry
-tccli tke DescribeClusterSecurity \
-  --ClusterId "{{output.cluster_id}}" \
-  --Region {{env.TENCENTCLOUD_REGION}} > /tmp/kubeconfig.yaml
-
-# Set image pull secret in kubeconfig (manual step shown)
-kubectl --kubeconfig=/tmp/kubeconfig.yaml create secret docker-registry tcr-secret \
-  --docker-server={{user.tcr_registry}} \
-  --docker-username={{user.tcr_username}} \
-  --docker-password={{user.tcr_password}} \
-  --docker-email={{user.email}}
-```
-
-**Note:** For full TCR operations, use `qcloud-tcr-ops` skill.
-
-#### Failure Recovery
-
-| Error pattern | Max retries | Backoff | Agent Action | UX Feedback |
-|---------------|-------------|---------|--------------|-------------|
-| `InvalidParameter` | 0–1 | — | Fix args per API spec; retry once | `[ERROR] InvalidParameter: Request parameter invalid → Check CreateCluster API spec → Retry` |
-| `ResourceInUse` | 0 | — | HALT | `[ERROR] ResourceInUse: Name or CIDR already in use → Use unique name/CIDR → Retry` |
-| `ResourceInsufficient.Vpc` | 0 | — | HALT | `[ERROR] VPC resource insufficient → Verify VPC/Subnet available → Check IP pool` |
-| `QuotaExceeded` | 0 | — | HALT | `[ERROR] Cluster quota exceeded → Request quota increase` |
-| `InvalidSecretKey` / `InvalidSecretId` | 0 | — | HALT | `[ERROR] Credential invalid → Verify env vars → Retry` |
-| `OperationConflict` | 3 | 30s | Wait for conflicting op; retry | `⚠️ Another operation in progress → Retrying after completion...` |
-| `RequestLimitExceeded` / 429 | 3 | exponential | Back off; respect rate limit | `⚠️ Rate limit reached → Retrying in {backoff}s` |
-| `InternalError` / 5xx | 3 | 2s, 4s, 8s | Retry; HALT with RequestId if persists | `[ERROR] InternalError → Retry → Escalate with RequestId: {{output.request_id}}` |
+> TCR 集成（可选）：见 [references/advanced/tcr-integration.md](references/advanced/tcr-integration.md)。
 
 ### Operation: DescribeClusters
 
-#### Execution
-
-```bash
-# List all clusters (JSON output)
-tccli tke DescribeClusters --Region {{env.TENCENTCLOUD_REGION}} --Offset 0 --Limit 100
-
-# Filter by cluster ID
-tccli tke DescribeClusters --Region {{env.TENCENTCLOUD_REGION}} --ClusterId "{{user.cluster_id}}"
-```
-
-```python
-# SDK equivalent
-req = models.DescribeClustersRequest()
-req.ClusterId = os.environ.get("CLUSTER_ID")
-req.Offset, req.Limit = 0, 100
-resp = client.DescribeClusters(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
-
-#### Present to User
-
-| Field | JSON Path | Notes |
-|-------|-----------|-------|
-| ClusterId | `$.Response.Clusters[0].ClusterId` | Plain text (cls-xxx) |
-| ClusterName | `$.Response.Clusters[0].ClusterName` | Human-readable |
-| ClusterStatus | `$.Response.Clusters[0].ClusterStatus` | Running/Creating/Abnormal/Deleting |
-| ClusterVersion | `$.Response.Clusters[0].ClusterVersion` | K8s version (e.g., 1.28.3) |
-| ClusterType | `$.Response.Clusters[0].ClusterType` | MANAGED_TKE / INDEPENDENT |
-| TotalNodeNum | `$.Response.Clusters[0].TotalNodeNum` | Node count |
-| CreatedTime | `$.Response.Clusters[0].CreatedTime` | ISO 8601 timestamp |
+**CLI**: `tccli tke DescribeClusters --Region {{env.TENCENTCLOUD_REGION}} [--ClusterId {{user.cluster_id}}]`
+**SDK**: 等价命令见 [references/api-sdk-usage.md](references/api-sdk-usage.md) §DescribeClusters。
+**输出字段**: 见 [Response Field Table](#response-field-table)。
 
 ### Operation: CreateClusterAsGroup (Node Pool)
 
-#### Pre-flight Checks
-
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| Cluster exists | `tccli tke DescribeClusters --ClusterId {{user.cluster_id}}` | Cluster in Running state | HALT |
-| Instance type valid | `tccli tke DescribeClusterAsGroupOption` or CVM catalog | Instance type available | Suggest alternative type |
-
-#### Execution — CLI
-
-```bash
-tccli tke CreateClusterAsGroup \
-  --ClusterId "{{user.cluster_id}}" \
-  --NodePoolName "{{user.node_pool_name}}" \
-  --InstanceType "{{user.instance_type}}" \
-  --SubnetId "{{user.subnet_id}}" \
-  --VpcId "{{user.vpc_id}}" \
-  --LaunchRemotePort 22 \
-  --DesiredPodNum 0 \
-  --MaxPodNum 256 \
-  --NodeOs "tlinux3.1x86_64" \
-  --NodeOsType "CUSTOM" \
-  --AutoscalingStatus "DISABLED" \
-  --MaxNum 10 \
-  --MinNum 1 \
-  --DeleteOption "RELEASE_INVOKE" \
-  --Region {{env.TENCENTCLOUD_REGION}}
-```
-
-#### Execution — Python SDK
-
-```python
-req = models.CreateClusterAsGroupRequest()
-req.ClusterId = os.environ.get("CLUSTER_ID")
-req.NodePoolName = os.environ.get("NODE_POOL_NAME")
-req.InstanceType = os.environ.get("INSTANCE_TYPE", "S5.MEDIUM8")
-req.SubnetId = os.environ.get("SUBNET_ID")
-req.VpcId = os.environ.get("VPC_ID")
-req.MaxNum = 10
-req.MinNum = 1
-req.AutoscalingStatus = "DISABLED"
-req.NodeOs = "tlinux3.1x86_64"
-resp = client.CreateClusterAsGroup(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
-
-#### Post-execution Validation
-
-1. Read `{{output.node_pool_id}}` from CreateClusterAsGroup response:
-   ```bash
-   NODE_POOL_ID=$(tccli tke CreateClusterAsGroup ... | jq -r '.Response.NodePoolId')
-   ```
-   Or from Python SDK:
-   ```python
-   output.node_pool_id = resp.NodePoolId  # e.g., "np-xxxxxxxx"
-   ```
-2. Poll DescribeClusterAsGroups until NodePoolStatus = `Running` (max 300s)
-3. Verify node count matches MinNum
-
-#### Failure Recovery
-
-| Error | Max retries | Agent Action | UX Feedback |
-|-------|-------------|--------------|-------------|
-| `ResourceNotFound.ClusterNotFound` | 0 | HALT | `[ERROR] Cluster not found → Verify ClusterId` |
-| `ResourceInCreation` | 3 | Backoff 10s; retry | `⚠️ Cluster still initializing → Retrying...` |
-| `InvalidInstanceType` | 0 | HALT | `[ERROR] Instance type invalid → Check available types` |
+**Pre-flight**: Cluster 是否 Running、Instance type 是否可用 — 检查表见 [references/cli-usage.md](references/cli-usage.md) §Pre-flight。
+**CLI**: `tccli tke CreateClusterAsGroup ...` — 完整命令见 [references/cli-usage.md](references/cli-usage.md) §CreateClusterAsGroup。
+**SDK**: 示例见 [references/api-sdk-usage.md](references/api-sdk-usage.md) §CreateClusterAsGroup。
+**验证**: 轮询 DescribeClusterAsGroups 直到 NodePoolStatus = Running (max 300s)。
+**错误处理**: 见 [通用错误表](#error-code-reference-tke-specific)。
 
 ### Operation: DeleteCluster
 
-#### Pre-flight (Safety Gate)
+**Pre-flight (Safety Gate)**:
+- **MUST** 显式确认：删除集群 `{{user.cluster_name}}` (`{{user.cluster_id}}`)
+- **MUST** 警示：删除所有节点、Pod 和数据；提示用户先导出 YAML
+- **MUST** 检查：节点健康（DescribeClusterInstances）；用户手动确认 workload（kubectl 不在本 Skill 范围内）
+- **MUST** 检查：节点池已缩容到 0 或先删除
 
-- **MUST** obtain explicit confirmation: irreversible delete of cluster `{{user.cluster_name}}` (`{{user.cluster_id}}`)
-- **MUST** warn: deletes all nodes, pods, and cluster data; remind user to backup important namespaces
-- **MUST** check: no active applications running; pods in Running or Succeeded state
-- **MUST** check: node pools are scaled down to 0 or delete first
-
-#### Execution — CLI
-
-```bash
-tccli tke DeleteCluster \
-  --ClusterId "{{user.cluster_id}}" \
-  --InstanceDeleteMode "TerminateAndDestroy" \
-  --Region {{env.TENCENTCLOUD_REGION}}
-```
-
-#### Execution — Python SDK
-
-```python
-req = models.DeleteClusterRequest()
-req.ClusterId = os.environ.get("CLUSTER_ID")
-req.InstanceDeleteMode = "TerminateAndDestroy"
-resp = client.DeleteCluster(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
-
-#### Post-execution Validation
-
-1. Poll DescribeClusters until cluster returns NotFound or ClusterStatus = `Deleting` → absent (max 600s)
-2. Verify CVM instances are terminated
-3. Verify VPC/Subnet resources released (or remain for reuse)
-
-#### Failure Recovery
-
-| Error | Max retries | Agent Action | UX Feedback |
-|-------|-------------|--------------|-------------|
-| `ResourcePreRunning` | 3, 30s | Wait; retry | `⚠️ Cluster has active operations → Waiting for completion...` |
-| `OperationConflict` | 3, 30s | Wait; retry | `⚠️ Another operation in progress → Retrying...` |
-| `InternalError` | 3, exponential | Retry; HALT with RequestId | `[ERROR] InternalError → Escalate with RequestId: {{output.request_id}}` |
+**CLI**: `tccli tke DeleteCluster --ClusterId "{{user.cluster_id}}" --InstanceDeleteMode "TerminateAndDestroy"`
+**SDK**: 示例见 [references/api-sdk-usage.md](references/api-sdk-usage.md) §DeleteCluster。
+**验证**: 轮询 DescribeClusters 直到 NotFound (max 600s)。
+**错误处理**: 见 [通用错误表](#error-code-reference-tke-specific)。
 
 ### Operation: InstallComponents (Addon Management)
 
-#### Execution — CLI
+**CLI**: `tccli tke InstallComponents --ClusterId "{{user.cluster_id}}" --Components '[{"ComponentName":"metrics-server","ComponentVersion":"3.8.4"}]'`
+**验证**: Addon 状态应为 Running（DescribeClusterAttribute）。
+**错误处理**: 见 [通用错误表](#error-code-reference-tke-specific) + `AddonConflict`（HALT）、`AddonNotSupport`（升级集群）。
 
-```bash
-# List available addons
-tccli tke DescribeClusterAttribute \
-  --ClusterId "{{user.cluster_id}}" \
-  --Attribute "ClusterLevel/Addons"
+### Operation: UpdateClusterVersion (K8s Upgrade)
 
-# Install an addon
-tccli tke InstallComponents \
-  --ClusterId "{{user.cluster_id}}" \
-  --Components '[{"ComponentName":"metrics-server", "ComponentVersion":"3.8.4"}]'
-```
+> **GCL 安全规则（Rubric §4 rule 4）**: 必须检查 addon 兼容性；拒绝跳版本升级（eg 1.28→1.30）；必须显式确认。
 
-#### Post-execution Validation
+**Pre-flight (Safety Gate)**:
 
-1. Verify addon status is `Running` via DescribeClusterAttribute
-2. Confirm addon pods are Ready in the cluster
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| Cluster exists | `tccli tke DescribeClusters --ClusterId {{user.cluster_id}}` | Running | HALT |
+| Current → target version | DescribeClusters + user input | ≥ current, no minor-skip | HALT; warn one-directional |
+| Addon compatibility | `DescribeClusterAttribute --Attribute "ClusterLevel/Addons"` | Compatible | Surface incompatible addons; require confirm |
+| User confirm | Cluster ID + name + version change | User approves | HALT |
 
-#### Failure Recovery
+**CLI**: `tccli tke ModifyCluster --ClusterId "{{user.cluster_id}}" --ClusterVersion "{{user.k8s_version}}"`
+**SDK**: 示例见 [references/api-sdk-usage.md](references/api-sdk-usage.md) §ModifyCluster。
+**验证**: 轮询 DescribeClusters 直到 ClusterStatus = Running 且 ClusterVersion = target (max 1200s)。
+**错误处理**: 见 [通用错误表](#error-code-reference-tke-specific) + `InvalidParameterValue`（不支持目标版本 → HALT）。
 
-| Error | Max retries | Agent Action | UX Feedback |
-|-------|-------------|--------------|-------------|
-| `AddonConflict` | 0 | HALT | `[ERROR] Addon already installed or conflicting → Check existing addons` |
-| `AddonNotSupport` | 0 | HALT | `[ERROR] Addon not supported in this cluster version → Upgrade cluster` |
-| `InternalError` | 3 | Retry | `[ERROR] InternalError → Retry or escalate with RequestId` |
+### Operation: DeleteNode / DrainNode
+
+> **GCL 安全规则（Rubric §4 rule 2）**: 节点 ID 回声；>50% 节点拒绝；PDB 检查；Desired/Ready 节点数显示。
+
+**Pre-flight (Safety Gate)**:
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| Cluster exists | `tccli tke DescribeClusters --ClusterId {{user.cluster_id}}` | Running | HALT |
+| Node instances | `DescribeClusterInstances` | Nodes exist; capture InstanceId(s) | HALT |
+| Node count check | Parse `$.Response.TotalCount` | Drain < 50% of total | **REFUSE** if >50% |
+| Instance IDs | User-supplied `{{user.instance_ids}}` | At least one ID | HALT |
+| PDB warning | Warn of PDB constraints | User acknowledges | Surface warning |
+
+**CLI**: `tccli tke DeleteClusterInstances --ClusterId "{{user.cluster_id}}" --InstanceIds '[{{user.instance_ids}}]' --DeleteMode "TERMINATE"`
+**SDK**: 示例见 [references/api-sdk-usage.md](references/api-sdk-usage.md) §DeleteClusterInstances。
+**验证**: 轮询 DescribeClusterInstances 直到 removed instances 消失 (max 300s)。
+**错误处理**: 见 [通用错误表](#error-code-reference-tke-specific)。
+
+### Operation: AddNodeToPool (Batch Scale)
+
+> **GCL 安全规则（Rubric §4 rule 3）**: 配额检查；当前+提议节点数显示；>10% 增加需确认；不超过 MaxNum。
+
+**Pre-flight (Safety Gate)**:
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| Cluster + NodePool exists | DescribeClusters + DescribeClusterAsGroups | Running | HALT |
+| Current node count | `$.Response.NodePoolSet[].DesiredNodeCount` | Known | Compare |
+| Proposed count | User-supplied `{{user.desired_nodes}}` | ≤ MaxNum, ≥ MinNum | Adjust bounds |
+| Scale risk | Proposed > current × 1.1 | Require confirm | HALT |
+| Account quota | `tccli tke DescribeUserQuota` | Sufficient | HALT |
+
+**CLI**: `tccli tke ModifyClusterAsGroup --ClusterId "{{user.cluster_id}}" --NodePoolId "{{user.node_pool_id}}" --DesiredNodeCount {{user.desired_nodes}}`
+**SDK**: 示例见 [references/api-sdk-usage.md](references/api-sdk-usage.md) §ModifyClusterAsGroup。
+**验证**: 轮询 DescribeClusterAsGroups 直到 DesiredNodeCount 匹配 (max 300s)。
+**错误处理**: 见 [通用错误表](#error-code-reference-tke-specific) + `InvalidParameterValue`（超出 [MinNum,MaxNum] → HALT）、`ResourceInsufficient`（更换类型/子网）。
+
+### Operation: ModifyClusterAttribute / CreateClusterEndpoint
+
+> **GCL 安全规则（Rubric §4 rule 5）**: 公网端点须有 IP 白名单确认；端点删除须警示 kubectl 中断；当前状态须显示。
+
+**Pre-flight (Safety Gate)**: Cluster 是否 Running（DescribeClusters）；当前端点状态（DescribeClusterEndpoints）；属性变更（用户指定名称/描述/端点）。
+
+**CLI**: `tccli tke ModifyCluster --ClusterId "{{user.cluster_id}}" --ClusterName "{{user.cluster_name}}"`（端点为 SDK-only 操作）
+**SDK**: 示例见 [references/api-sdk-usage.md](references/api-sdk-usage.md) §ModifyCluster + 附录 Endpoint 操作。
+**验证**: 属性修改 → DescribeClusters；端点变更 → DescribeClusterEndpoints。
+**错误处理**: 见 [通用错误表](#error-code-reference-tke-specific)。
 
 ---
 
 ## Error Code Reference (TKE-Specific)
 
-| Code | Meaning | Retry? | Agent Action |
-|------|---------|--------|--------------|
-| `InvalidParameter` | Parameter validation failed | No | Fix parameter; retry with correct value |
-| `InvalidParameterValue` | Parameter value out of range | No | Adjust value per API spec |
-| `MissingParameter` | Required parameter missing | No | Add missing parameter |
-| `ResourceNotFound` | Target cluster/resource not found | No | Verify ID; suggest Describe |
-| `ResourceNotFound.ClusterNotFound` | TKE cluster does not exist | No | Verify ClusterId; list clusters |
-| `ResourceInsufficient` | Quota exceeded | No | HALT; suggest quota increase |
-| `ResourceInUse` | Resource name/CIDR already used | No | Use unique name/CIDR |
-| `ResourcePreRunning` | Resource not yet ready | Yes (3x, 30s) | Wait; poll status; retry |
-| `OperationConflict` | Concurrent operation conflict | Yes (3x, 30s) | Wait; retry after completion |
-| `InvalidSecretKey` / `InvalidSecretId` | Credential invalid | No | HALT; fix credentials |
-| `RequestLimitExceeded` | API rate limit exceeded | Yes (3x) | Exponential backoff |
-| `InternalError` | Server-side error | Yes (3x) | Retry; escalate with RequestId |
-| `AddonConflict` | Addon already installed or conflict | No | Check existing addons |
-| `QuotaExceeded` | Cluster quota exceeded | No | HALT; request quota increase |
+| Code | Agent Action |
+|------|-------------|
+| `InvalidParameter` | Fix param — check API spec |
+| `InvalidParameterValue` | Adjust value per spec |
+| `MissingParameter` | Add missing param |
+| `ResourceNotFound` | Verify ID; suggest Describe |
+| `ResourceNotFound.ClusterNotFound` | Verify ClusterId; list clusters |
+| `ResourceInsufficient` | HALT — request quota increase |
+| `ResourceInUse` | Use unique name/CIDR |
+| `ResourcePreRunning` | RETRY (3×, 30s) — poll status; wait |
+| `OperationConflict` | RETRY (3×, 30s) — wait for completion |
+| `InvalidSecretKey` / `InvalidSecretId` | HALT — fix credentials |
+| `RequestLimitExceeded` | RETRY (3×, exponential) — backoff |
+| `InternalError` | RETRY (3×, exponential) — escalate with RequestId |
+| `AddonConflict` | Check existing addons; resolve conflict |
+| `QuotaExceeded` | HALT — request quota increase |
 
 > **After use:** Verify each code exists in the official TKE API error documentation.
 

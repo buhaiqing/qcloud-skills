@@ -69,7 +69,7 @@ tccli tke DescribeClusters --Region ap-guangzhou --Offset 0 --Limit 1
 | CLB for Service LoadBalancer | `qcloud-clb-ops` | Configure CLB listener, health check, backend |
 | CVM worker node management | `qcloud-cvm-ops` | SSH access, disk management, OS-level debugging |
 | Container image storage (COS) | `qcloud-cos-ops` | COS bucket for legacy image registry |
-| Container registry (TCR) | `qcloud-tcr-ops` | Modern registry, image pull credentials |
+| Container registry (TCR) | `qcloud-tcr-ops` (not yet implemented) | Modern registry, image pull credentials — use TCR console or SDK directly |
 | Metrics and alerting | `qcloud-monitor-ops` | Monitor data, alert rules, dashboards |
 | CAM permissions | `qcloud-cam-ops` | IAM policies for TKE operations |
 
