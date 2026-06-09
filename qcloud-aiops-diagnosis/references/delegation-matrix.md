@@ -7,10 +7,10 @@
 | qcloud-cvm-ops | qcloud-aiops-diagnosis | Performance degradation, OOM, CPU spike |
 | qcloud-redis-ops | qcloud-aiops-diagnosis | Memory growth, connection storm, slow commands |
 | qcloud-cdb-ops | qcloud-aiops-diagnosis | Slow queries, lock contention, connection exhaustion |
-| qcloud-tke-ops | qcloud-aiops-diagnosis | Pod crashes, node failures, resource pressure |
+| qcloud-tke-ops | qcloud-aiops-diagnosis | Pod crashes, node failures, resource pressure, TKE alarm storm/event aggregation |
 | qcloud-es-ops | qcloud-aiops-diagnosis | Cluster red/yellow, indexing slowdown |
-| qcloud-clb-ops | qcloud-aiops-diagnosis | Backend health failure, connection drops, CLS log anomaly correlation |
-| qcloud-monitor-ops | qcloud-aiops-diagnosis | Alarm storm, multi-metric correlation |
+| qcloud-clb-ops | qcloud-aiops-diagnosis | Backend health failure, connection drops, CLS log anomaly correlation, CLB 5xx → TKE backend correlation |
+| qcloud-monitor-ops | qcloud-aiops-diagnosis | Alarm storm, multi-metric correlation, alarm history collection for event bundles |
 | qcloud-cos-ops | qcloud-aiops-diagnosis | Request latency spike, error rate increase |
 
 ## Internal Routing (within aiops-diagnosis)
@@ -32,3 +32,74 @@ Alarm storm detected
   → Correlate with logs from log-intelligence.md
   → Output: root cause + resolution strategy
 ```
+
+## Multi-Source RCA Delegation
+
+When the agent performs Multi-Source Root Cause Localization (see [`multi-source-rca.md`](multi-source-rca.md)), the evidence collection and recommendation delegation follows:
+
+| Evidence Layer | Read From | Delegates Mutation To |
+|---|---|---|
+| CLB 5xx / backend health | `qcloud-clb-ops` (read-only: DescribeTargetHealth, DescribeTargets) | `qcloud-clb-ops` for config changes |
+| Node / Pod pressure | `qcloud-tke-ops` (read-only: DescribeClusters, DescribeClusterInstances, DescribeClusterNodePools, DescribeAddon) | `qcloud-tke-ops` for node pool changes, pod/workload actions |
+| CVM metrics / instance | `qcloud-cvm-ops` (read-only: DescribeInstances, Monitor GetMonitorData) | `qcloud-cvm-ops` for VM diagnostics |
+| Monitor metrics / alarms | `qcloud-monitor-ops` (read-only: GetMonitorData, DescribeAlarmHistories) | `qcloud-monitor-ops` for alarm policy tuning |
+| CLS logs | `cls` (read-only: SearchLog) | App owner for code/config fixes |
+
+> RCA collection is read-only. All mutation recommendations use the prefix `RECOMMENDATION (not execution)` and are delegated to the listed skill.
+
+## TKE Alarm Aggregation Routing
+
+| Input Signal | Read From | Correlate With | Recommendation Delegation |
+|---|---|---|---|
+| NodeNotReady / NodePressure | `qcloud-tke-ops` + `qcloud-monitor-ops` | Pod CrashLoopBackOff, CLB backend health, CVM CPU/memory | `qcloud-tke-ops` for node drain/replace; `qcloud-cvm-ops` for VM diagnostics |
+| Pod CrashLoopBackOff / OOMKilled | `qcloud-tke-ops` + CLS | Node pressure, image pull, app logs | `qcloud-tke-ops` for workload/node actions; app owner for code/config |
+| PodPending / Capacity | `qcloud-tke-ops` + Monitor quota metrics | NodePool Desired/Max, HPA max, quota | `qcloud-tke-ops` for node pool changes; `qcloud-monitor-ops` for alert tuning |
+| CLB 5xx / HealthCheckFail | `qcloud-clb-ops` + `qcloud-tke-ops` | Backend pod/node health | `qcloud-clb-ops` for LB config; `qcloud-tke-ops` for backend health |
+| DNS / metrics-server / network addon | `qcloud-tke-ops` + CLS | Addon pods, node pressure | `qcloud-tke-ops` for addon remediation |
+
+> Routing boundary: `qcloud-aiops-diagnosis` reads and aggregates only. All remediation is `RECOMMENDATION (not execution)` and delegated to the listed skill.
+
+## Change Correlation Routing
+
+| Change signal | Read from | Correlate with | Delegate fix to |
+|---|---|---|---|
+| Deployment / rollout (CLS K8s event) | CLS + TKE inventory | Pod CrashLoop, CLB 5xx, error-rate spike (Rule F) | `qcloud-tke-ops` rollback; app owner for code |
+| CLB config change (CloudAudit) | `cloudaudit LookUpEvents` + CLB Describe* | CLB 5xx without pod crash (F2) | `qcloud-clb-ops` |
+| SG / route change (CloudAudit) | CloudAudit + optional VPC read | Connection timeout/refused (F4) | `qcloud-vpc-ops` |
+| Node pool scale / CVM reboot | CloudAudit + TKE/CVM | NodeNotReady, transient pod pending (F3) | `qcloud-tke-ops` / `qcloud-cvm-ops` |
+| CAM / credential change | CloudAudit | Auth errors in CLS logs | `qcloud-cam-ops` |
+| Alarm policy change | CloudAudit + Monitor | New alarm storm vs real incident | `qcloud-monitor-ops` |
+
+Incident Timeline assembly is internal to this skill; no mutation. See [`incident-timeline.md`](incident-timeline.md).
+
+## Baseline Anomaly Routing
+
+| Finding | Detection | Correlate with | Delegate when sustained |
+|---|---|---|---|
+| CpuUsage/MemUsage anomaly (ratio ≥ 1.5) | [`anomaly-detection.md`](anomaly-detection.md) | NetworkIn, alarms, CLS logs | `qcloud-cvm-ops` right-size / investigate |
+| Redis Storage/Connections anomaly | Multi-window REDIS metrics | Slow commands, connection errors | `qcloud-redis-ops` |
+| CDB Qps/SlowQueries anomaly | Multi-window CDB metrics | Lock wait, VPC latency | `qcloud-cdb-ops` |
+| CLB UnhealthNum/DropTotal anomaly | Multi-window LB metrics | TKE backend health, RCA Rule A | `qcloud-clb-ops` + `qcloud-tke-ops` |
+| Gradual week-over-week drift | Week ratio > yesterday ratio | FinOps cost trend | `qcloud-finops-ops` (advisory) |
+
+Proactive-only scans output **Anomaly Bundle**; incident response embeds `anomaly_findings[]` in RCA Bundle.
+
+## Product RCA Routing (Rules H / I / J)
+
+| Rule | Trigger | Read from | Cross-correlate | Delegate fix |
+|---|---|---|---|---|
+| **H** CDB | SlowQueries, CPU, connections | `qcloud-cdb-ops` Describe + Monitor QCE/CDB | CLB 5xx, CLS slow log, Rule G | `qcloud-cdb-ops` |
+| **I** Redis | Storage, Connections | `qcloud-redis-ops` Describe + Monitor QCE/REDIS | App pool errors, CLB timeout | `qcloud-redis-ops` |
+| **J** ES | Red/yellow, JVM, latency | `qcloud-es-ops` Describe + Monitor QCE/CES | Search timeout logs | `qcloud-es-ops` |
+
+See [`product-rca-rules.md`](product-rca-rules.md).
+
+## Network RCA Routing (Rule G)
+
+| Trigger | Read from | Delegate fix |
+|---|---|---|
+| Timeout/refused; metrics normal | `qcloud-vpc-ops` SG/route/NAT Describe* + CloudAudit | `qcloud-vpc-ops` |
+| NodeNotReady + CVM Running | Rule D + Rule G | `qcloud-vpc-ops` then `qcloud-tke-ops` |
+| F4 SG/route change | [`change-correlation.md`](change-correlation.md) + Rule G | `qcloud-vpc-ops` |
+
+See [`network-rca.md`](network-rca.md).

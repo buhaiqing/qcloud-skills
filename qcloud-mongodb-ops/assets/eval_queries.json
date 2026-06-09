@@ -50,6 +50,26 @@
     "reason": "MongoDB instance recovery"
   },
   {
+    "query": "MongoDB按时间点回档到昨天下午3点",
+    "should_trigger": true,
+    "reason": "FlashBack point-in-time recovery"
+  },
+  {
+    "query": "杀掉MongoDB实例上的长查询",
+    "should_trigger": true,
+    "reason": "KillOps current operation management"
+  },
+  {
+    "query": "把MongoDB从6.0升级到7.0",
+    "should_trigger": true,
+    "reason": "Engine version upgrade"
+  },
+  {
+    "query": "MongoDB开启透明数据加密TDE",
+    "should_trigger": true,
+    "reason": "TDE enablement"
+  },
+  {
     "query": "查看我的CVM实例列表",
     "should_trigger": false,
     "reason": "CVM not MongoDB"
@@ -98,5 +118,15 @@
     "query": "给COS存储桶设置权限",
     "should_trigger": false,
     "reason": "COS operation, different skill"
+  },
+  {
+    "query": "PostgreSQL实例开启SSL",
+    "should_trigger": false,
+    "reason": "PostgreSQL operation, different skill"
+  },
+  {
+    "query": "Elasticsearch集群扩容",
+    "should_trigger": false,
+    "reason": "ES operation, different skill"
   }
 ]

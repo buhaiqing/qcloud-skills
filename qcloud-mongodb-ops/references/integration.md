@@ -19,6 +19,10 @@ python3 -c "from tencentcloud.mongodb.v20190725 import mongodb_client; print('OK
 | TENCENTCLOUD_SECRET_KEY | Yes | — | API key secret |
 | TENCENTCLOUD_REGION | Yes | — | Region (e.g. ap-guangzhou) |
 
+## Idempotency & Retries
+
+See [`idempotency-checklist.md`](idempotency-checklist.md) for per-operation retry rules and automation guards.
+
 ## Cross-Skill Delegation Matrix
 
 | If user asks about | Delegate to | Reason |

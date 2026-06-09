@@ -1,22 +1,222 @@
 [
-  {"query": "CPU突然飙高了，帮我排查一下", "should_trigger": true},
-  {"query": "服务连不上了，看看什么问题", "should_trigger": true},
-  {"query": "告警太多了快被淹没了，帮我分析下", "should_trigger": true},
-  {"query": "帮我找下这个故障的根因", "should_trigger": true},
-  {"query": "分析下这些日志有什么异常", "should_trigger": true},
-  {"query": "Redis内存一直在涨，怎么回事", "should_trigger": true},
-  {"query": "数据库查询特别慢，帮我诊断", "should_trigger": true},
-  {"query": "OutOfMemory了，帮我看看原因", "should_trigger": true},
-  {"query": "有什么潜在问题需要关注的", "should_trigger": true},
-  {"query": "帮我诊断下这个集群为什么响应很慢", "should_trigger": true},
-  {"query": "创建一台新的CVM", "should_trigger": false},
-  {"query": "帮我做一次架构审查", "should_trigger": false},
-  {"query": "删除这个Redis实例", "should_trigger": false},
-  {"query": "做一次成本分析", "should_trigger": false},
-  {"query": "配置一下负载均衡", "should_trigger": false},
-  {"query": "帮我做一次资源巡检", "should_trigger": false},
-  {"query": "升级一下实例规格", "should_trigger": false},
-  {"query": "Create a CAM policy", "should_trigger": false},
-  {"query": "刷新CDN缓存", "should_trigger": false},
-  {"query": "查看我的账单", "should_trigger": false}
+  {
+    "query": "CPU突然飙高了，帮我排查一下",
+    "should_trigger": true
+  },
+  {
+    "query": "服务连不上了，看看什么问题",
+    "should_trigger": true
+  },
+  {
+    "query": "告警太多了快被淹没了，帮我分析下",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我找下这个故障的根因",
+    "should_trigger": true
+  },
+  {
+    "query": "分析下这些日志有什么异常",
+    "should_trigger": true
+  },
+  {
+    "query": "Redis内存一直在涨，怎么回事",
+    "should_trigger": true
+  },
+  {
+    "query": "数据库查询特别慢，帮我诊断",
+    "should_trigger": true
+  },
+  {
+    "query": "OutOfMemory了，帮我看看原因",
+    "should_trigger": true
+  },
+  {
+    "query": "有什么潜在问题需要关注的",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我诊断下这个集群为什么响应很慢",
+    "should_trigger": true
+  },
+  {
+    "query": "创建一台新的CVM",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我做一次架构审查",
+    "should_trigger": false
+  },
+  {
+    "query": "删除这个Redis实例",
+    "should_trigger": false
+  },
+  {
+    "query": "做一次成本分析",
+    "should_trigger": false
+  },
+  {
+    "query": "配置一下负载均衡",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我做一次资源巡检",
+    "should_trigger": false
+  },
+  {
+    "query": "升级一下实例规格",
+    "should_trigger": false
+  },
+  {
+    "query": "Create a CAM policy",
+    "should_trigger": false
+  },
+  {
+    "query": "刷新CDN缓存",
+    "should_trigger": false
+  },
+  {
+    "query": "查看我的账单",
+    "should_trigger": false
+  },
+  {
+    "query": "TKE 集群告警太多了，帮我做告警降噪和事件聚合",
+    "should_trigger": true
+  },
+  {
+    "query": "node not ready、Pod CrashLoopBackOff、CLB 5xx 同时告警，帮我聚合根因",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我把这个 TKE 告警风暴按集群和节点归并成事件 bundle",
+    "should_trigger": true
+  },
+  {
+    "query": "K8s PodPending 和节点池容量告警一起出现，分析是否是容量根因",
+    "should_trigger": true
+  },
+  {
+    "query": "请直接扩容这个 TKE 节点池到 20 台",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我删除这个 Kubernetes 集群",
+    "should_trigger": false
+  },
+  {
+    "query": "创建一个新的云监控告警策略",
+    "should_trigger": false
+  },
+  {
+    "query": "调整 CLB 后端权重并立即发布",
+    "should_trigger": false
+  },
+  {
+    "query": "CLB 5xx 和 Pod CrashLoopBackOff 同时出现，帮我做跨层根因定位",
+    "should_trigger": true
+  },
+  {
+    "query": "CVM CPU 打满导致 TKE 节点异常，关联分析 Pod 和 CLB 影响",
+    "should_trigger": true
+  },
+  {
+    "query": "Node NotReady 后面是 CVM 磁盘满了还是网络问题，帮我跨产品诊断",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我重启这台 CVM 实例",
+    "should_trigger": false
+  },
+  {
+    "query": "配置 TKE 集群的 VPC 网络",
+    "should_trigger": false
+  },
+  {
+    "query": "查看 CLB 监听器列表",
+    "should_trigger": false
+  },
+  {
+    "query": "申请增加 CVM 配额",
+    "should_trigger": false
+  },
+  {
+    "query": "刚发布完 deployment 就 Pod CrashLoop 了，帮我查是不是变更引起的",
+    "should_trigger": true
+  },
+  {
+    "query": "按时间线梳理 NodeNotReady 到 CLB 5xx 的故障经过，输出 incident timeline",
+    "should_trigger": true
+  },
+  {
+    "query": "发布后出现 CLB 5xx，关联 CloudAudit 变更记录做根因分析",
+    "should_trigger": true
+  },
+  {
+    "query": "刚改完负载均衡配置就挂了，帮我做变更关联诊断",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我执行 deployment 回滚到上一个版本",
+    "should_trigger": false
+  },
+  {
+    "query": "在 CloudAudit 里创建一个新的审计跟踪集",
+    "should_trigger": false
+  },
+  {
+    "query": "修改 CAM 策略给用户授权",
+    "should_trigger": false
+  },
+  {
+    "query": "CPU 没超 90% 但比昨天同时段高很多，帮我做动态基线异常检测",
+    "should_trigger": true
+  },
+  {
+    "query": "对这台 CVM 做同环比指标扫描，输出 Anomaly Bundle",
+    "should_trigger": true
+  },
+  {
+    "query": "Redis 连接数同比上周异常，帮我诊断",
+    "should_trigger": true
+  },
+  {
+    "query": "看看最近指标有没有偏离基线的异常",
+    "should_trigger": true
+  },
+  {
+    "query": "训练一个机器学习异常检测模型",
+    "should_trigger": false
+  },
+  {
+    "query": "修改云监控告警阈值为 95%",
+    "should_trigger": false
+  },
+  {
+    "query": "CDB 慢查询导致应用超时，帮我做跨层根因分析",
+    "should_trigger": true
+  },
+  {
+    "query": "Redis 内存打满连接数暴涨，关联诊断一下",
+    "should_trigger": true
+  },
+  {
+    "query": "Elasticsearch 集群变红了，帮我找根因",
+    "should_trigger": true
+  },
+  {
+    "query": "实例 Running 但连不上，查下是不是安全组或 VPC 路由问题",
+    "should_trigger": true
+  },
+  {
+    "query": "Node NotReady 但 CVM 正常，是不是网络分区",
+    "should_trigger": true
+  },
+  {
+    "query": "给 CDB 实例创建只读副本",
+    "should_trigger": false
+  },
+  {
+    "query": "修改 VPC 安全组入站规则并发布",
+    "should_trigger": false
+  }
 ]

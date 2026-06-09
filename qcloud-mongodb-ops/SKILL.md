@@ -7,9 +7,10 @@ description: >-
   configuration, SSL/TLS, security groups, and performance diagnostics. User
   mentions MongoDB, Mongo, 云数据库 MongoDB, TencentDB MongoDB, or describes
   database connection issues, performance degradation, backup failures, or
-  instance creation/modification/deletion scenarios even without naming the
-  product directly. Not for basic VPC/CAM/billing operations which have their
-  own ops skills.
+  instance   creation/modification/deletion scenarios even without naming the
+  product directly. Not for other database types (MySQL/CDB, Redis, PostgreSQL,
+  ES), basic VPC/CAM/billing operations, or self-hosted MongoDB — those have
+  their own ops skills or are out of scope.
 license: MIT
 compatibility: >-
   Official Tencent Cloud CLI (`tccli`, Python tool, pip installable),
@@ -17,8 +18,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.1.0"
-  last_updated: "2026-06-04"
+  version: "1.2.0"
+  last_updated: "2026-06-09"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/240 — 2019-07-25"
@@ -57,6 +58,17 @@ TencentDB for MongoDB on Tencent Cloud provides fully managed MongoDB database s
 | 4 | **Complete Failure Strategies** | Error taxonomy table with ≥ 10 product-specific codes; HALT vs retry per error type |
 | 5 | **Absolute Single Responsibility** | One product (MongoDB), one primary resource (DBInstance); cross-product delegation to other skills |
 
+### Token Efficiency (TE)
+
+| Rule | Application in This Skill |
+|------|---------------------------|
+| **TE-1** | Engine versions and on-sale specs via `DescribeSpecInfo` — not hardcoded tables in flows |
+| **TE-3** | Error tables ≤3 columns (`Error Code \| Description \| Recovery`) |
+| **TE-4** | JSON paths centralized in [API and Response Conventions](#api-and-response-conventions) |
+| **TE-5** | `assets/example-config.yaml` uses YAML anchors (`&default-thresholds`) |
+| **TE-6** | Pre-flight → Execute → Validate → Recover defined only in this file; references hold depth |
+| **TE-7** | Variable table omits redundant Description column where field meaning is obvious |
+
 ### Well-Architected Framework Integration
 
 | Pillar | Skill Integration | Reference |
@@ -90,7 +102,7 @@ TencentDB for MongoDB on Tencent Cloud provides fully managed MongoDB database s
 - If configuring CAM policies for MongoDB access, delegate to `qcloud-cam-ops`
 - If setting up monitoring alarms, delegate to `qcloud-monitor-ops` for alarm policy creation
 
-## Variable Convention
+## Variables
 
 | Placeholder | Source | Meaning | Agent Action |
 |-------------|--------|---------|--------------|
@@ -102,8 +114,12 @@ TencentDB for MongoDB on Tencent Cloud provides fully managed MongoDB database s
 | `{{user.zone}}` | User | Availability zone (e.g. ap-guangzhou-3) | Ask once; check via DescribeSpecInfo |
 | `{{user.password}}` | User | Account password | Ask interactively (8-32 chars, letters+digits+special) |
 | `{{user.account_name}}` | User | MongoDB account username | Ask once |
+| `{{user.backup_id}}` | User | Backup ID for restore | Ask once |
+| `{{user.flashback_time}}` | User | Target flashback timestamp (ISO 8601) | Ask once |
+| `{{user.target_mongo_version}}` | User | Target engine version (e.g. MONGO_70_WT) | Ask once; verify via DescribeSpecInfo |
 | `{{output.instance_id}}` | API Response | New instance ID | Parse from DescribeDBInstances |
 | `{{output.deal_id}}` | API Response | Order/deal ID | Parse from CreateDBInstance response |
+| `{{output.flow_id}}` | API Response | Async flow ID | Parse from FlashBack/Upgrade responses |
 
 > **`{{env.*}}` MUST NOT** be collected from the user. **`{{user.*}}`** MUST be collected interactively when missing.
 
@@ -176,6 +192,11 @@ tccli mongodb DescribeDBInstances --Limit 20
 | Slow Log Diagnosis | View slow queries and patterns | Low | None |
 | SSL/TLS | Enable/disable SSL, check status | Low | Medium |
 | Audit Service | Open/close audit, query audit logs | Medium | Low |
+| FlashBack | Point-in-time / key-based data rollback | High | **High** — data overwrite |
+| Kill Ops | Terminate long-running operations | Low | Medium |
+| Version Upgrade | Upgrade MongoDB engine version | High | **High** — restart required |
+| TDE | Enable transparent data encryption | Medium | Medium |
+| Connection Diagnosis | Connection URI, clients, namespaces | Low | None |
 | Security Groups | Describe/modify bound security groups | Low | Medium |
 
 ## Execution Flows
@@ -629,6 +650,162 @@ tccli mongodb DescribeAuditLogs \
 tccli mongodb CloseAuditService --InstanceId "{{user.instance_id}}"
 ```
 
+### Operation: Connection Diagnosis
+
+#### Execution
+
+```bash
+# Connection URI and endpoints
+tccli mongodb DescribeDBInstanceURL --InstanceId "{{user.instance_id}}"
+
+# Active client connections
+tccli mongodb DescribeClientConnections --InstanceId "{{user.instance_id}}"
+
+# Databases and collections (namespace inventory)
+tccli mongodb DescribeDBInstanceNamespace --InstanceId "{{user.instance_id}}"
+```
+
+#### Post-execution Validation
+
+1. If connection failures reported, cross-check `Vip`/`Vport` from DescribeDBInstances against client config
+2. If `DescribeClientConnections` shows high count, compare with `Connper` metric (delegate alarm setup to `qcloud-monitor-ops`)
+3. Delegate VPC/security group misconfiguration to `qcloud-vpc-ops` when SG rules are the root cause
+
+### Operation: Current Operations & Kill Ops
+
+#### Pre-flight
+
+- **MUST** show operation list from `DescribeCurrentOp` before killing
+- **MUST** confirm opId(s) with user — killing wrong ops can abort legitimate maintenance
+
+#### Execution
+
+```bash
+# List current operations
+tccli mongodb DescribeCurrentOp --InstanceId "{{user.instance_id}}"
+
+# Kill specific operations (use opId from DescribeCurrentOp)
+tccli mongodb KillOps \
+  --InstanceId "{{user.instance_id}}" \
+  --Operations '[{"OpId":12345,"Ns":"testdb.$cmd","Op":"query"}]'
+```
+
+#### Execution — Python SDK (Fallback)
+
+```python
+req = models.KillOpsRequest()
+req.InstanceId = "{{user.instance_id}}"
+req.Operations = [{"OpId": 12345, "Ns": "testdb.$cmd", "Op": "query"}]
+resp = client.KillOps(req)
+```
+
+#### Failure Recovery
+
+| Error Code | Recovery |
+|------------|----------|
+| InvalidParameterValue.IllegalInstanceStatus | Wait for instance status=2 (running) |
+| FailedOperation.OperationNotAllowedInInstanceLocking | Retry 3x with 30s backoff |
+
+### Operation: FlashBack (Safety Gate — High Risk)
+
+> **Destructive operation — rolls back data to a prior point in time.**
+
+#### Pre-flight (Safety Gate)
+
+- **MUST** warn: flashback overwrites data in target databases for the selected time window
+- **MUST** confirm: instance `{{user.instance_id}}`, target time `{{user.flashback_time}}`, database list
+- **MUST** suggest pre-flashback backup: `CreateBackupDBInstance`
+
+#### Execution
+
+```bash
+tccli mongodb FlashBackDBInstance \
+  --InstanceId "{{user.instance_id}}" \
+  --TargetFlashbackTime "{{user.flashback_time}}" \
+  --TargetDatabases '[{"DbName":"testdb","CollectionNames":["orders"]}]'
+```
+
+Optional: `--TargetInstanceId` to flash back to a different instance (cross-instance recovery).
+
+#### Post-execution Validation
+
+1. Parse `{{output.flow_id}}` from response
+2. Poll `DescribeAsyncRequestInfo` or instance status until running
+3. Verify data integrity on target collections
+
+#### Failure Recovery
+
+| Error Code | Recovery |
+|------------|----------|
+| FailedOperation.FlashbackByKeyNotOpen | Instance type does not support flashback; use RestoreDBInstance instead |
+| InvalidParameterValue.QueryTimeOutOfRange | Adjust flashback time within supported window |
+
+### Operation: Version Upgrade (Safety Gate — Medium Risk)
+
+#### Pre-flight (Safety Gate)
+
+- **MUST** show current `MongoVersion` from DescribeDBInstances
+- **MUST** confirm target `{{user.target_mongo_version}}` is supported via DescribeSpecInfo
+- **MUST** warn: upgrade triggers restart (30–120s downtime); test in non-prod first
+
+#### Execution
+
+```bash
+tccli mongodb UpgradeDbInstanceVersion \
+  --InstanceId "{{user.instance_id}}" \
+  --MongoVersion "{{user.target_mongo_version}}" \
+  --InMaintenance 1
+```
+
+`InMaintenance`: 0=upgrade now, 1=upgrade in maintenance window.
+
+#### Execution — Python SDK (Fallback)
+
+```python
+req = models.UpgradeDbInstanceVersionRequest()
+req.InstanceId = "{{user.instance_id}}"
+req.MongoVersion = "{{user.target_mongo_version}}"
+req.InMaintenance = 1
+resp = client.UpgradeDbInstanceVersion(req)
+```
+
+#### Post-execution Validation
+
+1. Poll DescribeDBInstances until status=2 and `MongoVersion` matches target
+2. Run application smoke tests against upgraded instance
+
+#### Failure Recovery
+
+| Error Code | Recovery |
+|------------|----------|
+| UnsupportedOperation.VersionNotSupport | Choose supported version from DescribeSpecInfo |
+| InvalidParameterValue.IllegalInstanceStatus | Wait for running state |
+
+### Operation: Transparent Data Encryption (TDE)
+
+#### Pre-flight
+
+- **MUST** warn: TDE instances only support logical backup (not physical/snapshot)
+- **MUST** confirm KMS key availability (delegate KMS setup to `qcloud-cam-ops` if needed)
+
+#### Execution
+
+```bash
+# Check TDE status
+tccli mongodb DescribeTransparentDataEncryptionStatus --InstanceId "{{user.instance_id}}"
+
+# Enable TDE (irreversible for the instance)
+tccli mongodb EnableTransparentDataEncryption \
+  --InstanceId "{{user.instance_id}}" \
+  --KeyId "kms-xxxxx"
+```
+
+#### Failure Recovery
+
+| Error Code | Recovery |
+|------------|----------|
+| FailedOperation.TransparentDataEncryptionAlreadyOpen | TDE already enabled; use logical backup only |
+
 ### Operation: Security Group Management
 
 ```bash
@@ -743,6 +920,7 @@ Error responses:
 |---------|------|---------|
 | 1.0.0 | 2026-05-29 | Initial release — MongoDB instance lifecycle, backup/restore, accounts, parameters, slow logs, SSL, audit, security groups |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 MongoDB-specific safety rules incl. instance-isolate/destroy, database/collection drop, spec-change OOM risk, password change no-recovery, security group lockout), `references/prompt-templates.md`. `max_iter=2` per AGENTS.md §8 |
+| 1.2.0 | 2026-06-09 | Added Token Efficiency section (TE-1–TE-7); connection diagnosis, KillOps, FlashBack, version upgrade, TDE flows; `references/idempotency-checklist.md`; expanded eval queries and negative boundaries in description |
 
 ## Reference Directory
 
@@ -753,6 +931,7 @@ Error responses:
 - [Monitoring & Alerts](references/monitoring.md) — Metrics, alarms, anomaly patterns
 - [Integration](references/integration.md) — SDK setup, env vars, cross-skill delegation
 - [Well-Architected Assessment](references/well-architected-assessment.md) — 4-pillar assessment
+- [Idempotency Checklist](references/idempotency-checklist.md) — Retry-safe automation patterns
 
 ## Operational Best Practices
 

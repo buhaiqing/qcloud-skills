@@ -1,5 +1,7 @@
 # Log Intelligence — AIOps Pattern Recognition
 
+> **Metric anomalies:** For baseline-first detection (yesterday/week comparison), use [`anomaly-detection.md`](anomaly-detection.md). Correlate log patterns below when `anomaly_severity` ≥ MEDIUM.
+
 ## Common Log Patterns
 
 | Pattern Type | Regex | Severity | Root Cause |

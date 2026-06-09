@@ -13,6 +13,8 @@ qcloud-skills/
 ├── qcloud-es-ops/             # Elasticsearch 服务运维技能
 ├── qcloud-monitor-ops/        # 云监控运维技能
 ├── qcloud-redis-ops/          # 云缓存 Redis 运维技能
+├── qcloud-mongodb-ops/        # 云数据库 MongoDB 运维技能
+├── qcloud-postgres-ops/       # 云数据库 PostgreSQL 运维技能
 ├── qcloud-skill-generator/    # 技能生成器（元技能）
 ├── qcloud-tke-ops/            # 容器服务 TKE 运维技能
 ├── qcloud-vpc-ops/            # 虚拟私有云运维技能
@@ -218,6 +220,26 @@ qcloud-skills/
 | `references/integration.md` | 集成指南 |
 | `references/well-architected-assessment.md` | 卓越架构评估 |
 | `references/enhanced-self-healing-framework.md` | 自愈框架 |
+
+### qcloud-mongodb-ops — 云数据库 MongoDB 运维
+
+管理腾讯云 MongoDB（TencentDB for MongoDB）实例的完整生命周期，包括副本集/分片集群创建、备份恢复、回档（FlashBack）、账号与参数管理、慢日志诊断、SSL/TLS、审计、透明数据加密（TDE）、规格升降级与版本升级等。
+
+| 文件 | 说明 |
+|------|------|
+| `SKILL.md` | 核心技能文档 |
+| `assets/eval_queries.json` | 评估查询集（24 条） |
+| `assets/example-config.yaml` | 场景示例配置（YAML anchors） |
+| `references/core-concepts.md` | 核心概念 |
+| `references/cli-usage.md` | CLI 使用指南（79 actions） |
+| `references/api-sdk-usage.md` | Python SDK 使用指南 |
+| `references/troubleshooting.md` | 故障排查 |
+| `references/monitoring.md` | 监控配置 |
+| `references/integration.md` | 集成与跨技能委托 |
+| `references/well-architected-assessment.md` | 卓越架构评估 |
+| `references/idempotency-checklist.md` | 幂等性与重试策略 |
+| `references/rubric.md` | GCL 质量门 rubric |
+| `references/prompt-templates.md` | GCL 提示词模板 |
 
 ### qcloud-tke-ops — 容器服务 TKE 运维
 

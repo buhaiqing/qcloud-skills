@@ -4,19 +4,31 @@ diagnosis:
   resource_id: ins-xxxxxx
   log_source: cls
 
+_threshold_pairs:
+  resource_pressure: &resource_pressure
+    warning: 90
+    critical: 95
+  high_pressure: &high_pressure
+    warning: 85
+    critical: 95
+  error_rate: &error_rate
+    warning: 1
+    critical: 5
+  baseline_ratio: &baseline_ratio
+    warning: 1.5
+    critical: 2.0
+
 thresholds:
-  cpu_warning: 90
-  cpu_critical: 97
-  memory_warning: 90
-  memory_critical: 95
-  disk_warning: 85
-  disk_critical: 95
-  connection_warning: 80
-  connection_critical: 90
-  latency_p99_warning_ms: 3000
-  latency_p99_critical_ms: 10000
-  error_rate_warning_pct: 1
-  error_rate_critical_pct: 5
+  cpu: *resource_pressure
+  memory: *resource_pressure
+  disk: *high_pressure
+  connection:
+    warning: 80
+    critical: 90
+  latency_p99_ms:
+    warning: 3000
+    critical: 10000
+  error_rate_pct: *error_rate
 
 log_patterns:
   error_spike_threshold: 10
@@ -28,7 +40,120 @@ log_patterns:
 
 alarm_handling:
   storm_threshold: 50
+  storm_window_minutes: 5
   flapping_window_minutes: 10
   flapping_count_threshold: 5
+  flapping_settle_minutes: 5
   auto_deduplicate: true
-  mute_low_during_storm: true
+  de_prioritize_low_during_storm: true
+  max_alarms_per_cluster: 100
+  maintenance_clusters: []
+
+tke_alarm_aggregation:
+  enabled: true
+  event_model: canonical_alarm_event
+  inputs:
+    cluster_id: cls-xxxxxx
+    time_start_epoch: 1780970400
+    time_end_epoch: 1780974000
+    tke_event_logset_id: logset-optional   # optional CLS logset that owns the TKE event topic
+    tke_event_topic_id: topic-optional
+    node_pool_id: np-optional
+    addon_name: coredns
+    load_balancer_id: lb-optional
+  default_grouping_keys:
+    - cluster_id
+    - resource_type
+    - resource_id
+    - metric_name
+  topology_keys:
+    node: [cluster_id, labels.node_name]
+    workload: [cluster_id, labels.namespace, labels.workload]
+    service_chain: [cluster_id, labels.service_name]
+  data_quality:
+    degraded: false
+    status: complete   # complete|partial|stale
+    source_recency: {}  # per-source last-updated timestamps
+    missing_sources: []
+    warnings: []
+  incident_classes:
+    - Node Pressure
+    - Pod Crash Loop
+    - Capacity Exhaustion
+    - CLB 5xx Chain
+    - Addon Failure
+    - Disk Pressure
+  output_schema: event_bundle
+  recommendation_boundary: "RECOMMENDATION (not execution)"
+
+change_correlation:
+  enabled: true
+  lead_window_minutes: 15
+  lag_window_minutes: 30
+  sources:
+    cloudaudit: true
+    cls_k8s_events: true
+    cls_app_logs: false
+  inputs:
+    namespace: prod
+    workload: api-deploy
+    app_log_topic_id: topic-optional
+  rule_f_hypotheses:
+    - F1_deploy_regression
+    - F2_clb_config
+    - F3_scale_reboot
+    - F4_network_sg
+  output_fields:
+    - change_timeline
+    - likely_change_trigger
+    - incident_timeline_ref
+
+incident_timeline:
+  enabled: true
+  persist_path: "./audit-results/incident-timeline-YYYYMMDD-HHMMSS.json"
+  max_narrative_chars: 280
+
+anomaly_detection:
+  enabled: true
+  mode: baseline_primary   # baseline_primary | static_only
+  max_metrics_per_run: 6
+  max_window_hours: 24
+  deviation_ratio: *baseline_ratio
+  absolute_delta_warning_pct: 15
+  min_absolute_floor_pct: 20
+  slope_multiplier: 2.0
+  severity_thresholds: &anomaly_severity_thresholds
+    critical: 70
+    high: 50
+    medium: 30
+  persist_path: "./audit-results/anomaly-bundle-YYYYMMDD-HHMMSS.json"
+  product_metrics:
+    cvm: [CpuUsage, MemUsage, DiskUsage, NetworkIn, NetworkOut]
+    redis: [CpuUs, Storage, Connections]
+    cdb: [CpuUseRate, Qps, SlowQueries]
+    clb: [ClientConnum, UnhealthNum, DropTotal]
+    tke: [cluster_cpu_usage, cluster_mem_usage, cluster_running_nodes]
+    es: [ClusterStatus, JvmMemUsage, SearchLatency]
+
+product_rca:
+  enabled: true
+  rules:
+    cdb: H
+    redis: I
+    es: J
+  cross_link_clb: true
+  cross_link_vpc: true
+
+network_rca:
+  enabled: true
+  rule: G
+  inputs:
+    vpc_id: vpc-optional
+    instance_id: ins-optional
+    security_group_id: sg-optional
+  triggers:
+    - connection_timeout
+    - connection_refused
+    - node_not_ready_cvm_healthy
+    - clb_5xx_backends_running
+    - cloudaudit_sg_route_change

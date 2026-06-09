@@ -21,6 +21,16 @@
 | MemUsage ↑ | OOM errors in logs | Memory leak or undersized |
 | DiskUsage ↑ | DiskIO latency ↑ | I/O bottleneck |
 
+### 1.3 Baseline-First Anomaly Detection
+
+Before static thresholds (`CPU > 90%`), compare current window p95 against **yesterday** and **last week** same windows. See [`anomaly-detection.md`](anomaly-detection.md).
+
+| Pattern | Baseline signal | Static threshold alone | Diagnosis |
+|---|---|---|---|
+| Daily peak | Ratio < 1.5 vs yesterday/week | May breach 85% | Normal cyclical load — LOW severity |
+| True spike | Ratio ≥ 1.5, slope spike | May or may not breach 90% | Investigate — correlate NetworkIn/logs |
+| Gradual drift | Week ratio > yesterday ratio | Below warning | Capacity trend — delegate FinOps/right-size |
+
 ## Dimension 2: Root Cause Localization (根因定位)
 
 ### 2.1 Decision Tree Template
