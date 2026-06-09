@@ -221,6 +221,9 @@ __marimo__/
 .omo/
 .codebuddy/
 
+# GCL / audit traces (runtime artifacts)
+audit-results/
+
 # OS 系统文件（macOS Finder / Windows Explorer）
 .DS_Store
 .AppleDouble

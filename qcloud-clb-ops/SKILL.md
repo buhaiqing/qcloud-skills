@@ -90,7 +90,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - Task is **VPC network only** (subnet, route table, NAT gateway) → delegate to: `qcloud-vpc-ops`
 - Task is **CVM instance management** → delegate to: `qcloud-cvm-ops`
 - Task is **SSL certificate management only** → delegate to: `qcloud-ssl-ops` (when present)
-- User insists on **console-only** flows with no API → state limitation; do not invent undocumented HTTP steps
+- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 
 ### Delegation Rules
 
@@ -99,6 +99,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - SSL certificates for HTTPS listeners: verify certificate exists via SSL service or CAM
 - CLB access log analysis (FinOps/AiOps): delegate to `qcloud-cls-ops` for CLS log search and aggregation queries; reference `clb-log-analysis.md` for query templates
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
 
 ## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)

@@ -1,5 +1,9 @@
 # CDN Well-Architected Assessment
 
+> **Mode split:** `[assessment-readonly]` — Describe* / GetMonitorData only (Well-Architected worker).
+> `[remediation-only]` — Create/Modify/Delete runbooks; **MUST NOT** execute when `{{user.mode}}=well-architected-readonly`.
+> Worker JSON: **Worker Output Contract** at end of this file.
+
 ## Reliability
 
 | Check | Assessment | Pass Criteria |
@@ -94,11 +98,16 @@
   "resource_count": 3,
   "pillars": {
     "reliability": {
+      "score": null,
+      "status": "skipped",
+      "findings": []
+    },
+    "security": {
       "score": 75,
       "status": "assessed",
       "findings": [
         {
-          "id": "cdn-rel-001",
+          "id": "cdn-sec-001",
           "severity": "High",
           "confidence": "HIGH",
           "title": "HTTPS not enforced",
@@ -107,11 +116,6 @@
           "effort": "medium"
         }
       ]
-    },
-    "security": {
-      "score": 88,
-      "status": "assessed",
-      "findings": []
     },
     "cost": {
       "score": 72,
@@ -127,7 +131,7 @@
   "recommendations": [
     {
       "priority": "High",
-      "pillar": "reliability",
+      "pillar": "security",
       "action": "Enable HTTPS and HTTP→HTTPS redirect",
       "effort": "medium"
     }

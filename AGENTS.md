@@ -29,7 +29,7 @@ Run `ls qcloud-*-ops/` for the canonical list. The `README.md` skill list is als
 
 - **Dual-path execution**: `tccli` CLI is primary; `tencentcloud-sdk-python` is fallback. The `cli_applicability` frontmatter field declares the policy per skill: `cli-first` / `dual-path` (most common — must ship `references/cli-usage.md` and document BOTH paths in every flow) / `cli-only` (read-only skills) / `sdk-only` (e.g. `qcloud-agsx-ops` — `tccli` does not ship an `ags` subcommand; verify via `tccli ags help`).
 - **Pre-check → Execute → Verify → Recover** is the standard 4-step runbook shape. Every operation must follow it.
-- **Cross-skill delegation**: CVM → VPC/CLB/COS; Monitor → CVM/CLB/VPC; CDB/ES → VPC/Monitor/COS. Check the target skill's `## Trigger & Scope` for explicit `delegate-to` markers before inventing a flow.
+- **Cross-skill delegation**: CVM → VPC/CLB/COS; Monitor → CVM/CLB/VPC; CDB/ES → VPC/Monitor/COS; **Well-Architected** → `qcloud-well-architected-review` (orchestrator) dispatches read-only workers on each `qcloud-*-ops`; **proactive inspection** → `qcloud-proactive-inspection` delegates Discovery to product skills. Check the target skill's `## Trigger & Scope` for explicit `delegate-to` markers before inventing a flow.
 - **Five Core Standards** (P0 quality gates, all skills must satisfy): Clear Boundaries, Structured I/O (`{{env.*}}` / `{{user.*}}` / `{{output.*}}` placeholders), Explicit Actionable Steps, Complete Failure Strategies (≥ 10 product-specific error codes with HALT vs retry), Absolute Single Responsibility.
 - **Token Efficiency** (P0 — 强制): 在保持 Agent 可执行性的前提下最小化 Token 消耗。规则包括 TE-1（API 查替代硬编码表）、TE-3（紧凑错误表 ≤3 列）、TE-4（JSON paths 集中声明）、TE-5（YAML anchors）、TE-6（消除跨文件重复）。详见下方 Round 1 检查清单。
 - **No web console as agent execution path.** The console may be referenced for product docs but never for state changes.
@@ -83,6 +83,17 @@ Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` addition
 
 `assets/eval_queries.json` per skill holds intent-classification test cases (`should_trigger: true/false`). No test runner exists in-repo; these are for external evaluation harnesses. When adding capability, add eval cases in the same change.
 
+**Build-time regression:** after changing any `references/well-architected-assessment.md` Worker Output Contract example JSON, run:
+
+```bash
+python3 scripts/validate_product_assessment.py
+python3 scripts/validate_skills_frontmatter.py
+```
+
+Exit non-zero ⇒ fix finding ID / pillar mismatch before claiming done.
+
+**Runtime GCL (Phase 2):** `scripts/gcl_runner.py` implements the Orchestrator loop (trace → external Critic → PASS/RETRY/SAFETY_FAIL). Critic scores MUST be injected from an isolated agent context via `--critic-json` or stdin; use `--structural-critic-only` only for CI smoke tests.
+
 ## Adding or modifying a skill
 
 1. **New skill** → use `qcloud-skill-generator` (do not hand-roll). It enforces the 2-round review internally.
@@ -91,7 +102,11 @@ Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` addition
 
 ## Files that do NOT exist
 
-- No `package.json`, `Makefile`, CI configs, build scripts, linter, typechecker, or test runner.
+- No `package.json`, `Makefile`, CI configs, build scripts, linter, typechecker, or test runner — **except**:
+  - `scripts/validate_product_assessment.py` — Well-Architected worker JSON regression
+  - `scripts/validate_skills_frontmatter.py` — SKILL.md frontmatter checks
+  - `scripts/gcl_runner.py` — GCL Orchestrator (Phase 2; external Critic required in production)
+  - `.github/workflows/validate-skills.yml` — CI for the above
 - No `CLAUDE.md`, `opencode.json`, `.cursorrules` in this repo.
 - `.omc/`, `.omo/`, `.codebuddy/`, `.omc/project-memory.json` are gitignored cache data — not source.
 - `docs/superpowers/plans/` contains historical planning notes; safe to read but not a runtime source of truth.
@@ -297,7 +312,8 @@ Each skill may override `max_iter` in its own `SKILL.md` (under `## Quality Gate
   `ResetInstances` with reset-image, and CAM-driven reset) with its `references/prompt-templates.md`
   and `references/rubric.md`. `qcloud-cdb-ops` and `qcloud-cos-ops` follow in the next PR.
 - **Phase 2** — add `scripts/gcl_runner.py` as a reusable Orchestrator (wraps `tccli` calls
-  with isolated sub-agent Critic).
+  with isolated sub-agent Critic). **Done (2026-06-09):** orchestrator loop + trace persistence;
+  Critic via `--critic-json`/stdin; `--structural-critic-only` for CI.
 - **Phase 3** — feed `gcl-trace-*.json` into `qcloud-monitor-ops` (custom metric) and
   `qcloud-proactive-inspection` for quality dashboards.
 - **Phase 4** — wire rubric pass-rate to Cloud Monitor alarms (real incidents refine thresholds).

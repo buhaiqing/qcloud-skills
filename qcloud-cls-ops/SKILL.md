@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.2.0"
-  last_updated: "2026-06-04"
+  version: "1.3.0"
+  last_updated: "2026-06-09"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/614"
@@ -99,7 +99,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - Task is **CKafka message queue** operations → delegate to: `qcloud-ckafka-ops`
 - Task is **SCF serverless function** deployment → delegate to: `qcloud-scf-ops` (when present)
 - Task is **TKE Kubernetes** log collection → use `qcloud-tke-ops` for TKE-specific log collection; use this skill for CLS backend operations
-- User insists on **console-only** flows with no API → state limitation; do not invent undocumented HTTP steps
+- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 
 ### Delegation Rules
 
@@ -112,6 +112,22 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs
 - COS access log analysis requires enabling COS logging first: delegate to `qcloud-cos-ops` to verify/enable bucket logging before importing
 - COS import task (`CreateCosRecharge`) depends on COS bucket: verify bucket exists via `qcloud-cos-ops` before creating import task
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Read-only Well-Architected assessment for **CLS**; return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | reliability / security / cost / efficiency (or `all`) |
+| `{{user.scope}}` | `single-resource` or `account-wide` |
+
+**Allowed:** `Describe*`, `SearchLog` (read-only query) — **no** Create/Delete/Modify mutations.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: cls`).
 
 ## Variable Convention (Agent-Readable)
 

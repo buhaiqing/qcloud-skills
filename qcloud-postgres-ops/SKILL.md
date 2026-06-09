@@ -83,7 +83,7 @@ TencentDB for PostgreSQL on Tencent Cloud provides fully managed PostgreSQL data
 - Task is about self-hosted PostgreSQL (docker, k8s, manual install) → state limitation
 - User asks for PostgreSQL SQL help (SELECT, INSERT, EXPLAIN, VACUUM) → this is for cloud ops only
 - Task is about VPC / security group design (without referencing PostgreSQL) → delegate to: `qcloud-vpc-ops`
-- User insists on **console-only** flows with no API → state limitation; do not invent undocumented HTTP steps
+- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 - Task is about other database products (MySQL, MariaDB, TDSQL) → delegate to their respective skills
 
 ### Delegation Rules
@@ -91,6 +91,7 @@ TencentDB for PostgreSQL on Tencent Cloud provides fully managed PostgreSQL data
 - If creating a PostgreSQL instance in a new VPC/subnet, delegate VPC setup to `qcloud-vpc-ops` first
 - If configuring CAM policies for PostgreSQL access, delegate to `qcloud-cam-ops`
 - If setting up monitoring alarms, delegate to `qcloud-monitor-ops` for alarm policy creation
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
 
 ## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)

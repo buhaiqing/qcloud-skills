@@ -16,8 +16,8 @@ compatibility: >-
   Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.1.0"
-  last_updated: "2026-06-04"
+  version: "1.3.0"
+  last_updated: "2026-06-09"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   type: cross-cutting-inspection
   python_version_minimum: "3.8"
@@ -53,6 +53,38 @@ It enables agents to systematically inspect Tencent Cloud resources for potentia
 ### Core Principle
 
 **Proactive > Reactive.** Inspect resources regularly using configurable thresholds, detect anomalies early, diagnose root causes, and report actionable findings.
+
+### Boundary vs Well-Architected Review
+
+| Skill | Purpose | Output |
+|-------|---------|--------|
+| **This skill** (`qcloud-proactive-inspection`) | Threshold-based health check (CPU/disk/expiry) | Inspection report with Warning/Critical |
+| **`qcloud-well-architected-review`** | Four-pillar scored architecture assessment | `product_assessment` JSON + architecture report |
+
+Route **「做一次架构审查 / Well-Architected 评估」** → `qcloud-well-architected-review`, **not** this skill.
+
+## Product Skill Delegation (Discovery)
+
+> Prefer **product ops skills** for read-only discovery/collection. Inline `tccli` in Step 1 below is **fallback** when no product skill exists.
+
+| `{{user.products}}` | delegate-to | Product checklist |
+|---------------------|-------------|-------------------|
+| `cvm` | `qcloud-cvm-ops` | [proactive-inspection.md](../qcloud-cvm-ops/references/proactive-inspection.md) |
+| `clb` | `qcloud-clb-ops` | [proactive-inspection.md](../qcloud-clb-ops/references/proactive-inspection.md) |
+| `cdb` | `qcloud-cdb-ops` |同上 |
+| `redis` | `qcloud-redis-ops` |同上 |
+| `tke` | `qcloud-tke-ops` |同上 |
+| `vpc` | `qcloud-vpc-ops` |同上 |
+| `cos` | `qcloud-cos-ops` |同上 |
+| `es` / `mongodb` / `postgres` | respective ops skill | Product detection rules |
+| `ckafka` / `scf` / `cls` / `cbs` | respective ops skill |同上 |
+| `cdn` / `ssl` / `agsx` | respective ops skill |同上 |
+| billing slice | `qcloud-finops-ops` | Spend anomaly in inspection checklist |
+| metrics | `qcloud-monitor-ops` | GetMonitorData for Step 2 collection |
+
+**Output contract:** each product returns `{{output.inspection_findings}}` per [inspection-output-schema.md](references/inspection-output-schema.md).
+
+Pass `{{user.mode}}=inspection-readonly` (implicit); product skills MUST NOT mutate resources during inspection delegation.
 
 ## Trigger & Scope (Agent-Readable)
 
@@ -95,7 +127,10 @@ It enables agents to systematically inspect Tencent Cloud resources for potentia
 ## Inspection Workflow
 
 ### Step 1: Discovery (发现)
-Enumerate all resources to inspect:
+
+**Primary path:** For each product in `{{user.products}}`, **delegate-to** the product ops skill (see [Product Skill Delegation](#product-skill-delegation-discovery)) for read-only resource enumeration.
+
+**Fallback path** (product skill unavailable): direct `tccli Describe*` with pagination:
 ```bash
 # Discover CVM instances
 tccli cvm DescribeInstances --Region {{env.TENCENTCLOUD_REGION}} --Limit 100
@@ -166,6 +201,8 @@ Default thresholds (override via `{{user.thresholds}}`):
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial release — 5-step inspection pipeline (Discovery → Collection → Detection → Diagnosis → Report) |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 rules: run idempotency, read-only collection, credential safety, snapshot timing, report path security), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
+| 1.2.0 | 2026-06-09 | Product skill delegation for Discovery; boundary vs `qcloud-well-architected-review` |
+| 1.3.0 | 2026-06-09 | `inspection-output-schema.md`; 20 product `proactive-inspection.md` checklists |
 
 ## Quality Gate (GCL)
 
@@ -192,6 +229,7 @@ Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 ---
 
 For detailed inspection patterns, see:
+- [inspection-output-schema.md](references/inspection-output-schema.md) — Product → orchestrator handoff JSON
 - [Discovery Patterns](references/discovery.md) — Resource enumeration techniques
 - [Collection Methods](references/collection.md) — Metric collection patterns
 - [Detection Rules](references/detection.md) — Anomaly detection thresholds

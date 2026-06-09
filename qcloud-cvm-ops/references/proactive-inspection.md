@@ -1,5 +1,9 @@
 # CVM Proactive Inspection
 
+> **delegate-from:** `qcloud-proactive-inspection` — read-only discovery/collection for **CVM**.
+> Output handoff: [inspection-output-schema.md](../../qcloud-proactive-inspection/references/inspection-output-schema.md).
+> Architecture scoring → `qcloud-well-architected-review`.
+
 Five-step closed-loop proactive inspection workflow for CVM.
 
 ---

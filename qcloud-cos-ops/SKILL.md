@@ -82,10 +82,13 @@ COS (Cloud Object Storage) on Tencent Cloud provides scalable, secure, and highl
 - COS access log analysis (audit, troubleshooting, security) → delegate to `qcloud-cls-ops`
 - Console-only → State limitation
 
+- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
+
 ### Delegation Rules
 
 - COS access log analysis → delegate to `qcloud-cls-ops` with bucket name, region, and CLS topic
 - COS access logging must be enabled before CLS can analyze logs (see [references/cls-analysis-guide.md](references/cls-analysis-guide.md))
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
 
 ## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)

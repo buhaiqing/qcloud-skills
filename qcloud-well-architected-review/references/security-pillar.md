@@ -16,6 +16,7 @@
 | CDB / Redis / TKE / COS | respective `qcloud-*-ops` | Product `well-architected-assessment.md` |
 | MongoDB / PostgreSQL / ES | `qcloud-mongodb-ops`, `qcloud-postgres-ops`, `qcloud-es-ops` | Data-layer encryption, network isolation |
 | SSL / CDN (TLS edge) | `qcloud-ssl-ops`, `qcloud-cdn-ops` | Cert expiry, HTTPS, access control |
+| CKafka / SCF / CLS / CBS | respective `qcloud-*-ops` | ACL, VPC, encryption, log access scope |
 
 Pass `{{user.mode}}=well-architected-readonly`, `{{user.pillars}}` includes `security`.
 

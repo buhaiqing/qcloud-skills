@@ -1,5 +1,9 @@
 # COS Well-Architected Assessment
 
+> **Mode split:** `[assessment-readonly]` — Describe* / GetMonitorData only (Well-Architected worker).
+> `[remediation-only]` — Create/Modify/Delete runbooks; **MUST NOT** execute when `{{user.mode}}=well-architected-readonly`.
+> Worker JSON: **Worker Output Contract** at end of this file.
+
 ## Four Pillars
 
 ### Reliability (可靠性)

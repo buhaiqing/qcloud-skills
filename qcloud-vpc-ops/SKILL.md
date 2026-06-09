@@ -83,13 +83,14 @@ Every generated skill MUST satisfy these five standards. Use them as a design ch
 - Task is about **CVM instances** → delegate to: `qcloud-cvm-ops`
 - Task is about **CBS disks** → delegate to: `qcloud-cbs-ops`
 - Task is about **CLB load balancers** → delegate to: `qcloud-clb-ops`
-- User insists on **console-only** flows with no API → state limitation; do not invent HTTP steps
+- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 
 ### Delegation Rules
 
 - If creating CVM instances in VPC, delegate CVM creation to `qcloud-cvm-ops` after VPC/Subnet setup
 - If creating CLB in VPC, delegate to `qcloud-clb-ops` after VPC verification
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
 
 ## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)

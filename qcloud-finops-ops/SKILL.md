@@ -32,12 +32,14 @@ related_skills:
 
 ### SHOULD NOT Use
 
+- 四支柱卓越架构评估 / 架构设计审查 → delegate to: `qcloud-well-architected-review`
 - 多云账单（阿里云/AWS/华为云）→ 不支持
 - 权限/账号/密钥 → `qcloud-cam-ops`
 - 资源 CRUD → 对应产品 skill
 - 实时监控指标 → `qcloud-monitor-ops`
 - 实际计费规则计算（阶梯价/折扣）→ 引用腾讯云官方文档
 - 企业财务对账（合同/发票/报销）→ 超出 FinOps 范围
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected 成本评估（只读）→ 由 `qcloud-well-architected-review` 编排调用；见 **Read-Only Assessment Mode**
 
 ## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)

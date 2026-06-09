@@ -87,7 +87,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - Task is **VPC network only** (subnet, route table, NAT gateway) → delegate to: `qcloud-vpc-ops`
 - Task is **CLB load balancing** → delegate to: `qcloud-clb-ops`
 - Task is **MySQL/Redis database** → delegate to: `qcloud-mysql-ops` / `qcloud-redis-ops`
-- User insists on **console-only** flows with no API → state limitation; do not invent undocumented HTTP steps
+- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 
 ### Delegation Rules
 
@@ -97,6 +97,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - Snapshot/Image operations are within CVM scope for instance backup/restore
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs
 - Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review` orchestrator; see **Read-Only Assessment Mode** below
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 
 ## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
 

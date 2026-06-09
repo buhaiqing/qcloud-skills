@@ -64,6 +64,8 @@ CAM (Cloud Access Management) is Tencent Cloud's identity and access management 
 - Resource CRUD (CVM, Redis, etc.) → delegate to product-specific ops skill
 - Billing/account management → use dedicated billing tools
 - Application-level auth (JWT, OAuth in apps) → use app-specific debugging
+- Task is **full architecture review** (four pillars / multi-product) → delegate to: `qcloud-well-architected-review`
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected security audit (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
 
 ## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)

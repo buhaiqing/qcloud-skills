@@ -319,15 +319,19 @@ qcloud-skills/
 
 ### qcloud-well-architected-review — 卓越架构审查（跨产品）
 
-对腾讯云资源进行四支柱（可靠性/安全性/成本/效率）架构评估，支持单资源审查和全站架构审计，可作为各产品运维技能的委派目标。
+**Orchestrator + Worker 架构：** 编排层 `qcloud-well-architected-review` 负责范围、派发与聚合；各 `qcloud-*-ops` 产品 skill 在 `## Read-Only Assessment Mode` 下作为 Worker 返回 `{{output.product_assessment}}` JSON（契约见 `references/worker-output-schema.md` v1.1）。21 个产品 Worker 已注册（含 `ckafka` / `scf` / `cls` / `cbs`）。
+
+对腾讯云资源进行四支柱（可靠性/安全性/成本/效率）架构评估，支持单资源审查和全站架构审计。与 **主动巡检**（阈值异常）边界不同 — 架构评估走本 skill，巡检走 `qcloud-proactive-inspection`。
 
 | 文件 | 说明 |
 |------|------|
-| `SKILL.md` | 核心技能文档 |
-| `references/reliability-pillar.md` | 可靠性支柱：备份/恢复/多可用区 |
-| `references/security-pillar.md` | 安全性支柱：CAM/凭证/加密 |
-| `references/cost-pillar.md` | 成本支柱：计费/闲置检测/升配降配 |
-| `references/efficiency-pillar.md` | 效率支柱：批量操作/自动化/API优化 |
+| `SKILL.md` | Orchestrator 技能文档（Product Worker Registry） |
+| `references/worker-output-schema.md` | Worker 输出契约（canonical） |
+| `references/cross-product-analysis.md` | 跨产品关联分析（编排层专用） |
+| `references/reliability-pillar.md` | 可靠性支柱 worker 映射 |
+| `references/security-pillar.md` | 安全性支柱 worker 映射 |
+| `references/cost-pillar.md` | 成本支柱 worker 映射 |
+| `references/efficiency-pillar.md` | 效率支柱 worker 映射 |
 | `assets/eval_queries.json` | 评估查询集 |
 | `assets/example-config.yaml` | 示例配置 |
 
@@ -348,11 +352,12 @@ qcloud-skills/
 
 ### qcloud-proactive-inspection — 主动巡检（跨产品）
 
-五步闭环巡检流程（发现→采集→检测→诊断→报告），支持多产品资源巡检、可配置阈值、统计异常检测和结构化报告生成。
+五步闭环巡检流程（发现→采集→检测→诊断→报告），支持多产品资源巡检、可配置阈值、统计异常检测和结构化报告生成。**Discovery 优先委派**各产品 ops skill（只读 Describe*）；与 Well-Architected 编排评估边界见 SKILL.md。
 
 | 文件 | 说明 |
 |------|------|
-| `SKILL.md` | 核心技能文档 |
+| `SKILL.md` | 核心技能文档（含 Product Skill Delegation） |
+| `references/inspection-output-schema.md` | 产品 Worker → 编排层 JSON 契约 |
 | `references/discovery.md` | 资源发现模式 |
 | `references/collection.md` | 指标采集方法 |
 | `references/detection.md` | 异常检测规则 |
@@ -369,7 +374,27 @@ qcloud-skills/
 - **五大核心标准** — 清晰边界、结构化 I/O、明确操作步骤、完整的失败策略、绝对单一职责
 - **卓越架构集成** — 将操作映射到可靠性、安全性、成本、效率四大支柱
 - **前置检查 → 执行 → 验证 → 恢复** 四步执行流程
-- **技能间委派** — CVM 可委派 VPC/CLB/COS，Monitor 可委派 CVM/CLB/VPC，CDB/ES 可委派 VPC/Monitor/COS 等
+- **技能间委派** — CVM 可委派 VPC/CLB/COS；Monitor 可委派 CVM/CLB/VPC；CDB/ES 可委派 VPC/Monitor/COS；**架构评估** → `qcloud-well-architected-review`（Orchestrator）→ 各产品 Worker；**巡检** → `qcloud-proactive-inspection`（Discovery 委派产品 skill）
+
+## 本地校验
+
+```bash
+# Worker Output Contract 示例 JSON
+python3 scripts/validate_product_assessment.py
+
+# SKILL.md frontmatter
+python3 scripts/validate_skills_frontmatter.py
+
+# GCL Orchestrator smoke (structural critic)
+python3 scripts/gcl_runner.py run \
+  --skill qcloud-cvm-ops \
+  --request "read-only smoke" \
+  --command 'echo smoke' \
+  --max-iter 1 \
+  --structural-critic-only
+```
+
+GitHub Actions workflow: `.github/workflows/validate-skills.yml` runs the first two checks on every PR.
 
 ## 快速开始
 

@@ -24,6 +24,10 @@ assessment:
     - ssl
     - cdn
     - agsx
+    - ckafka
+    - scf
+    - cls
+    - cbs
 
 thresholds:
   reliability:

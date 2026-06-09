@@ -88,13 +88,14 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - Task is **application-level Redis client debugging** (connection strings, serialization) → application debugging, not this skill
 - Task is **TencentDB for MySQL/PostgreSQL** → delegate to: `qcloud-cdb-ops` / `qcloud-postgresql-ops`
 - Task is cloud **Memcached** → delegate to appropriate Memcached skill (when present)
-- User insists on **console-only** flows with no API → state limitation; do not invent undocumented HTTP steps
+- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 
 ### Delegation Rules
 
 - Redis depends on VPC: verify VPC/Subnet exist via `qcloud-vpc-ops` before CreateInstance
 - Redis uses Monitor for metrics: delegate alerting/dashboard to `qcloud-monitor-ops`
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
 
 ## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)

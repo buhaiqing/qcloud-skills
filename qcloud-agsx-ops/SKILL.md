@@ -77,12 +77,13 @@ This skill is an **operational runbook** for agents: explicit scope, credential 
 - Task is purely billing / account management -> delegate to: `qcloud-billing-ops`
 - Task is CAM / permission model only -> delegate to: `qcloud-cam-ops`
 - Task is about TKE / CVM / SCF compute -> delegate to: `qcloud-tke-ops`
-- User insists on **console-only** flows with no API -> state limitation; do not invent undocumented HTTP steps
+- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 
 ### Delegation Rules
 
 - If AGSX sandbox requires VPC access, configure VPC via `qcloud-vpc-ops` before sandbox creation.
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs.
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
 
 ## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)

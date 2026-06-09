@@ -18,6 +18,7 @@
 | SSL | `qcloud-ssl-ops` | Auto-renewal, cert deployment automation |
 | AGSX | `qcloud-agsx-ops` | Batch sandbox, image prewarm (SDK) |
 | COS | `qcloud-cos-ops` | Lifecycle automation |
+| CKafka / SCF / CLS / CBS | respective ops skill | Partition scaling, triggers, log alarms, snapshot automation |
 
 Pass `{{user.mode}}=well-architected-readonly`, `{{user.pillars}}` includes `efficiency`.
 

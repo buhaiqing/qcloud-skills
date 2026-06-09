@@ -18,5 +18,7 @@
   {"query": "配置负载均衡监听器", "should_trigger": false},
   {"query": "帮我刷新CDN缓存", "should_trigger": false},
   {"query": "查看告警历史", "should_trigger": false},
-  {"query": "创建CAM用户并分配权限", "should_trigger": false}
+  {"query": "创建CAM用户并分配权限", "should_trigger": false},
+  {"query": "全站四支柱架构评估", "should_trigger": false},
+  {"query": "Well-Architected review for production", "should_trigger": false}
 ]

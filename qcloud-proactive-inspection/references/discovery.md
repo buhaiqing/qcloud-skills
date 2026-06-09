@@ -1,6 +1,32 @@
 # Discovery Patterns — Proactive Inspection
 
-## Resource Enumeration
+> **Delegation first:** For each product, prefer `qcloud-{product}-ops` read-only Describe* flows
+> (see `qcloud-proactive-inspection/SKILL.md` § Product Skill Delegation). Examples below are
+> **fallback** when delegating to a product skill is not possible.
+
+## Product → skill map
+
+| Product code | delegate-to |
+|--------------|-------------|
+| cvm | `qcloud-cvm-ops` |
+| clb | `qcloud-clb-ops` |
+| cdb | `qcloud-cdb-ops` |
+| redis | `qcloud-redis-ops` |
+| tke | `qcloud-tke-ops` |
+| vpc | `qcloud-vpc-ops` |
+| cos | `qcloud-cos-ops` |
+| es | `qcloud-es-ops` |
+| mongodb | `qcloud-mongodb-ops` |
+| postgres | `qcloud-postgres-ops` |
+| ckafka | `qcloud-ckafka-ops` |
+| scf | `qcloud-scf-ops` |
+| cls | `qcloud-cls-ops` |
+| cbs | `qcloud-cbs-ops` |
+| cdn | `qcloud-cdn-ops` |
+| ssl | `qcloud-ssl-ops` |
+| agsx | `qcloud-agsx-ops` |
+
+## Resource Enumeration (fallback tccli)
 
 ### CVM Discovery
 ```bash

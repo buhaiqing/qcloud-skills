@@ -100,7 +100,7 @@ TencentDB for MySQL (CDB) on Tencent Cloud provides a stable, reliable, and elas
 - Task is **PostgreSQL** → delegate to: `qcloud-pg-ops` (when present)
 - Task is **SQL Server** → delegate to: `qcloud-sqlserver-ops` (when present)
 - Task is **MongoDB** → delegate to: `qcloud-mongodb-ops` (when present)
-- User insists on **console-only** flows with no API → state limitation; do not invent undocumented HTTP steps
+- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 
 ### Delegation Rules
 
@@ -108,6 +108,7 @@ TencentDB for MySQL (CDB) on Tencent Cloud provides a stable, reliable, and elas
 - For database migration (DTS), refer to Tencent Cloud DTS documentation (separate skill planned)
 - Cloud Monitor integration via `qcloud-monitor-ops` for dashboard and alarm configuration
 - Other database types: route to their respective skills (qcloud-es-ops, qcloud-redis-ops, etc.)
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
 
 ## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)

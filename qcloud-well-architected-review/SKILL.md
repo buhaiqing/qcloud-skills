@@ -20,7 +20,7 @@ compatibility:
   - tencentcloud-api-credentials
 metadata:
   author: qcloud
-  version: "1.3.3"
+  version: "1.3.4"
   last_updated: "2026-06-09"
   type: cross-cutting-assessment
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
@@ -230,6 +230,10 @@ Pillar orchestration guides (worker mapping only — no inline CLI):
 | `ssl` | `qcloud-ssl-ops` |同上 |
 | `cdn` | `qcloud-cdn-ops` |同上 |
 | `agsx` | `qcloud-agsx-ops` |同上 (sdk-only worker) |
+| `ckafka` | `qcloud-ckafka-ops` |同上 |
+| `scf` | `qcloud-scf-ops` |同上 |
+| `cls` | `qcloud-cls-ops` |同上 |
+| `cbs` | `qcloud-cbs-ops` | Standalone disks / snapshot policies (attached disks also in `cvm` worker) |
 | `finops` | `qcloud-finops-ops` | Cost/billing worker (§ Worker Output Contract) |
 | _(security)_ | `qcloud-cam-ops` | Cross-cutting |
 | _(metrics)_ | `qcloud-monitor-ops` | Cross-cutting (GetMonitorData, alarms) |
@@ -290,6 +294,10 @@ Exclude `not_assessed` pillars from weight denominator; document excluded pillar
 | qcloud-ssl-ops | qcloud-well-architected-review | Certificate expiry / TLS coverage audit |
 | qcloud-cdn-ops | qcloud-well-architected-review | CDN security / cost / cache efficiency |
 | qcloud-agsx-ops | qcloud-well-architected-review | Agent sandbox architecture review |
+| qcloud-ckafka-ops | qcloud-well-architected-review | Kafka HA / ACL / lag assessment |
+| qcloud-scf-ops | qcloud-well-architected-review | Serverless reliability / DLQ / cost review |
+| qcloud-cls-ops | qcloud-well-architected-review | Log retention / audit coverage review |
+| qcloud-cbs-ops | qcloud-well-architected-review | Snapshot / orphan disk / encryption audit |
 
 ### Outbound — this orchestrator delegate-to workers
 
@@ -323,6 +331,7 @@ Exclude `not_assessed` pillars from weight denominator; document excluded pillar
 | 1.3.1 | 2026-06-09 | Worker registry: es, mongodb, postgres, ssl, cdn, agsx |
 | 1.3.2 | 2026-06-09 | worker-output-schema v1.1; product well-architected-assessment.md aligned |
 | 1.3.3 | 2026-06-09 | `qcloud-finops-ops` well-architected-assessment.md (Cost worker) |
+| 1.3.4 | 2026-06-09 | Workers: ckafka, scf, cls, cbs; Assessment vs Remediation banners; CAM example pillar fix |
 
 ## Quality Gate (GCL)
 

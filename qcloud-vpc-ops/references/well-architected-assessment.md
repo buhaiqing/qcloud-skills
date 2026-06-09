@@ -1,5 +1,9 @@
 # VPC Well-Architected Assessment
 
+> **Mode split:** `[assessment-readonly]` — Describe* / GetMonitorData only (Well-Architected worker).
+> `[remediation-only]` — Create/Modify/Delete runbooks; **MUST NOT** execute when `{{user.mode}}=well-architected-readonly`.
+> Worker JSON: **Worker Output Contract** at end of this file.
+
 ## Four-Pillar Framework
 
 This document maps VPC operations to Tencent Cloud Well-Architected Framework's four pillars:
@@ -468,11 +472,16 @@ jq -r '.Response.VpcSet[] | select(.VpcName == "prod") | .VpcId' /tmp/vpc-cache.
   "resource_count": 3,
   "pillars": {
     "reliability": {
+      "score": null,
+      "status": "skipped",
+      "findings": []
+    },
+    "security": {
       "score": 75,
       "status": "assessed",
       "findings": [
         {
-          "id": "vpc-rel-001",
+          "id": "vpc-sec-001",
           "severity": "High",
           "confidence": "HIGH",
           "title": "Overly permissive security group",
@@ -481,11 +490,6 @@ jq -r '.Response.VpcSet[] | select(.VpcName == "prod") | .VpcId' /tmp/vpc-cache.
           "effort": "medium"
         }
       ]
-    },
-    "security": {
-      "score": 88,
-      "status": "assessed",
-      "findings": []
     },
     "cost": {
       "score": 72,
@@ -501,7 +505,7 @@ jq -r '.Response.VpcSet[] | select(.VpcName == "prod") | .VpcId' /tmp/vpc-cache.
   "recommendations": [
     {
       "priority": "High",
-      "pillar": "reliability",
+      "pillar": "security",
       "action": "Restrict source CIDRs; use bastion or VPN",
       "effort": "medium"
     }

@@ -92,6 +92,7 @@ Every generated skill MUST satisfy these five standards:
 
 ### SHOULD NOT Use This Skill When
 
+- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 - Task is **product-specific operations** → delegate to product ops skill:
   - CVM → `qcloud-cvm-ops`
   - CLB → `qcloud-clb-ops`
@@ -112,6 +113,7 @@ Every generated skill MUST satisfy these five standards:
 | `QCE/VPC` | `qcloud-vpc-ops` | VPC flow metrics → VPC operations |
 
 **Rule:** Monitor skill handles alarm/metric configuration. Product ops skills handle resource operations based on alarm findings.
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
 
 ## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)

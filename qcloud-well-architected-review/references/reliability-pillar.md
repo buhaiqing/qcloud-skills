@@ -20,6 +20,10 @@
 | COS | `qcloud-cos-ops` |同上 |
 | VPC | `qcloud-vpc-ops` | `references/well-architected-assessment.md` § Reliability |
 | Monitor (coverage) | `qcloud-monitor-ops` | Alarm/health coverage for reliability signals |
+| CKafka | `qcloud-ckafka-ops` | Replication / ISR / consumer lag |
+| SCF | `qcloud-scf-ops` | DLQ / retry / async reliability |
+| CLS | `qcloud-cls-ops` | Log shipping DR / collection coverage |
+| CBS | `qcloud-cbs-ops` | Auto-snapshot / unattached disk backup gap |
 
 Pass orchestrator inputs: `{{user.mode}}=well-architected-readonly`, `{{user.pillars}}` includes `reliability`.
 

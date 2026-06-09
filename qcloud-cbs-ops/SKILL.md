@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.1.0"
-  last_updated: "2026-06-04"
+  version: "1.2.0"
+  last_updated: "2026-06-09"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/362"
@@ -86,7 +86,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - Task is **CVM instance** management (VM lifecycle, SSH access) → delegate to: `qcloud-cvm-ops`
 - Task is **VPC network** operations (subnet, route table) → delegate to: `qcloud-vpc-ops`
 - Task is **COS object storage** (buckets, objects) → delegate to: `qcloud-cos-ops`
-- User insists on **console-only** flows with no API → state limitation; do not invent undocumented HTTP steps
+- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 
 ### Delegation Rules
 
@@ -94,6 +94,23 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - CBS snapshots can be used for CVM image creation: delegate image operations to `qcloud-cvm-ops`
 - CBS disk operations require VPC/Subnet for network-attached storage: verify via `qcloud-vpc-ops`
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+- Disks attached to CVM during architecture review → orchestrator may also dispatch `qcloud-cvm-ops`; this skill covers **standalone CBS** (unattached disks, snapshot policies)
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Read-only Well-Architected assessment for **CBS**; return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | reliability / security / cost / efficiency (or `all`) |
+| `{{user.scope}}` | `single-resource` or `account-wide` |
+
+**Allowed:** `Describe*` only — **no** Create/Attach/Detach/Delete/Resize mutations.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: cbs`).
 
 ## Variable Convention (Agent-Readable)
 

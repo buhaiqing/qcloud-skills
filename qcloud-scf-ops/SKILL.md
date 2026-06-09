@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.1.0"
-  last_updated: "2026-06-04"
+  version: "1.2.0"
+  last_updated: "2026-06-09"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/583"
@@ -90,7 +90,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - Task is **API Gateway** configuration only → delegate to: `qcloud-apigw-ops` (when present)
 - Task is **container-based serverless** (EKS/Serverless containers) → delegate to: `qcloud-tke-ops`
 - Task is **long-running batch processing** (>15 minutes execution time) → suggest alternative compute solutions
-- User insists on **console-only** flows with no API → state limitation; do not invent undocumented HTTP steps
+- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 
 ### Delegation Rules
 
@@ -100,6 +100,22 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - SCF uses VPC: verify VPC/Subnet via `qcloud-vpc-ops` for VPC-connected functions
 - SCF uses Monitor: use `qcloud-monitor-ops` for detailed metrics and alerting setup
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Read-only Well-Architected assessment for **SCF**; return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | reliability / security / cost / efficiency (or `all`) |
+| `{{user.scope}}` | `single-resource` or `account-wide` |
+
+**Allowed:** `Describe*`, `GetFunction`, `ListFunctions`, `GetFunctionLogs` — **no** Create/Update/Delete mutations.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: scf`).
 
 ## Variable Convention (Agent-Readable)
 

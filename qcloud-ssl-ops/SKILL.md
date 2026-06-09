@@ -81,7 +81,7 @@ SSL Certificate Service (SSL 证书服务) on Tencent Cloud provides certificate
 - Task is about SSL/TLS protocol configuration within application code → state limitation
 - User asks for generic HTTPS setup (nginx, apache, IIS) without referencing SSL Certificate Service → state limitation
 - Task is about VPC / security group design → delegate to: `qcloud-vpc-ops`
-- User insists on **console-only** flows with no API → state limitation; do not invent undocumented HTTP steps
+- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 
 ### Delegation Rules
 
@@ -89,6 +89,7 @@ SSL Certificate Service (SSL 证书服务) on Tencent Cloud provides certificate
 - If deploying certificate to CLB, delegate CLB certificate configuration to `qcloud-clb-ops`
 - If configuring CAM policies for certificate management, delegate to `qcloud-cam-ops`
 - If setting up certificate expiry monitoring alarms, delegate to `qcloud-monitor-ops`
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
 
 ## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)

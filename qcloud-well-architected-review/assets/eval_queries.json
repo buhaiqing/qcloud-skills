@@ -22,8 +22,15 @@
   {"query": "评估下Elasticsearch集群架构", "should_trigger": true},
   {"query": "MongoDB有没有备份和HA问题", "should_trigger": true},
   {"query": "对CVM和CLB做一次Well-Architected评估", "should_trigger": true},
+  {"query": "评估CKafka消费者组和Topic架构", "should_trigger": true},
+  {"query": "SCF云函数有没有DLQ和成本优化空间", "should_trigger": true},
+  {"query": "CLS日志保留和审计覆盖够不够", "should_trigger": true},
+  {"query": "云硬盘快照和闲置盘有没有风险", "should_trigger": true},
   {"query": "帮我做一次巡检", "should_trigger": false},
   {"query": "生成巡检报告", "should_trigger": false},
   {"query": "排查一下CVM为什么CPU这么高", "should_trigger": false},
-  {"query": "帮我看看这个告警是什么原因", "should_trigger": false}
+  {"query": "帮我看看这个告警是什么原因", "should_trigger": false},
+  {"query": "CKafka消费者延迟高做一次架构评估", "should_trigger": true},
+  {"query": "全站四支柱卓越架构审查", "should_trigger": true},
+  {"query": "SCF和CKafka一起评估可靠性", "should_trigger": true}
 ]

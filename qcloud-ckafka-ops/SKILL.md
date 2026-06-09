@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.1.0"
-  last_updated: "2026-06-04"
+  version: "1.2.0"
+  last_updated: "2026-06-09"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/597"
@@ -91,13 +91,29 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - Task is **TDMQ (Tencent Distributed Message Queue)** → delegate to: `qcloud-tdmq-ops` (when present)
 - Task is **RocketMQ or other message queue services** → delegate to appropriate skills
 - Task is **CVM / compute instance** → delegate to: `qcloud-cvm-ops`
-- User insists on **console-only** flows with no API → state limitation; do not invent undocumented HTTP steps
+- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 
 ### Delegation Rules
 
 - CKafka depends on VPC: verify VPC/Subnet/SecurityGroup exist via `qcloud-vpc-ops` before CreateInstance
 - CKafka uses Monitor for metrics: delegate alerting/dashboard to `qcloud-monitor-ops`
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs into one ambiguous flow
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Read-only Well-Architected assessment for **CKafka**; return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | reliability / security / cost / efficiency (or `all`) |
+| `{{user.scope}}` | `single-resource` or `account-wide` |
+
+**Allowed:** `Describe*` and `GetMonitorData` only — **no** Create/Delete/Modify mutations.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: ckafka`).
 
 ## Variable Convention (Agent-Readable)
 

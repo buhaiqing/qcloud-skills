@@ -13,6 +13,7 @@
 | CPU/memory idle metrics | `qcloud-monitor-ops` | `GetMonitorData` via `references/well-architected-assessment.md` |
 | CVM right-sizing / stopped instances | `qcloud-cvm-ops` | Cost section in `well-architected-assessment.md` |
 | CLB / CDB / Redis / TKE / COS / ES / MongoDB / PostgreSQL | respective `qcloud-*-ops` | Product cost checklist |
+| CKafka / SCF / CLS / CBS | `qcloud-ckafka-ops`, `qcloud-scf-ops`, `qcloud-cls-ops`, `qcloud-cbs-ops` | Retention, idle resources, orphan disks |
 | CDN | `qcloud-cdn-ops` | Traffic / cache hit / bandwidth waste |
 | AGSX | `qcloud-agsx-ops` | Sandbox-hours / idle pool (SDK read-only) |
 

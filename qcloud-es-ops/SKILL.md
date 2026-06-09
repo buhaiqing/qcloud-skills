@@ -93,7 +93,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - Task is **COS standalone** (object upload/download without ES context) → delegate to: `qcloud-cos-ops`
 - Task is **CVM / compute instance** → delegate to: `qcloud-cvm-ops`
 - Task is **MySQL/Redis/PostgreSQL database** → delegate to: `qcloud-cdb-ops` / `qcloud-redis-ops` / `qcloud-pg-ops`
-- User insists on **console-only** flows with no API → state limitation; do not invent undocumented HTTP steps
+- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 
 ### Delegation Rules
 
@@ -101,6 +101,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - ES uses COS for snapshot backup: delegate COS storage management to `qcloud-cos-ops` for bucket-level operations
 - ES monitoring integration uses `qcloud-monitor-ops` for Cloud Monitor dashboard and alarm configuration
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs into one ambiguous flow
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
 
 ## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)

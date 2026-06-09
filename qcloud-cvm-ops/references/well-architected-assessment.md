@@ -1,5 +1,9 @@
 # CVM Well-Architected Assessment
 
+> **Mode split:** `[assessment-readonly]` — Describe* / GetMonitorData only (Well-Architected worker).
+> `[remediation-only]` — Create/Modify/Delete runbooks; **MUST NOT** execute when `{{user.mode}}=well-architected-readonly`.
+> Worker JSON: **Worker Output Contract** at end of this file.
+
 Four-pillar assessment based on Tencent Cloud Well-Architected Framework: Reliability, Security, Cost, Efficiency.
 
 ---
@@ -53,9 +57,9 @@ tccli cbs DescribeSnapshots --Region ap-guangzhou | jq '.Response.SnapshotSet[].
 # Retention: 7-30 days based on RPO requirement
 ```
 
-### DR Runbook (Phase 1 → 2 → 3)
+### DR Runbook [remediation-only] (Phase 1 → 2 → 3)
 
-**Phase 1: Immediate Recovery (0-15 min)**
+**Phase 1 [remediation-only]: Immediate Recovery (0-15 min)**
 
 ```bash
 # 1. Identify failed instance

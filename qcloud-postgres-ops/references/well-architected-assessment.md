@@ -1,5 +1,9 @@
 # Well-Architected Assessment — TencentDB for PostgreSQL
 
+> **Mode split:** `[assessment-readonly]` — Describe* / GetMonitorData only (Well-Architected worker).
+> `[remediation-only]` — Create/Modify/Delete runbooks; **MUST NOT** execute when `{{user.mode}}=well-architected-readonly`.
+> Worker JSON: **Worker Output Contract** at end of this file.
+
 ## Pillar 1: Reliability (可靠性)
 
 | Aspect | Assessment | Recommendation |

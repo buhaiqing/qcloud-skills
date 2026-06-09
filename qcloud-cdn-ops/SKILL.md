@@ -66,6 +66,8 @@ CDN (Content Delivery Network) is Tencent Cloud's content delivery service provi
 - Load balancer config → delegate to qcloud-clb-ops
 - SSL certificate management (general, not CDN-specific) → use cert management skill
 - Billing management → use dedicated billing tools
+- Task is **full architecture review** (four pillars / multi-product) → delegate to: `qcloud-well-architected-review`
+- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
 
 ## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
