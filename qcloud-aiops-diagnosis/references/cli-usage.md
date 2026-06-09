@@ -338,3 +338,7 @@ Normalize raw data into the Event Bundle schema in [`alarm-handling.md`](alarm-h
 See [`multi-source-rca.md`](multi-source-rca.md) §4 for the RCA Bundle output schema. After bundling, assemble Incident Timeline per [`incident-timeline.md`](incident-timeline.md); persist to `./audit-results/incident-timeline-YYYYMMDD-HHMMSS.json`.
 
 Anomaly-only scans: output schema in [`anomaly-detection.md`](anomaly-detection.md) §6; persist to `./audit-results/anomaly-bundle-YYYYMMDD-HHMMSS.json`.
+
+Impact assessment uses CLB `DescribeTargetHealth` / `DescribeTargets` (see [`incident-knowledge.md`](incident-knowledge.md) §1). KB records persist to `./audit-results/incident-kb-YYYYMMDD-HHMMSS.json`; optional index at `./audit-results/incident-kb-index.json`.
+
+Cross-skill orchestration: do **not** call billing APIs from this skill during F1/F2 — consume `{{user.finops_handoff}}` from `qcloud-finops-ops`. Persist merged output to `./audit-results/cross-skill-bundle-YYYYMMDD-HHMMSS.json` per [`cross-skill-orchestration.md`](cross-skill-orchestration.md).

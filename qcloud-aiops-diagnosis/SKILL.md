@@ -15,7 +15,7 @@ compatibility: >-
   log analysis, valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.5.0"
+  version: "2.0.0"
   last_updated: "2026-06-09"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   type: cross-cutting-diagnosis
@@ -31,7 +31,8 @@ metadata:
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
   related_skills:
-    - qcloud-finops-ops   # 反向：异常账单根因分析可与本 skill 协同（finops 触发，aiops 提供多指标诊断）
+    - qcloud-finops-ops   # 双向：F1/F2 账单异常+指标联合诊断；A2 容量信号回传 FinOps 优化
+    - qcloud-proactive-inspection  # 双向：F1 finops 派发巡检后 AIOps 深化；P1 巡检 CRITICAL→验证；A1 事后防复发巡检项
     - qcloud-tke-ops       # 反向：TKE 告警降噪与事件聚合能力集成（tke 触发告警风暴，aiops 提供聚合诊断）
     - qcloud-monitor-ops   # 反向：Monitor 告警历史与指标查询被 aiops 告警聚合管道使用
     - qcloud-cvm-ops       # 反向：节点/实例压力证据与 VM 诊断建议委托
@@ -66,7 +67,7 @@ Symptom Detection → Metric Analysis → Log Correlation → Diagnosis Conclusi
 ## Quick Start
 
 ### What This Skill Does
-Diagnoses incidents and aggregates noisy alarms into evidence-backed findings. For TKE alarm storms, it produces an Event Bundle with root alarm, output-only symptom de-prioritization, confidence, evidence, data quality, and delegated recommendations. For multi-source incidents spanning Pod, Node, CLB, and CVM, it performs cross-layer topology linking, hypothesis scoring, and produces an RCA Bundle with ranked root cause candidates and verification steps (see [`multi-source-rca.md`](references/multi-source-rca.md)). **Change correlation** (CloudAudit + CLS rollout events) and a unified **Incident Timeline** narrative link deployments/config changes to symptoms (see [`change-correlation.md`](references/change-correlation.md), [`incident-timeline.md`](references/incident-timeline.md)). **Dynamic baseline anomaly detection** compares metrics against yesterday/last-week same windows before applying static thresholds (see [`anomaly-detection.md`](references/anomaly-detection.md)). **Product RCA rules** (CDB/Redis/ES) and **VPC network path diagnosis** (Rule G) extend cross-layer coverage (see [`product-rca-rules.md`](references/product-rca-rules.md), [`network-rca.md`](references/network-rca.md)).
+Diagnoses incidents and aggregates noisy alarms into evidence-backed findings. For TKE alarm storms, it produces an Event Bundle with root alarm, output-only symptom de-prioritization, confidence, evidence, data quality, and delegated recommendations. For multi-source incidents spanning Pod, Node, CLB, and CVM, it performs cross-layer topology linking, hypothesis scoring, and produces an RCA Bundle with ranked root cause candidates and verification steps (see [`multi-source-rca.md`](references/multi-source-rca.md)). **Change correlation** (CloudAudit + CLS rollout events) and a unified **Incident Timeline** narrative link deployments/config changes to symptoms (see [`change-correlation.md`](references/change-correlation.md), [`incident-timeline.md`](references/incident-timeline.md)). **Dynamic baseline anomaly detection** compares metrics against yesterday/last-week same windows before applying static thresholds (see [`anomaly-detection.md`](references/anomaly-detection.md)). **Product RCA rules** (CDB/Redis/ES) and **VPC network path diagnosis** (Rule G) extend cross-layer coverage (see [`product-rca-rules.md`](references/product-rca-rules.md), [`network-rca.md`](references/network-rca.md)). **Incident knowledge** adds business **impact** assessment, **similar historical cases** from `./audit-results/incident-kb-*.json`, and a **feedback loop** to improve future diagnoses (see [`incident-knowledge.md`](references/incident-knowledge.md)). **Cross-skill orchestration** with FinOps and proactive inspection closes the cost ↔ metrics ↔ prevention loop (see [`cross-skill-orchestration.md`](references/cross-skill-orchestration.md)).
 
 ### Prerequisites
 - [ ] `tccli` available for read-only Monitor/TKE/CLS queries
@@ -95,6 +96,14 @@ Scan CVM {{user.resource_id}} for baseline anomalies in {{user.time_range}} (vs 
 CDB 慢查询导致应用超时 — 关联 CLB 5xx 和 VPC 网络路径，输出 RCA Bundle（Rule H + Rule G）。
 ```
 
+```text
+TKE 告警风暴诊断完成后，评估业务影响面、匹配历史相似事件，并写入 incident KB。
+```
+
+```text
+FinOps 检测到 HIGH 置信度账单异常 — 接收 finops_handoff，联动巡检与多指标 RCA，输出 Cross-Skill Bundle。
+```
+
 ### Well-Architected Framework Integration
 
 | Pillar | Skill Integration | Reference |
@@ -120,13 +129,16 @@ CDB 慢查询导致应用超时 — 关联 CLB 5xx 和 VPC 网络路径，输出
 - Incident timeline: "按时间线梳理故障经过", "变更和告警的先后顺序", "输出 incident timeline"
 - CDB/Redis/ES RCA: "数据库慢查询根因", "Redis 内存暴涨连接打满", "ES 集群变红", "CDB 导致 CLB 超时"
 - Network path RCA: "连不上但实例正常", "安全组变更后超时", "VPC 路由问题", "NAT 网关异常", "Node NotReady 但 CVM 正常是不是网络"
+- Impact & similar cases: "评估业务影响面", "有没有类似历史故障", "影响多少流量", "相似事件匹配", "记录这次根因反馈"
+- Cross-skill orchestration: "账单涨了同时 CPU 飙高联合诊断", "finops 异常派发后做 RCA", "巡检发现严重项帮我验证", "故障后生成防复发巡检项", "容量问题转 FinOps 优化"
 - Product skill delegates intelligent diagnosis here
 
 ### SHOULD NOT Use This Skill When
 - User needs resource CRUD → delegate to product-specific ops skill
 - User asks about architecture design → delegate to qcloud-well-architected-review
-- User requests cost analysis / 异常账单根因 → delegate to `qcloud-finops-ops`
-- 协同场景：`qcloud-finops-ops` 触发异常检测后，可调用本 skill 做多指标根因分析（CPU 飙高 + 账单上涨的联合诊断）
+- Pure billing / budget / 账单汇总 only → delegate to `qcloud-finops-ops` (unless user requests **joint** bill + metrics RCA — then orchestrate per [`cross-skill-orchestration.md`](references/cross-skill-orchestration.md) F2)
+- Scheduled proactive inspection only → delegate to `qcloud-proactive-inspection` (unless escalated CRITICAL finding → P1)
+- 协同场景：FinOps HIGH → F1 巡检+AIOps；FinOps+指标 → F2；巡检 CRITICAL → P1；RCA 完成 → A1/A2
 - Single known issue with documented fix → use product troubleshooting directly
 
 ## Variables
@@ -164,6 +176,16 @@ CDB 慢查询导致应用超时 — 关联 CLB 5xx 和 VPC 网络路径，输出
 | `{{user.vpc_id}}` | User | VPC ID for Rule G network path diagnosis | `vpc-xxxxxx` |
 | `{{user.security_group_id}}` | User | Optional SG ID when known | `sg-xxxxxx` |
 | `{{user.subnet_id}}` | User | Optional subnet ID for route/NAT linkage | `subnet-xxxxxx` |
+| `{{user.business_criticality}}` | User | Business tier for impact block (`P0`–`P3`) | `P1` |
+| `{{user.slo_name}}` | User | Optional SLO or Monitor policy name for error-budget fields | `api-latency-slo` |
+| `{{user.feedback_was_accurate}}` | User | Post-incident: whether diagnosis was correct (`true`/`false`) | `true` |
+| `{{user.feedback_actual_root_cause}}` | User | Post-incident: verified root cause if different | `Disk full` |
+| `{{user.mask_resource_ids}}` | User | Mask resource IDs in KB export (`true`/`false`) | `false` |
+| `{{user.handoff_source}}` | User/Caller | `finops`, `proactive_inspection`, or `none` | `finops` |
+| `{{user.finops_handoff}}` | FinOps | JSON handoff per [`cross-skill-orchestration.md`](references/cross-skill-orchestration.md) §2.1 | `{...}` |
+| `{{user.inspection_handoff}}` | Inspection | JSON handoff per §2.2 | `{...}` |
+| `{{user.orchestration_mode}}` | User | `auto`, `F1`, `F2`, `P1`, `A1`, `A2` | `auto` |
+| `{{user.auto_dispatch_inspection}}` | Config | F1: delegate inspection when finops HIGH | `true` |
 
 ## Five Core Standards (Quality Gates)
 
@@ -233,6 +255,8 @@ Provide prioritized recovery actions with effort estimates.
 | Single-layer root cause | Attributing CLB 5xx only to CLB config, or OOMKilled only to app bug | Run Multi-Source RCA ([multi-source-rca.md](references/multi-source-rca.md)) across Pod/Node/CLB/CVM; add product rules ([product-rca-rules.md](references/product-rca-rules.md)) or Rule G ([network-rca.md](references/network-rca.md)) when datastore/network involved |
 | Network blind spot | Node/CDB healthy but connection timeout | Run Rule G ([network-rca.md](references/network-rca.md)) before blaming application |
 | Over-aggregation | Bundling unrelated alarms from different clusters | Use composite grouping keys per §1 TKE Grouping Keys; do not merge across `cluster_id` |
+| History overrides evidence | Auto-applying past incident fix without re-verification | `similar_incidents` are REFERENCE ONLY; always re-run current evidence collection |
+| Skill boundary blur | Running DescribeBill* during RCA or skipping FinOps on pure bill asks | Bill primary → finops; joint RCA → [`cross-skill-orchestration.md`](references/cross-skill-orchestration.md) F2 only |
 
 ---
 
@@ -246,6 +270,8 @@ Provide prioritized recovery actions with effort estimates.
 | 1.3.0 | 2026-06-09 | **Change correlation + Incident Timeline (Phase A):** `references/change-correlation.md` (Change Evidence Model, CloudAudit/CLS collection, Rule F post-change regression), `references/incident-timeline.md` (unified causal narrative schema); RCA Bundle fields `change_timeline`, `likely_change_trigger`, `incident_timeline_ref`; Workflow 7; eval cases for change/timeline triggers |
 | 1.4.0 | 2026-06-09 | **Dynamic baseline anomaly detection (Phase B):** `references/anomaly-detection.md` (multi-window baselines, ratio/percentile/slope scoring, Anomaly Bundle); baseline-first Step 2; CLI multi-window `GetMonitorData`; `anomaly_findings` in RCA Bundle |
 | 1.5.0 | 2026-06-09 | **Product + network RCA (Phase C):** `references/product-rca-rules.md` (Rules H/I/J CDB/Redis/ES), `references/network-rca.md` (Rule G VPC SG/route/NAT); evidence layers + `product_rca`/`network_rca` bundle fields; Workflow 9 |
+| 1.6.0 | 2026-06-09 | **Incident knowledge (Phase D):** `references/incident-knowledge.md` (`impact`, `similar_incidents`, KB persistence, feedback loop); Workflow 10; `assets/incident-kb-index.schema.json` |
+| 2.0.0 | 2026-06-09 | **Cross-skill orchestration (Phase E):** `references/cross-skill-orchestration.md` (F1/F2/P1/A1/A2, handoffs, Cross-Skill Bundle); Workflow 11; finops↔inspection↔aiops bidirectional flows |
 
 ## Quality Gate (GCL)
 
@@ -282,5 +308,7 @@ For detailed diagnosis patterns, see:
 - [Anomaly Detection](references/anomaly-detection.md) — Dynamic baselines (yesterday/week), anomaly score, Anomaly Bundle
 - [Product RCA Rules](references/product-rca-rules.md) — CDB / Redis / ES correlation rules H/I/J
 - [Network RCA](references/network-rca.md) — Rule G VPC security group, route, NAT path diagnosis
+- [Incident Knowledge](references/incident-knowledge.md) — Impact assessment, similar cases, KB persistence, feedback loop
+- [Cross-Skill Orchestration](references/cross-skill-orchestration.md) — FinOps + proactive inspection joint workflows, Cross-Skill Bundle
 - [CLI Usage](references/cli-usage.md) — CLI-first read-only collection and SDK fallback for TKE event bundles and multi-source RCA
 - [Delegation Matrix](references/delegation-matrix.md) — Cross-skill diagnosis routing

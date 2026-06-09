@@ -38,6 +38,7 @@
 - Prefix all actionable recommendations: `RECOMMENDATION (not execution)`
 - Include `delegate_to` field naming the product skill
 - Never auto-execute mutations (scaling, restart, delete)
+- `similar_incidents` advisories must be prefixed `REFERENCE ONLY` — historical cases do not override current evidence
 
 ## Scoring Examples
 
@@ -98,3 +99,4 @@
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-06-09 | Initial release — 5 rubric rules for read-only AIOps diagnosis skill, scoring examples, Safety=0 handling for read-only skills |
+| 1.1.0 | 2026-06-09 | Rule 5 extension: `similar_incidents` must be REFERENCE ONLY |

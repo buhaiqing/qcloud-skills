@@ -236,6 +236,14 @@ The aggregation pipeline outputs one **Event Bundle** per incident:
       "delegate_to": "qcloud-tke-ops"
     }
   ],
+  "impact": {
+    "severity": "P1",
+    "affected_resources": {"nodes": 1, "pods": 3},
+    "alarm_summary": {"p0_count": 0, "p1_count": 2, "suppressed_symptom_count": 4},
+    "confidence": "HIGH"
+  },
+  "similar_incidents": [],
+  "feedback_loop": {"kb_id": "ikb-20260609-001", "status": "pending_review"},
   "incident_timeline_ref": {
     "timeline_id": "tl-20260609-001",
     "narrative_summary": "NodeNotReady@10:00 → pod CrashLoop@10:03 → CLB backend unhealthy@10:05",
@@ -244,7 +252,7 @@ The aggregation pipeline outputs one **Event Bundle** per incident:
 }
 ```
 
-Optional: when change evidence is collected per [`change-correlation.md`](change-correlation.md), embed `change_timeline[]` summary in `evidence` and link full timeline via `incident_timeline_ref`. Assemble per [`incident-timeline.md`](incident-timeline.md).
+Optional: `impact`, `similar_incidents`, KB persistence per [`incident-knowledge.md`](incident-knowledge.md). When change evidence is collected per [`change-correlation.md`](change-correlation.md), embed `change_timeline[]` summary in `evidence` and link full timeline via `incident_timeline_ref`. Assemble per [`incident-timeline.md`](incident-timeline.md).
 
 > **Boundary:** All `recommendations` are advisory. This skill never mutates resources.
 > Every recommendation that involves mutation is prefixed `RECOMMENDATION (not execution)` and
@@ -287,6 +295,7 @@ Do not call `Create*`, `Modify*`, `Delete*`, `Install*`, `Update*`, `Drain*`, or
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1.3 | 2026-06-09 | Event Bundle `impact`, `similar_incidents`, `feedback_loop.kb_id` |
 | 1.1.2 | 2026-06-09 | Event Bundle optional `incident_timeline_ref`; change evidence cross-link to `change-correlation.md` |
 | 1.1.1 | 2026-06-09 | Round-1 review fixes: corrected Monitor alarm-history syntax, added verified read-only TKE/CLB/CLS commands, data-quality schema, raw-to-canonical mapping, output-only suppression wording, SDK fallback note, and TE-1 API freshness note |
 | 1.1.0 | 2026-06-09 | TKE alarm noise reduction & event aggregation: added canonical alarm event model, TKE grouping keys, 6-step aggregation pipeline, 6 noise-reduction policies, 6 TKE incident classes with directional rules, 4 TKE aggregation flows, event bundle output schema with confidence/evidence/recommendations, explicit read-only boundary |

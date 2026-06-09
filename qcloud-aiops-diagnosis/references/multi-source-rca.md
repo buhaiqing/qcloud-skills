@@ -386,13 +386,52 @@ Verification steps:
     "narrative_summary": "Deploy api-deploy@10:02 → pod CrashLoop@10:04 → CLB 5xx@10:05",
     "event_count": 6
   },
+  "impact": {
+    "severity": "P1",
+    "business_criticality": "P1",
+    "affected_scope": {"cluster_id": "cls-xxx", "workloads": ["api-deploy"], "load_balancer_ids": ["lb-xxx"]},
+    "affected_resources": {"nodes": 1, "pods": 4, "clb_backends_unhealthy": 2, "clb_backends_total": 6},
+    "estimated_traffic_pct": 33,
+    "alarm_summary": {"p0_count": 0, "p1_count": 3, "suppressed_symptom_count": 5},
+    "slo": {"configured": false, "latency_slo_violated": null, "error_budget_burn": null},
+    "confidence": "MEDIUM",
+    "data_gaps": ["slo_not_configured"]
+  },
+  "similar_incidents": [
+    {
+      "kb_id": "ikb-20260601-003",
+      "similarity_score": 78,
+      "similarity": "HIGH",
+      "recorded_at": "2026-06-01T14:20:00+08:00",
+      "narrative": "CVM disk pressure → NodeNotReady → CLB 5xx",
+      "historical_top_cause": "CVM disk pressure",
+      "historical_resolution": {
+        "was_accurate": true,
+        "verified_root_cause": "DiskUsage 98%",
+        "actions_taken": "RECOMMENDATION (not execution): expand disk via qcloud-cvm-ops"
+      },
+      "advisory": "REFERENCE ONLY — verify current disk metrics before acting"
+    }
+  ],
   "feedback_loop": {
+    "kb_id": "ikb-20260609-001",
+    "status": "pending_review",
     "was_accurate": null,
     "actual_root_cause": null,
-    "notes": null
-  }
+    "notes": null,
+    "submitted_at": null
+  },
+  "cross_skill_ref": {
+    "orchestration_id": "xskill-20260609-001",
+    "mode": "F2",
+    "joint_hypothesis_summary": "CVM traffic burst ↔ May bill delta"
+  },
+  "prevention_items": [],
+  "finops_advisory": null
 }
 ```
+
+> `impact` and `similar_incidents` per [`incident-knowledge.md`](incident-knowledge.md). Cross-skill fields per [`cross-skill-orchestration.md`](cross-skill-orchestration.md). Persist KB to `./audit-results/incident-kb-YYYYMMDD-HHMMSS.json`.
 
 > `change_timeline` and `likely_change_trigger` are populated when change evidence is collected; set `likely_change_trigger` to `null` when unavailable. Full timeline: [`incident-timeline.md`](incident-timeline.md). Persist to `./audit-results/incident-timeline-YYYYMMDD-HHMMSS.json`.
 
@@ -432,3 +471,5 @@ All fallback methods are read-only. Use product skills (qcloud-tke-ops, qcloud-c
 | 1.1.0 | 2026-06-09 | Rule F post-change regression, change evidence layer, `change_timeline` / `likely_change_trigger` / `incident_timeline_ref` in RCA Bundle |
 | 1.2.0 | 2026-06-09 | Baseline anomaly evidence layer, hypothesis scoring boost, `anomaly_findings` in RCA Bundle |
 | 1.3.0 | 2026-06-09 | Rule G VPC network path; Rules H/I/J CDB/Redis/ES; product + vpc evidence layers; `product_rca` / `network_rca` bundle fields |
+| 1.4.0 | 2026-06-09 | `impact`, `similar_incidents`, expanded `feedback_loop`; incident KB persistence |
+| 1.5.0 | 2026-06-09 | `cross_skill_ref`, `prevention_items`, `finops_advisory` for Phase E orchestration |

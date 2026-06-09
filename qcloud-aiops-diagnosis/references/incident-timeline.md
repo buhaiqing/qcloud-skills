@@ -131,7 +131,7 @@ Full `events[]` live in the standalone Incident Timeline object or `./audit-resu
 | Artifact | Path |
 |---|---|
 | Full timeline JSON | `./audit-results/incident-timeline-YYYYMMDD-HHMMSS.json` |
-| KB seed (optional) | `./audit-results/incident-kb-YYYYMMDD-HHMMSS.json` — `trigger_signals` + `top_cause` + `narrative_summary` for future similar-case matching |
+Full KB record, similar-case matching, and impact assessment: [`incident-knowledge.md`](incident-knowledge.md).
 
 ## 7. Changelog
 
@@ -139,3 +139,4 @@ Full `events[]` live in the standalone Incident Timeline object or `./audit-resu
 |---|---|---|
 | 1.0.0 | 2026-06-09 | Initial release — Timeline Event model, assembly pipeline, output schema, Event/RCA Bundle integration |
 | 1.1.0 | 2026-06-09 | `metric_anomaly` timeline role for baseline findings |
+| 1.2.0 | 2026-06-09 | KB persistence delegated to `incident-knowledge.md` |

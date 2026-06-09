@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Incident KB Index",
+  "description": "Optional index at ./audit-results/incident-kb-index.json for similar-case lookup",
+  "type": "object",
+  "properties": {
+    "version": { "type": "string", "const": "1.0" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kb_id", "recorded_at", "path", "fingerprint"],
+        "properties": {
+          "kb_id": { "type": "string" },
+          "recorded_at": { "type": "string" },
+          "path": { "type": "string" },
+          "fingerprint": {
+            "type": "object",
+            "properties": {
+              "trigger_signals": { "type": "array", "items": { "type": "string" } },
+              "incident_class": { "type": "string" },
+              "hypothesis_id": { "type": "string" },
+              "root_entity_type": { "type": "string" }
+            }
+          },
+          "was_accurate": { "type": ["boolean", "null"] }
+        }
+      }
+    }
+  },
+  "required": ["version", "entries"]
+}

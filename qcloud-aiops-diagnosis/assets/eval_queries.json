@@ -218,5 +218,57 @@
   {
     "query": "修改 VPC 安全组入站规则并发布",
     "should_trigger": false
+  },
+  {
+    "query": "这次故障影响多少业务流量，帮我评估影响面",
+    "should_trigger": true
+  },
+  {
+    "query": "有没有类似的历史故障可以参考",
+    "should_trigger": true
+  },
+  {
+    "query": "诊断完成后记录到 incident KB，并匹配相似事件",
+    "should_trigger": true
+  },
+  {
+    "query": "上次诊断的根因是对的，帮我更新反馈",
+    "should_trigger": true
+  },
+  {
+    "query": "删除 audit-results 里所有 incident KB 文件",
+    "should_trigger": false
+  },
+  {
+    "query": "导出 incident KB 到外部数据库",
+    "should_trigger": false
+  },
+  {
+    "query": "账单异常 HIGH 置信度，联动巡检和多指标 RCA 出 Cross-Skill Bundle",
+    "should_trigger": true
+  },
+  {
+    "query": "费用涨了同时 CVM CPU 飙高，做联合根因分析",
+    "should_trigger": true
+  },
+  {
+    "query": "巡检发现 CRITICAL 项，帮我用 AIOps 验证是不是真故障",
+    "should_trigger": true
+  },
+  {
+    "query": "这次故障后生成防复发巡检项并派发给 proactive inspection",
+    "should_trigger": true
+  },
+  {
+    "query": "RCA 显示容量饱和，转 FinOps 做成本优化建议",
+    "should_trigger": true
+  },
+  {
+    "query": "只看本月账单汇总不要诊断",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我做一次全面资源巡检生成报告",
+    "should_trigger": false
   }
 ]

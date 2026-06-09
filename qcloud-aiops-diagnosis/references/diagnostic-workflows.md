@@ -204,3 +204,45 @@ If H4/I4/J4 or G5: downgrade product-root confidence; surface alternate layer
   ↓
 Output RCA Bundle with product_rca / network_rca blocks + delegated recommendations
 ```
+
+## Workflow 10: Impact, Similar Cases, and KB Persistence
+
+Canonical spec: [`incident-knowledge.md`](incident-knowledge.md).
+
+```
+Event Bundle and/or RCA Bundle assembled (Workflow 5/6/9)
+  ↓
+Compute impact block (CLB backend health, alarm severity mix, optional {{user.business_criticality}})
+  ↓
+Load incident-kb-index.json OR glob ./audit-results/incident-kb-*.json
+  ↓
+Score similar cases (Jaccard on trigger_signals + hypothesis/incident_class match)
+  ↓
+Attach similar_incidents[] (top 3, score ≥ 40); add REFERENCE ONLY advisories
+  ↓
+Sort recommendations by impact.severity then technical priority
+  ↓
+Write incident-kb-YYYYMMDD-HHMMSS.json; update incident-kb-index.json
+  ↓
+Set feedback_loop.kb_id + status=pending_review on bundle
+  ↓
+On user feedback ({{user.feedback_was_accurate}}): update KB resolution fields
+```
+
+## Workflow 11: Cross-Skill Orchestration (FinOps · Inspection · AIOps)
+
+Canonical spec: [`cross-skill-orchestration.md`](cross-skill-orchestration.md).
+
+```
+Resolve orchestration_mode (auto or F1/F2/P1/A1/A2) from handoff_source + confidence
+  ↓
+F1: finops HIGH → delegate qcloud-proactive-inspection → AIOps RCA on findings + top resources
+F2: finops_handoff → joint bill/metric hypothesis scoring → RCA + anomaly bundles
+P1: inspection_handoff CRITICAL/HIGH → validate with baseline + RCA (note inspection snapshot age)
+A1: post-RCA → emit prevention_items[] → RECOMMENDATION delegate inspection
+A2: capacity/drift signals → attach finops_advisory → delegate qcloud-finops-ops
+  ↓
+Merge artifacts into Cross-Skill Bundle; embed cross_skill_ref on RCA Bundle
+  ↓
+Persist ./audit-results/cross-skill-bundle-YYYYMMDD-HHMMSS.json
+```

@@ -157,3 +157,40 @@ network_rca:
     - node_not_ready_cvm_healthy
     - clb_5xx_backends_running
     - cloudaudit_sg_route_change
+
+incident_knowledge:
+  enabled: true
+  similar_case_lookup: true
+  max_similar_results: 3
+  min_similarity_score: 40
+  strong_match_threshold: 70
+  retention_days: 90
+  persist_kb_path: "./audit-results/incident-kb-YYYYMMDD-HHMMSS.json"
+  index_path: "./audit-results/incident-kb-index.json"
+  impact:
+    use_clb_backend_ratio: true
+    default_business_criticality: unknown
+  feedback:
+    auto_write_kb: true
+    status_on_complete: pending_review
+
+cross_skill_orchestration:
+  enabled: true
+  default_mode: auto
+  finops:
+    enabled: true
+    auto_dispatch_inspection_on_high: true
+    joint_diagnosis_mode: F2
+    full_chain_mode: F1
+  proactive_inspection:
+    enabled: true
+    escalate_severity: [CRITICAL, HIGH]
+    mode: P1
+  post_incident:
+    emit_prevention_items: true
+    mode: A1
+  capacity_to_finops:
+    enabled: true
+    anomaly_score_threshold: 50
+    mode: A2
+  persist_path: "./audit-results/cross-skill-bundle-YYYYMMDD-HHMMSS.json"

@@ -103,3 +103,28 @@ See [`product-rca-rules.md`](product-rca-rules.md).
 | F4 SG/route change | [`change-correlation.md`](change-correlation.md) + Rule G | `qcloud-vpc-ops` |
 
 See [`network-rca.md`](network-rca.md).
+
+## Incident Knowledge Routing
+
+| Step | Action | Output |
+|---|---|---|
+| Impact assessment | CLB `DescribeTargetHealth` + alarm counts | `impact` block on bundle |
+| Similar cases | Read `./audit-results/incident-kb-*.json` | `similar_incidents[]` (advisory) |
+| KB write | After bundle complete | `incident-kb-*.json` + index update |
+| User feedback | `{{user.feedback_was_accurate}}` | Update KB `resolution.*` |
+
+See [`incident-knowledge.md`](incident-knowledge.md). No mutation from KB layer.
+
+## Cross-Skill Orchestration (Phase E)
+
+Bidirectional flows — full spec [`cross-skill-orchestration.md`](cross-skill-orchestration.md).
+
+| Direction | Mode | Trigger | This skill action | Delegate to |
+|---|---|---|---|---|
+| FinOps → AIOps | F1 | Bill anomaly HIGH + dispatch_inspection | Receive handoff; after inspection, RCA | `qcloud-proactive-inspection` first |
+| FinOps → AIOps | F2 | Bill anomaly + product delta | Joint hypothesis + RCA/anomaly | `qcloud-finops-ops` for bill context only |
+| Inspection → AIOps | P1 | CRITICAL/HIGH finding | Deep RCA validate | source: `qcloud-proactive-inspection` |
+| AIOps → Inspection | A1 | Post-incident prevention | `prevention_items[]` | `qcloud-proactive-inspection` |
+| AIOps → FinOps | A2 | Capacity/saturation/drift | `finops_advisory` | `qcloud-finops-ops` |
+
+**Boundary:** AIOps does not own `DescribeBill*` as primary path; FinOps does not own RCA bundles.
