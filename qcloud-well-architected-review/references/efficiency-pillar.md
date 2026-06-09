@@ -1,66 +1,49 @@
-# Efficiency Pillar — Tencent Cloud Well-Architected Framework
+# Efficiency Pillar — Orchestrator Guide
 
-## Overview
+> **Orchestrator-only.** Automation, batch ops, and API patterns are **delegated** to
+> product worker skills.
 
-The Efficiency pillar ensures operations are automated, batch-capable, API-optimized, and integrated into CI/CD pipelines for maximum operational throughput.
+---
 
-## 1. Batch Operations
+## 1. Worker mapping
 
-| Operation | Batch Support | Assessment |
-|-----------|---------------|------------|
-| Create | Max 100 instances per call | ✓ if batch create documented |
-| Describe | Pagination with Limit/Offset | ✓ if pagination loop implemented |
-| Modify | Batch modify supported | ✓ if batch modify pattern present |
-| Delete | Batch delete with safety gate | ✓ if batch delete + confirmation |
+| Product | delegate-to | Assessment reference |
+|---------|-------------|---------------------|
+| CVM | `qcloud-cvm-ops` | Batch ops, auto-scaling, scheduling |
+| CLB | `qcloud-clb-ops` | Listener/target batch patterns |
+| TKE | `qcloud-tke-ops` | HPA, CI/CD, cluster automation |
+| CDB / Redis | respective ops skill | Parameter templates, batch maintenance |
+| ES / MongoDB / PostgreSQL | respective ops skill | Index/sharding ops, maintenance windows |
+| CDN | `qcloud-cdn-ops` | Cache purge automation, origin pull patterns |
+| SSL | `qcloud-ssl-ops` | Auto-renewal, cert deployment automation |
+| AGSX | `qcloud-agsx-ops` | Batch sandbox, image prewarm (SDK) |
+| COS | `qcloud-cos-ops` | Lifecycle automation |
 
-### 1.1 Pagination Pattern
+Pass `{{user.mode}}=well-architected-readonly`, `{{user.pillars}}` includes `efficiency`.
 
-```python
-def describe_all(client, region, limit=100):
-    """Paginate through all resources"""
-    resources = []
-    offset = 0
-    while True:
-        resp = client.DescribeInstances(
-            Region=region, Offset=offset, Limit=limit
-        )
-        resources.extend(resp.InstanceSet)
-        if len(resp.InstanceSet) < limit:
-            break
-        offset += limit
-    return resources
-```
+---
 
-## 2. Automation Integration
+## 2. Orchestrator checks
 
-| Integration | Assessment | Pass Criteria |
-|-------------|-----------|---------------|
-| CI/CD pipeline | Pipeline integration documented | ✓ if Terraform/CI-CD examples present |
-| Scheduled operations | Cron/auto-scaling configured | ✓ if maintenance windows defined |
-| Infrastructure as Code | IaC templates available | ✓ if Terraform/CloudFormation examples |
+- Pagination completeness: workers must report if discovery was partial
+- IaC / CI/CD signals: aggregate from worker `findings` — orchestrator does not scan repos
 
-## 3. Resource Scheduling
+---
 
-| Feature | Assessment |
-|---------|-----------|
-| Start/Stop schedules | Auto-scheduling for dev/test environments |
-| Maintenance windows | Documented maintenance window configuration |
-| Auto-scaling | HPA/VPA integration for Kubernetes, auto-scaling groups for CVM |
-
-## 4. API Optimization
-
-| Optimization | Assessment |
-|-------------|-----------|
-| Appropriate Limit values | Use 50-100, not default 10 |
-| Batch API calls | Use batch operations where available |
-| Caching | Cache Describe* results for same-session operations |
-| Async operations | Use async APIs for long-running operations, poll with intervals |
-
-## 5. Efficiency Assessment Score
+## 3. Scoring rubric
 
 | Score | Criteria |
 |-------|----------|
-| 90-100 | Full automation, CI/CD integrated, batch ops, auto-scaling enabled |
-| 70-89 | Partial automation, some batch ops, manual CI/CD triggers |
-| 50-69 | Manual operations, limited batching, no auto-scaling |
-| < 50 | All manual console operations, no automation |
+| 90-100 | Full automation; batch ops; auto-scaling |
+| 70-89 | Partial automation |
+| 50-69 | Mostly manual |
+| < 50 | Console-only operations |
+
+---
+
+## 4. Changelog
+
+| Version | Date | Change |
+|---------|------|--------|
+| 1.0.0 | 2026-05-21 | Initial pillar with inline Python/CLI |
+| 1.1.0 | 2026-06-09 | Delegated to product workers |

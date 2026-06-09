@@ -64,6 +64,21 @@ CAM (Cloud Access Management) is Tencent Cloud's identity and access management 
 - Resource CRUD (CVM, Redis, etc.) → delegate to product-specific ops skill
 - Billing/account management → use dedicated billing tools
 - Application-level auth (JWT, OAuth in apps) → use app-specific debugging
+- Well-Architected security audit (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Account-wide **CAM/IAM security** pillar assessment; return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | typically `security` |
+| `{{user.scope}}` | `account-wide` |
+
+**Allowed:** List/Get/Describe CAM APIs only — **no** Create/Delete/Update policy, user, role, or API key mutations.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: cam`).
 
 ## Variables
 

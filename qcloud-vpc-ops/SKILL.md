@@ -90,6 +90,21 @@ Every generated skill MUST satisfy these five standards. Use them as a design ch
 - If creating CVM instances in VPC, delegate CVM creation to `qcloud-cvm-ops` after VPC/Subnet setup
 - If creating CLB in VPC, delegate to `qcloud-clb-ops` after VPC verification
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Read-only Well-Architected assessment for **VPC/network isolation**; return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | typically `security`; may include reliability |
+| `{{user.scope}}` | `single-resource` or `account-wide` |
+
+**Allowed:** `Describe*` only — **no** Create/Delete/Modify VPC, SG, NACL, or routes.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: vpc`).
 
 ## Variable Convention (Agent-Readable)
 

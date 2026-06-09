@@ -108,6 +108,21 @@ TencentDB for MySQL (CDB) on Tencent Cloud provides a stable, reliable, and elas
 - For database migration (DTS), refer to Tencent Cloud DTS documentation (separate skill planned)
 - Cloud Monitor integration via `qcloud-monitor-ops` for dashboard and alarm configuration
 - Other database types: route to their respective skills (qcloud-es-ops, qcloud-redis-ops, etc.)
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Read-only Well-Architected assessment for **CDB**; return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | reliability / security / cost / efficiency (or `all`) |
+| `{{user.scope}}` | `single-resource` or `account-wide` |
+
+**Allowed:** `Describe*` and `GetMonitorData` only — **no** Isolate/Drop/DDL mutations.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: cdb`).
 
 ## Variable Convention (Agent-Readable)
 

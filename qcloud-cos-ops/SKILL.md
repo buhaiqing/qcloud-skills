@@ -86,6 +86,21 @@ COS (Cloud Object Storage) on Tencent Cloud provides scalable, secure, and highl
 
 - COS access log analysis → delegate to `qcloud-cls-ops` with bucket name, region, and CLS topic
 - COS access logging must be enabled before CLS can analyze logs (see [references/cls-analysis-guide.md](references/cls-analysis-guide.md))
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Read-only Well-Architected assessment for **COS**; return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | reliability / security / cost / efficiency (or `all`) |
+| `{{user.scope}}` | `single-resource` or `account-wide` |
+
+**Allowed:** List/Head/Describe-style read APIs only — **no** Put/Delete bucket or object mutations.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: cos`).
 
 ## Variables
 

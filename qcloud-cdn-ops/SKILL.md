@@ -66,6 +66,21 @@ CDN (Content Delivery Network) is Tencent Cloud's content delivery service provi
 - Load balancer config → delegate to qcloud-clb-ops
 - SSL certificate management (general, not CDN-specific) → use cert management skill
 - Billing management → use dedicated billing tools
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Read-only Well-Architected assessment for **CDN** (HTTPS, cache, origin, traffic); return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | security / cost / efficiency (or `all`) |
+| `{{user.scope}}` | `account-wide` |
+
+**Allowed:** `Describe*`, `ListTopData`, `DescribeCdnData` — **no** Purge/Push/Add/Delete domain mutations.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: cdn`).
 
 ## Variables
 

@@ -1,79 +1,54 @@
-# Reliability Pillar — Tencent Cloud Well-Architected Framework
+# Reliability Pillar — Orchestrator Guide
 
-## Overview
+> **Orchestrator-only.** Product-specific discovery and scoring are **delegated** to worker
+> skills. Do NOT inline `tccli` commands here — use the worker mapping below.
 
-The Reliability pillar ensures your Tencent Cloud architecture can withstand failures and recover quickly. Assessment covers: backup/recovery, disaster recovery, multi-AZ deployment, health checks, and safety gates.
+---
 
-## 1. Multi-AZ Deployment
+## 1. Worker mapping
 
-| Check | Method | Pass Criteria |
-|-------|--------|---------------|
-| Cross-AZ nodes | `DescribeInstances` for each product | Resources deployed across ≥ 2 AZs |
-| Single-AZ risk | Count instances per AZ | No single point of failure if AZ goes down |
-| Region failover | Check DR documentation | Runbook exists for region failover |
+| Product | delegate-to | Assessment reference |
+|---------|-------------|---------------------|
+| CVM | `qcloud-cvm-ops` | `references/well-architected-assessment.md` § Reliability |
+| CLB | `qcloud-clb-ops` | `references/well-architected-assessment.md` § Reliability |
+| CDB | `qcloud-cdb-ops` | `references/well-architected-assessment.md` § Reliability |
+| Redis | `qcloud-redis-ops` |同上 |
+| TKE | `qcloud-tke-ops` |同上 |
+| MongoDB | `qcloud-mongodb-ops` |同上 |
+| PostgreSQL | `qcloud-postgres-ops` |同上 |
+| ES | `qcloud-es-ops` | Snapshot / multi-node HA |
+| COS | `qcloud-cos-ops` |同上 |
+| VPC | `qcloud-vpc-ops` | `references/well-architected-assessment.md` § Reliability |
+| Monitor (coverage) | `qcloud-monitor-ops` | Alarm/health coverage for reliability signals |
 
-**CLI pattern:**
-```bash
-# Check CVM AZ distribution
-tccli cvm DescribeInstances --Region {{env.TENCENTCLOUD_REGION}} \
-  --Filter '{"Name":"zone","Values":["ap-guangzhou-1","ap-guangzhou-2"]}' \
-  | jq '.InstanceSet[] | {InstanceId, Zone}' | jq -s 'group_by(.Zone) | map({zone: .[0].Zone, count: length})'
-```
+Pass orchestrator inputs: `{{user.mode}}=well-architected-readonly`, `{{user.pillars}}` includes `reliability`.
 
-## 2. Backup & Recovery Operations
+---
 
-### 2.1 Backup Coverage Checklist
+## 2. Orchestrator checks (after workers return)
 
-| Operation | Required | Assessment Method |
-|-----------|----------|-------------------|
-| Automated backup enabled | Yes | Check backup config per instance |
-| Backup frequency adequate | Yes | Daily for production, weekly for dev |
-| RPO ≤ target | Yes | Compare backup frequency to RPO requirement |
-| RTO ≤ target | Yes | Test restore time against RTO target |
-| Backup retention policy | Yes | Check retention period (default: 7 days) |
+| Check | Source |
+|-------|--------|
+| Multi-AZ consistency CVM ↔ CLB | [cross-product-analysis.md](cross-product-analysis.md) |
+| Backup gap on stateful services | Merge `cdb` + `redis` + `mongodb` + `postgres` + `es` + `cvm` worker findings |
+| Skipped products | Mark reliability pillar `not_assessed` — do not score |
 
-### 2.2 Per-Product Backup Assessment
+---
 
-| Product | Backup Command | Verification |
-|---------|---------------|--------------|
-| CVM | `tccli cvm DescribeImages` | Latest snapshot < 24h old |
-| CDB | `tccli cdb DescribeBackups` | Latest backup < 24h old |
-| Redis | `tccli redis DescribeInstanceBackupRecords` | Latest backup < 24h old |
-| ES | Snapshot configuration in `DescribeInstances` | Snapshot enabled |
-
-## 3. Failure-Oriented Design
-
-### 3.1 Failure Scenarios & Runbooks
-
-| Scenario | Runbook Required | Assessment |
-|----------|-----------------|------------|
-| Instance failure | Recovery procedure exists | ✓ if runbook documented |
-| Region outage | Cross-region failover | ✓ if multi-region deployed |
-| Data corruption | Backup restore procedure | ✓ if restore tested recently |
-| Network partition | Connectivity recovery steps | ✓ if VPC/config documented |
-
-### 3.2 Health Check Assessment
-
-| Check | Assessment | Pass Criteria |
-|-------|-----------|---------------|
-| Pre-flight validation | Resource existence, quota, dependencies | Documented in skill |
-| Post-operation polling | State verification until terminal | Terminal state names documented |
-| Ongoing monitoring | Integration with TCOP | Alert rules configured |
-
-## 4. Safety Gates for Destructive Operations
-
-| Gate | Required | Assessment |
-|------|----------|------------|
-| Explicit confirmation | Before every destructive operation | ✓ if confirmation step present |
-| Pre-backup reminder | Before delete/terminate | ✓ if backup suggestion documented |
-| Dependency check | Before delete with attachments | ✓ if dependency verification present |
-| Post-delete verification | Poll until 404 | ✓ if poll-until-gone documented |
-
-## Scoring Rubric
+## 3. Scoring rubric (orchestrator aggregates worker scores)
 
 | Score | Criteria |
 |-------|----------|
-| 90-100 | Multi-AZ deployed, automated backup, DR runbook tested quarterly |
-| 70-89 | Multi-AZ partial, backup configured but recovery not tested |
-| 50-69 | Single AZ, backup configured manually, no DR runbook |
-| < 50 | Single AZ, no backup, no recovery plan |
+| 90-100 | All workers report multi-AZ/backup/DR signals pass |
+| 70-89 | Partial multi-AZ or backup configured but untested |
+| 50-69 | Single AZ or manual backup only |
+| < 50 | No backup / no recovery plan |
+
+---
+
+## 4. Changelog
+
+| Version | Date | Change |
+|---------|------|--------|
+| 1.0.0 | 2026-05-21 | Initial pillar with inline CLI |
+| 1.1.0 | 2026-06-09 | Orchestrator guide; CLI delegated to product workers |

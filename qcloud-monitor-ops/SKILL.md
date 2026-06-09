@@ -112,6 +112,21 @@ Every generated skill MUST satisfy these five standards:
 | `QCE/VPC` | `qcloud-vpc-ops` | VPC flow metrics → VPC operations |
 
 **Rule:** Monitor skill handles alarm/metric configuration. Product ops skills handle resource operations based on alarm findings.
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Cross-cutting **metrics and alarm coverage** for Well-Architected cost/reliability pillars; return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | typically `cost`, `reliability` |
+| `{{user.scope}}` | `account-wide` |
+
+**Allowed:** `GetMonitorData`, `DescribeAlarm*`, `DescribeAllNamespaces` — **no** Create/Modify/Delete alarm policies.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: monitor`).
 
 ## Variable Convention
 

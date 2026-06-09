@@ -1,4 +1,9 @@
+# YAML anchors (TE-5) — reuse threshold defaults across pillars
+defaults: &defaults
+  region: ap-guangzhou
+
 assessment:
+  <<: *defaults
   scope: account-wide
   pillars:
     - reliability
@@ -11,9 +16,14 @@ assessment:
     - cdb
     - tke
     - es
+    - mongodb
+    - postgres
     - clb
     - vpc
     - cos
+    - ssl
+    - cdn
+    - agsx
 
 thresholds:
   reliability:

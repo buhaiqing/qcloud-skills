@@ -18,5 +18,12 @@
   {"query": "重启一下数据库", "should_trigger": false},
   {"query": "Set up a VPC and subnet", "should_trigger": false},
   {"query": "TKE集群加几个节点", "should_trigger": false},
-  {"query": "Upload a file to COS bucket", "should_trigger": false}
+  {"query": "Upload a file to COS bucket", "should_trigger": false},
+  {"query": "评估下Elasticsearch集群架构", "should_trigger": true},
+  {"query": "MongoDB有没有备份和HA问题", "should_trigger": true},
+  {"query": "对CVM和CLB做一次Well-Architected评估", "should_trigger": true},
+  {"query": "帮我做一次巡检", "should_trigger": false},
+  {"query": "生成巡检报告", "should_trigger": false},
+  {"query": "排查一下CVM为什么CPU这么高", "should_trigger": false},
+  {"query": "帮我看看这个告警是什么原因", "should_trigger": false}
 ]

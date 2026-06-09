@@ -89,6 +89,21 @@ SSL Certificate Service (SSL 证书服务) on Tencent Cloud provides certificate
 - If deploying certificate to CLB, delegate CLB certificate configuration to `qcloud-clb-ops`
 - If configuring CAM policies for certificate management, delegate to `qcloud-cam-ops`
 - If setting up certificate expiry monitoring alarms, delegate to `qcloud-monitor-ops`
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Read-only Well-Architected assessment for **SSL certificates** (expiry, renewal, deployment coverage); return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | typically `security`, `reliability`; may include `efficiency` |
+| `{{user.scope}}` | `account-wide` |
+
+**Allowed:** `Describe*`, `List*` certificate APIs only — **no** DeleteCertificates/Upload/Modify mutations.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: ssl`).
 
 ## Variable Convention
 

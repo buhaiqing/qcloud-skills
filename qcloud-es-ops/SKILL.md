@@ -101,6 +101,21 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - ES uses COS for snapshot backup: delegate COS storage management to `qcloud-cos-ops` for bucket-level operations
 - ES monitoring integration uses `qcloud-monitor-ops` for Cloud Monitor dashboard and alarm configuration
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs into one ambiguous flow
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Read-only Well-Architected assessment for **Elasticsearch (ES)**; return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | reliability / security / cost / efficiency (or `all`) |
+| `{{user.scope}}` | `single-resource` or `account-wide` |
+
+**Allowed:** `Describe*` and read-only snapshot/index queries — **no** DeleteInstance/DeleteIndex/Update/Upgrade/Restart mutations.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: es`).
 
 ## Variable Convention (Agent-Readable)
 

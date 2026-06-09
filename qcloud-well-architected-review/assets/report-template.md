@@ -1,121 +1,126 @@
 # Tencent Cloud Well-Architected Assessment Report
 
+**skill_id:** qcloud-well-architected-review | **version:** {{output.skill_version}} | **trace_id:** {{output.trace_id}}
+
 ## Executive Summary
 
 | Metric | Value |
 |--------|-------|
-| Assessment Date | {{date}} |
-| Target Project/Account | {{project}} |
-| Overall Score | {{overall_score}}/100 |
-| Rating | {{rating}} |
+| Assessment Date | {{output.assessment_date}} |
+| Target Project/Account | {{user.project}} |
+| Assessment Scope | {{user.scope}} |
+| Overall Score | {{output.overall_score}}/100 |
+| Rating | {{output.rating}} |
 
 ### Score Breakdown
 
 | Pillar | Score | Status |
 |--------|-------|--------|
-| Reliability | {{reliability_score}}/100 | {{status}} |
-| Security | {{security_score}}/100 | {{status}} |
-| Cost | {{cost_score}}/100 | {{status}} |
-| Efficiency | {{efficiency_score}}/100 | {{status}} |
+| Reliability | {{output.reliability_score}}/100 | {{output.reliability_status}} |
+| Security | {{output.security_score}}/100 | {{output.security_status}} |
+| Cost | {{output.cost_score}}/100 | {{output.cost_status}} |
+| Efficiency | {{output.efficiency_score}}/100 | {{output.efficiency_status}} |
+
+> Pillars marked **NOT ASSESSED** were skipped due to missing data — not scored as pass.
 
 ---
 
 ## 1. Reliability Assessment
 
 ### 1.1 Multi-AZ Deployment
-- **Status**: {{pass/fail/warning}}
-- **Findings**: {{findings}}
-- **Resources Affected**: {{resources}}
+- **Status**: {{output.reliability_multiaz_status}}
+- **Findings**: {{output.reliability_multiaz_findings}}
+- **Resources Affected**: {{output.reliability_multiaz_resources}}
 
 ### 1.2 Backup & Recovery
-- **Automated Backups**: {{status}}
-- **Backup Coverage**: {{percentage}}%
-- **RTO/RPO Compliance**: {{status}}
+- **Automated Backups**: {{output.reliability_backup_status}}
+- **Backup Coverage**: {{output.reliability_backup_coverage_pct}}%
+- **RTO/RPO Compliance**: {{output.reliability_rto_rpo_status}}
 
 ### 1.3 Recommendations
 
 | Priority | Recommendation | Effort | Impact |
 |----------|---------------|--------|--------|
-| {{High/Medium/Low}} | {{description}} | {{hours}} | {{description}} |
+| {{user.recommendation_priority}} | {{output.reliability_recommendation}} | {{user.effort_hours}} | {{output.reliability_impact}} |
 
 ---
 
 ## 2. Security Assessment
 
 ### 2.1 CAM Permissions
-- **Principle of Least Privilege**: {{status}}
-- **Key Rotation Compliance**: {{status}}
-- **Findings**: {{findings}}
+- **Principle of Least Privilege**: {{output.security_least_privilege_status}}
+- **Key Rotation Compliance**: {{output.security_key_rotation_status}}
+- **Findings**: {{output.security_cam_findings}}
 
 ### 2.2 Network Isolation
-- **VPC Configuration**: {{status}}
-- **Security Groups**: {{status}}
+- **VPC Configuration**: {{output.security_vpc_status}}
+- **Security Groups**: {{output.security_sg_status}}
 
 ### 2.3 Recommendations
 
 | Priority | Recommendation | Effort | Impact |
 |----------|---------------|--------|--------|
-| {{High/Medium/Low}} | {{description}} | {{hours}} | {{description}} |
+| {{user.recommendation_priority}} | {{output.security_recommendation}} | {{user.effort_hours}} | {{output.security_impact}} |
 
 ---
 
 ## 3. Cost Assessment
 
 ### 3.1 Billing Model Analysis
-- **On-Demand Resources**: {{count}}
-- **Monthly/Yearly Resources**: {{count}}
-- **Spot Instances**: {{count}}
+- **On-Demand Resources**: {{output.cost_ondemand_count}}
+- **Monthly/Yearly Resources**: {{output.cost_prepaid_count}}
+- **Spot Instances**: {{output.cost_spot_count}}
 
 ### 3.2 Idle Resource Detection
 
 | Resource Type | Count | Potential Savings |
 |---------------|-------|-------------------|
-| Low CPU Instances | {{count}} | {{amount}}/month |
-| Unattached Disks | {{count}} | {{amount}}/month |
-| Unused EIPs | {{count}} | {{amount}}/month |
+| Low CPU Instances | {{output.cost_idle_cpu_count}} | {{output.cost_idle_cpu_savings}}/month |
+| Unattached Disks | {{output.cost_unattached_disk_count}} | {{output.cost_unattached_disk_savings}}/month |
+| Unused EIPs | {{output.cost_unused_eip_count}} | {{output.cost_unused_eip_savings}}/month |
 
 ### 3.3 Recommendations
 
 | Priority | Recommendation | Effort | Monthly Savings |
 |----------|---------------|--------|-----------------|
-| {{High/Medium/Low}} | {{description}} | {{hours}} | {{amount}} |
+| {{user.recommendation_priority}} | {{output.cost_recommendation}} | {{user.effort_hours}} | {{output.cost_monthly_savings}} |
 
 ---
 
 ## 4. Efficiency Assessment
 
 ### 4.1 Automation Coverage
-- **CI/CD Integration**: {{status}}
-- **Infrastructure as Code**: {{status}}
-- **Auto-scaling Configuration**: {{status}}
+- **CI/CD Integration**: {{output.efficiency_cicd_status}}
+- **Infrastructure as Code**: {{output.efficiency_iac_status}}
+- **Auto-scaling Configuration**: {{output.efficiency_autoscaling_status}}
 
 ### 4.2 Batch Operations
-- **Eligible for Batch**: {{count}} resources
-- **Current Utilization**: {{percentage}}%
+- **Eligible for Batch**: {{output.efficiency_batch_eligible_count}} resources
+- **Current Utilization**: {{output.efficiency_batch_utilization_pct}}%
 
 ### 4.3 Recommendations
 
 | Priority | Recommendation | Effort | Impact |
 |----------|---------------|--------|--------|
-| {{High/Medium/Low}} | {{description}} | {{hours}} | {{description}} |
+| {{user.recommendation_priority}} | {{output.efficiency_recommendation}} | {{user.effort_hours}} | {{output.efficiency_impact}} |
 
 ---
 
 ## Action Plan
 
 ### Immediate Actions (Critical)
-1. {{action_item}}
-2. {{action_item}}
+1. {{output.action_immediate_1}}
+2. {{output.action_immediate_2}}
 
 ### Short-term Improvements (1-2 weeks)
-1. {{action_item}}
-2. {{action_item}}
+1. {{output.action_shortterm_1}}
+2. {{output.action_shortterm_2}}
 
 ### Long-term Optimizations (1-3 months)
-1. {{action_item}}
-2. {{action_item}}
+1. {{output.action_longterm_1}}
+2. {{output.action_longterm_2}}
 
 ---
 
 *Report generated by: qcloud-well-architected-review skill*
-*Framework Version: 1.0.0*
+*Framework Version: 1.2.0*

@@ -101,6 +101,21 @@ TencentDB for MongoDB on Tencent Cloud provides fully managed MongoDB database s
 - If creating a MongoDB instance in a new VPC/subnet, delegate VPC setup to `qcloud-vpc-ops` first
 - If configuring CAM policies for MongoDB access, delegate to `qcloud-cam-ops`
 - If setting up monitoring alarms, delegate to `qcloud-monitor-ops` for alarm policy creation
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Read-only Well-Architected assessment for **MongoDB**; return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | reliability / security / cost / efficiency (or `all`) |
+| `{{user.scope}}` | `single-resource` or `account-wide` |
+
+**Allowed:** `Describe*` and `GetMonitorData` only — **no** TerminateDBInstance/DropDB/Modify mutations.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: mongodb`).
 
 ## Variables
 

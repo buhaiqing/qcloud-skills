@@ -96,6 +96,21 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - CBS disk operations are within CVM scope (attached storage), but standalone CBS management uses this skill
 - Snapshot/Image operations are within CVM scope for instance backup/restore
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review` orchestrator; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** When `qcloud-well-architected-review` invokes this skill with `{{user.mode}}=well-architected-readonly`, assess **CVM/CBS/snapshot/image** architecture read-only and return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | `all` or subset: reliability / security / cost / efficiency |
+| `{{user.scope}}` | `single-resource` or `account-wide` |
+
+**Allowed:** `Describe*` and `GetMonitorData` only — **no** Run/Start/Stop/Terminate/Create/Modify/Delete.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract**; paginate Describe* → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: cvm`).
 
 ## Variable Convention (Agent-Readable)
 

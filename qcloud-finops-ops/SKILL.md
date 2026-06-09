@@ -38,6 +38,21 @@ related_skills:
 - 实时监控指标 → `qcloud-monitor-ops`
 - 实际计费规则计算（阶梯价/折扣）→ 引用腾讯云官方文档
 - 企业财务对账（合同/发票/报销）→ 超出 FinOps 范围
+- Well-Architected 成本评估（只读）→ 由 `qcloud-well-architected-review` 编排调用；见 **Read-Only Assessment Mode**
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** **Cost pillar** billing/TCO data for Well-Architected orchestrator; return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | typically `cost` |
+| `{{user.scope}}` | `account-wide` |
+
+**Allowed:** 只读账单 API（`DescribeBill*`, `DescribeCost*`, `DescribeAccountBalance` 等）— **禁止** 触发计费变更或资源删除。
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: finops`).
 
 ## 凭证与配置
 
@@ -244,7 +259,8 @@ tccli voucher DescribeVoucherList --Status "unused" --Limit 100
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 FinOps-specific safety rules: billing data privacy, no-auto-execute constraint, tag attribution timing, idle detection accuracy, cross-skill delegation), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
+| 1.0.0 | 2026-06-04 | Phase 1 GCL rollout |
+| 1.1.0 | 2026-06-09 | Added `references/well-architected-assessment.md` (Cost worker + schema-aligned output) |
 
 ---
 
@@ -279,6 +295,6 @@ This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
 | `qcloud-monitor-ops` | 监控指标 + 告警通道 |
 | `qcloud-aiops-diagnosis` | 多指标诊断（含成本维度）|
 | `qcloud-proactive-inspection` | 异常账单自动派发 |
-| `qcloud-well-architected-review` | 架构评估（含 TCO）|
+| `qcloud-finops-ops` | 架构评估（含 TCO）| [`references/well-architected-assessment.md`](references/well-architected-assessment.md) |
 | `qcloud-cam-ops` | 权限/账号/密钥 |
 | 23 个产品 skill | 资源元数据归因（只读）|

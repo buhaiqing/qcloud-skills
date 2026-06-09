@@ -1,78 +1,51 @@
-# Security Pillar — Tencent Cloud Well-Architected Framework
+# Security Pillar — Orchestrator Guide
 
-## Overview
+> **Orchestrator-only.** CAM, network isolation, and product encryption checks are
+> **delegated** to worker skills.
 
-The Security pillar ensures Tencent Cloud resources follow the principle of least privilege, proper credential management, network isolation, and encryption at rest/in transit.
+---
 
-## 1. CAM (Cloud Access Management) Permissions
+## 1. Worker mapping
 
-### 1.1 Minimum Permissions Assessment
+| Scope | delegate-to | Assessment reference |
+|-------|-------------|---------------------|
+| CAM / IAM (account-wide) | `qcloud-cam-ops` | `references/well-architected-assessment.md` |
+| VPC / SG / NACL | `qcloud-vpc-ops` | `references/well-architected-assessment.md` |
+| CVM | `qcloud-cvm-ops` | SSH keys, SG attachment, encryption |
+| CLB | `qcloud-clb-ops` | HTTPS, cert, listener exposure |
+| CDB / Redis / TKE / COS | respective `qcloud-*-ops` | Product `well-architected-assessment.md` |
+| MongoDB / PostgreSQL / ES | `qcloud-mongodb-ops`, `qcloud-postgres-ops`, `qcloud-es-ops` | Data-layer encryption, network isolation |
+| SSL / CDN (TLS edge) | `qcloud-ssl-ops`, `qcloud-cdn-ops` | Cert expiry, HTTPS, access control |
 
-| Check | Method | Pass Criteria |
-|-------|--------|---------------|
-| Role-based access | `tccli cam ListAttachedRolePolicies` | Roles used instead of direct user permissions |
-| Least privilege | Review policy documents | Policies grant only required permissions |
-| No wildcard `*` | Search policy documents | No `action: "*"` or `resource: "*"` unless required |
+Pass `{{user.mode}}=well-architected-readonly`, `{{user.pillars}}` includes `security`.
 
-### 1.2 CAM Policy Template
+**CAM worker** focuses on: least privilege, wildcard policies, MFA, key age (read-only List/Get APIs).
 
-```json
-{
-  "version": "2.0",
-  "statement": [
-    {
-      "action": [
-        "cvm:DescribeInstances",
-        "cvm:RunInstances"
-      ],
-      "effect": "allow",
-      "resource": "*"
-    }
-  ]
-}
-```
+---
 
-## 2. Credential Management
+## 2. Orchestrator checks
 
-| Requirement | Assessment | Pass Criteria |
-|-------------|-----------|---------------|
-| Environment variables | Use `TENCENTCLOUD_SECRET_ID/KEY` | Not hardcoded in scripts |
-| Credential masking | No SecretKey in output/logs | All masking enforced |
-| Key rotation | API key age < 90 days | Rotation policy exists |
-| MFA enabled | CAM user MFA status | MFA enabled for all human accounts |
+| Check | Source |
+|-------|--------|
+| SG `0.0.0.0/0` vs CAM wildcard | [cross-product-analysis.md](cross-product-analysis.md) |
+| Public IP justification | Correlate `cvm` + `vpc` worker findings |
 
-## 3. Network Isolation
+---
 
-| Check | Method | Pass Criteria |
-|-------|--------|---------------|
-| VPC isolation | `tccli vpc DescribeVpcs` | Resources in private VPC, not default |
-| Security groups | `tccli vpc DescribeSecurityGroups` | Ingress rules restrict access |
-| Network ACLs | `tccli vpc DescribeNetworkAcls` | Subnet-level filtering enabled |
-| Public IP exposure | `DescribeInstances` output | Only necessary resources have public IPs |
-
-## 4. Encryption
-
-| Check | Method | Pass Criteria |
-|-------|--------|---------------|
-| Data at rest | `Describe*` for encryption status | SSE enabled for storage products |
-| Data in transit | HTTPS/TLS check | TLS 1.2+ required |
-| Key management | KMS integration Check | Customer-managed keys where required |
-
-## 5. Security Assessment Score
+## 3. Scoring rubric
 
 | Score | Criteria |
 |-------|----------|
-| 90-100 | Least privilege, MFA enabled, encrypted at rest + transit, no public IPs |
-| 70-89 | Role-based access, encryption in transit, some public IPs justified |
-| 50-69 | Basic security groups, password auth, no encryption at rest |
-| < 50 | Default VPC, open security groups, credentials in code |
+| 90-100 | CAM + network workers pass; encryption at rest + transit |
+| 70-89 | Role-based access; minor public exposure justified |
+| 50-69 | Basic SG; gaps in encryption or MFA |
+| < 50 | Default VPC, open SG, credentials at risk |
 
-## Common Security Anti-Patterns
+---
 
-| Anti-Pattern | Risk | Remediation |
-|-------------|------|-------------|
-| `0.0.0.0/0` security groups | Critical | Restrict to specific CIDRs |
-| Root account for daily ops | Critical | Create role-based accounts |
-| Credentials in git repos | Critical | Use environment variables + vault |
-| No MFA on privileged accounts | High | Enable MFA immediately |
-| Default passwords on DBs | High | Change and enforce rotation |
+## 4. Changelog
+
+| Version | Date | Change |
+|---------|------|--------|
+| 1.0.0 | 2026-05-21 | Initial pillar with inline CLI |
+| 1.1.0 | 2026-06-09 | Delegated to cam/vpc/product workers |

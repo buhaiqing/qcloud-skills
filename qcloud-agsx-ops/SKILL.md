@@ -83,6 +83,22 @@ This skill is an **operational runbook** for agents: explicit scope, credential 
 
 - If AGSX sandbox requires VPC access, configure VPC via `qcloud-vpc-ops` before sandbox creation.
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs.
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Read-only Well-Architected assessment for **AGSX (Agent Sandbox)**; return `{{output.product_assessment}}`.
+> **sdk-only:** No `tccli` — use `Describe*` via `tencentcloud-sdk-python` only.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | reliability / security / cost / efficiency (or `all`) |
+| `{{user.scope}}` | `account-wide` |
+
+**Allowed:** SDK `Describe*` / list APIs only — **no** DeleteAgentPool/Create/Modify sandbox mutations.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: agsx`).
 
 ## Variable Convention (Agent-Readable)
 

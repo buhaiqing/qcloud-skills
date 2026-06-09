@@ -419,7 +419,104 @@ jq -r '.Response.VpcSet[] | select(.VpcName == "prod") | .VpcId' /tmp/vpc-cache.
 }
 ```
 
+
 ---
+
+## Worker Output Contract (Read-Only Assessment Mode)
+
+> Invoked when `qcloud-well-architected-review` sets `{{user.mode}}=well-architected-readonly`.
+> Return **`{{output.product_assessment}}`** — field names MUST match the canonical schema.
+
+**Canonical schema:** [worker-output-schema.md](../../qcloud-well-architected-review/references/worker-output-schema.md)
+
+| Constant | Value |
+|----------|-------|
+| `skill_id` | `qcloud-vpc-ops` |
+| `product` | `vpc` |
+| Finding `id` pattern | `vpc-{rel|sec|cost|eff}-NNN` (3-digit sequence per pillar) |
+
+### Pillar → checklist map
+
+| `pillars` key | Checklist source in this document |
+|---------------|-------------------------------------|
+| `reliability` | Pillar 1: Reliability |
+| `security` | Pillar 2: Security |
+| `cost` | Pillar 3: Cost |
+| `efficiency` | Pillar 4: Efficiency |
+
+### Populate rules
+
+1. Include only pillar keys requested by orchestrator `{{user.pillars}}` (`all` = four keys).
+2. `score = round(passed / applicable × 100)`; use `status=not_assessed` when data missing (omit score or null).
+3. Each failed/warn checklist item → one `findings[]` entry with all six finding fields (§2.1 in schema).
+4. `recommendations[]`: top 1–5 actions with `priority`, `pillar`, `action`, `effort` (§2.2 in schema).
+5. `partial=true` when any pillar is `not_assessed`; top-level `status=PARTIAL`.
+6. `trace.commands`: every read API call; mask credentials. `errors[]` on API failure (§3 in schema).
+7. Local “Score Calculation” sections are for manual review only — **worker mode must emit this JSON**.
+
+### Example `{{output.product_assessment}}`
+
+```json
+{
+  "skill_id": "qcloud-vpc-ops",
+  "product": "vpc",
+  "region": "ap-guangzhou",
+  "scope": "account-wide",
+  "assessment_date": "2026-06-09T10:00:00+08:00",
+  "status": "OK",
+  "partial": false,
+  "resource_count": 3,
+  "pillars": {
+    "reliability": {
+      "score": 75,
+      "status": "assessed",
+      "findings": [
+        {
+          "id": "vpc-rel-001",
+          "severity": "High",
+          "confidence": "HIGH",
+          "title": "Overly permissive security group",
+          "evidence": "Ingress 0.0.0.0/0 on admin port",
+          "recommendation": "Restrict source CIDRs; use bastion or VPN",
+          "effort": "medium"
+        }
+      ]
+    },
+    "security": {
+      "score": 88,
+      "status": "assessed",
+      "findings": []
+    },
+    "cost": {
+      "score": 72,
+      "status": "assessed",
+      "findings": []
+    },
+    "efficiency": {
+      "score": 70,
+      "status": "assessed",
+      "findings": []
+    }
+  },
+  "recommendations": [
+    {
+      "priority": "High",
+      "pillar": "reliability",
+      "action": "Restrict source CIDRs; use bastion or VPN",
+      "effort": "medium"
+    }
+  ],
+  "trace": {
+    "commands": [
+      "tccli vpc DescribeSecurityGroups --Region ap-guangzhou (SecretKey=<masked>)"
+    ],
+    "request_ids": [
+      "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    ]
+  },
+  "errors": []
+}
+```
 
 ## References
 

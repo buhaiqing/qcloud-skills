@@ -100,6 +100,21 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - TKE worker nodes are CVM instances: delegate VM-level operations (SSH, disk, OS) to `qcloud-cvm-ops`
 - TKE container images may use COS/TCR: delegate storage/registry to `qcloud-cos-ops` or `qcloud-tcr-ops`
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Read-only Well-Architected assessment for **TKE**; return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | reliability / security / cost / efficiency (or `all`) |
+| `{{user.scope}}` | `single-resource` or `account-wide` |
+
+**Allowed:** `Describe*` and `GetMonitorData` only — **no** DeleteCluster/DeleteNode/Modify mutations.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: tke`).
 
 ## Variable Convention (Agent-Readable)
 

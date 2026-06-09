@@ -99,6 +99,21 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - SSL certificates for HTTPS listeners: verify certificate exists via SSL service or CAM
 - CLB access log analysis (FinOps/AiOps): delegate to `qcloud-cls-ops` for CLS log search and aggregation queries; reference `clb-log-analysis.md` for query templates
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Read-only Well-Architected assessment for **CLB**; return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | reliability / security / cost / efficiency (or `all`) |
+| `{{user.scope}}` | `single-resource` or `account-wide` |
+
+**Allowed:** `Describe*` and `GetMonitorData` only — **no** Create/Delete/Modify/Register/Deregister.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: clb`).
 
 ## Variable Convention (Agent-Readable)
 
