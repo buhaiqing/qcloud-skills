@@ -188,7 +188,7 @@ def describe_cluster_context(cluster_id: str) -> dict:
     req = tke_models.DescribeClusterNodePoolsRequest()
     req.ClusterId = cluster_id
     try:
-        resp = tke_client.DescribeClusterNodePools(req)
+        resp = tke_cli.DescribeClusterNodePools(req)
         result["sources"]["node_pools"] = resp.to_json_string()
     except TencentCloudSDKException as e:
         result["sources"]["node_pools"] = {"error": str(e)}
@@ -219,7 +219,7 @@ def search_cls_events(topic_id: str, query: str, start_time: int, end_time: int)
     req.Limit = 100
 
     try:
-        resp = cls_client.SearchLog(req)
+        resp = cls_cli.SearchLog(req)
         return resp.to_json_string()
     except TencentCloudSDKException as e:
         return {"error": str(e), "code": e.get_code(), "data_quality": {"degraded": True}}
