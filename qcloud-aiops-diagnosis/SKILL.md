@@ -7,7 +7,7 @@ description: >-
   recognition, multi-metric correlation, or proactive anomaly identification.
   Triggers on phrases like "排查问题", "帮我诊断", "CPU 突然飙高", "告警风暴",
   "分析日志异常", "找出根因", or any scenario requiring automated fault detection
-  across CVM, Redis, CDB, ES, TKE, CLB, VPC, COS products. Not for live resource
+  across CVM, Redis, CDB, ES, TKE, CLB, VPC, COS, CKafka, MongoDB, Postgres, SCF, CDN products. Not for live resource
   CRUD operations unless paired with a product-specific ops skill.
 license: MIT
 compatibility: >-
@@ -15,8 +15,8 @@ compatibility: >-
   log analysis, valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "2.0.0"
-  last_updated: "2026-06-09"
+  version: "2.4.0"
+  last_updated: "2026-06-13"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   type: cross-cutting-diagnosis
   python_version_minimum: "3.8"
@@ -42,6 +42,12 @@ metadata:
     - qcloud-cdb-ops       # 反向：Rule H CDB 慢查询/连接链只读证据与修复委托
     - qcloud-redis-ops     # 反向：Rule I Redis 内存/连接风暴诊断委托
     - qcloud-es-ops        # 反向：Rule J ES 集群红黄/索引延迟诊断委托
+    - qcloud-cos-ops       # 反向：Rule K COS 4xx/5xx/延迟诊断委托
+    - qcloud-ckafka-ops    # 反向：Rule L CKafka lag/磁盘/吞吐诊断委托
+    - qcloud-mongodb-ops   # 反向：Rule M MongoDB 连接/复制/CPU 诊断委托
+    - qcloud-postgres-ops  # 反向：Rule N Postgres 慢查询/连接/复制诊断委托
+    - qcloud-scf-ops       # 反向：Rule O SCF 错误/超时/限流诊断委托
+    - qcloud-cdn-ops       # 反向：Rule P CDN 源站5xx/缓存/延迟诊断委托
 ---
 
 # Tencent Cloud AIOps Diagnosis Skill
@@ -67,12 +73,26 @@ Symptom Detection → Metric Analysis → Log Correlation → Diagnosis Conclusi
 ## Quick Start
 
 ### What This Skill Does
-Diagnoses incidents and aggregates noisy alarms into evidence-backed findings. For TKE alarm storms, it produces an Event Bundle with root alarm, output-only symptom de-prioritization, confidence, evidence, data quality, and delegated recommendations. For multi-source incidents spanning Pod, Node, CLB, and CVM, it performs cross-layer topology linking, hypothesis scoring, and produces an RCA Bundle with ranked root cause candidates and verification steps (see [`multi-source-rca.md`](references/multi-source-rca.md)). **Change correlation** (CloudAudit + CLS rollout events) and a unified **Incident Timeline** narrative link deployments/config changes to symptoms (see [`change-correlation.md`](references/change-correlation.md), [`incident-timeline.md`](references/incident-timeline.md)). **Dynamic baseline anomaly detection** compares metrics against yesterday/last-week same windows before applying static thresholds (see [`anomaly-detection.md`](references/anomaly-detection.md)). **Product RCA rules** (CDB/Redis/ES) and **VPC network path diagnosis** (Rule G) extend cross-layer coverage (see [`product-rca-rules.md`](references/product-rca-rules.md), [`network-rca.md`](references/network-rca.md)). **Incident knowledge** adds business **impact** assessment, **similar historical cases** from `./audit-results/incident-kb-*.json`, and a **feedback loop** to improve future diagnoses (see [`incident-knowledge.md`](references/incident-knowledge.md)). **Cross-skill orchestration** with FinOps and proactive inspection closes the cost ↔ metrics ↔ prevention loop (see [`cross-skill-orchestration.md`](references/cross-skill-orchestration.md)).
+
+Read-only cross-product diagnosis: correlate metrics, logs, alarms, and changes into evidence-backed bundles. JSON paths: [`output-schemas.md`](references/output-schemas.md). Full reference index: [`references/README.md`](references/README.md).
+
+| Scenario | Output | Primary reference |
+|----------|--------|-------------------|
+| TKE alarm storm / 告警降噪 | Event Bundle | [`alarm-handling.md`](references/alarm-handling.md) |
+| Pod + Node + CLB + CVM RCA | RCA Bundle | [`multi-source-rca.md`](references/multi-source-rca.md) |
+| Post-deploy / CloudAudit regression | RCA + Timeline | [`change-correlation.md`](references/change-correlation.md) |
+| Baseline anomaly (yesterday/week) | Anomaly Bundle | [`anomaly-detection.md`](references/anomaly-detection.md) |
+| CDB / Redis / ES + network | RCA Bundle | [`product-rca-rules.md`](references/product-rca-rules.md) H–J, [`network-rca.md`](references/network-rca.md) |
+| COS / CKafka / MongoDB / Postgres | RCA Bundle | [`product-rca-rules.md`](references/product-rca-rules.md) K–N |
+| SCF / CDN | RCA Bundle | [`product-rca-rules.md`](references/product-rca-rules.md) O–P |
+| Impact + historical cases | KB record | [`incident-knowledge.md`](references/incident-knowledge.md) |
+| FinOps / inspection handoff | Cross-Skill Bundle | [`cross-skill-orchestration.md`](references/cross-skill-orchestration.md) |
 
 ### Prerequisites
 - [ ] `tccli` available for read-only Monitor/TKE/CLS queries
 - [ ] Credentials configured in environment; never print secret values
 - [ ] Region and time window known (`{{env.TENCENTCLOUD_REGION}}`, `{{user.time_range}}`)
+- [ ] On failure: [`troubleshooting.md`](references/troubleshooting.md)
 
 ### First Diagnostic Request
 
@@ -128,6 +148,8 @@ FinOps 检测到 HIGH 置信度账单异常 — 接收 finops_handoff，联动�
 - Change correlation: "发布后出现故障", "刚改完配置就挂了", "deployment 后 CLB 5xx", "变更导致回归", "CloudAudit 查下最近谁改了什么"
 - Incident timeline: "按时间线梳理故障经过", "变更和告警的先后顺序", "输出 incident timeline"
 - CDB/Redis/ES RCA: "数据库慢查询根因", "Redis 内存暴涨连接打满", "ES 集群变红", "CDB 导致 CLB 超时"
+- COS/CKafka/MongoDB/Postgres RCA: "COS 5xx 根因", "对象存储延迟飙高", "CKafka 消费 lag", "MongoDB 连接打满", "主从延迟", "Postgres 慢查询导致超时"
+- SCF/CDN RCA: "云函数超时报错", "SCF 冷启动慢", "函数并发打满", "CDN 回源 5xx", "CDN 命中率下降", "加速域名延迟高"
 - Network path RCA: "连不上但实例正常", "安全组变更后超时", "VPC 路由问题", "NAT 网关异常", "Node NotReady 但 CVM 正常是不是网络"
 - Impact & similar cases: "评估业务影响面", "有没有类似历史故障", "影响多少流量", "相似事件匹配", "记录这次根因反馈"
 - Cross-skill orchestration: "账单涨了同时 CPU 飙高联合诊断", "finops 异常派发后做 RCA", "巡检发现严重项帮我验证", "故障后生成防复发巡检项", "容量问题转 FinOps 优化"
@@ -157,35 +179,12 @@ FinOps 检测到 HIGH 置信度账单异常 — 接收 finops_handoff，联动�
 | `{{user.time_end}}` | User | Aggregation window end (ISO 8601; convert to epoch seconds for Monitor/CLS queries) | `2026-06-09T11:00:00+08:00` |
 | `{{user.time_start_epoch}}` | Derived/User | Aggregation start as Unix epoch seconds for `DescribeAlarmHistories` / `SearchLog` | `1780970400` |
 | `{{user.time_end_epoch}}` | Derived/User | Aggregation end as Unix epoch seconds for `DescribeAlarmHistories` / `SearchLog` | `1780974000` |
-| `{{user.tke_event_logset_id}}` | User | Optional CLS logset ID that owns the TKE Kubernetes event topic | `logset-xxxxxx` |
-| `{{user.tke_event_topic_id}}` | User | Optional CLS topic ID for TKE Kubernetes events | `topic-xxxxxx` |
-| `{{user.node_pool_id}}` | User | Optional TKE node pool ID for capacity detail | `np-xxxxxx` |
-| `{{user.addon_name}}` | User | Optional TKE addon name for addon degradation analysis | `coredns` |
-| `{{user.pod_cpu_filter}}` | User | Optional CPU filter required only for best-effort `DescribePodsBySpec` fallback | `0.5` |
-| `{{user.pod_memory_filter}}` | User | Optional memory filter required only for best-effort `DescribePodsBySpec` fallback | `1` |
-| `{{user.load_balancer_id}}` | User | Optional CLB ID for 5xx/backend health correlation | `lb-xxxxxx` |
-| `{{user.instance_id}}` | User | Optional CVM instance ID for node-level RCA correlation | `ins-xxxxxx` |
-| `{{user.namespace}}` | User | Optional K8s namespace for workload-scoped change correlation | `prod` |
-| `{{user.workload}}` | User | Optional Deployment/StatefulSet name for Rule F matching | `api-deploy` |
-| `{{user.app_log_topic_id}}` | User | Optional CLS topic for app config-change log patterns | `topic-xxxxxx` |
-| `{{user.baseline_yesterday_start}}` | Derived | Yesterday baseline window start (ISO; `time_start` − 24h) | `2026-06-08T10:00:00+08:00` |
-| `{{user.baseline_yesterday_end}}` | Derived | Yesterday baseline window end (ISO; `time_end` − 24h) | `2026-06-08T11:00:00+08:00` |
-| `{{user.baseline_week_start}}` | Derived | Last-week baseline window start (ISO; `time_start` − 7d) | `2026-06-02T10:00:00+08:00` |
-| `{{user.baseline_week_end}}` | Derived | Last-week baseline window end (ISO; `time_end` − 7d) | `2026-06-02T11:00:00+08:00` |
-| `{{user.anomaly_mode}}` | User | `baseline_primary` (default) or `static_only` | `baseline_primary` |
-| `{{user.vpc_id}}` | User | VPC ID for Rule G network path diagnosis | `vpc-xxxxxx` |
-| `{{user.security_group_id}}` | User | Optional SG ID when known | `sg-xxxxxx` |
-| `{{user.subnet_id}}` | User | Optional subnet ID for route/NAT linkage | `subnet-xxxxxx` |
-| `{{user.business_criticality}}` | User | Business tier for impact block (`P0`–`P3`) | `P1` |
-| `{{user.slo_name}}` | User | Optional SLO or Monitor policy name for error-budget fields | `api-latency-slo` |
-| `{{user.feedback_was_accurate}}` | User | Post-incident: whether diagnosis was correct (`true`/`false`) | `true` |
-| `{{user.feedback_actual_root_cause}}` | User | Post-incident: verified root cause if different | `Disk full` |
-| `{{user.mask_resource_ids}}` | User | Mask resource IDs in KB export (`true`/`false`) | `false` |
 | `{{user.handoff_source}}` | User/Caller | `finops`, `proactive_inspection`, or `none` | `finops` |
-| `{{user.finops_handoff}}` | FinOps | JSON handoff per [`cross-skill-orchestration.md`](references/cross-skill-orchestration.md) §2.1 | `{...}` |
-| `{{user.inspection_handoff}}` | Inspection | JSON handoff per §2.2 | `{...}` |
+| `{{user.finops_handoff}}` | FinOps | JSON per §2.1; schema: `assets/finops-handoff.schema.json` | `{...}` |
+| `{{user.inspection_handoff}}` | Inspection | JSON per §2.2; schema: `assets/inspection-handoff.schema.json` | `{...}` |
 | `{{user.orchestration_mode}}` | User | `auto`, `F1`, `F2`, `P1`, `A1`, `A2` | `auto` |
-| `{{user.auto_dispatch_inspection}}` | Config | F1: delegate inspection when finops HIGH | `true` |
+
+> **Extended variables** (TKE/CLB/VPC/baseline/KB): [`variables-extended.md`](references/variables-extended.md).
 
 ## Five Core Standards (Quality Gates)
 
@@ -194,10 +193,29 @@ FinOps 检测到 HIGH 置信度账单异常 — 接收 finops_handoff，联动�
 | 1 | **Clear Boundaries** | Diagnosis-only scope; delegates mutation to product skills |
 | 2 | **Structured I/O** | Symptom input → diagnosis output with severity, cause, fix |
 | 3 | **Explicit Actionable Steps** | 5-step workflow: detect → analyze → correlate → diagnose → resolve |
-| 4 | **Complete Failure Strategies** | API rate limits, missing metrics fallback, partial data handling, TKE alarm collection failures → partial bundle with degraded-data warning |
+| 4 | **Complete Failure Strategies** | ≥15 codes in [`troubleshooting.md`](references/troubleshooting.md); HALT vs retry vs degrade per layer |
 | 5 | **Absolute Single Responsibility** | Diagnosis + alarm aggregation + multi-source/product/network RCA; no mutations; fixes delegated to product skills |
 
 ## Diagnosis Workflow
+
+### Workflow Router
+
+Select workflow before collecting evidence (details: [`diagnostic-workflows.md`](references/diagnostic-workflows.md)):
+
+```
+IF {{user.handoff_source}} == finops AND confidence HIGH AND auto_dispatch → Workflow 11 (F1)
+ELIF {{user.handoff_source}} == finops AND top_product_delta → Workflow 11 (F2)
+ELIF {{user.handoff_source}} == proactive_inspection AND severity >= CRITICAL → Workflow 11 (P1)
+ELIF TKE alarm storm / 告警降噪 / event aggregation → Workflow 5
+ELIF cross-layer (Pod+Node+CLB/CVM) OR CLB 5xx root cause → Workflow 6
+ELIF post-deploy / CloudAudit / 变更关联 → Workflow 6 + 7 + change-correlation
+ELIF baseline-only / 同环比 / Anomaly Bundle → Workflow 8
+ELIF CDB/Redis/ES/COS/CKafka/MongoDB/Postgres/SCF/CDN primary symptom → Workflow 9 (Rules H–P)
+ELIF connection timeout + instance healthy → Workflow 9 Rule G
+ELIF impact / similar cases / KB feedback → Workflow 10
+ELIF post-incident prevention OR capacity→FinOps → Workflow 11 (A1/A2)
+ELSE → Steps 1–5 below by symptom category (Workflows 1–4)
+```
 
 ### Step 1: Symptom Detection
 Classify the symptom into one of four categories:
@@ -219,7 +237,9 @@ tccli monitor GetMonitorData \
   --Period 300
 ```
 
-Use `DescribeBaseMetrics` for latest metric names. See [`cli-usage.md`](references/cli-usage.md#dynamic-baseline-metric-windows) for multi-window syntax.
+Use `DescribeBaseMetrics` for latest metric names. See [`cli-usage.md`](references/cli-usage.md#dynamic-baseline-metric-windows) for multi-window syntax. **SDK fallback:** [`api-sdk-usage.md`](references/api-sdk-usage.md).
+
+On API error: follow [`troubleshooting.md`](references/troubleshooting.md).
 
 ### Step 3: Log Correlation
 Search logs for patterns matching the time window:
@@ -240,7 +260,7 @@ symptom=performance
 ```
 
 ### Step 5: Resolution
-Provide prioritized recovery actions with effort estimates.
+Provide prioritized recovery actions with effort estimates. Prefix `RECOMMENDATION (not execution)`; set `delegate_to` per [`delegation-matrix.md`](references/delegation-matrix.md). Output schema: [`output-schemas.md`](references/output-schemas.md).
 
 ## Anti-Patterns
 
@@ -264,14 +284,11 @@ Provide prioritized recovery actions with effort estimates.
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0.0 | 2026-05-21 | Initial release — multi-metric correlation, root cause analysis, anomaly detection |
-| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md`, `references/prompt-templates.md`. `max_iter=5` per AGENTS.md §8 |
-| 1.2.0 | 2026-06-09 | TKE alarm noise reduction & event aggregation + Multi-Source RCA: canonical alarm event model, 6-step aggregation pipeline, output-only noise-reduction policies, 6 TKE incident classes with correlation rules, 4 TKE aggregation flows, Event Bundle output schema; **Multi-Source RCA evidence model**, 6-step RCA pipeline, 5 correlation rules with hypothesis scoring (CLB→Pod/Node, CrashLoopBackOff, PodPending, NodeNotReady, CVM saturation), RCA Bundle output schema with topology links/time alignment/verification steps; added `references/multi-source-rca.md`, updated `cli-usage.md`, `delegation-matrix.md`, `diagnostic-workflows.md`, `eval_queries.json`, `example-config.yaml` |
-| 1.3.0 | 2026-06-09 | **Change correlation + Incident Timeline (Phase A):** `references/change-correlation.md` (Change Evidence Model, CloudAudit/CLS collection, Rule F post-change regression), `references/incident-timeline.md` (unified causal narrative schema); RCA Bundle fields `change_timeline`, `likely_change_trigger`, `incident_timeline_ref`; Workflow 7; eval cases for change/timeline triggers |
-| 1.4.0 | 2026-06-09 | **Dynamic baseline anomaly detection (Phase B):** `references/anomaly-detection.md` (multi-window baselines, ratio/percentile/slope scoring, Anomaly Bundle); baseline-first Step 2; CLI multi-window `GetMonitorData`; `anomaly_findings` in RCA Bundle |
-| 1.5.0 | 2026-06-09 | **Product + network RCA (Phase C):** `references/product-rca-rules.md` (Rules H/I/J CDB/Redis/ES), `references/network-rca.md` (Rule G VPC SG/route/NAT); evidence layers + `product_rca`/`network_rca` bundle fields; Workflow 9 |
-| 1.6.0 | 2026-06-09 | **Incident knowledge (Phase D):** `references/incident-knowledge.md` (`impact`, `similar_incidents`, KB persistence, feedback loop); Workflow 10; `assets/incident-kb-index.schema.json` |
-| 2.0.0 | 2026-06-09 | **Cross-skill orchestration (Phase E):** `references/cross-skill-orchestration.md` (F1/F2/P1/A1/A2, handoffs, Cross-Skill Bundle); Workflow 11; finops↔inspection↔aiops bidirectional flows |
+| 2.4.0 | 2026-06-13 | **Phase F (cont.):** Rules O (SCF), P (CDN) |
+| 2.3.0 | 2026-06-13 | Rules K–N (COS, CKafka, MongoDB, Postgres) |
+| 2.2.0 | 2026-06-13 | Split SDK to `api-sdk-usage.md`; GCL Phase 3 trace export + monitor aggregate hook |
+| 2.1.0 | 2026-06-13 | Workflow router; troubleshooting, output-schemas, variables-extended, handoff schemas |
+| 2.0.0 | 2026-06-09 | Cross-skill orchestration (F1/F2/P1/A1/A2); Phases A–E (change, baseline, product/network RCA, incident KB) |
 
 ## Quality Gate (GCL)
 
@@ -285,6 +302,26 @@ This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
 | Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
 
+### GCL trace export (Phase 3)
+
+After any GCL run completes, embed trace reference in diagnosis bundles when applicable:
+
+```json
+"gcl_trace_ref": {
+  "path": "./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json",
+  "final_status": "PASS|SAFETY_FAIL|MAX_ITER",
+  "quality_summary_path": "./audit-results/gcl-quality-summary-YYYYMMDD-HHMMSS.json"
+}
+```
+
+Aggregate traces for Monitor dashboards:
+
+```bash
+python3 scripts/gcl_trace_aggregate.py --since-hours 24
+```
+
+Delegate quality regression alerting to [`qcloud-monitor-ops`](../qcloud-monitor-ops/references/gcl-quality-dashboard.md). Inspection reports may embed the latest summary per [`qcloud-proactive-inspection`](../qcloud-proactive-inspection/references/reporting.md#gcl-quality-section-phase-3).
+
 ### Safety rules (rubric §4)
 
 1. **Confidence disclosure** — surface HIGH/MEDIUM/LOW for each finding; no correlation-as-causation
@@ -297,7 +334,9 @@ This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
 
 ---
 
-For detailed diagnosis patterns, see:
+For detailed diagnosis patterns, see [`references/README.md`](references/README.md) or:
+- [Output Schemas](references/output-schemas.md) — Central JSON path index (TE-4)
+- [Troubleshooting](references/troubleshooting.md) — Error codes, HALT/retry, partial data recovery
 - [Diagnosis Framework](references/diagnosis-framework.md) — 3D optimization framework
 - [Log Intelligence](references/log-intelligence.md) — Pattern recognition, anomaly detection
 - [Diagnostic Workflows](references/diagnostic-workflows.md) — Decision trees per symptom
@@ -306,9 +345,10 @@ For detailed diagnosis patterns, see:
 - [Change Correlation](references/change-correlation.md) — CloudAudit/CLS change evidence, Rule F post-change regression, lead-lag windows
 - [Incident Timeline](references/incident-timeline.md) — Unified time-ordered narrative across alarms, metrics, logs, and changes
 - [Anomaly Detection](references/anomaly-detection.md) — Dynamic baselines (yesterday/week), anomaly score, Anomaly Bundle
-- [Product RCA Rules](references/product-rca-rules.md) — CDB / Redis / ES correlation rules H/I/J
+- [Product RCA Rules](references/product-rca-rules.md) — Rules H–P (CDB through CDN)
 - [Network RCA](references/network-rca.md) — Rule G VPC security group, route, NAT path diagnosis
 - [Incident Knowledge](references/incident-knowledge.md) — Impact assessment, similar cases, KB persistence, feedback loop
 - [Cross-Skill Orchestration](references/cross-skill-orchestration.md) — FinOps + proactive inspection joint workflows, Cross-Skill Bundle
-- [CLI Usage](references/cli-usage.md) — CLI-first read-only collection and SDK fallback for TKE event bundles and multi-source RCA
+- [CLI Usage](references/cli-usage.md) — CLI-first read-only collection
+- [API & SDK Usage](references/api-sdk-usage.md) — Python SDK fallback (dual-path)
 - [Delegation Matrix](references/delegation-matrix.md) — Cross-skill diagnosis routing

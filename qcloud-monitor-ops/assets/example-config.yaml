@@ -116,4 +116,18 @@ optimization:
       - enable_policy
       - bind_objects
       - fix_notification_template
+
+# GCL Quality Dashboard (Phase 3 — AGENTS.md)
+gcl_quality:
+  enabled: true
+  aggregate_script: "../../scripts/gcl_trace_aggregate.py"
+  summary_schema: "./assets/gcl-quality-summary.schema.json"
+  summary_glob: "./audit-results/gcl-quality-summary-*.json"
+  since_hours_default: 24
+  pass_rate_warn: 0.85
+  pass_rate_critical: 0.70
+  max_iter_warn_count: 3
+  safety_fail_alert: true
+  cls_topic_id: topic-optional   # optional UploadLog sink
+  webhook_notice_id: notice-optional
 ```

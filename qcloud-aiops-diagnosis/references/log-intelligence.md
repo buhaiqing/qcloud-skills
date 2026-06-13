@@ -1,76 +1,46 @@
 # Log Intelligence — AIOps Pattern Recognition
 
-> **Metric anomalies:** For baseline-first detection (yesterday/week comparison), use [`anomaly-detection.md`](anomaly-detection.md). Correlate log patterns below when `anomaly_severity` ≥ MEDIUM.
+> **Metric anomalies:** [`anomaly-detection.md`](anomaly-detection.md). **Thresholds:** `assets/example-config.yaml` → `log_patterns` and `thresholds` anchors.
 
 ## Common Log Patterns
 
 | Pattern Type | Regex | Severity | Root Cause |
 |-------------|-------|----------|------------|
-| Error spike | `ERROR.*\n{10,}` | HIGH | Application failure |
-| Exception | `Exception:.*\n.*\n.*\n` | HIGH | Code defect |
-| Timeout | `timeout\|Timeout\|TIMEOUT` | MEDIUM | Network/performance issue |
-| OOM | `OutOfMemory\|OOM\|cannot allocate` | CRITICAL | Memory leak |
-| Connection refused | `Connection refused\|ECONNREFUSED` | HIGH | Service unavailable |
-| Slow query | `Slow query.*time: (\d+)ms` (if > 1000) | MEDIUM | Database issue |
+| Error spike | `(ERROR\|ERR).{10,}` | HIGH | Application failure |
+| Exception | `Exception:\s*(\w+)` | HIGH | Code defect |
+| Timeout | `(timeout\|Timeout\|TIMEOUT)` | MEDIUM | Network/performance issue |
+| OOM | `(OutOfMemoryError\|OOM\|cannot allocate memory)` | CRITICAL | Memory leak |
+| Connection refused | `(Connection refused\|ECONNREFUSED)` | HIGH | Service unavailable |
+| Slow query | `Slow query.*time:\s*(\d+)ms` (>1000) | MEDIUM | Database issue |
 
-## Pattern Detection
+## Detection Rules (Agent-Executable)
 
-```python
-import re
-from collections import Counter
-from typing import Dict, List
-
-def detect_log_patterns(log_lines: List[str]) -> List[Dict]:
-    patterns = {
-        'error_spike': r'(ERROR|ERR).{10,}',
-        'exception': r'Exception:\s*(\w+)',
-        'timeout': r'(timeout|Timeout|TIMEOUT)',
-        'oom': r'(OutOfMemoryError|OOM|cannot allocate memory)',
-        'connection_refused': r'(Connection refused|ECONNREFUSED)',
-        'slow_query': r'Slow query.*time:\s*(\d+)ms',
-    }
-
-    anomalies = []
-    for line in log_lines:
-        for name, regex in patterns.items():
-            match = re.search(regex, line)
-            if match:
-                anomalies.append({
-                    'pattern': name,
-                    'matched': match.group(0),
-                    'line': line
-                })
-
-    return aggregate_anomalies(anomalies)
-
-def aggregate_anomalies(anomalies: List[Dict]) -> List[Dict]:
-    counts = Counter(a['pattern'] for a in anomalies)
-    summaries = []
-    for pattern, count in counts.items():
-        if count > 10:
-            sample = [a['line'] for a in anomalies if a['pattern'] == pattern][:3]
-            summaries.append({
-                'pattern': pattern,
-                'count': count,
-                'sample_lines': sample
-            })
-    return sorted(summaries, key=lambda s: s['count'], reverse=True)
-```
+1. Scan CLS `SearchLog` results or user-supplied log lines within `{{user.time_start}}`–`{{user.time_end}}`.
+2. Match each line against regex column above (case-sensitive unless noted).
+3. Count matches per pattern; compare to `log_patterns.error_spike_threshold` (default 10) in config.
+4. Emit pattern hits into RCA `evidence_by_layer.cls_events` or Event Bundle evidence block.
 
 ## Severity Classification
 
-| Severity | Count Threshold | Action |
-|----------|----------------|--------|
-| CRITICAL | Error spike + OOM | Immediate investigation required |
-| HIGH | 50+ error occurrences in 1h | Diagnose within 1 hour |
-| MEDIUM | 10-50 error occurrences | Diagnose within 4 hours |
-| LOW | < 10 error occurrences | Monitor, add to knowledge base |
+| Severity | Condition | Action |
+|----------|-----------|--------|
+| CRITICAL | OOM pattern + MemUsage anomaly or OOM in ≥1 line | Immediate RCA |
+| HIGH | ≥50 matches/hour OR error_spike threshold exceeded | Diagnose within 1h |
+| MEDIUM | 10–49 matches/hour | Diagnose within 4h |
+| LOW | <10 matches/hour | Monitor; optional KB entry |
 
-## Log Correlation with Metrics
+## Log ↔ Metric Correlation
 
 | Log Pattern | Correlated Metric | Diagnosis |
 |-------------|------------------|-----------|
 | OOM in logs | MemUsage > 95% | Memory leak confirmed |
 | Timeout in logs | Latency p99 > 5s | Performance degradation |
 | Connection refused | Active connections → 0 | Service crash |
-| Slow query in logs | DB CPU > 80% | Database bottleneck |
+| Slow query in logs | DB CPU > 80% / CDB SlowQueries | Database bottleneck |
+
+## Changelog
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-05-21 | Initial pattern library |
+| 1.1.0 | 2026-06-13 | Removed inline Python (TE-6); align with example-config anchors |

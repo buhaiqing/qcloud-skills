@@ -33,7 +33,7 @@ ELSE
 
 ### 2.1 FinOps → AIOps (`finops_handoff`)
 
-Produced by `qcloud-finops-ops` anomaly pipeline; consumed at AIOps pre-flight.
+Produced by `qcloud-finops-ops` anomaly pipeline; consumed at AIOps pre-flight. Validate: `assets/finops-handoff.schema.json`.
 
 ```json
 {
@@ -65,6 +65,8 @@ Produced by `qcloud-finops-ops` anomaly pipeline; consumed at AIOps pre-flight.
 4. Never duplicate FinOps billing API calls unless verifying a specific resource attribution.
 
 ### 2.2 Proactive Inspection → AIOps (`inspection_handoff`)
+
+Validate: `assets/inspection-handoff.schema.json`.
 
 ```json
 {

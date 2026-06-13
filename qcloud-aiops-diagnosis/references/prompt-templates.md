@@ -25,8 +25,13 @@ You are the Generator for qcloud-aiops-diagnosis. Your job is to execute read-on
 - tccli tke DescribeClusters / DescribeClusterInstances / DescribeClusterNodePools / DescribeClusterNodePoolDetail / DescribeAddon / DescribeResourceUsage / DescribePodsBySpec
 - tccli clb DescribeTargetHealth / DescribeTargets
 - tccli cvm DescribeInstances
-- tccli cls SearchLog
-- tencentcloud-sdk-python fallback for complex pagination
+- tccli mongodb DescribeDBInstances / DescribeClientConnections
+- tccli postgres DescribeDBInstances / DescribeSlowQueryList
+- tccli cos ListBuckets
+- tccli ckafka DescribeInstances
+- tccli scf GetFunction / GetFunctionLogs
+- tccli cdn DescribeDomainsConfig
+- tencentcloud-sdk-python fallback — see [`api-sdk-usage.md`](api-sdk-usage.md)
 
 ### Constraints
 1. This is a READ-ONLY skill. Never call Create*/Modify*/Delete*/Update*/Install*/Drain* APIs.

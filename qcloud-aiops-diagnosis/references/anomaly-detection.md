@@ -156,8 +156,14 @@ Integrate into RCA hypothesis scoring: **+1** per HIGH+ anomaly on root entity; 
 | `clb` | `QCE/LB` | `ClientConnum`, `UnhealthNum`, `DropTotal`, `Intraffic`, `Outtraffic` |
 | `tke` | `QCE/TKE` | `cluster_cpu_usage`, `cluster_mem_usage`, `cluster_running_nodes` |
 | `es` | `QCE/CES` | `indexing_latency`, `jvm_mem_usage`, `cpu_usage` |
+| `cos` | `QCE/COS` | `5xxResponse`, `4xxResponse`, `TotalRequest`, `FirstByteDelay` |
+| `ckafka` | `QCE/CKAFKA` | `ConsumerGroupOffsetLag`, `InstanceDiskUsage`, `InstanceMessagesIn` |
+| `mongodb` | `QCE/CMONGO` | `Connper`, `SlaveDelay`, `MonogdMaxCpuUsage`, `ClusterDiskUsage` |
+| `postgres` | `QCE/POSTGRES` | `cpu_usage`, `connections`, `disk_usage` |
+| `scf` | `QCE/SCF` | `Error`, `Duration`, `Invocation`, `Throttle` |
+| `cdn` | `QCE/CDN` | `StatusCode5XX`, `CacheHitRate`, `CdnResponseTime`, `CdnRequest` |
 
-Dimensions: CVM `InstanceId`; Redis `instanceid`; CDB `instanceId`; CLB `loadBalancerId`; TKE `clusterid`.
+Dimensions: CVM `InstanceId`; Redis `instanceid`; CDB `instanceId`; CLB `loadBalancerId`; TKE `clusterid`; COS `bucket`; CKafka `InstanceId`; MongoDB `target`; Postgres `DBInstanceId`; SCF `FunctionName`; CDN `Domain`.
 
 ## 6. Anomaly Bundle Output Schema
 

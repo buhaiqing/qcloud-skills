@@ -134,6 +134,12 @@ anomaly_detection:
     clb: [ClientConnum, UnhealthNum, DropTotal]
     tke: [cluster_cpu_usage, cluster_mem_usage, cluster_running_nodes]
     es: [ClusterStatus, JvmMemUsage, SearchLatency]
+    cos: [5xxResponse, 4xxResponse, TotalRequest, FirstByteDelay]
+    ckafka: [ConsumerGroupOffsetLag, InstanceDiskUsage, InstanceMessagesIn]
+    mongodb: [Connper, SlaveDelay, MonogdMaxCpuUsage, ClusterDiskUsage]
+    postgres: [cpu_usage, connections, disk_usage]
+    scf: [Error, Duration, Invocation, Throttle]
+    cdn: [StatusCode5XX, CacheHitRate, CdnResponseTime, CdnRequest]
 
 product_rca:
   enabled: true
@@ -141,6 +147,12 @@ product_rca:
     cdb: H
     redis: I
     es: J
+    cos: K
+    ckafka: L
+    mongodb: M
+    postgres: N
+    scf: O
+    cdn: P
   cross_link_clb: true
   cross_link_vpc: true
 

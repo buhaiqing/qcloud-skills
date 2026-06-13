@@ -1,6 +1,6 @@
-# AIOps Diagnosis CLI Usage — TKE Alarm Aggregation
+# AIOps Diagnosis CLI Usage
 
-This cross-cutting diagnosis skill is **CLI-first with SDK fallback**. All commands here are read-only collection steps for TKE alarm noise reduction and Event Bundle generation.
+This cross-cutting diagnosis skill is **CLI-first with SDK fallback**. All commands here are read-only. **SDK paths:** [`api-sdk-usage.md`](api-sdk-usage.md).
 
 ## Preconditions
 
@@ -22,6 +22,18 @@ tccli monitor DescribeAlarmHistories \
   --PageNumber 1 \
   --PageSize 100
 ```
+
+### Alarm history pagination
+
+Storm windows may exceed one page. Loop until `TotalCount` satisfied or cap reached:
+
+1. Start `PageNumber=1`, `PageSize=100`.
+2. Append `Histories[]` to in-memory collection.
+3. If `len(collected) >= TotalCount` OR `len(collected) >= max_alarms_per_cluster` (default 100 from `example-config.yaml`) → stop.
+4. Else `PageNumber++`, retry; on `LimitExceeded` → wait 2s, retry once per [`troubleshooting.md`](troubleshooting.md).
+5. If truncated at cap, set `data_quality.warnings[]`: `"alarm history truncated at max_alarms_per_cluster"`.
+
+SDK fallback: same loop — see [`api-sdk-usage.md`](api-sdk-usage.md#sdk-example-monitor-alarm-history-with-pagination).
 
 ### Metric metadata and metric data
 
@@ -85,149 +97,7 @@ tccli cls SearchLog \
   --Limit 100
 ```
 
-## SDK Fallback
-
-Use `tencentcloud-sdk-python` when CLI JSON quoting, pagination, or batch fan-in becomes cumbersome. Keep the same read-only boundary.
-
-### SDK Client Setup
-
-```python
-import os
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.monitor import monitor_client, models as monitor_models
-from tencentcloud.tke import tke_client, models as tke_models
-from tencentcloud.clb import clb_client, models as clb_models
-from tencentcloud.cls import cls_client, models as cls_models
-
-# Credential from environment (never print secret values)
-cred = credential.Credential(
-    os.environ.get("TENCENTCLOUD_SECRET_ID"),
-    os.environ.get("TENCENTCLOUD_SECRET_KEY")
-)
-region = os.environ.get("TENCENTCLOUD_REGION", "ap-guangzhou")
-
-# Clients (use _cli suffix to avoid shadowing module names)
-monitor_cli = monitor_client.MonitorClient(cred, region)
-tke_cli = tke_client.TkeClient(cred, region)
-clb_cli = clb_client.ClbClient(cred, region)
-cls_cli = cls_client.ClsClient(cred, region)
-```
-
-### Allowed Methods by Product
-
-| Product | SDK client | Allowed methods |
-|---|---|---|
-| Monitor | `monitor_client.MonitorClient` | `DescribeAlarmHistories`, `GetMonitorData`, `DescribeAllNamespaces` (`SceneType=ST_ALARM`), `DescribeBaseMetrics` |
-| TKE | `tke_client.TkeClient` | `DescribeClusters`, `DescribeClusterInstances`, `DescribeClusterNodePools`, `DescribeClusterNodePoolDetail`, `DescribeAddon`, `DescribePodsBySpec` (best-effort with CPU/Memory filters), `DescribeResourceUsage` |
-| CLB | `clb_client.ClbClient` | `DescribeTargetHealth`, `DescribeTargets` |
-| CLS | `cls_client.ClsClient` | `SearchLog` |
-| CloudAudit | `cloudaudit_client.CloudauditClient` | `LookUpEvents` |
-
-### SDK Example: Monitor Alarm History
-
-```python
-def describe_alarm_histories(start_time: int, end_time: int) -> dict:
-    """Query TKE alarm history via SDK fallback.
-
-    Args:
-        start_time: Unix epoch seconds
-        end_time: Unix epoch seconds
-
-    Returns:
-        Alarm history response dict
-    """
-    req = monitor_models.DescribeAlarmHistoriesRequest()
-    req.Module = "monitor"
-    req.Namespaces = [{"MonitorType": "MT_QCE", "Namespace": "QCE/TKE"}]
-    req.StartTime = start_time
-    req.EndTime = end_time
-    req.PageNumber = 1
-    req.PageSize = 100
-
-    try:
-        resp = monitor_cli.DescribeAlarmHistories(req)
-        return resp.to_json_string()
-    except TencentCloudSDKException as e:
-        return {"error": str(e), "code": e.get_code()}
-```
-
-### SDK Example: TKE Cluster Inventory
-
-```python
-def describe_cluster_context(cluster_id: str) -> dict:
-    """Collect TKE cluster context via SDK.
-
-    Args:
-        cluster_id: TKE cluster ID (cls-xxxxxx)
-
-    Returns:
-        Cluster context with nodes, node pools, addons
-    """
-    result = {"cluster_id": cluster_id, "sources": {}}
-
-    # Cluster info
-    req = tke_models.DescribeClustersRequest()
-    req.ClusterIds = [cluster_id]
-    try:
-        resp = tke_cli.DescribeClusters(req)
-        result["sources"]["cluster"] = resp.to_json_string()
-    except TencentCloudSDKException as e:
-        result["sources"]["cluster"] = {"error": str(e)}
-
-    # Node instances
-    req = tke_models.DescribeClusterInstancesRequest()
-    req.ClusterId = cluster_id
-    try:
-        resp = tke_cli.DescribeClusterInstances(req)
-        result["sources"]["nodes"] = resp.to_json_string()
-    except TencentCloudSDKException as e:
-        result["sources"]["nodes"] = {"error": str(e)}
-
-    # Node pools
-    req = tke_models.DescribeClusterNodePoolsRequest()
-    req.ClusterId = cluster_id
-    try:
-        resp = tke_cli.DescribeClusterNodePools(req)
-        result["sources"]["node_pools"] = resp.to_json_string()
-    except TencentCloudSDKException as e:
-        result["sources"]["node_pools"] = {"error": str(e)}
-
-    return result
-```
-
-### SDK Example: CLS Log Search
-
-```python
-def search_cls_events(topic_id: str, query: str, start_time: int, end_time: int) -> dict:
-    """Search CLS logs via SDK.
-
-    Args:
-        topic_id: CLS topic ID
-        query: Query string (e.g., "(level:Warning OR level:Error) AND cluster_id:cls-xxx")
-        start_time: Unix epoch seconds
-        end_time: Unix epoch seconds
-
-    Returns:
-        Log search results
-    """
-    req = cls_models.SearchLogRequest()
-    req.TopicId = topic_id
-    req.Query = query
-    req.StartTime = start_time
-    req.EndTime = end_time
-    req.Limit = 100
-
-    try:
-        resp = cls_cli.SearchLog(req)
-        return resp.to_json_string()
-    except TencentCloudSDKException as e:
-        return {"error": str(e), "code": e.get_code(), "data_quality": {"degraded": True}}
-```
-
-### Safety Constraints
-
-Do not call mutation APIs (`Create*`, `Modify*`, `Delete*`, `Install*`, `Update*`, `Drain*`, scaling APIs). Recommendations must be emitted as `RECOMMENDATION (not execution)` and delegated to product skills.
+> **SDK fallback:** [`api-sdk-usage.md`](api-sdk-usage.md) — client setup, allowed methods, pagination, CLS/TKE examples.
 
 ## Multi-Source RCA Collection
 
@@ -292,22 +162,53 @@ tccli monitor GetMonitorData \
 
 Cap metrics per run at `anomaly_detection.max_metrics_per_run` (default 6). Compute p50/p95/max and anomaly score per [`anomaly-detection.md`](anomaly-detection.md) §4.
 
-### Product RCA collection (CDB / Redis / ES)
+### Product RCA collection (CDB / Redis / ES / COS / CKafka / MongoDB / Postgres)
 
-See [`product-rca-rules.md`](product-rca-rules.md). Examples:
+See [`product-rca-rules.md`](product-rca-rules.md) Rules H–P. Examples:
 
 ```bash
+# H/I/J (existing)
 tccli cdb DescribeDBInstances --InstanceIds '["{{user.resource_id}}"]'
-tccli monitor GetMonitorData --Namespace QCE/CDB --MetricName SlowQueries \
-  --Instances '[{"Dimensions":[{"Name":"instanceId","Value":"{{user.resource_id}}"}]}]' \
-  --StartTime "{{user.time_start}}" --EndTime "{{user.time_end}}" --Period 300
-
 tccli redis DescribeInstances --InstanceId "{{user.resource_id}}"
-tccli monitor GetMonitorData --Namespace QCE/REDIS --MetricName Storage \
-  --Instances '[{"Dimensions":[{"Name":"instanceid","Value":"{{user.resource_id}}"}]}]' \
+tccli es DescribeInstances --InstanceIds '["{{user.resource_id}}"]'
+
+# K — COS (verify bucket dimension via DescribeBaseMetrics --Namespace QCE/COS)
+tccli cos ListBuckets --Region {{env.TENCENTCLOUD_REGION}}
+tccli monitor GetMonitorData --Namespace QCE/COS --MetricName 5xxResponse \
+  --Instances '[{"Dimensions":[{"Name":"bucket","Value":"{{user.bucket_name}}-{{user.app_id}}"}]}]' \
   --StartTime "{{user.time_start}}" --EndTime "{{user.time_end}}" --Period 300
 
-tccli es DescribeInstances --InstanceIds '["{{user.resource_id}}"]'
+# L — CKafka
+tccli ckafka DescribeInstances --InstanceIdList '["{{user.resource_id}}"]' --Region {{env.TENCENTCLOUD_REGION}}
+tccli monitor GetMonitorData --Namespace QCE/CKAFKA --MetricName ConsumerGroupOffsetLag \
+  --Instances '[{"Dimensions":[{"Name":"InstanceId","Value":"{{user.resource_id}}"}]}]' \
+  --StartTime "{{user.time_start}}" --EndTime "{{user.time_end}}" --Period 300
+
+# M — MongoDB
+tccli mongodb DescribeDBInstances --InstanceIds '["{{user.resource_id}}"]'
+tccli monitor GetMonitorData --Namespace QCE/CMONGO --MetricName Connper \
+  --Instances '[{"Dimensions":[{"Name":"target","Value":"{{user.resource_id}}"}]}]' \
+  --StartTime "{{user.time_start}}" --EndTime "{{user.time_end}}" --Period 300
+
+# N — Postgres
+tccli postgres DescribeDBInstances --Filters '[{"Name":"db-instance-id","Values":["{{user.resource_id}}"]}]'
+tccli monitor GetMonitorData --Namespace QCE/POSTGRES --MetricName cpu_usage \
+  --Instances '[{"Dimensions":[{"Name":"DBInstanceId","Value":"{{user.resource_id}}"}]}]' \
+  --StartTime "{{user.time_start}}" --EndTime "{{user.time_end}}" --Period 300
+
+# O — SCF
+tccli scf GetFunction --FunctionName "{{user.function_name}}" --Namespace "{{user.scf_namespace}}"
+tccli scf GetFunctionLogs --FunctionName "{{user.function_name}}" --Namespace "{{user.scf_namespace}}" \
+  --StartTime {{user.time_start_epoch}} --EndTime {{user.time_end_epoch}} --Limit 50
+tccli monitor GetMonitorData --Namespace QCE/SCF --MetricName Error \
+  --Instances '[{"Dimensions":[{"Name":"FunctionName","Value":"{{user.function_name}}"}]}]' \
+  --StartTime "{{user.time_start}}" --EndTime "{{user.time_end}}" --Period 300
+
+# P — CDN
+tccli cdn DescribeDomainsConfig --Domains '["{{user.domain}}"]'
+tccli monitor GetMonitorData --Namespace QCE/CDN --MetricName StatusCode5XX \
+  --Instances '[{"Dimensions":[{"Name":"Domain","Value":"{{user.domain}}"}]}]' \
+  --StartTime "{{user.time_start}}" --EndTime "{{user.time_end}}" --Period 300
 ```
 
 ### VPC network path (Rule G)
@@ -321,15 +222,7 @@ tccli vpc DescribeRouteTables --Filters '[{"Name":"vpc-id","Values":["{{user.vpc
 tccli vpc DescribeNatGateways --Filters '[{"Name":"vpc-id","Values":["{{user.vpc_id}}"]}]'
 ```
 
-### SDK Fallback (RCA additions)
-
-| Product | SDK client | Additional RCA methods |
-|---|---|---|
-| CVM | `cvm_client.CvmClient` | `DescribeInstances` |
-| CDB | `cdb_client.CdbClient` | `DescribeDBInstances` |
-| Redis | `redis_client.RedisClient` | `DescribeInstances` |
-| ES | `es_client.EsClient` | `DescribeInstances` |
-| VPC | `vpc_client.VpcClient` | `DescribeSecurityGroups`, `DescribeRouteTables`, `DescribeNatGateways` |
+Product SDK clients for RCA: see [`api-sdk-usage.md`](api-sdk-usage.md#allowed-methods-by-product).
 
 ## Output
 

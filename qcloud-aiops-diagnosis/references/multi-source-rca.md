@@ -67,7 +67,7 @@ Gather evidence from available sources. See [`cli-usage.md`](cli-usage.md) for f
 | Baseline anomalies | Multi-window `GetMonitorData` per [`anomaly-detection.md`](anomaly-detection.md) | Baselines unavailable → static fallback; lower confidence |
 | CLS event/log | TKE Kubernetes events, app error logs | No topic_id → skip |
 | Change events | CloudAudit `LookUpEvents`, CLS rollout events | CloudAudit disabled or AccessDenied → skip; see [`change-correlation.md`](change-correlation.md) |
-| CDB/Redis/ES metrics | Product `Describe*` + Monitor `QCE/CDB|REDIS|CES` | Missing `resource_id` → skip; see [`product-rca-rules.md`](product-rca-rules.md) |
+| CDB/Redis/ES/COS/CKafka/MongoDB/Postgres/SCF/CDN metrics | Product `Describe*` + Monitor namespaces | Missing IDs → skip; see [`product-rca-rules.md`](product-rca-rules.md) Rules H–P |
 | VPC network path | SG, route, NAT read-only | Missing `vpc_id` and cannot infer → skip; see [`network-rca.md`](network-rca.md) |
 
 All collection is read-only. Missing sources are recorded in `evidence_by_layer` with `data_quality.degraded=true` and a warning.

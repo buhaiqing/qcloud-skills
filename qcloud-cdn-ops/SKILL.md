@@ -16,8 +16,8 @@ compatibility: >-
   Tencent Cloud CDN endpoints.
 metadata:
   author: qcloud
-  version: "1.1.0"
-  last_updated: "2026-06-04"
+  version: "1.2.0"
+  last_updated: "2026-06-13"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/228"
@@ -67,6 +67,7 @@ CDN (Content Delivery Network) is Tencent Cloud's content delivery service provi
 - SSL certificate management (general, not CDN-specific) → use cert management skill
 - Billing management → use dedicated billing tools
 - Task is **full architecture review** (four pillars / multi-product) → delegate to: `qcloud-well-architected-review`
+- Task is **origin 5xx RCA, cache hit drop, edge latency correlation, or cross-layer origin diagnosis** (CDN + COS/CVM/CLB) → delegate to: `qcloud-aiops-diagnosis` (read-only); execute fixes via this skill per bundle recommendations — see [`references/aiops-diagnosis.md`](references/aiops-diagnosis.md)
 - Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
 
@@ -110,6 +111,7 @@ CDN (Content Delivery Network) is Tencent Cloud's content delivery service provi
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial release — CDN domain management, cache purge, config update |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CDN-specific safety rules incl. domain-deletion CNAME break, wildcard `/*` purge mass flush, origin config change, preload origin cost), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
+| 1.2.0 | 2026-06-13 | Rule P reverse delegation: `references/aiops-diagnosis.md`; Trigger & Scope aiops delegate for origin 5xx/cache/latency RCA |
 
 ## Safety Gates
 

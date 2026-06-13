@@ -905,7 +905,7 @@ python3 -c "from tencentcloud.cbs import cbs_client; print('✅ SDK OK')" && tcc
 ### AIOps Intelligent Operations
 
 - [Proactive Inspection](references/proactive-inspection.md) — Five-step closed-loop inspection workflow for CBS
-- [AIOps Diagnosis](references/aiops-diagnosis.md) — Multi-metric correlation, disk performance diagnosis
+- [AIOps Diagnosis](references/aiops-diagnosis.md) — Delegate to `qcloud-aiops-diagnosis` for disk I/O correlation and cross-layer RCA
 
 ## Operational Best Practices
 

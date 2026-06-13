@@ -7,13 +7,19 @@ Collection of Tencent Cloud AI Agent skills (OpenSpec) for ops runbooks. Each sk
 ## Layout
 
 ```
-qcloud-[product]-ops/      # 24 skill directories (see Skills Inventory below)
-  SKILL.md                 # YAML frontmatter (metadata) + Markdown runbook
-  assets/
-    eval_queries.json      # Intent classification test set (should_trigger true/false)
-    example-config.yaml    # Optional example YAML
-  references/              # Supporting docs: cli-usage, api-sdk-usage, troubleshooting, ...
+qcloud-skills/                 # repo root — cross-cutting tooling only (see Asset placement below)
+  scripts/                     # Shared executables: validate_*, gcl_runner, gcl_trace_aggregate
+  audit-results/               # Runtime output (gitignored); not skill source
+  qcloud-[product]-ops/        # 24 skill directories (see Skills Inventory below)
+    SKILL.md                   # YAML frontmatter (metadata) + Markdown runbook
+    assets/
+      eval_queries.json        # Intent classification test set (should_trigger true/false)
+      example-config.yaml      # Optional example YAML
+      *.schema.json            # JSON Schema / handoff contracts owned by THIS skill
+    references/                # Supporting docs: cli-usage, api-sdk-usage, troubleshooting, ...
 ```
+
+**There is no repo-root `assets/` directory.** Every schema, handoff contract, and skill-specific config lives under the owning skill's `assets/` (or `references/` for Markdown-only contracts).
 
 ## Skills inventory (24)
 
@@ -34,6 +40,31 @@ Run `ls qcloud-*-ops/` for the canonical list. The `README.md` skill list is als
 - **Token Efficiency** (P0 — 强制): 在保持 Agent 可执行性的前提下最小化 Token 消耗。规则包括 TE-1（API 查替代硬编码表）、TE-3（紧凑错误表 ≤3 列）、TE-4（JSON paths 集中声明）、TE-5（YAML anchors）、TE-6（消除跨文件重复）。详见下方 Round 1 检查清单。
 - **No web console as agent execution path.** The console may be referenced for product docs but never for state changes.
 - **UX spec** in `qcloud-skill-generator/references/user-experience-spec.md` is mandatory for all generated skills.
+- **Asset & schema placement (mandatory)** — skill-owned artifacts MUST NOT be placed at repo root. Use this split:
+
+  | Location | Allowed contents | Forbidden |
+  |---|---|---|
+  | `qcloud-*-ops/assets/` | `eval_queries.json`, `example-config.yaml`, `*.schema.json`, skill-specific templates | Cross-skill executables |
+  | `qcloud-*-ops/references/` | Runbooks, output contracts in Markdown, delegation stubs | Duplicate JSON schemas that belong in `assets/` |
+  | `scripts/` (repo root) | Shared **executables** used by multiple skills (`validate_*.py`, `gcl_runner.py`, `gcl_trace_aggregate.py`) | JSON Schema, handoff contracts, example YAML |
+  | `audit-results/` (runtime) | Generated traces/reports (`gcl-trace-*.json`, inspection outputs) | Source-of-truth schema files |
+
+  **Owner skill rule:** the skill that **defines and primarily consumes** the contract owns the file. Secondary consumers link to the owner via relative path — they do not copy or re-home the schema.
+
+  | Artifact | Owner skill | Secondary consumers (link only) |
+  |---|---|---|
+  | `gcl-quality-summary.schema.json` | `qcloud-monitor-ops` | `qcloud-proactive-inspection` (report embed), `scripts/gcl_trace_aggregate.py` (docstring) |
+  | `finops-handoff.schema.json` | `qcloud-aiops-diagnosis` | `qcloud-finops-ops` |
+  | `inspection-handoff.schema.json` | `qcloud-aiops-diagnosis` | `qcloud-proactive-inspection` |
+
+  **When adding a new `*.schema.json` or handoff contract:**
+  1. Pick the owner skill (primary consumer of the JSON contract).
+  2. Create under `qcloud-<owner>-ops/assets/<name>.schema.json`.
+  3. Reference from owner `SKILL.md` / `references/` and owner `example-config.yaml` if config-driven.
+  4. Secondary skills cite the owner path (e.g. `../qcloud-monitor-ops/assets/...`) — never `assets/` at repo root.
+  5. If a repo-root `scripts/*.py` emits JSON matching the schema, its docstring MUST point at the owner skill path (script ≠ schema owner).
+
+  **Anti-pattern (banned):** creating `assets/` at repo root because a script is shared — shared **code** lives in `scripts/`; shared **contracts** still belong to an owning skill.
 
 ## Mandatory rule: 2-round self-review after every skill update
 
@@ -52,6 +83,7 @@ After any modification to a skill's `SKILL.md`, `references/`, or `assets/`, the
 5. Verify the YAML frontmatter is valid, `version` and `last_updated` are bumped, and `related_skills` reflect the new state.
 6. Confirm credentials are never printed in any output path — only `<masked>`.
 7. Check that eval_queries.json coverage of new triggers is updated (add 2–4 positive + 2–4 negative cases for new functionality).
+8. **Asset placement:** any new `*.schema.json`, handoff contract, or skill config YAML is under the **owning** `qcloud-*-ops/assets/` — not repo-root `assets/`. Cross-skill scripts stay in `scripts/` only; they reference the owner schema path in docstring/comments. Secondary consumers link to owner; no duplicate copies.
 
 **Round 2 — Adversarial review** (mirror the meta-skill's governance doc):
 1. Apply the four review categories from `qcloud-skill-generator/references/governance-and-adversarial-review.md`: **R1 Security** (credential leaks), **R2 API Fidelity** (invented methods, wrong params — must match official API doc), **R3 Safety Gates** (delete confirmations, pre-backup, rollback), **R4 UX** (Quick Start present, error format, output schema).
@@ -102,10 +134,12 @@ Exit non-zero ⇒ fix finding ID / pillar mismatch before claiming done.
 
 ## Files that do NOT exist
 
+- No repo-root **`assets/`** directory — all skill schemas and handoff contracts live under `qcloud-*-ops/assets/` (see **Asset & schema placement** above).
 - No `package.json`, `Makefile`, CI configs, build scripts, linter, typechecker, or test runner — **except**:
   - `scripts/validate_product_assessment.py` — Well-Architected worker JSON regression
   - `scripts/validate_skills_frontmatter.py` — SKILL.md frontmatter checks
   - `scripts/gcl_runner.py` — GCL Orchestrator (Phase 2; external Critic required in production)
+  - `scripts/gcl_trace_aggregate.py` — GCL trace → quality summary (Phase 3; feeds monitor-ops / inspection)
   - `.github/workflows/validate-skills.yml` — CI for the above
 - No `CLAUDE.md`, `opencode.json`, `.cursorrules` in this repo.
 - `.omc/`, `.omo/`, `.codebuddy/`, `.omc/project-memory.json` are gitignored cache data — not source.
@@ -315,7 +349,10 @@ Each skill may override `max_iter` in its own `SKILL.md` (under `## Quality Gate
   with isolated sub-agent Critic). **Done (2026-06-09):** orchestrator loop + trace persistence;
   Critic via `--critic-json`/stdin; `--structural-critic-only` for CI.
 - **Phase 3** — feed `gcl-trace-*.json` into `qcloud-monitor-ops` (custom metric) and
-  `qcloud-proactive-inspection` for quality dashboards.
+  `qcloud-proactive-inspection` for quality dashboards. **Done (2026-06-13):**
+  `scripts/gcl_trace_aggregate.py`, `qcloud-monitor-ops/assets/gcl-quality-summary.schema.json`,
+  `qcloud-monitor-ops/references/gcl-quality-dashboard.md`, inspection report embed in
+  `qcloud-proactive-inspection/references/reporting.md`; `gcl_trace_ref` on aiops bundles.
 - **Phase 4** — wire rubric pass-rate to Cloud Monitor alarms (real incidents refine thresholds).
 
 ### 11. Relationship to existing 2-round self-review

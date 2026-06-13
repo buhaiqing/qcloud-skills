@@ -723,7 +723,7 @@ python3 -c "from tencentcloud.cvm import cvm_client; print('✅ SDK OK')" && tcc
 ### AIOps Intelligent Operations
 
 - [Proactive Inspection](references/proactive-inspection.md) — Five-step closed-loop inspection workflow (Discovery → Collection → Detection → Diagnosis → Report)
-- [AIOps Diagnosis](references/aiops-diagnosis.md) — Multi-metric correlation, cross-skill diagnosis decision tree, alarm storm handling, fault prediction
+- [AIOps Diagnosis](references/aiops-diagnosis.md) — Delegate to `qcloud-aiops-diagnosis` for multi-metric RCA and alarm storm bundling
 
 ## Operational Best Practices
 

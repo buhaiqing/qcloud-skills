@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.2.0"
-  last_updated: "2026-06-09"
+  version: "1.3.0"
+  last_updated: "2026-06-13"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/583"
@@ -91,6 +91,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - Task is **container-based serverless** (EKS/Serverless containers) → delegate to: `qcloud-tke-ops`
 - Task is **long-running batch processing** (>15 minutes execution time) → suggest alternative compute solutions
 - Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
+- Task is **multi-metric RCA, error/timeout/throttle root cause, cold-start correlation, or cross-layer diagnosis** (SCF + downstream CDB/VPC/API GW) → delegate to: `qcloud-aiops-diagnosis` (read-only); execute fixes via this skill per bundle recommendations — see [`references/aiops-diagnosis.md`](references/aiops-diagnosis.md)
 
 ### Delegation Rules
 
@@ -98,7 +99,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - SCF integrates with COS: use `qcloud-cos-ops` for bucket operations when setting up COS triggers
 - SCF integrates with CMQ/Ckafka: use relevant skills for message queue trigger configuration
 - SCF uses VPC: verify VPC/Subnet via `qcloud-vpc-ops` for VPC-connected functions
-- SCF uses Monitor: use `qcloud-monitor-ops` for detailed metrics and alerting setup
+- SCF uses Monitor: use `qcloud-monitor-ops` for alarm **policy** CRUD; **diagnosis bundling** (Error/Duration/Throttle RCA, Rule O) → `qcloud-aiops-diagnosis` with `{{user.function_name}}`, `{{user.scf_namespace}}`, time window
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs
 - Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
@@ -229,8 +230,7 @@ tccli scf ListFunctions --Region {{env.TENCENTCLOUD_REGION}} --Namespace default
 |---------|------|---------|
 | 1.0.0 | 2026-05-28 | Initial release — function lifecycle, triggers, layers, versions, dual-path |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 SCF-specific safety rules incl. function-delete cascade, trigger disruption, namespace/layer cascade, code update env var overwrite, invocation side effects), `references/prompt-templates.md`. `max_iter=2` per AGENTS.md §8 |
-
----
+| 1.3.0 | 2026-06-13 | Rule O reverse delegation: `references/aiops-diagnosis.md`; Trigger & Scope aiops delegate for error/timeout/throttle/cold-start RCA |
 
 ## Execution Flows (Agent-Readable)
 

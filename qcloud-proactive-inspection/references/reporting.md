@@ -41,6 +41,33 @@
 2. cbp-aaa 未关联实例 45 天 → 确认是否可删除
 ```
 
+## GCL Quality Section (Phase 3)
+
+When `./audit-results/gcl-trace-*.json` exists in the inspection window, embed skill execution quality:
+
+```markdown
+## Agent 技能质量 (GCL)
+
+**数据窗口**: 最近 {{gcl_since_hours}}h | **汇总文件**: {{gcl_summary_path}}
+
+| 指标 | 值 |
+|------|-----|
+| 总执行次数 | {{gcl.totals.total_runs}} |
+| 通过率 | {{gcl.pass_rate}} |
+| Safety 失败 | {{gcl.totals.SAFETY_FAIL}} |
+| MAX_ITER 耗尽 | {{gcl.totals.MAX_ITER}} |
+
+### 按技能 breakdown
+| 技能 | 总数 | PASS | SAFETY_FAIL | MAX_ITER |
+|------|------|------|-------------|----------|
+| {{skill}} | {{total}} | {{PASS}} | {{SAFETY_FAIL}} | {{MAX_ITER}} |
+
+> 生成命令: `python3 scripts/gcl_trace_aggregate.py --since-hours {{gcl_since_hours}}`  
+> 告警阈值: 见 `qcloud-monitor-ops` → `gcl_quality` config
+```
+
+Pre-flight: run aggregate script; if no traces, omit this section (do not fabricate metrics).
+
 ## Report Generation (Python)
 ```python
 def generate_report(resources, metrics, detections, format='markdown'):

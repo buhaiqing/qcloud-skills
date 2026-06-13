@@ -44,7 +44,7 @@ Tencent Cloud Observability Platform (TCOP, 腾讯云可观测平台, 云监控)
 
 > **UX Compliance:** This skill follows the [User Experience Specification](../qcloud-skill-generator/references/user-experience-spec.md). All operations include onboarding guidance, minimal prompts, smart defaults, clear feedback, and user-friendly error handling.
 
-> **AIOps Integration:** This is a monitoring skill. It MUST follow [AIOps Best Practices](../qcloud-skill-generator/references/aiops-best-practices.md) for alarm storm handling, multi-metric correlation, proactive inspection, and diagnostic delegation.
+> **AIOps Integration:** For alarm storm root cause, multi-metric correlation across products, or cross-layer RCA → delegate to [`qcloud-aiops-diagnosis`](../qcloud-aiops-diagnosis/SKILL.md). This skill handles alarm **policy** CRUD and metric **collection**; AIOps handles diagnosis bundling.
 
 ### CLI applicability (repository policy)
 
@@ -68,6 +68,7 @@ Every generated skill MUST satisfy these five standards:
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial release — alarm policy CRUD, metric query, dashboard, troubleshooting |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 Monitor-specific safety rules incl. alarm-policy deletion silent incident, unbinding coverage loss, threshold drift, notice template silence, default policy reach), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
+| 1.2.0 | 2026-06-13 | **GCL Phase 3:** `references/gcl-quality-dashboard.md`, `gcl_quality` in example-config; `scripts/gcl_trace_aggregate.py` integration |
 
 ### Well-Architected Framework Integration
 
@@ -101,6 +102,7 @@ Every generated skill MUST satisfy these five standards:
 - Task is purely billing/FinOps/cost analysis → `qcloud-finops-ops` (when present)
 - Task is CAM only → `qcloud-cam-ops` (when present)
 - User wants **console-only** → state limitation; no undocumented HTTP steps
+- **Alarm storm root cause analysis, multi-metric correlation across products, cross-layer RCA** → delegate to `qcloud-aiops-diagnosis` (pass alarm history time window + resource IDs)
 
 ### Delegation Matrix
 
@@ -112,7 +114,7 @@ Every generated skill MUST satisfy these five standards:
 | `QCE/REDIS` | `qcloud-redis-ops` | Redis metrics → Redis operations |
 | `QCE/VPC` | `qcloud-vpc-ops` | VPC flow metrics → VPC operations |
 
-**Rule:** Monitor skill handles alarm/metric configuration. Product ops skills handle resource operations based on alarm findings.
+**Rule:** Monitor skill handles alarm/metric configuration. Product ops skills handle resource operations based on alarm findings. **Diagnosis bundling** (storm aggregation, RCA) → `qcloud-aiops-diagnosis`.
 - Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
 
@@ -476,6 +478,15 @@ This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
 
 Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
+### GCL quality dashboard (Phase 3)
+
+After skill executions that produce GCL traces:
+
+1. Run `python3 scripts/gcl_trace_aggregate.py --since-hours 24`
+2. Load thresholds from [`example-config.yaml`](assets/example-config.yaml) → `gcl_quality`
+3. Follow [`references/gcl-quality-dashboard.md`](references/gcl-quality-dashboard.md) for webhook/CLS alerting
+4. On `pass_rate < pass_rate_critical` or `SAFETY_FAIL > 0`, notify via existing Monitor notice — **do not** auto-modify alarm policies
+
 ---
 
 ## Reference Directory
@@ -486,6 +497,7 @@ Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 - [CLI Usage](references/cli-usage.md) — `tccli monitor` commands
 - [Troubleshooting](references/troubleshooting.md) — Alarm issues and solutions
 - [Integration](references/integration.md) — Cross-skill delegation matrix
+- [GCL Quality Dashboard](references/gcl-quality-dashboard.md) — Phase 3 trace aggregation and quality alerting
 
 ### Framework Integration
 - [Well-Architected Assessment](references/well-architected-assessment.md) — Four-pillar framework for monitoring

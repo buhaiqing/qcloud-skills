@@ -270,5 +270,69 @@
   {
     "query": "帮我做一次全面资源巡检生成报告",
     "should_trigger": false
+  },
+  {
+    "query": "COS 请求延迟突然升高帮我诊断根因",
+    "should_trigger": true
+  },
+  {
+    "query": "CKafka 消费 lag 暴涨关联诊断",
+    "should_trigger": true
+  },
+  {
+    "query": "SCF 函数冷启动超时帮我排查",
+    "should_trigger": true
+  },
+  {
+    "query": "部署一个新的 CKafka Topic",
+    "should_trigger": false
+  },
+  {
+    "query": "创建 SCF 函数",
+    "should_trigger": false
+  },
+  {
+    "query": "MongoDB 主从延迟很高帮我找根因",
+    "should_trigger": true
+  },
+  {
+    "query": "Postgres 慢查询导致应用超时，做跨层诊断",
+    "should_trigger": true
+  },
+  {
+    "query": "COS 桶 403 突然增多是不是 CAM 问题",
+    "should_trigger": true
+  },
+  {
+    "query": "创建 MongoDB 只读副本",
+    "should_trigger": false
+  },
+  {
+    "query": "删除 CKafka 实例",
+    "should_trigger": false
+  },
+  {
+    "query": "SCF 函数一直超时报错，帮我找根因",
+    "should_trigger": true
+  },
+  {
+    "query": "云函数冷启动特别慢怎么诊断",
+    "should_trigger": true
+  },
+  {
+    "query": "CDN 回源 5xx 飙高，关联源站做 RCA",
+    "should_trigger": true
+  },
+  {
+    "query": "加速域名命中率突然下降，帮我分析",
+    "should_trigger": true
+  },
+  {
+    "query": "发布新版本云函数",
+    "should_trigger": false
+  },
+  {
+    "query": "刷新 CDN 全站缓存",
+    "should_trigger": false
   }
 ]

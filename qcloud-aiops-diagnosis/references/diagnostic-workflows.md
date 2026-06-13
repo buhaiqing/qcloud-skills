@@ -184,23 +184,23 @@ Output Anomaly Bundle; embed anomaly_findings[] in RCA Bundle when RCA also runs
 Persist optional: ./audit-results/anomaly-bundle-YYYYMMDD-HHMMSS.json
 ```
 
-## Workflow 9: Product + Network RCA (CDB / Redis / ES / VPC)
+## Workflow 9: Product + Network RCA (all product rules H–P / VPC Rule G)
 
 Canonical specs: [`product-rca-rules.md`](product-rca-rules.md), [`network-rca.md`](network-rca.md).
 
 ```
-Symptom on CDB/Redis/ES OR connection timeout with healthy compute metrics
+Symptom on any product (CDB/Redis/ES/COS/CKafka/MongoDB/Postgres/SCF/CDN) OR connection timeout with healthy compute metrics
   ↓
-Set resource_type + resource_id; optional load_balancer_id / vpc_id / instance_id
+Set resource_type + resource_id; optional domain / function_name / scf_namespace / load_balancer_id / vpc_id
   ↓
-Collect product metrics + Describe* (Rules H/I/J)
+Collect product metrics + Describe* (Rules H–P)
   ↓
 If timeout/refused OR NodeNotReady+CVM healthy OR F4 network change:
   Collect VPC SG/route/NAT (Rule G)
   ↓
 Score product hypotheses; cross-link CLB symptom layer if present
   ↓
-If H4/I4/J4 or G5: downgrade product-root confidence; surface alternate layer
+If H4/I4/J4/K4/L4/M5/N5/O5/P5 or G5: downgrade product-root confidence; surface alternate layer
   ↓
 Output RCA Bundle with product_rca / network_rca blocks + delegated recommendations
 ```

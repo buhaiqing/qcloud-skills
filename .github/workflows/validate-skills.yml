@@ -29,3 +29,4 @@ jobs:
             --command 'echo {"Response":{"RequestId":"ci-smoke"}}' \
             --max-iter 1 \
             --structural-critic-only
+          python3 scripts/gcl_trace_aggregate.py --since-hours 168

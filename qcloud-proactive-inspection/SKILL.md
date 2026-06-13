@@ -203,6 +203,7 @@ Default thresholds (override via `{{user.thresholds}}`):
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 rules: run idempotency, read-only collection, credential safety, snapshot timing, report path security), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
 | 1.2.0 | 2026-06-09 | Product skill delegation for Discovery; boundary vs `qcloud-well-architected-review` |
 | 1.3.0 | 2026-06-09 | `inspection-output-schema.md`; 20 product `proactive-inspection.md` checklists |
+| 1.4.0 | 2026-06-13 | GCL Phase 3: embed `gcl-quality-summary` in inspection report (`reporting.md`) |
 
 ## Quality Gate (GCL)
 
@@ -234,4 +235,4 @@ For detailed inspection patterns, see:
 - [Collection Methods](references/collection.md) — Metric collection patterns
 - [Detection Rules](references/detection.md) — Anomaly detection thresholds
 - [Diagnosis Workflows](references/diagnosis.md) — Root cause analysis per anomaly
-- [Reporting Templates](references/reporting.md) — Report generation and formats
+- [Reporting Templates](references/reporting.md) — Report generation and formats (incl. GCL quality §Phase 3)

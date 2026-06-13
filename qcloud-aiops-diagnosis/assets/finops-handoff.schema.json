@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FinOps to AIOps Handoff",
+  "description": "Payload from qcloud-finops-ops consumed at AIOps pre-flight (cross-skill-orchestration.md §2.1)",
+  "type": "object",
+  "required": ["handoff_id", "source_skill", "anomaly", "top_products"],
+  "properties": {
+    "handoff_id": { "type": "string" },
+    "source_skill": { "type": "string", "const": "qcloud-finops-ops" },
+    "anomaly": {
+      "type": "object",
+      "required": ["confidence"],
+      "properties": {
+        "month": { "type": "string" },
+        "confidence": { "type": "string", "enum": ["HIGH", "MEDIUM", "LOW"] },
+        "ii_ratio": { "type": "number" },
+        "iii_ratio": { "type": "number" },
+        "total_delta_cny": { "type": "number" }
+      }
+    },
+    "top_products": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["product", "delta_cny"],
+        "properties": {
+          "product": { "type": "string" },
+          "delta_cny": { "type": "number" },
+          "delta_pct": { "type": "number" },
+          "top_resource_ids": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "dispatch_inspection": { "type": "boolean" },
+    "time_window": {
+      "type": "object",
+      "properties": {
+        "start": { "type": "string" },
+        "end": { "type": "string" }
+      }
+    },
+    "owner": { "type": "string" }
+  }
+}

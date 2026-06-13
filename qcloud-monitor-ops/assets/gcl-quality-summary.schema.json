@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GCL Quality Summary",
+  "description": "Aggregated output from scripts/gcl_trace_aggregate.py (AGENTS.md GCL Phase 3). Owned by qcloud-monitor-ops; consumed by gcl-quality-dashboard.md and proactive-inspection reporting embed.",
+  "type": "object",
+  "required": ["version", "generated_at", "totals", "pass_rate", "by_skill"],
+  "properties": {
+    "version": { "type": "string", "const": "1.0" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "window": {
+      "type": "object",
+      "properties": {
+        "trace_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "required": ["total_runs", "PASS", "SAFETY_FAIL", "MAX_ITER"],
+      "properties": {
+        "total_runs": { "type": "integer", "minimum": 0 },
+        "PASS": { "type": "integer", "minimum": 0 },
+        "SAFETY_FAIL": { "type": "integer", "minimum": 0 },
+        "MAX_ITER": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "pass_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "avg_rubric_scores": {
+      "type": "object",
+      "properties": {
+        "correctness": { "type": ["number", "null"] },
+        "safety": { "type": ["number", "null"] },
+        "idempotency": { "type": ["number", "null"] },
+        "traceability": { "type": ["number", "null"] },
+        "spec_compliance": { "type": ["number", "null"] }
+      }
+    },
+    "by_skill": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer" },
+          "PASS": { "type": "integer" },
+          "SAFETY_FAIL": { "type": "integer" },
+          "MAX_ITER": { "type": "integer" },
+          "avg_iterations": { "type": "number" }
+        }
+      }
+    },
+    "trace_files": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

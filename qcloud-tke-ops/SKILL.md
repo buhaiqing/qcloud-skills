@@ -92,6 +92,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - Task is **application-level Kubernetes YAML** (Deployments, Services, Ingress) → application-level tool, not this skill
 - Task is cloud **container registry (TCR)** specific → delegate to `qcloud-tcr-ops` (when present)
 - Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
+- Task is **alarm storm aggregation, multi-metric cross-layer RCA, or intelligent root cause analysis** (Pod+Node+CLB correlation, event bundling) → delegate to: `qcloud-aiops-diagnosis` (read-only); execute fixes via this skill per bundle recommendations
 
 ### Delegation Rules
 
@@ -99,6 +100,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - TKE uses CLB for Service type LoadBalancer: delegate load balancer operations to `qcloud-clb-ops`
 - TKE worker nodes are CVM instances: delegate VM-level operations (SSH, disk, OS) to `qcloud-cvm-ops`
 - TKE container images may use COS/TCR: delegate storage/registry to `qcloud-cos-ops` or `qcloud-tcr-ops`
+- **Alarm storm / event aggregation / cross-layer diagnosis** → `qcloud-aiops-diagnosis` with `{{user.cluster_id}}`, time window, optional `load_balancer_id`; return Event Bundle or RCA Bundle
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs
 - Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
 - Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
