@@ -117,29 +117,32 @@ class ConformanceTests(unittest.TestCase):
     def test_rubric_section_count(self) -> None:
         """All 24 skills must have rubric.md with exactly 8 numbered sections (1..8, no gaps)."""
         result = gclc.check_all(ROOT)
-        failing = [r["skill"] for r in result if not r["rubric_ok"]]
-        self.assertEqual(
-            failing, [],
-            f"Skills with non-conformant rubric.md: {failing}",
-        )
+        for r in result:
+            with self.subTest(skill=r["skill"]):
+                self.assertEqual(
+                    r["rubric_sections"], 8,
+                    f"{r['skill']} rubric has {r['rubric_sections']} sections, expected 8",
+                )
 
     def test_prompt_section_count(self) -> None:
         """All 24 skills must have prompt-templates.md with exactly 7 numbered sections (1..7, no gaps)."""
         result = gclc.check_all(ROOT)
-        failing = [r["skill"] for r in result if not r["prompt_ok"]]
-        self.assertEqual(
-            failing, [],
-            f"Skills with non-conformant prompt-templates.md: {failing}",
-        )
+        for r in result:
+            with self.subTest(skill=r["skill"]):
+                self.assertEqual(
+                    r["prompt_sections"], 7,
+                    f"{r['skill']} prompt-templates has {r['prompt_sections']} sections, expected 7",
+                )
 
     def test_quality_gate_present(self) -> None:
         """All 24 SKILL.md files must contain the `## Quality Gate (GCL)` heading."""
         result = gclc.check_all(ROOT)
-        failing = [r["skill"] for r in result if not r["skill_ok"]]
-        self.assertEqual(
-            failing, [],
-            f"Skills missing `## Quality Gate (GCL)` in SKILL.md: {failing}",
-        )
+        for r in result:
+            with self.subTest(skill=r["skill"]):
+                self.assertIs(
+                    r["has_quality_gate"], True,
+                    f"{r['skill']} SKILL.md is missing `## Quality Gate (GCL)` heading",
+                )
 
 
 if __name__ == "__main__":

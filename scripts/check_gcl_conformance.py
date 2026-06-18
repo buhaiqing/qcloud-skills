@@ -134,9 +134,7 @@ def check_all(root: Path) -> list[dict[str, Any]]:
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
-    parser = argparse.ArgumentParser(
-        description="Check GCL Tier-A artifact conformance across all qcloud-* skills.",
-    )
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--root",
         type=Path,
