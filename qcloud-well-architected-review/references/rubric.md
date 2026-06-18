@@ -103,10 +103,60 @@ Each dimension is scored `0`, `0.5`, or `1`. Thresholds from [AGENTS.md §3](../
 
 ---
 
-## 6. Changelog
+## 6. Worked examples
+
+### Example A — PASS on 4-pillar assessment (all workers complete)
+
+| Dimension | Score | Justification |
+|---|---|---|
+| Correctness | 1 | All pillar scores backed by worker `product_assessment` JSON |
+| Safety | 1 | Read-only Describe* only; report masked |
+| Idempotency | 1 | First run on scope; timestamp in header |
+| Traceability | 1 | Worker delegation logged per product |
+| Spec Compliance | 1 | Registry respected; no orchestrator inline CLI |
+
+`blocking: false`. `final: PASS, iter: 1`.
+
+### Example B — RETRY on Reliability pillar (RTO exceeds SLA)
+
+| Dimension | Score | Justification |
+|---|---|---|
+| Correctness | 0.5 | RTO finding lacks backup recovery test evidence |
+| Safety | 1 | — |
+| Idempotency | 1 | — |
+| Traceability | 0.5 | Partial worker trace |
+| Spec Compliance | 0.5 | Reliability worker incomplete |
+
+`blocking: true`. Suggestion: re-run CDB backup restore Describe* via worker.
+
+### Example C — SAFETY_FAIL on credential in report draft
+
+| Dimension | Score | Justification |
+|---|---|---|
+| Correctness | 1 | — |
+| **Safety** | **0** | Raw `TENCENTCLOUD_SECRET_KEY` in report output |
+| Idempotency | 1 | — |
+| Traceability | 1 | — |
+| Spec Compliance | 0 | Rule 2 violated |
+
+`blocking: true`. **ABORT**. Recovery: redact with `<masked>`; re-generate report section.
+
+---
+
+## 7. Changelog
 
 | Version | Date | Change |
 |---|---|---|
 | 1.0.0 | 2026-06-04 | Initial: §5 advisory rules only |
 | 1.1.0 | 2026-06-09 | Added §1–§4 five dimensions |
 | 1.2.0 | 2026-06-09 | Orchestrator + Worker scoring; DELEGATION_VIOLATION checks |
+| 1.3.0 | 2026-06-19 | Added §6 worked examples; Changelog → §7; §8 See also |
+
+---
+
+## 8. See also
+
+- [AGENTS.md §3 Rubric](../../AGENTS.md#3-rubric-mandatory-per-skill)
+- [AGENTS.md §8 Per-Skill Defaults](../../AGENTS.md#8-per-skill-defaults-qcloud) — `qcloud-well-architected-review` is `optional`, `max_iter=5`
+- [`prompt-templates.md`](prompt-templates.md)
+- [SKILL.md](../SKILL.md)

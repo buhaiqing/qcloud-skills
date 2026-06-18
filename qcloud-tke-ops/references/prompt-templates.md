@@ -198,3 +198,12 @@ Decision output JSON:
 |---|---|---|
 | 1.0.0 | 2026-06-04 | Phase 1 TKE rollout: templates (5 rules, version-upgrade addon-compat guard, node-drain PDB guard, public-endpoint security). Initially cross-referenced CLB templates |
 | 1.1.0 | 2026-06-04 | Made templates self-contained: inlined full Generator/Critic/Orchestrator prompts with TKE-specific API names, safety rules, abort conditions, and anti-patterns. Removed CLB cross-reference dependency |
+| 1.2.0 | 2026-06-19 | Added §7 See also (Tier A prompt conformance) |
+
+---
+
+## 7. See also
+
+- [AGENTS.md §7 Prompt Templates](../../AGENTS.md#7-prompt-templates-mandatory-per-skill)
+- [`rubric.md`](rubric.md) — 5 TKE-specific safety rules
+- [SKILL.md](../SKILL.md)
