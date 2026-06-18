@@ -30,3 +30,15 @@ jobs:
             --max-iter 1 \
             --structural-critic-only
           python3 scripts/gcl_trace_aggregate.py --since-hours 168
+
+      - name: GCL runner unit tests
+        run: |
+          cd scripts && python3 -m unittest gcl_runner_test -v
+
+      - name: GCL alarm wire plan (no mutations)
+        run: |
+          python3 scripts/gcl_alarm_wire.py plan || echo "alarm_wire plan finished (exit=$?)"
+
+      - name: GCL Tier-A conformance (Charter C7)
+        run: |
+          python3 scripts/check_gcl_conformance.py
