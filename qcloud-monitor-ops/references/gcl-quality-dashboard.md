@@ -99,6 +99,81 @@ If `pass_rate < gcl_quality.pass_rate_critical` OR `totals.SAFETY_FAIL > 0`:
 2. **Do not** auto-modify skill rubrics or cloud resources.
 3. Delegate deep RCA to `qcloud-aiops-diagnosis` when quality drop correlates with production incidents.
 
+## Step 5: Phase 4 — Wire rubric pass-rate to Cloud Monitor alarms
+
+> **AGENTS.md §10.10 Phase 4:** Close the loop by ensuring Cloud Monitor alarm
+> policies exist for GCL quality SLOs. Custom metric namespace `qce/gcl_custom`
+> holds two metrics: `GCLPassRate` (gauge, 0–1) and `GCLSafetyFailCount` (counter).
+
+### 5.1 Plan first (no mutations)
+
+```bash
+python3 scripts/gcl_alarm_wire.py plan \
+  --config qcloud-monitor-ops/assets/example-config.yaml
+# Or with a specific summary:
+python3 scripts/gcl_alarm_wire.py plan \
+  --summary audit-results/gcl-quality-summary-LATEST.json
+```
+
+Output is a JSON report: thresholds, breach evaluation, and the alarm-policy
+operations that **would** be applied. Exit code `1` ⇒ SLO breach detected;
+exit code `0` ⇒ within SLO. CI / first-time setup should run `plan` only.
+
+### 5.2 Apply (idempotent — safe to re-run)
+
+```bash
+# Dry-run first (recommended)
+python3 scripts/gcl_alarm_wire.py apply --dry-run
+
+# Real apply — invokes `tccli monitor CreateAlarmPolicy`
+python3 scripts/gcl_alarm_wire.py apply
+```
+
+The script enforces three alarm policies by default:
+
+| Policy | Severity | Metric | Trigger |
+|---|---|---|---|
+| `gcl-quality-pass-rate-critical` | CRITICAL | `GCLPassRate` | `< gcl_quality.pass_rate_critical` (default 0.70) for 5 min |
+| `gcl-quality-pass-rate-warn` | WARN | `GCLPassRate` | `< gcl_quality.pass_rate_warn` (default 0.85) for 10 min |
+| `gcl-safety-fail-critical` | CRITICAL | `GCLSafetyFailCount` | `> 0` for 1 min (any SAFETY_FAIL) |
+
+### 5.3 Custom metric upload (GCL → Cloud Monitor)
+
+For Cloud Monitor to evaluate the policies above, the runtime must publish
+`GCLPassRate` and `GCLSafetyFailCount` into namespace `qce/gcl_custom`. Two
+patterns:
+
+```bash
+# Path A — Inline upload after each aggregate (recommended)
+SUMMARY=$(ls -t audit-results/gcl-quality-summary-*.json | head -1)
+python3 - <<'PY'
+import json, subprocess, sys
+s = json.load(open("$SUMMARY".replace("$SUMMARY", "$SUMMARY")))
+metric_value = s["pass_rate"]
+# tccli monitor PutMonitorData — verify with `tccli monitor help`
+# Custom metric upload: namespace="qce/gcl_custom", metricName="GCLPassRate",
+# dimensions=[{"Name":"skill","Value":"aggregate"}], value=metric_value
+PY
+
+# Path B — Cron / scheduled task writes a JSON file the script ingests
+# (preferred for stable deployment)
+```
+
+If `tccli monitor PutMonitorData` is unavailable in your account (some
+sub-accounts have monitoring-write restrictions), fall back to **Path A
+webhook only** (Step 3A) and let the alarm policies fire on stale data;
+the dashboard surfaces the breach via webhook regardless.
+
+### 5.4 Operational checklist
+
+| # | Check |
+|---|--------|
+| 1 | `tccli monitor help` lists `CreateAlarmPolicy` and `PutMonitorData` |
+| 2 | `python3 scripts/gcl_alarm_wire.py plan` exits 0 with latest summary |
+| 3 | `python3 scripts/gcl_alarm_wire.py apply` ran clean (no FAILED lines) |
+| 4 | `tccli monitor DescribeAlarmPolicies --Module monitor --PolicyName gcl-quality-pass-rate-critical` returns the policy |
+| 5 | Custom metric `qce/gcl_custom / GCLPassRate` is registered (one-time via Cloud Monitor console or `tccli monitor CreateCustomMetric` if supported in your version) |
+
 ## Cross-Skill Hooks
 
 | Producer | Consumer | Handoff |
@@ -113,3 +188,4 @@ If `pass_rate < gcl_quality.pass_rate_critical` OR `totals.SAFETY_FAIL > 0`:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-06-13 | Phase 3 initial — aggregate script integration, webhook/CLS paths, config thresholds |
+| 1.1.0 | 2026-06-18 | **Phase 4:** added `scripts/gcl_alarm_wire.py` (`plan` / `apply` / `--dry-run`); Step 5 covers tccli `CreateAlarmPolicy` for `GCLPassRate` / `GCLSafetyFailCount`; custom-metric upload path documented; operational checklist |

@@ -187,6 +187,55 @@ def decide(scores: dict[str, float]) -> str:
     return "PASS"
 
 
+# Reflexion: failure-pattern extraction (AGENTS.md §14.6).
+# Maps Generator output + Critic suggestions to a structured failure_pattern
+# block that callers (or Reflexion pre-flight) can persist to
+# docs/failure-patterns.md. Categories match the schema in that file:
+#   cli_parameter | skill_generation | cross_skill | runtime | token_efficiency
+_FAILURE_SIGNATURES: list[tuple[str, re.Pattern[str]]] = [
+    ("cli_parameter", re.compile(r"InvalidParameter|MissingParameter|AuthFailure\.", re.I)),
+    ("runtime", re.compile(r"TIMEOUT|RequestLimitExceeded|InternalError|ConnectionError", re.I)),
+    ("cross_skill", re.compile(r"delegate-to|not found in target skill|cross-skill", re.I)),
+    ("token_efficiency", re.compile(r"token budget|exceeds.*token|too long|truncated", re.I)),
+    ("skill_generation", re.compile(r"frontmatter missing|missing rubric|broken link", re.I)),
+]
+
+
+def extract_failure_pattern(
+    skill: str,
+    command: str,
+    generator: dict[str, Any],
+    critic: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Heuristic failure-pattern extraction. Returns None if no pattern matched.
+
+    The schema mirrors ``docs/failure-patterns.md`` so that traces can feed
+    Reflexion memory directly. Count starts at 1; downstream tooling is
+    expected to dedup-and-increment before persisting.
+    """
+    corpus_parts = [
+        command or "",
+        generator.get("result_excerpt", "") or "",
+        *(critic.get("suggestions") or []),
+    ]
+    corpus = "\n".join(corpus_parts)
+    for category, pattern in _FAILURE_SIGNATURES:
+        match = pattern.search(corpus)
+        if not match:
+            continue
+        fix = (critic.get("suggestions") or ["Investigate failure pattern and add fix"])[0]
+        return {
+            "category": category,
+            "skill": skill,
+            "command": command[:200] if command else None,
+            "error": match.group(0),
+            "fix": fix[:200],
+            "count": 1,
+            "reusable": category in {"cli_parameter", "runtime"},
+        }
+    return None
+
+
 def persist_trace(root: Path, trace: dict[str, Any]) -> Path:
     out_dir = root / "audit-results"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -245,7 +294,14 @@ def cmd_run(args: argparse.Namespace) -> int:
         )
 
         if decision == "SAFETY_FAIL":
-            trace["final"] = {"status": "SAFETY_FAIL", "iter": iteration, "output": None}
+            trace["final"] = {
+                "status": "SAFETY_FAIL",
+                "iter": iteration,
+                "output": None,
+                "failure_pattern": extract_failure_pattern(
+                    args.skill, command, generator, critic
+                ),
+            }
             path = persist_trace(root, trace)
             print(f"SAFETY_FAIL — trace: {path}", file=sys.stderr)
             return 3
@@ -270,6 +326,9 @@ def cmd_run(args: argparse.Namespace) -> int:
             d for d, t in RUBRIC_THRESHOLDS.items()
             if trace["iterations"][-1]["critic"]["scores"].get(d, 0) < t
         ],
+        "failure_pattern": extract_failure_pattern(
+            args.skill, command, trace["iterations"][-1]["generator"], trace["iterations"][-1]["critic"]
+        ),
     }
     path = persist_trace(root, trace)
     print(f"MAX_ITER — trace: {path}", file=sys.stderr)
@@ -278,10 +337,15 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     sub = p.add_subparsers(dest="cmd", required=True)
 
     run = sub.add_parser("run", help="Execute GCL loop")
+    run.add_argument(
+        "--root",
+        type=Path,
+        default=Path(__file__).resolve().parents[1],
+        help="Repository root (default: parent of scripts/)",
+    )
     run.add_argument("--skill", required=True, help="Skill id, e.g. qcloud-cvm-ops")
     run.add_argument("--request", required=True, help="Sanitized user request (stored in trace)")
     run.add_argument("--command", required=True, help="Shell command for Generator")

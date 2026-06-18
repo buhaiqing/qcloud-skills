@@ -559,6 +559,24 @@ Every **Delete**, **Terminate**, or **irreversible** operation MUST have:
 
 ---
 
+## Quality Gate (GCL)
+
+> **Required when:** this skill is GCL `required` or `recommended` per [AGENTS.md §10.8](../../AGENTS.md#8-per-skill-defaults-qcloud). Defaults: any product with destructive operations (Terminate / Delete / Drop / Destroy / Reset) is `required` and `max_iter=2`. Read-only / advisory skills are `optional` and may skip this section.
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot ([AGENTS.md §10](../../AGENTS.md#10-generator-critic-loop-gcl--adversarial-quality-gate)). Every mutation executes through `scripts/gcl_runner.py run` with an isolated-context Critic scoring 5 dimensions (correctness / safety / idempotency / traceability / spec_compliance). Safety = 0 ⇒ ABORT.
+
+| Item | Value |
+|---|---|
+| GCL applicability | `required` / `recommended` / `optional` (per AGENTS.md §8) |
+| `max_iterations` | `2` (required) / `3` (recommended) / `5` (optional) |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` |
+
+> **Prompt-context isolation (mandatory):** Generator and Critic run in **isolated** prompt contexts (sub-agent or fresh conversation). Critic MUST NOT see the raw user request — only `{{output.generator_output}}` + `{{output.trace}}`. See `references/prompt-templates.md` §2 for the Critic skeleton.
+
+---
+
 ## Output Schema
 
 All responses follow Tencent Cloud API structure:

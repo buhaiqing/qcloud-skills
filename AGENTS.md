@@ -365,7 +365,17 @@ Each skill may override `max_iter` in its own `SKILL.md` (under `## Quality Gate
   `scripts/gcl_trace_aggregate.py`, `qcloud-monitor-ops/assets/gcl-quality-summary.schema.json`,
   `qcloud-monitor-ops/references/gcl-quality-dashboard.md`, inspection report embed in
   `qcloud-proactive-inspection/references/reporting.md`; `gcl_trace_ref` on aiops bundles.
-- **Phase 4** — wire rubric pass-rate to Cloud Monitor alarms (real incidents refine thresholds).
+- **Phase 4** — wire rubric pass-rate to Cloud Monitor alarms (real incidents refine thresholds). **Done (2026-06-18):**
+  `scripts/gcl_alarm_wire.py` (`plan` / `apply` / `--dry-run`) creates three idempotent
+  alarm policies (`gcl-quality-pass-rate-critical`, `gcl-quality-pass-rate-warn`,
+  `gcl-safety-fail-critical`) on the `qce/gcl_custom` namespace;
+  `qcloud-monitor-ops/references/gcl-quality-dashboard.md` Step 5 documents the
+  end-to-end wiring; `gcl_runner_test.py` covers 35 unit tests
+  (masking, structural_critic, decide, persist, end-to-end PASS/SAFETY_FAIL/MAX_ITER);
+  `failure_pattern` is extracted from Critic suggestions into `trace.final.failure_pattern`
+  for Reflexion memory (`docs/failure-patterns.md`); `qcloud-skill-generator`
+  Output table + Charter C7 now require `references/rubric.md` + `references/prompt-templates.md`
+  + `## Quality Gate (GCL)` SKILL.md section for every GCL `required`/`recommended` skill.
 
 ### 11. Relationship to existing 2-round self-review
 
@@ -385,6 +395,7 @@ does not exempt a sloppy skill update.
 | Version | Date | Change |
 |---|---|---|
 | 1.0.0 | 2026-06-04 | Initial GCL specification added to `AGENTS.md` (adapted from `jdcloud-skills/AGENTS.md`; per-skill defaults remapped to qcloud skill set; `tccli` / `tencentcloud-sdk-python` execution path; Phase 1 pilot scoped to `qcloud-cvm-ops`) |
+| 1.1.0 | 2026-06-18 | **Phase 4 completion:** `scripts/gcl_alarm_wire.py` (plan/apply/dry-run) + Cloud Monitor alarm policies; `scripts/gcl_runner_test.py` (35 unit tests); `failure_pattern` extraction in `gcl_runner.py` (Reflexion); `qcloud-skill-generator` Charter C7 + Output table GCL artifacts; `## Quality Gate (GCL)` template section |
 
 ### 13. See also
 

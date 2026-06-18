@@ -138,8 +138,18 @@ If the user wants **operational execution** (e.g. "create a resource"), load the
 | `references/knowledge-base.md` | Fault pattern library for diagnostic skills | AIOps/diagnosis skills |
 | `references/observability.md` | Metrics→Logs→Traces linkage | Monitoring/AIOps skills |
 | `references/idempotency-checklist.md` | Idempotent behavior for retries/automation | Automation-heavy products |
+| `references/rubric.md` | GCL runtime scoring rubric (5 dimensions + product-specific safety rules). Owner for GCL scoring. | GCL `required` / `recommended` per [AGENTS.md §10.8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `references/prompt-templates.md` | GCL Generator/Critic/Orchestrator prompt skeletons; isolated-context enforcement | GCL `required` / `recommended` per [AGENTS.md §10.8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
 | `assets/example-config.yaml` | Example configuration with UX and optimization settings | Always |
 | `assets/eval_queries.json` | Trigger accuracy evaluation queries for the generated skill | Always |
+
+> **GCL artifacts (rubric.md, prompt-templates.md)** are **mandatory** when the
+> skill is GCL `required` or `recommended` per [AGENTS.md §10.8](../../AGENTS.md#8-per-skill-defaults-qcloud).
+> For products with destructive operations (e.g. `TerminateInstances`,
+> `DeleteBucket`, `IsolateDBInstance`, `DropDB`), the default is `required` and
+> `max_iter=2`. Mirror the existing pilot skills (`qcloud-cvm-ops/references/rubric.md`,
+> `qcloud-cvm-ops/references/prompt-templates.md`) and instantiate the **C6**
+> Charter check below.
 
 ---
 
@@ -205,6 +215,7 @@ C1-C6 全通过？
 | C4 | Well-Architected | `grep -c "Well-Architected Framework" SKILL.md` | ≥ 1 match | Add Well-Architected Framework table |
 | C5 | Variables | `grep -c "^## Variables" SKILL.md` | ≥ 1 match | Add Variables section with `{{env.*}}`/`{{user.*}}`/`{{output.*}}` |
 | C6 | Token Efficiency | `grep -c "TE-[1-7]" SKILL.md` | ≥ 1 TE rule applied | Apply Token Efficiency rules per [Token Efficiency Requirements](#token-efficiency-requirements-p0) |
+| C7 | **GCL Quality Gate** (when skill is GCL `required`/`recommended`) | `[ -f references/rubric.md ] && [ -f references/prompt-templates.md ] && grep -q "## Quality Gate (GCL)" SKILL.md` | All three checks pass | Scaffold rubric + prompt-templates from `qcloud-cvm-ops/references/{rubric,prompt-templates}.md`; add `## Quality Gate (GCL)` section to SKILL.md per [AGENTS.md §10](../../AGENTS.md#10-generator-critic-loop-gcl--adversarial-quality-gate) |
 
 ### Self-Remediation Template (自动修复模板)
 
