@@ -750,6 +750,65 @@ Optional later improvements: PR template checkbox linking to that doc; periodic 
 
 ---
 
+## Quality Gate (GCL)
+
+This meta-skill participates in the **Generator-Critic-Loop (GCL)** at the **generation-time**
+layer. The loop audits the **generated artifact** (a `qcloud-*-ops/SKILL.md` + `references/`
+tree), not cloud resources.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **optional** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **3** | per-skill override |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 generator-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### Why this skill is `optional` (not `required`)
+
+The meta-skill **does not mutate cloud resources**. Its output is a skill
+checked into git. Safety is enforced by the **build-time** Charter C1-C7
+self-check + 2-round self-review (already mandatory above) and by the
+**Charter C7 enforcement** that requires generated skills to ship with their
+own Tier A rubric.md + prompt-templates.md + Quality Gate chapter. The GCL
+loop on this meta-skill is therefore a **double-check**: it verifies that
+the Charter was followed during generation.
+
+### Decision flow
+
+1. **Safety = 0** (e.g., credential literal emitted) ⇒ **ABORT** — emit
+   recovery: replace literal with `{{env.*}}` placeholder
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved
+   Charter violations in `final.unresolved`
+3. **All Charter C1-C7 checks pass** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's `charter_violations` injected
+
+### Meta-skill-specific safety rules (rubric §4)
+
+1. Generated `references/rubric.md` MUST have `safety = 1.0` threshold for destructive ops
+2. Generated `references/prompt-templates.md` §2 Critic MUST be isolated-context
+3. Generated `SKILL.md` MUST include `## Quality Gate (GCL)` chapter (Charter C7)
+4. Frontmatter `metadata.cli_applicability` MUST be set with `cli_support_evidence`
+5. Real-time API doc changes MUST surface breaking changes in trace + bump version
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+
+### Worked example — generating a hypothetical `qcloud-foo-ops`
+
+| Dimension | Score |
+|---|---|
+| Correctness | 1 (frontmatter has all 5 keys) |
+| **Safety** | **0** (rule 1 violated: rubric.md missing `safety = 1.0` for `DeleteFoo`) |
+| Idempotency | 1 |
+| Traceability | 1 |
+| Spec Compliance | 0.5 (Charter C7 partial — rubric.md present, prompt-templates.md missing) |
+
+`decision: ABORT`. Recovery suggestion: "Add `safety = 1.0` to rubric.md §2 dimensions and scaffold prompt-templates.md from cos-ops reference".
+
+See [`references/rubric.md`](references/rubric.md) §6 for two more examples.
+
+---
+
 ## Reference Directory
 
 | File | Purpose |
