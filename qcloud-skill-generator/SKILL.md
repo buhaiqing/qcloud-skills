@@ -384,7 +384,7 @@ thresholds:
 
 ### TE-6: 消除跨文件重复流程
 
-**规则**：Pre-flight → Execute → Validate → Recover 流程仅在 `SKILL.md` 中完整定义，`references/` 和 `assets/` 中不重复相同流程。
+**规则**：Pre-flight → Execute → Validate → Recover 流程仅在 `SKILL.md` 中完整定义，`references/` 和 `assets/` 中不重复相同流程。GCL 的 Generator/Critic/Orchestrator 共享骨架集中在 [`references/gcl-prompt-backbone.md`](references/gcl-prompt-backbone.md)；各 product skill 的 `references/prompt-templates.md` 仅保留 **§5 产品 anti-patterns**（§1–§3 链接 backbone，**§4 安全规则见 `references/rubric.md` §4**，不在 prompt-templates 重复 per-op 表）；维护脚本：`scripts/te6_gcl_compress.py`。
 
 ```markdown
 # ❌ 重复：execution-environment.md 中再次出现完整流程
@@ -819,6 +819,7 @@ See [`references/rubric.md`](references/rubric.md) §6 for two more examples.
 | [enhanced-self-healing-framework.md](references/enhanced-self-healing-framework.md) | **MANDATORY** self-healing patterns for installation flows |
 | [governance-and-adversarial-review.md](references/governance-and-adversarial-review.md) | (when present) Adversarial review scenarios and governance checklist |
 | [prompt-library.md](references/prompt-library.md) | Structured prompts for the generation lifecycle |
+| [gcl-prompt-backbone.md](references/gcl-prompt-backbone.md) | **TE-6** shared GCL Generator/Critic/Orchestrator skeletons (product skills link, do not duplicate) |
 | [optimization-analysis.md](references/optimization-analysis.md) | Three-dimensional optimization framework |
 | [user-experience-spec.md](references/user-experience-spec.md) | Mandatory UX requirements for all generated skills |
 | [aiops-best-practices.md](references/aiops-best-practices.md) | Mandatory AIOps patterns for monitoring/diagnosis skills |

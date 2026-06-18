@@ -396,11 +396,15 @@ This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
 
 ### TKE-specific safety rules (rubric §4)
 
-1. `DeleteCluster` — ID + Name echo; workload cascade warning (PVCs, CRDs, all namespaces); YAML export prompt
-2. `DeleteNode` / `DrainNode` — node count check (>50% refuse); PDB check for critical namespaces
-3. `AddNodeToPool` (batch) — capacity check; confirmation when >10% scale-up
-4. `UpdateClusterVersion` — show current → target; warn one-directional; surface addon compatibility; reject minor-version skip
-5. `ModifyClusterAttribute` / `CreateClusterEndpoint` — public endpoint security warning; current status display
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
+
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `DeleteCluster` (any) | Cluster ID + Name echo + explicit confirmation + workload cascade warning (PVCs, CRDs, all namesp... |
+| 2 | `DeleteNode` / `DrainNode` (any) | Node ID + instance ID echoed; check node count in the cluster before drain (if draining >50% of n... |
+| 3 | `AddNodeToPool` (batch) | Check account capacity quota (`DescribeUserQuota` or `DescribeClusterRouteTable`); surface curren... |
+| 4 | `UpdateClusterVersion` (K8s upgrade) | Show current K8s version → target version; warn that K8s upgrades are one-directional (downgradin... |
+| 5 | `ModifyClusterAttribute` / `CreateClusterEndpoint` (public endpoint / ACL) | For public-endpoint enable: warn that the cluster API server becomes publicly accessible; require... |
 
 Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 

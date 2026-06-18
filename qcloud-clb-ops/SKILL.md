@@ -655,11 +655,17 @@ rubric, in addition to the build-time **Safety Gates** above and the build-time
 
 ### CLB-specific safety rules (rubric §4)
 
-1. `DeleteLoadBalancers` (any) — LB ID + Name echo; listener / target-binding / replication dependency check; `--DryRun` for batch; warn atomicity
-2. `DeleteListeners` (single or batch) — listener ID + protocol + port echoed; "traffic on port X cut immediately"; HTTPS cert detachment warning; rules count
-3. `DeregisterTargets` batch > 50% — DRAIN guard: require `ConnectionDrainTimeout ≥ 30s`; surface `CurrConnections`; recurse-confirm
-4. `ModifyLoadBalancerAttributes` switching Internet↔Internal — BEFORE/AFTER diff (type / IP version / accessibility); warn public IP release/acquisition; recurse-confirm
-5. `RegisterTargets` (any) — verify each target `InstanceState == RUNNING`; reject cross-VPC without peer; surface weight=0 as hidden config error
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
+
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `DeleteLoadBalancers` (any) | LB ID + Name echo + explicit confirmation + listener/target-binding dependency check + replicatio... |
+| 2 | `DeleteListeners` (any, single or batch) | Listener ID + protocol + port echoed; explicit confirmation with "traffic on port X will be cut i... |
+| 3 | `DeregisterTargets` (batch) with count > 50% of bound targets | DRAIN guard: refuse to proceed without explicit `ConnectionDrainTimeout` setting ≥ 30s; surface a... |
+| 4 | `ModifyLoadBalancerAttributes` switching Internet ↔ Internal | Show BEFORE/AFTER `LoadBalancerType` / `AddressIPVersion` / `InternetAccessible`; warn that the p... |
+| 5 | `RegisterTargets` (any) | Reject targets whose `InstanceState ≠ RUNNING` (per `DescribeInstances`); reject targets in a dif... |
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Sibling — CVM / CDB / COS / CLB Quality Gates
 

@@ -984,15 +984,17 @@ rubric, in addition to the build-time **Safety Gates** above and the build-time
 
 ### CBS-specific safety rules (rubric §4)
 
-The Critic checks 5 CBS-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. `TerminateDisks` (destroy) — Disk ID + Name + Size + Status echo; warn that disk destroy is irreversible (snapshot recovery is the only path); surface whether `DeleteWithInstance` is set; require explicit confirmation "yes, destroy `disk-xxx` (`prod-data-01`) permanently"
-2. `DetachDisks` (force detach) — Disk ID + attached CVM ID + status echo; warn that detaching a disk attached to a running CVM without unmount may cause data corruption; require user to confirm filesystem is unmounted first (or surface the `Force` flag as the fallback)
-3. `ResizeDisk` (any) — Show current size → target size; warn that CBS resize is **EXPAND ONLY** (cannot shrink except by creating a new smaller disk and migrating data); reject if `target < current` with "CBS does not support shrink" before the API call
-4. `DeleteSnapshots` (any) — Snapshot ID + Name + Size + CreatedTime echoed; warn that deleting the last snapshot removes the ability to recover from catastrophic data loss; for batch (`len(SnapshotIds) > 1`), require `--DryRun` first; require explicit confirmation "yes, delete snapshot `snap-xxx` (name)"
-5. `ModifyDiskAttributes` (changing `DiskName`, `ProjectId`, or `DeleteWithInstance`) — Echo new attributes BEFORE the call; for `DeleteWithInstance` toggle `FALSE` → `TRUE`: warn that the disk will auto-delete when the attached CVM is terminated; for `ProjectId` change: warn that billing/cost allocation shifts; require confirmation for each change
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `TerminateDisks` (destroy) | Disk ID + Name + Size + Status echo; warn that disk destroy is irreversible (snapshot recovery is... |
+| 2 | `DetachDisks` (force detach) | Disk ID + attached CVM ID + status echo; warn that detaching a disk attached to a running CVM wit... |
+| 3 | `ResizeDisk` (any) | Show current size → target size; warn that CBS resize is EXPAND ONLY (cannot shrink except by cre... |
+| 4 | `DeleteSnapshots` (any) | Snapshot ID + Name + Size + CreatedTime + any dependent `ApplySnapshot` references echoed; warn t... |
+| 5 | `ModifyDiskAttributes` (changing `DiskName`, `ProjectId`, or `DeleteWithInstance`) | Echo new attributes BEFORE the call; for `DeleteWithInstance` toggle from `FALSE` → `TRUE`: warn ... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `ResizeDisk` shrink attempt (ExpandOnly violation)
 

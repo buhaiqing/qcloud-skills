@@ -1260,15 +1260,17 @@ self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-
 
 ### CLS-specific safety rules (rubric §4)
 
-The Critic checks 5 CLS-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. `DeleteLogset` — topic count + data size echo; literal `CONFIRM DELETE LOGSET <name>`; shipper enumeration
-2. `DeleteTopic` — shipper + alarm count echo; pipeline break warning
-3. `ModifyTopic` (retention reduction) — projected data loss figure; hard-truncate warning
-4. `CreateIndex` (full-text) — projected monthly cost; `FullText` vs `KeyValue` conflict warning
-5. `ModifyConfig` / `DeleteConfigAttachment` — BEFORE/AFTER diff; 60s apply delay; collection stop warning
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `DeleteLogset` (any) | Logset ID + Name + topic count + total log data size echo; list all topics via `DescribeTopics`; ... |
+| 2 | `DeleteTopic` (any) | Topic ID + Name + partition count + storage size + active shipper count (via `DescribeShippers`) ... |
+| 3 | `ModifyTopic` (retention reduction: `Period > 0` AND new `Period < current Period`) | Show current `Period` × current storage size (via `DescribeTopics` `Storage` field) → target `Per... |
+| 4 | `CreateIndex` (full-text + key-value, especially `FullText` enabled) | Show current index (if any via `DescribeIndex`); if no existing index: surface projected cost = c... |
+| 5 | `ModifyConfig` (collection path / filter / `ExcludePaths` / `LogFormat` change) AND `ApplyConfigToMachineGroup` / `DeleteConfigAttachment` (machine-group ↔ config rebinding) | Show BEFORE / AFTER config diff; warn that the agent applies changes on its NEXT polling cycle (~... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `DeleteLogset` with active COS shipper
 

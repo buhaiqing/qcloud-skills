@@ -898,17 +898,17 @@ rubric, in addition to the build-time **Safety Gates** above and the build-time
 
 ### MongoDB-specific safety rules (rubric §4)
 
-The Critic checks 5 MongoDB-specific rules independently of which operation ran.
-These encode the two MongoDB-specific invariants that distinguish this skill from
-the CDB / CVM rubrics:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. **`IsolateDBInstance` / `DestroyDBInstance` / `TerminateDBInstances` (any)** — Instance ID + Name + Status echo; warn recycle-bin window (7-day retention for pay-as-you-go, immediate for prepaid expired); for `DestroyDBInstance`: warn irreversible — the instance and all data are destroyed permanently; check deletion protection status via `SetDBInstanceDeletionProtection`; require explicit confirmation; for `TerminateDBInstances` on a replica-set primary (`NodeNum ≥ 3`), enumerate the 2 secondaries via `DescribeDBInstanceNodeProperty` and warn that terminating the primary strands them with no path to elect a new primary; for batch (`len(InstanceIds) > 1`) require `--DryRun` first
-2. **`DropDatabase` / `DropCollection` (data-plane equivalent)** — Database/collection name echoed; warn that **ALL documents, indexes, and user-defined roles** for that database/collection are permanently removed; require explicit confirmation; **do NOT batch-drop** — each database must be confirmed separately; surface current oplog window so the user understands replication lag impact
-3. **`ModifyDBInstanceSpec` (upgrade/downgrade of `Memory`, `Volume`, `NodeNum`)** — Show current spec → target spec; warn that spec changes trigger a primary-standby switchover (30-120s downtime); for **downgrade** (`Memory` or `Volume` reduction): warn that MongoDB data must fit in the new spec; surface current `RealInstanceUsage` (disk) and `MemoryUsage` from `DescribeDBInstanceNodeProperty` / Cloud Monitor; require explicit confirmation; enforce `new Volume ≥ 1.2 × current used disk` and `new Memory ≥ peak working-set size`
-4. **`ModifyAccountPassword` (any account, especially root / `mongouser`)** — Account name echoed; warn that the password change takes **immediate effect**; all active connections using the old password will be closed; for the root / `mongouser` account: warn that there is **no recovery path** — the old password is gone forever and Tencent Cloud has no admin-portal override; require confirmation with account name; never log the password value (only `<masked>`)
-5. **`ModifyDBInstanceSecurityGroup` / network change** — For security group change: show current SG ID(s) → target; warn that the wrong SG can lock out all client connections (the #1 MongoDB connectivity issue — 90% of "I can't connect" tickets are SG-related); surface current network ACL status; require explicit confirmation. For VPC / subnet change: warn that the instance's endpoint IP will change — DNS-connected applications will break until connection strings are updated
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `IsolateDBInstance` / `DestroyDBInstance` (any) | Instance ID + Name + Status echo; warn that isolation moves the instance to recycle bin (7-day re... |
+| 2 | `DropDatabase` / `DropCollection` (MongoDB wire protocol / `tccli mongodb` API equivalent) | Database/collection name echoed; warn that ALL documents, indexes, and user-defined roles for tha... |
+| 3 | `ModifyDBInstanceSpec` (upgrade/downgrade: `NodeNum`, `Memory`, `Volume`) | Show current spec → target spec; warn that spec changes trigger a restart (30-120s downtime); for... |
+| 4 | `ModifyAccountPassword` (any account) | Account name echoed; warn that the password change takes immediate effect; all active connections... |
+| 5 | `ModifySecurityGroup` / `ModifyNetworkAccess` (security group or VPC network change) | For security group change: show current security group ID(s) → target; warn that the wrong securi... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `TerminateDBInstances` with active oplog replay (prepaid, single primary)
 

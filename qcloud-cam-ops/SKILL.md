@@ -168,15 +168,17 @@ rubric, in addition to the build-time **Safety Gates** above and the build-time
 
 ### CAM-specific safety rules (rubric §4)
 
-The Critic checks 5 CAM-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. `DeleteUser` (any with attached policies or API keys) — **Name + UIN echo; enumerate attached policies via `ListAttachedUserPolicies`, group memberships via `ListGroupsForUser`, AND API keys via `ListApiKey` BEFORE the delete; warn that deleting a user with N active API keys leaves N integrations with `AuthFailure.SecretIdNotFound`; require confirmation that the user's API keys have been rotated/revoked first**. The classic incident: "I deleted the CI/CD user but forgot Jenkins was still using its API key — all deployments failed."
-2. `DeletePolicy` (referenced by any principal) — **Policy name + `PolicyId` + `Scope` (User/Role/Group) echoed; list all attached principals via `ListEntitiesForPolicy`; warn that deleting a referenced policy breaks permissions for all attached principals; require explicit confirmation**. CAM has no "default deny" grace period — unlike CVM's recycle bin, the permission loss is immediate and silent.
-3. `DeleteApiKey` (any, especially in-use) — **Key `SecretId` + associated user echo; check last-used status (via `GetApiKeyLastUsed` or equivalent audit log); warn that deleting an in-use key breaks the application/CI/CD pipeline using it (next call returns `AuthFailure.SecretIdNotFound`); require confirmation with key ID**. For `CreateApiKey` (rotate flow): pre-flight `ListApiKey` to detect the per-user 2-key limit (`LimitExceeded.ApiKeyCountLimit`); pivot to `DeleteApiKey` (older key) + `CreateApiKey` instead of blind retry.
-4. `UpdateAssumeRolePolicy` / trust policy mutation — **Show BEFORE/AFTER trust policy diff; warn if the new policy contains `Principal=*` or `Principal={"Service": "cvm.qcloud.com"}` (opens trust to any CVM instance); for cross-account `Principal`, warn that any user in the specified account can assume this role; require explicit confirmation for any trust widening**. A single `"Principal": "*"` allows ANY Tencent Cloud account's users to assume the role — the most common CAM incident pattern.
-5. `AttachUserPolicy` / `AttachRolePolicy` / `AttachGroupPolicy` / `CreatePolicy` granting over-permissive policies — **Surface the policy document (for `CreatePolicy`) or policy name (for Attach); warn if the policy grants `QcloudCamFullAccess`, `AdministratorAccess`, or any wildcard `"Action": "*"` + `"Resource": "*"` combination; for policies containing `"Effect": "Allow"` + `"Action": "cam:*"`, warn that the grant itself can be used to escalate privileges (a user with `cam:*` can attach `QcloudCamFullAccess` to themselves); require explicit confirmation for over-permissive grants; for `CreatePolicy`, the policy document is shown to the user before commit**.
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `DeleteUser` (any with attached policies) | User name + UIN echo; enumerate attached policies via `ListAttachedUserPolicies` and group member... |
+| 2 | `DeletePolicy` (referenced by any principal) | Policy name + ID + `Scope` (User/Role/Group) echoed; list all attached principals via `ListEntiti... |
+| 3 | `DeleteApiKey` (any, especially in-use) | Key ID + associated user echo; check if the key has been used in the last 30 days (via `GetApiKey... |
+| 4 | `UpdateAssumeRolePolicy` / `ModifyRolePolicy` (trust policy modification, especially `Principal=*`) | Show BEFORE/AFTER trust policy diff; warn if the new trust policy contains `Principal=*` or `Prin... |
+| 5 | `AttachUserPolicy` / `AttachRolePolicy` / `CreatePolicy` (granting over-permissive policies like `QcloudCamFullAccess`) | Surface the policy document (for CreatePolicy) or policy name (for Attach); warn if the policy gr... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `DeleteUser` with orphan access keys
 

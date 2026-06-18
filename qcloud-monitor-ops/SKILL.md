@@ -489,15 +489,17 @@ rubric, in addition to the build-time **Safety Gates** above and the build-time
 
 ### Monitor-specific safety rules (rubric §4)
 
-The Critic checks 5 Monitor-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. `DeleteAlarmPolicy` — policy ID + Name + bound resource count echo; alert silence warning; literal confirm
-2. `UnbindAlarmRuleResource` — policy + resource ID echo; coverage loss warning
-3. `ModifyAlarmPolicy` (condition) — BEFORE/AFTER diff; threshold drift warning per field
-4. `DeleteAlarmNotices` — notice template + referencing policy list; notification silence warning
-5. `SetDefaultAlarmPolicy` / auto-remediation — warn default applies to ALL future resources
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `DeleteAlarmPolicy` (any) | Policy ID + Name + bound resource count echo (via `DescribeBindingAlarmPolicy` or equivalent); li... |
+| 2 | `UnbindAlarmRuleResource` / `UnBindingPolicyObject` | Policy ID + Name + resource ID + resource type echoed; warn that unbinding the resource stops ale... |
+| 3 | `ModifyAlarmPolicy` / `ModifyAlarmPolicyCondition` (change conditions: metric threshold, evaluation period, consecutive periods) | Show BEFORE/AFTER condition diff (metric, comparison operator, threshold value, evaluation window... |
+| 4 | `DeleteAlarmNotices` (delete notice template) | Notice template ID + Name + notice type (Email/SMS/WeChat/Webhook) + channel count; list alarm po... |
+| 5 | `SetDefaultAlarmPolicy` / `ModifyAlarmPolicyTasks` (default policy or auto-remediation tasks) | Surface that the default alarm policy applies to all newly created resources; warn that changing ... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `DeleteAlarmPolicy` with 12 bound CVM instances
 

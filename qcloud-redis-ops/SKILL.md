@@ -487,15 +487,17 @@ rubric, in addition to the build-time **Safety Gates** above and the build-time
 
 ### Redis-specific safety rules (rubric §4)
 
-The Critic checks 5 Redis-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. `IsolateInstance` / `CleanInstance` (any, batch or single) — ID+Name+Status echo, explicit confirmation, recycle-bin window warning (postpaid: short, prepaid: longer), dependency check (CLS log tail consumers, downstream cache consumers, cluster slot rebalancing), `--DryRun` for batch
-2. `ClearInstance` (`FlushInstance` — FLUSHALL/FLUSHDB) — ID+Name+DB index (0–255) echo, warn FLUSHALL removes ALL keys in ALL databases, warn operation is **invisible to Tencent Cloud API audit** (Redis wire protocol, not Tencent Cloud API), require literal `CONFIRM FLUSH <instance_id>` token from user, capture `DBSIZE` pre + post as the only audit trail
-3. `UpgradeInstance` / spec change (memory / shard / replica / node) — current spec → target spec diff, warn primary-replica failover (5–30s downtime), for memory reduction: warn `maxmemory-policy` eviction (current `MemSize` and `RedisUsage` surfaced from `DescribeInstanceMonitorBigKey`), re-confirm on any reduction
-4. `ResetPassword` (any, especially `default` account) — account name echo, warn password change takes **immediate effect** and all existing connections are closed, warn `default` account has no "forgot password" recovery path, mask `{{user.new_password}}` in trace
-5. `BackupDownload` / export — backup file size + time range echo, warn backup contains ALL in-memory data (sessions / tokens / PII), user-confirmed secure destination (NOT public COS, NOT world-readable `/tmp`), `OutputFile` path security check
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `DestroyInstances` / `IsolateInstance` (any) | Instance ID + Name + Status echo; warn that isolation moves instance to recycle bin (short retent... |
+| 2 | `ClearInstance` (`FlushInstance` — FLUSHALL / FLUSHDB) | Instance ID + Name + database index (0-255) echoed; warn that FLUSHALL removes ALL keys in ALL da... |
+| 3 | `ModifyInstanceSpec` / `UpgradeInstance` (spec change, `MemSize`, `ReplicasNum`, `NodeNum`, `ShardNum`) | Show current spec → target spec; warn that spec changes trigger a failover (5-30s downtime); for ... |
+| 4 | `ResetPassword` (any, especially `default` account) | Account name echoed; warn that the password change takes immediate effect and all existing connec... |
+| 5 | `BackupDownload` / export (sensitive data) | Backup file size + time range echoed; warn that the backup contains all cached data including any... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `ClearInstance` (FLUSHALL) without literal confirmation
 

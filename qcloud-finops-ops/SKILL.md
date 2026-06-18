@@ -302,15 +302,17 @@ self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-
 
 ### FinOps-specific rules (rubric §4)
 
-The Critic checks 5 FinOps-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. **Billing data privacy** — mask account IDs, invoice URLs, contacts in trace; no raw billing output
-2. **No auto-execute** — recommend only; delegate execution to product skills with explicit handoff
-3. **Tag attribution timing** — warn tags apply to future billing only; confirm before tag changes
-4. **Idle detection accuracy** — warn CLS query latency; verify idle window before recommending action
-5. **Resource recommendation delegation** — do NOT auto-execute; cross-skill handoff only with user confirmation
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | Bill download / cost report generation (any read op) | Warn that the report contains sensitive billing data — do NOT output the raw report contents in t... |
+| 2 | Cost anomaly detection / budget alert configuration (recommendation flow) | For any cost anomaly that triggers a budget alert: warn that the system will NOT auto-execute any... |
+| 3 | Tag-based cost allocation modification (`CreateCostAllocationTag` / `DeleteCostAllocationTag` / `ModifyCostAllocationTag`) | Warn that changing cost allocation tags changes how costs are attributed in future reports; exist... |
+| 4 | `DeleteBillSummary` / `DeleteBillExport` (historical billing data purge) | Warn that historical billing data will be permanently purged (this is NOT soft-delete); require p... |
+| 5 | Resource type report / cross-skill delegation (recommendation flow) | For resource-type recommendations (e.g., "consider terminating idle CVM"): delegate to the specif... |
 
-**This is a read-only/advisory skill.** Privacy/threshold violations (rules 1, 3, 4) score Safety = 0.5 → RETRY, not ABORT. Rules 2 and 5 violations (auto-execute) score Safety = 0 → ABORT.
+Auto-execute / credential leak ⇒ **Safety = 0**; see rubric §2 for advisory thresholds.
 
 ### Worked example — idle CVM recommendation with auto-terminate attempt
 

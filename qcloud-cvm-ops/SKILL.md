@@ -797,15 +797,17 @@ rubric, in addition to the build-time **Safety Gates** above and the build-time
 
 ### CVM-specific safety rules (rubric §4)
 
-The Critic checks 5 CVM-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. `TerminateInstances` (any, batch or single) — ID+Name echo, explicit confirmation, `DeleteWithInstance` query, dependency check, `--DryRun` for batch
-2. `StopInstances` with `--StopType HARD` — block on production (heuristic: name matches `^(prod|prd|live)-` or `Tag.Role=production`) without literal re-confirmation
-3. `ResizeInstanceDisks` — target `DiskSize` ≥ current; `DiskType` must be resizable (no `LOCAL_*`)
-4. `RunInstances` — `ClientToken` set; zone × type matrix validated; VPC / Subnet / SG pre-existence
-5. `ResetInstances` — `ImageId` differs from current; instance state `STOPPED` / `SHUTDOWN`; explicit confirmation (re-image ≠ restart)
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `TerminateInstances` (any, batch or single) | ID + Name echo + explicit confirmation + `DeleteWithInstance` query + dependency check (CLB / ASG... |
+| 2 | `StopInstances` with `--StopType HARD` | Block on production instance (heuristic: name matches `^(prod|prd|live)-` or any instance with `T... |
+| 3 | `ResizeInstanceDisks` | Target `DiskSize` ≥ current `DiskSize`; `DiskType` must be resizable (no `LOCAL_BASIC`/`LOCAL_SSD... |
+| 4 | `RunInstances` | `ClientToken` MUST be set; zone-instance type matrix MUST be validated (`DescribeZoneInstanceConf... |
+| 5 | `ResetInstances` | `ImageId` MUST differ from current; current state MUST be `STOPPED` or `SHUTDOWN`; explicit confi... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `StopInstances` (HARD on prod)
 

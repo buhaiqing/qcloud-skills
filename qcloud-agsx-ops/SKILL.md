@@ -656,15 +656,17 @@ self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-
 
 ### AGSX-specific safety rules (rubric §4)
 
-The Critic checks 5 AGSX-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. `DeleteAgentPool` / `TerminateAgentPool` — pool ID + agent count echo; cascade warning; literal confirm
-2. `DeleteAgent` (active) — pending execution count echo; in-flight kill warning
-3. `TerminateAgentExecution` — execution ID + agent ID echo; no-rollback warning
-4. `UpdateAgentPoolConfig` — BEFORE/AFTER diff; capacity/timeout kills in-flight agents warning
-5. `CreateAgentPool` / `CreateAgent` — projected cost + quota echo; compute billing warning
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `DeleteSandboxTool` | Tool ID + Name + active instance count (`DescribeSandboxInstanceList` filtered by `ToolId`) echo;... |
+| 2 | `DeleteAgent` (any active agent) / `StopSandboxInstance` | Agent / instance ID + name + status echo; surface remaining TTL (`ExpireAt`); warn that removing ... |
+| 3 | `TerminateAgentExecution` / force-stop a running execution | Execution ID + instance ID + start time echoed; warn that force termination does NOT roll back pa... |
+| 4 | `UpdateSandboxTool` (modify `DefaultTimeout`, `ToolType`, capacity, or security config) | Show current config → target config (`DefaultTimeout`, `ToolType`, `MaxConcurrency`, `VpcId`); fo... |
+| 5 | `CreateSandboxTool` / `CreateAPIKey` / `StartSandboxInstance` (provisioning new resources) | For `CreateSandboxTool`: surface the tool's `DefaultTimeout` cost implications (sandbox-hours bil... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `DeleteAgentPool` with running agents
 

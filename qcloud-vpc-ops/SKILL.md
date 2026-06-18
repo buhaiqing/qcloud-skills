@@ -665,15 +665,17 @@ via cross-VPC peering.
 
 ### VPC-specific safety rules (rubric §4)
 
-The Critic checks 5 VPC-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. `DeleteVpc` (any) — VPC ID + Name + CIDR echo; enumerate ALL subnets, route tables, security groups, and dependent resources (CVM via `DescribeInstances --Filters Name=vpc-id`, CLB via `DescribeLoadBalancers --Filters Name=vpc-id`, NAT Gateway, Peering Connections) via `DescribeVpcResourceDashboard`; warn cascade (all subnets + route tables + default SGs removed); literal `CONFIRM DELETE VPC <vpc_id>`; `--DryRun=true` first for batch; cascade trace MUST capture parent + each child `RequestId`
-2. `DeleteSubnet` (any, especially with running resources) — Subnet ID + VPC ID + CIDR echo; check running resources via `DescribeSubnetResourceDashboard` or `DescribeInstances --Filters Name=subnet-id`; warn that all CVM/CLB/NAT in this subnet lose connectivity; confirm with subnet ID; verify subnet is not the VPC's default subnet
-3. `ReleaseAddresses` (EIP, single or batch) — EIP ID + IP echoed; check binding via `DescribeAddresses` (`InstanceId` / `NetworkInterfaceId` / `InstanceType`); warn that releasing a bound EIP terminates public internet connectivity and breaks DNS; confirm per EIP (NO batch confirm)
-4. `DeleteRouteTable` / `DeleteRoutes` (any, especially default `0.0.0.0/0`) — Route table ID + VPC ID + all entries listed via `DescribeRouteTables`; default-route delete warns "all internet-bound traffic drops (BLACKHOLE)"; non-default warns "specific traffic patterns fall through"; confirm with route table ID; verify the route table is not the VPC's main/default route table
-5. `DeleteSecurityGroup` (any with rules) — SG ID + Name + Inbound/Outbound rule count; enumerate bound instances via `DescribeSecurityGroupReferences`; default SG warns "auto-created new SG may differ"; warn that all bound instances lose those rules; confirm with SG ID; cross-VPC `sg-` references must be enumerated
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `DeleteVpc` (any) | VPC ID + Name + CIDR echo; enumerate ALL subnets, route tables, security groups, and dependent re... |
+| 2 | `DeleteSubnet` (any, especially with running resources) | Subnet ID + VPC ID + CIDR echo; check if subnet has running resources via `DescribeSubnetResource... |
+| 3 | `ReleaseAddresses` (EIP — single or batch) | EIP ID + IP address echoed; check if EIP is bound to a CVM / CLB / NAT Gateway via `DescribeAddre... |
+| 4 | `DeleteRouteTable` / `DeleteRoutes` (any, especially default route `0.0.0.0/0`) | Route table ID + VPC ID + all route entries listed; for default route deletion (`0.0.0.0/0`): war... |
+| 5 | `DeleteSecurityGroup` (any with rules) | Security group ID + Name + Inbound/Outbound rule count; warn that all instances bound to this SG ... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `DeleteSubnet` with running CVMs (cascading connectivity loss)
 

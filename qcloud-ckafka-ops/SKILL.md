@@ -757,15 +757,17 @@ rubric, in addition to the build-time **Safety Gates** above and the build-time
 
 ### CKafka-specific safety rules (rubric §4)
 
-The Critic checks 5 CKafka-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. `DeleteInstance` (any, batch or single) — instance ID+Name echo; enumerate **all** topics via `DescribeTopic` AND **all** consumer groups via `DescribeConsumerGroup` AND **all** topic-group subscriptions via `DescribeTopicSubscribeGroup`; surface `ConsumeLag` for each group; require literal `CONFIRM DELETE <instance_id>`; block if any group has `ConsumeLag > 0` unless an explicit "ignore lag" rationale is captured; batch (n>1) MUST run `--DryRun` first. CKafka has **no recycle bin** — unlike CDB's `IsolateDBInstance`, instance deletion is permanent and no rollback exists.
-2. `DeleteTopic` (any, batch or single) — topic Name + `PartitionNum` + **all** subscribed consumer groups (via `DescribeTopicSubscribeGroup`) echoed; warn that all messages within retention AND committed offsets for **every** subscribed group are lost; require explicit confirmation with topic name; require that all subscribed groups have been notified (in real systems, "user has confirmed downstream consumers are aware their offsets will reset"). This is the #1 CKafka data-loss pattern — a user deleting a "temp" topic can take out a critical consumer group's progress.
-3. `ModifyTopic` (partition count change) — show current → target `PartitionNum`; warn that partition increase is **one-directional** (Kafka cannot shrink partitions); surface rebalancing impact on consumers (every consumer group for this topic will rebalance — potential duplicate redelivery or out-of-order delivery during the transition, in-flight commits lost); require confirmation when the increase > 2× current; verify the new partition count is bounded by the instance's broker count (replication factor for new partitions must fit — silent under-replication is the failure mode).
-4. `ModifyInstanceAttributes` (broker config: `MaxTopicNum`, `MsgRetentionTime`, `CleanUpPolicy`, `LogRetentionTime`, `MaxMessageBytes`, etc.) — echo current → new value for each modified attribute; for `MsgRetentionTime` reduction: warn that messages older than the new retention will be deleted at the **next** retention cycle (NOT at the next rotation — the most common misread); for `CleanUpPolicy` change (`delete`→`compact` or vice versa): warn that log cleanup behavior changes irreversibly for existing segments; require confirmation for each change; **unit-mismatch guard**: `MsgRetentionTime` is **minutes**, not milliseconds.
-5. `CreateAcl` / `DeleteAcl` (access control) — for `CreateAcl`: surface the rule tuple (`InstanceId`, `ResourceType`, `ResourceName`, `Principal`, `Host`, `Operation`, `PermissionType`); warn if `PermissionType=ALLOW`+`Operation=ALL`+`Host=*` (open cluster access pattern); require explicit confirmation for permissive ACLs. For `DeleteAcl`: surface the rule being removed; warn if the rule is the **only allow rule** for an operation — consumers may be locked out until a new ACL is created; require that the user has confirmed the consumer groups that depend on this rule have been notified.
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `DeleteInstance` (any) | Instance ID + Name echo; warn that ALL topics, messages, consumer offsets, and ACL configurations... |
+| 2 | `DeleteTopic` (any) | Topic Name + Partition count + any active consumer groups subscribed (via `DescribeTopicSubscribe... |
+| 3 | `ModifyTopic` (partition count change) | Show current partition count → target; warn that partition increase is one-directional (Kafka can... |
+| 4 | `ModifyInstanceAttributes` (broker config: `MaxTopicNum`, `MsgRetentionTime`, `CleanUpPolicy`, `LogRetentionTime`, `MaxMessageBytes`, etc.) | Echo current → new value for each modified attribute; for `MsgRetentionTime` reduction: warn that... |
+| 5 | `CreateAcl` / `DeleteAcl` (access control) | For `CreateAcl`: surface the ACL rule being added (principal, host, operation, permission type, r... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `DeleteTopic` with consumer offset lag (silent progress loss)
 

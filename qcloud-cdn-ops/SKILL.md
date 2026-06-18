@@ -161,15 +161,17 @@ self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-
 
 ### CDN-specific safety rules (rubric §4)
 
-The Critic checks 5 CDN-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. `DeleteCdnDomain` — domain + CNAME + traffic echo; literal `CONFIRM DELETE DOMAIN <name>`; `dig` CNAME orphan check
-2. `PurgeUrlsCache` with `/*` — cache hit ratio surfaced; recurse-confirm "yes, purge ALL cached content"
-3. `PurgePathCache` — path prefix echo; root `/` treated same as `/*`
-4. `UpdateDomainConfig` — BEFORE/AFTER diff; origin content parity + HTTPS cert overlap window
-5. `PushUrlsCache` — URL list + aggregate size; origin bandwidth cost warning for large preloads
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `DeleteCdnDomain` (any) | Domain name + CNAME + traffic/bandwidth estimate echo; warn that deletion deactivates the domain'... |
+| 2 | `PurgeUrlsCache` with `/*` wildcard (purge all) | Domain name + URL pattern echoed; warn that `/*` clears ALL cached content for the domain — every... |
+| 3 | `PurgePathCache` (directory-level) | Domain name + path prefix echoed; warn that purging a directory invalidates ALL files under that ... |
+| 4 | `UpdateDomainConfig` (any configuration change: origin, SSL cert, cache rules, access control) | Show BEFORE/AFTER config diff; for origin change: warn that new origin must serve the same conten... |
+| 5 | `PushUrlsCache` (prefetch / URL preload) | URL list + estimated preload size echoed; warn that prefetching large files (>1GB total) may incu... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `DeleteCdnDomain` with active DNS
 

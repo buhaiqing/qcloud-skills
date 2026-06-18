@@ -1,122 +1,58 @@
 # Proactive Inspection GCL Prompt Templates
 
-> Prompt skeletons for **Generator (G)**, **Critic (C)**, and **Orchestrator (O)**
-> of `qcloud-proactive-inspection`, per [AGENTS.md §7](../../AGENTS.md#7-prompt-templates-mandatory-per-skill).
->
-> **Placeholder convention:** `{{env.*}}` / `{{user.*}}` / `{{output.*}}` only.
-> **Hard constraint:** G and C MUST run in isolated contexts; Critic MUST NOT see raw user request.
+> **TE-6:** G/C/O → [`gcl-prompt-backbone.md`](../../qcloud-skill-generator/references/gcl-prompt-backbone.md); §4 gates → [`rubric.md`](rubric.md) §4; this file: **§5 product anti-patterns** only.
 
 ---
 
 ## 1. Generator prompt template
 
-```text
-You are the Generator for qcloud-proactive-inspection. Execute the 5-step pipeline read-only.
+> **TE-6 backbone:** [Generator skeleton](../../qcloud-skill-generator/references/gcl-prompt-backbone.md#1-generator-prompt-template).
+> Pre-flight gates: [`references/rubric.md`](rubric.md) §4 (canonical).
 
-# User Request
-{{user.request}}
+| Override | Value |
+|---|---|
+| skill | `qcloud-proactive-inspection` |
+| CLI | `tccli monitor help` |
+| max_iterations | 3 |
 
-# Critic feedback (may be empty)
-{{output.critic_feedback}}
 
-# Rubric
-{{output.rubric}}
-
-# Pipeline (MUST follow order)
-1. Discovery — scope resources via delegated qcloud-*-ops read-only Describe*
-2. Assessment — evaluate against well-architected / security heuristics
-3. Diagnosis — correlate findings (optional: qcloud-aiops-diagnosis handoff)
-4. Recommendation — RECOMMENDATION ONLY; delegate mutations to product skills
-5. Report — write inspection report; embed gcl_trace_ref if available
-
-# Idempotency pre-flight (rule 1)
-- Check prior inspection for same scope/time within 1h
-- If exists: warn user; offer force=yes or reuse prior inspection_id
-
-# Constraints
-- ALL product skill calls MUST be read-only
-- Mask credentials in report (<masked>)
-- NEVER auto-execute terminate/stop/delete
-- Surface "state as of <timestamp>" in report header
-
-# Return structured JSON + report path
-```
+Load rubric §4 before Execute; append gate results to trace `preflight`.
 
 ---
 
 ## 2. Critic prompt template
 
-```text
-You are an independent auditor for qcloud-proactive-inspection.
-Score against rubric. Do NOT consider the original user request.
-
-# Rubric
-{{output.rubric}}
-
-# Generator Output
-{{output.generator_output}}
-
-# Trace
-{{output.trace}}
-
-# Dimensions
-1. Correctness — findings backed by evidence? scope correct?
-2. Safety — read-only only? no credentials? no auto-remediation?
-3. Idempotency — duplicate run handled? inspection ID tracked?
-4. Traceability — delegations logged with skill_id + RequestId?
-5. Spec Compliance — 5-step order? report schema? path security?
-
-# Return strict JSON
-{
-  "scores": {"correctness": 0|0.5|1, "safety": 0|1, "idempotency": 0|0.5|1,
-             "traceability": 0|0.5|1, "spec_compliance": 0|0.5|1},
-  "suggestions": ["≤ 3 improvements"],
-  "blocking": true|false
-}
-
-Safety=0 on auto-execute or credential leak → blocking=true.
-```
+> **TE-6 backbone:** [Critic skeleton](../../qcloud-skill-generator/references/gcl-prompt-backbone.md#2-critic-prompt-template) — no `{{user.request}}`.
+> Score [`references/rubric.md`](rubric.md) §3 + §4 (Inspection).
 
 ---
 
 ## 3. Orchestrator prompt template
 
-```text
-You are the Orchestrator for GCL on qcloud-proactive-inspection (recommended, max_iter=3).
-
-# Context
-- current_iter: {{output.current_iter}}
-- max_iterations: 3
-
-# Previous iterations
-{{output.iterations_json}}
-
-# Decision (first match wins)
-1. Safety=0 (auto-execute or credential in report) → ABORT
-2. current_iter >= max_iterations → RETURN best-so-far + unresolved
-3. All thresholds met → PASS
-4. Else → RETRY with critic feedback
-
-# Cross-skill delegation
-- Discovery/Assessment: read-only qcloud-*-ops only
-- Recommendation: handoff JSON to product skill; NEVER inline mutation
-```
+> **TE-6 backbone:** [Orchestrator skeleton](../../qcloud-skill-generator/references/gcl-prompt-backbone.md#3-orchestrator-prompt-template).
+> `max_iterations`: **3**.
 
 ---
 
 ## 4. Per-operation variants
 
-| Pipeline step | Pre-flight augmentation |
+> **TE-6:** Pre-flight / Critic rule checks are **canonical** in [`references/rubric.md`](rubric.md) §4 (Inspection — 5 rules). Do not duplicate gate text here.
+
+| Role | Action |
 |---|---|
-| Discovery | rule 1: scope boundary; no prod-wide scan without confirm |
-| Cross-skill data collection | rule 2: read-only confirm in trace |
-| Report generation | rule 3: scan output for credentials before write |
-| Result presentation | rule 4: timestamp + snapshot warning |
-| File write | rule 5: umask / path security check |
+| Generator | Load rubric §4; map op → rule 1–5; run gates; append to trace `preflight` |
+| Critic | Score rubric §3 + mark §4 rules VIOLATED / SATISFIED / NOT-APPLICABLE |
+| Orchestrator | Safety=0 on §4 violation (destructive) → ABORT; advisory/read-only: rubric §2 |
+
+Pipeline: Discovery → Assessment → Diagnosis → Recommendation → Report — [SKILL.md](../SKILL.md).
 
 ---
 
 ## 5. Anti-patterns
+
+
+> Generic GCL anti-patterns: [../../qcloud-skill-generator/references/gcl-prompt-backbone.md](../../qcloud-skill-generator/references/gcl-prompt-backbone.md) §4.
+> Below: **product-only** bans.
 
 - ❌ **Auto-remediation** — inspection MUST NOT call Terminate/Stop/Delete APIs
 - ❌ **Duplicate silent re-run** — same scope within 1h without warn (rule 1)
@@ -132,6 +68,9 @@ You are the Orchestrator for GCL on qcloud-proactive-inspection (recommended, ma
 |---|---|---|
 | 1.0.0 | 2026-06-04 | Phase 1: per-op variants for 5 safety rules |
 | 1.1.0 | 2026-06-19 | Full 7-section structure (Tier C conformance) |
+
+| 1.3.0 | 2026-06-19 | TE-6 §4: defer per-op gates to rubric §4 only |
+| 1.2.0 | 2026-06-19 | TE-6: G/C/O → gcl-prompt-backbone |
 
 ---
 

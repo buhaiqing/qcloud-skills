@@ -525,15 +525,17 @@ self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-
 
 ### SSL-specific safety rules (rubric §4)
 
-The Critic checks 5 SSL-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. `DeleteCertificate` — deployed resource list echo; literal `CONFIRM DELETE CERT <id>`; expiry overlap check
-2. `DeployCertificateInstance` — target resource + current cert echo; immediate replace warning
-3. `ReplaceCertificate` — BEFORE/AFTER diff; domain SAN match; overlap window for dual-cert deploy
-4. `ApplyCertificate` — domain + validation method echo; DNS/HTTP access prerequisite check
-5. `UploadCertificate` — chain completeness check; reject < 2048-bit key; private key never in trace
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `DeleteCertificate` (any; especially if deployed) | Certificate ID + name + domain + issuer + deploy status echo; check if cert is deployed to any re... |
+| 2 | `DeployCertificateInstance` (deploy to specific resource type: CLB, CDN, API GW, TKE, WAF, Live, TEO, VOD, TCB) | Show certificate domain + resource type + resource ID + resource region; warn that deploying repl... |
+| 3 | `ReplaceCertificate` / `CertificateRollback` (replace in-place on a resource) | Show old cert domain + expiration → new cert domain + expiration; warn that the replacement is im... |
+| 4 | `ApplyCertificate` (apply for a new DV/OV/EV cert; includes `ApplyCertificatePackage`) | Show domain name(s), validation method (DNS / HTTP), and certificate type (DV/OV/EV); warn that D... |
+| 5 | `UploadCertificate` (upload PEM / PKCS12 / SSL certificate with private key) | Show certificate subject, issuer, valid-from, valid-to, SAN count; warn if the certificate chain ... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `DeleteCertificate` still deployed on CLB
 

@@ -825,15 +825,17 @@ rubric, in addition to the build-time **Safety Gates** above and the build-time
 
 ### CDB-specific safety rules (rubric §4)
 
-The Critic checks 5 CDB-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. `IsolateDBInstance` (any, batch or single) — ID+Name echo, explicit confirmation, retention-window warning (postpaid: 1 day, prepaid: 7 days), dependency check (read-only replicas, DR instance), `--DryRun` for batch
-2. `CreateCloneInstance` / restore from backup — source backup named + `DescribeBackups` re-confirms; explicit confirmation that the action CREATES A NEW INSTANCE; new `Spec` ≥ source; new instance name distinct from source
-3. `DeleteBackups` — backup IDs + names + retention-day math surfaced; block on the ONLY remaining backup if `IsolateDBInstance` is in-flight
-4. `DeleteAccounts` — account `User`+`Host` echoed; dependency check on active connections (`RealSession` metric); explicit confirmation; block if account is the only `GRANT OPTION` source
-5. `ModifyAccountPrivileges` (esp. `GRANT ALL` / root-level revoke) — BEFORE/AFTER privilege diff; explicit re-confirmation for `GRANT ALL`, `GRANT SUPER`, `GRANT ALL ON *.*`, or any revoke stripping root-level grants; `Host` field explicit (no silent `%`)
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `IsolateDBInstance` (any, batch or single) | ID + Name echo + explicit confirmation + retention-window warning + dependency check (read-only r... |
+| 2 | `CreateCloneInstance` / `Restore from backup` | Source backup must be named + `DescribeBackups` re-confirms; explicit confirmation that the actio... |
+| 3 | `DeleteBackups` | Backup IDs + names + retention-day math surfaced ("deleting this backup means you cannot restore ... |
+| 4 | `DeleteAccounts` | Account `User`+`Host` echoed; dependency check on active connections (`SHOW PROCESSLIST` or Tence... |
+| 5 | `ModifyAccountPrivileges` (especially `GRANT ALL` / `REVOKE` of root-level privileges) | Show BEFORE / AFTER privilege diff; require explicit re-confirmation when the change is `GRANT AL... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `DeleteBackups` (last backup while isolate in flight)
 

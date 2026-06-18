@@ -78,7 +78,7 @@ After any modification to a skill's `SKILL.md`, `references/`, or `assets/`, the
    - **TE-3**: Error tables ≤3 columns, compact format; per-operation tables replaced with reference to main table
    - **TE-4**: JSON paths centralized at file top, not duplicated per operation
    - **TE-5**: example-config.yaml uses YAML anchors to eliminate repeated fields
-   - **TE-6**: SKILL.md has no inline Python/CLI scripts duplicated in references/; use SDK references instead
+   - **TE-6**: SKILL.md has no inline Python/CLI scripts duplicated in references/; GCL G/C/O skeletons in `qcloud-skill-generator/references/gcl-prompt-backbone.md`; product `prompt-templates.md` §4 defers to `references/rubric.md` §4 (§5 product anti-patterns only)
 4. Cross-check `cli_applicability` against actual CLI support. If `dual-path`, confirm every execution flow shows BOTH `tccli` and SDK steps; if `sdk-only`, confirm the absence of `references/cli-usage.md` is intentional and `cli_support_evidence` cites the verification (`tccli ags help` → "Invalid product" for agsx).
 5. Verify the YAML frontmatter is valid, `version` and `last_updated` are bumped, and `related_skills` reflect the new state.
 6. Confirm credentials are never printed in any output path — only `<masked>`.

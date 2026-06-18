@@ -798,15 +798,17 @@ rubric, in addition to the build-time **Safety Gates** above and the build-time
 
 ### COS-specific safety rules (rubric §4)
 
-The Critic checks 5 COS-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. `DeleteObject` on a **versioning-enabled** bucket — surface versioning status via `GetBucketVersioning`; require `VersionId` for hard delete OR explicit acknowledgement of `DeleteMarker` semantics; warn on `Status=Suspended`
-2. `DeleteBucket` — enumerate live objects + non-current versions + DeleteMarkers + incomplete multipart uploads; surface ACL/bucket-policy/CORS/replication dependencies; explicit confirmation with all four counts
-3. `PutBucketACL` with `public-read` / `public-read-write` — surface full object key listing; require user to confirm no key contains credentials / PII / private keys; warn ACL applies to ALL objects including pre-existing ones
-4. `PutBucketLifecycle` with `Transition → ARCHIVE` / `DEEP_ARCHIVE` (or `Expiration`) — show BEFORE/AFTER rule diff; require re-confirmation when prefix is broad AND target is cold; require non-zero `Expiration.Days`
-5. Batch delete: `coscmd delete -r`, `coscmd delete -f prefix/`, multi-object API with count > 1000 — MUST run `--dry-run` first and surface count + sample keys; require literal "yes, delete <count> objects" recurse-confirm; block if count > 10000 unless explicit `--force-bulk` rationale
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `DeleteObject` (any) on a **versioning-enabled** bucket | Surface versioning status (via `GetBucketVersioning`) before the call; specify `VersionId` to del... |
+| 2 | `DeleteBucket` | Bucket must be empty of (a) live objects, (b) non-current versions, (c) DeleteMarkers, (d) incomp... |
+| 3 | `PutBucketACL` with `public-read` or `public-read-write` | Surface the full object listing (key paths only, no values) of the bucket to the user before comm... |
+| 4 | `PutBucketLifecycle` with `Transition → ARCHIVE` / `DEEP_ARCHIVE` (or `Expiration`) | Show BEFORE/AFTER rule diff; require explicit re-confirmation when (a) the prefix is broad (empty... |
+| 5 | Batch delete: `coscmd delete -r`, `coscmd delete -f prefix/`, or any multi-object API call covering >1000 objects | MUST run `coscmd delete --dry-run` (or the SDK equivalent) first and surface the count + a sample... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `PutBucketACL public-read` (silent)
 

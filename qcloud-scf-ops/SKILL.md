@@ -689,15 +689,17 @@ self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-
 
 ### SCF-specific safety rules (rubric §4)
 
-The Critic checks 5 SCF-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. `DeleteFunction` — namespace + version + trigger count echo; cascade warning; literal confirm
-2. `DeleteFunctionTriggers` — trigger type + ARN echo; service disruption warning
-3. `DeleteNamespace` / `DeleteLayerVersion` — dependent function enumeration; cold-start failure warning
-4. `UpdateFunctionCode` / `UpdateFunctionConfiguration` — BEFORE/AFTER diff; env var overwrite warning
-5. `InvokeFunction` (Event type) — live execution warning; confirm for non-test payloads
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `DeleteFunction` (any version/alias) | Function name + namespace + version count + active trigger count echo; warn that deletion removes... |
+| 2 | `DeleteFunctionTriggers` (any) | Trigger type + trigger name + trigger-escaped source ARN echo; warn that removing a trigger stops... |
+| 3 | `DeleteNamespace` / `DeleteLayerVersion` | Namespace name / layer name + version echo; for `DeleteNamespace`: warn that ALL functions, layer... |
+| 4 | `UpdateFunctionCode` / `UpdateFunctionConfiguration` (code or config change) | Show BEFORE/AFTER diff (for code: `CosBucketName`, `CosObjectName`, `ZipFile`; for config: `Memor... |
+| 5 | `InvokeFunction` (with `InvocationType=RequestResponse` or `Event`) | For `InvocationType=Event` (async): warn that the function may not execute immediately and errors... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `DeleteFunction` with active API Gateway trigger
 

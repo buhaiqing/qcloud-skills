@@ -690,15 +690,17 @@ rubric, in addition to the build-time **Safety Gates** above and the build-time
 
 ### PostgreSQL-specific safety rules (rubric §4)
 
-The Critic checks 5 PostgreSQL-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. `IsolateDBInstance` / `DeleteDBInstance` — ID+Name+Status echo, recycle-bin 7-day window warning, dependency check (read replicas / active sessions), `--DryRun` for batch
-2. `RestoreDBInstance` / restore-from-backup — `BackupId` named, overwrite warning, recovery point surfaced
-3. `UpgradeDBInstance` / `ModifyDBInstanceSpec` — BEFORE/AFTER spec diff, restart warning, **storage reduction REJECT** before API call
-4. `ResetAccountPassword` / `ModifyAccountPassword` — account echo, immediate effect + connection drop, **`postgres` superuser no-recovery** warning
-5. `CreateAccount` (wildcard host) / `ModifyAccountPrivileges` (`REVOKE ALL`) — host pattern audit, BEFORE/AFTER privilege diff, running-app failure warning
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `IsolateDBInstance` / `DeleteDBInstance` (any, batch or single) | ID + Name + Status echo + explicit confirmation + retention-window warning + dependency check (re... |
+| 2 | `RestoreDBInstance` / restore-from-backup (data plane boundary) | Source `BackupId` named + `DescribeDBBackups` re-confirms; explicit confirmation that the action ... |
+| 3 | `UpgradeDBInstance` (downgrade: `Storage`; also any `Memory` change) | Show current spec → target spec; warn that spec changes trigger a restart (30-60s downtime, brief... |
+| 4 | `ResetAccountPassword` / `ModifyAccountPassword` (any account, **especially** `postgres` / superuser) | Account name echoed; warn that the password change takes immediate effect; all active connections... |
+| 5 | `CreateAccount` (especially with wildcard `Host`) and `ModifyAccountPrivileges` with `REVOKE ALL` | For `CreateAccount`: surface the account name, host pattern (PG API does not always expose `Host`... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `ModifyAccountPrivileges` (`REVOKE ALL`) on running connections
 

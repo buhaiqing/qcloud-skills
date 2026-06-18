@@ -581,15 +581,17 @@ rubric, in addition to the build-time **Safety Gates** above and the build-time
 
 ### ES-specific safety rules (rubric §4)
 
-The Critic checks 5 ES-specific rules independently of which operation ran:
+Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-1. `DeleteInstance` / `DeleteCluster` (any, batch or single) — ID + Name + EsVersion + active index count echoed; warn that all indices, data, snapshots, and Kibana configuration are permanently removed (no Tencent Cloud recycle bin); list active indices via `DescribeIndexList`; require explicit confirmation with cluster name
-2. `DeleteIndex` / `DeleteDataStream` (data-plane or API) — index name + shard count + document count + health status echoed; warn that the index may be part of an ILM policy / data stream / rollover alias; require explicit confirmation with index name; do NOT batch-drop
-3. `UpdateInstanceSettings` / `ModifyClusterConfig` (cluster dynamic settings: `YML`, `ESConfig`, breaker / thread-pool) — echo BEFORE vs AFTER diff; warn stability risk (wrong `indices.breaker.*` or `thread_pool.*` can OOM the cluster); require explicit confirmation per changed setting
-4. `ResetPassword` / `ModifyAccountPassword` (Kibana / ES built-in user, esp. `elastic`) — account name echoed; warn that change is immediate; warn there is no Tencent Cloud admin recovery path for `elastic` (cluster may need to be rebuilt); require confirmation with account name
-5. `UpgradeElasticsearchVersion` (ES version upgrade) — show current → target; warn that ES upgrades are one-directional (downgrade requires full snapshot-restore to a new cluster); list installed plugins and check compatibility with target; warn that incompatible plugins will be disabled; require explicit confirmation
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `DeleteInstance` / `DeleteCluster` (any) | Cluster ID + Name + version + index count echo; warn that ALL indices, data, snapshots, and Kiban... |
+| 2 | `DeleteIndex` / `DeleteDataStream` (data-plane or API) | Index name + shard count + document count + index health status echoed; warn that index deletion ... |
+| 3 | `UpdateInstanceSettings` / `ModifyClusterConfig` (cluster settings: `YML`, `ESConfig`, or dynamic settings) | Echo the config change diff (BEFORE vs AFTER); for settings that affect stability (`indices.field... |
+| 4 | `ResetPassword` / `ModifyAccountPassword` (Kibana / ES built-in user) | Account name echoed; warn that the password change takes immediate effect; for the `elastic` / Ki... |
+| 5 | `UpgradeElasticsearchVersion` (ES version upgrade) | Show current version → target version; warn that ES upgrades are one-directional (downgrade requi... |
 
-Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
 ### Worked example — `DeleteIndex` without ILM / data-stream check
 
