@@ -455,25 +455,61 @@ Every **IsolateInstance** and **CleanInstance** operation MUST have:
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
+is a **runtime** scoring layer that audits each Redis execution against an explicit
+rubric, in addition to the build-time **Safety Gates** above and the build-time
+**2-round self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
 
 | Property | Value | Source |
 |---|---|---|
 | GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
-| `max_iterations` | **2** | per-skill override |
+| `max_iterations` | **2** | per-skill override (matches AGENTS.md §8 default for `qcloud-redis-ops`) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 Redis-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Destructive: `IsolateInstance` (soft delete), `CleanInstance` (hard delete), `ClearInstance` (FLUSHALL/FLUSHDB data-plane flush), `ResetPassword` on `default` account | **yes** | Irreversible or near-irreversible; needs scoring |
+| Sensitive mutating: `UpgradeInstance` (memory/shard/replica change — triggers primary-replica failover), `ModifyInstanceParams` (`NeedRestart=1`), `ResetPassword` (immediate effect, drops live connections), `BackupDownload` (export — in-memory exposure) | **yes** | Failover / immediate-effect / data-plane audit-blind risk; needs scoring |
+| Mutating: `CreateInstance`, `AutoRenewInstance` / `ManualRenewInstance`, `ModifyAutoBackupConfig`, `ModifyNetworkConfig`, `ModifyInstanceAccount` | **yes** | Cost / state-change / security risk; needs scoring |
+| Read-only: `DescribeInstances`, `DescribeInstanceList`, `DescribeProductInfo`, `DescribeAutoBackupConfig`, `DescribeInstanceBackups`, `DescribeInstanceMonitorBigKey`, `DescribeParamTemplateInfo` | optional (max_iter=1, no hard abort) | Polling tails are part of the parent op's trace |
+| **Out of scope**: raw Redis wire-protocol data-plane commands outside the skill's `ClearInstance` surface (`KEYS`, `SCAN` mass reads, `DEBUG` family, raw `CONFIG SET` via app side-channel) | **HALT** | This skill does not own the application-side data plane. GCL pilot covers Tencent Cloud Redis API ops plus the documented `ClearInstance` flush |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** OR any rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result). Password or `TENCENTCLOUD_SECRET_KEY` leak in trace is also an unconditional ABORT.
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
 
 ### Redis-specific safety rules (rubric §4)
 
-1. `DestroyInstances` / `IsolateInstance` — ID + Name echo; warn recycle-bin window; confirm
-2. `ClearInstance` (FLUSHALL/FLUSHDB) — warn ALL keys removed; warn invisible to CloudAudit; literal confirm
-3. `ModifyInstanceSpec` / `UpgradeInstance` — warn failover + downtime; for reduction warn eviction; confirm
-4. `ResetPassword` — warn immediate effect + connections closed; no-recovery for `default`; confirm
-5. `BackupDownload` — warn sensitive data content; check output path security; confirm
+The Critic checks 5 Redis-specific rules independently of which operation ran:
 
-Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+1. `IsolateInstance` / `CleanInstance` (any, batch or single) — ID+Name+Status echo, explicit confirmation, recycle-bin window warning (postpaid: short, prepaid: longer), dependency check (CLS log tail consumers, downstream cache consumers, cluster slot rebalancing), `--DryRun` for batch
+2. `ClearInstance` (`FlushInstance` — FLUSHALL/FLUSHDB) — ID+Name+DB index (0–255) echo, warn FLUSHALL removes ALL keys in ALL databases, warn operation is **invisible to Tencent Cloud API audit** (Redis wire protocol, not Tencent Cloud API), require literal `CONFIRM FLUSH <instance_id>` token from user, capture `DBSIZE` pre + post as the only audit trail
+3. `UpgradeInstance` / spec change (memory / shard / replica / node) — current spec → target spec diff, warn primary-replica failover (5–30s downtime), for memory reduction: warn `maxmemory-policy` eviction (current `MemSize` and `RedisUsage` surfaced from `DescribeInstanceMonitorBigKey`), re-confirm on any reduction
+4. `ResetPassword` (any, especially `default` account) — account name echo, warn password change takes **immediate effect** and all existing connections are closed, warn `default` account has no "forgot password" recovery path, mask `{{user.new_password}}` in trace
+5. `BackupDownload` / export — backup file size + time range echo, warn backup contains ALL in-memory data (sessions / tokens / PII), user-confirmed secure destination (NOT public COS, NOT world-readable `/tmp`), `OutputFile` path security check
+
+Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+
+### Worked example — `ClearInstance` (FLUSHALL) without literal confirmation
+
+| Dimension | Score |
+|---|---|
+| Correctness | 0.5 (FLUSHALL issued, protocol returned `+OK`, but gate should have caught it) |
+| **Safety** | **0** (rule 2 violated) |
+| Idempotency | 1 |
+| Traceability | 0 (no `RequestId` — call is invisible to API audit; `DBSIZE` post-check missing) |
+| Spec Compliance | 1 |
+
+`decision: ABORT`. Recovery suggestion emitted: "Confirm with user that the dev cache is the intended target; add a 'literal `CONFIRM FLUSH <instance_id>`' gate to pre-flight for all `ClearInstance` calls; capture `DBSIZE` pre + post as the only audit trail — `ClearInstance` is invisible to CloudAudit."
+
+See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `DescribeInstances` and RETRY on `ResetPassword`).
 
 ---
 

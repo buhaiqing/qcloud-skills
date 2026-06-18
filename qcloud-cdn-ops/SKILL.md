@@ -129,25 +129,61 @@ CDN (Content Delivery Network) is Tencent Cloud's content delivery service provi
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
+is a **runtime** scoring layer that audits each CDN execution against an explicit rubric,
+in addition to the build-time **Safety Gates** above and the build-time **2-round
+self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
 
 | Property | Value | Source |
 |---|---|---|
 | GCL applicability | **recommended** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
 | `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-cdn-ops`) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CDN-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Destructive: `DeleteCdnDomain` | **yes** | Irreversible; DNS still pointing to CNAME breaks all traffic |
+| Cache mutation: `PurgeUrlsCache` / `PurgePathCache` with `/*` or `/` | **yes** | Origin traffic spike; cost impact; needs scoring |
+| Sensitive mutating: `UpdateDomainConfig` (origin / HTTPS cert swap), `StopCdnDomain` | **yes** | Silent user-impact surface; TLS handshake failures |
+| Mutating: `AddCdnDomain`, `PushUrlsCache`, `UpdatePayType`, `EnableCdnDomain` | **yes** | Cost / config risk; needs scoring |
+| Read-only: `DescribeDomainsConfig`, `DescribeCdnData`, `DescribePurgeQuota` | optional (max_iter=1, no hard abort) | Pre-flight for parent mutations |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result)
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
 
 ### CDN-specific safety rules (rubric §4)
 
-1. `DeleteCdnDomain` — domain + CNAME echo; warn CDN stop; list origin config; literal confirm
-2. `PurgeUrlsCache` with `/*` — warn ALL content cleared; surface cache hit ratio; recurse-confirm
-3. `PurgePathCache` — path echo; warn broad impact; root path → recurse-confirm
-4. `UpdateDomainConfig` — BEFORE/AFTER diff; warn origin/SSL mismatch; confirm per field
-5. `PushUrlsCache` (preload) — URL list + size echo; warn large preload origin cost; confirm
+The Critic checks 5 CDN-specific rules independently of which operation ran:
 
-Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+1. `DeleteCdnDomain` — domain + CNAME + traffic echo; literal `CONFIRM DELETE DOMAIN <name>`; `dig` CNAME orphan check
+2. `PurgeUrlsCache` with `/*` — cache hit ratio surfaced; recurse-confirm "yes, purge ALL cached content"
+3. `PurgePathCache` — path prefix echo; root `/` treated same as `/*`
+4. `UpdateDomainConfig` — BEFORE/AFTER diff; origin content parity + HTTPS cert overlap window
+5. `PushUrlsCache` — URL list + aggregate size; origin bandwidth cost warning for large preloads
+
+Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+
+### Worked example — `DeleteCdnDomain` with active DNS
+
+| Dimension | Score |
+|---|---|
+| Correctness | 0.5 (domain deleted, but gate should have caught DNS) |
+| **Safety** | **0** (rule 1 violated — no `dig` CNAME check, no literal confirm) |
+| Idempotency | 1 |
+| Traceability | 1 |
+| Spec Compliance | 1 |
+
+`decision: ABORT`. Recovery suggestion: "Re-add domain via `AddCdnDomain`; update DNS to point away from CDN CNAME before retry."
+
+See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `PurgeUrlsCache` and RETRY on `UpdateDomainConfig` HTTPS cert swap).
 
 ---
 

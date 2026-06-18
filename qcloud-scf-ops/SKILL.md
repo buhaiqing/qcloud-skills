@@ -658,25 +658,60 @@ Every **DeleteFunction** or irreversible operation MUST have:
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
+is a **runtime** scoring layer that audits each SCF execution against an explicit rubric,
+in addition to the build-time **Safety Gates** above and the build-time **2-round
+self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
 
 | Property | Value | Source |
 |---|---|---|
 | GCL applicability | **recommended** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
 | `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-scf-ops`) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 SCF-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Destructive: `DeleteFunction`, `DeleteNamespace`, `DeleteLayerVersion`, `DeleteFunctionTriggers` | **yes** | Cascade to triggers / dependent functions |
+| Sensitive mutating: `UpdateFunctionCode`, `UpdateFunctionConfiguration` (env vars), `InvokeFunction` (Event type) | **yes** | Live side effects; env var overwrite |
+| Mutating: `CreateFunction`, `CreateNamespace`, `PublishVersion`, `CreateTrigger` | **yes** | Cost / availability risk |
+| Read-only: `GetFunction`, `ListFunctions`, `GetFunctionLogs`, `ListTriggers` | optional (max_iter=1, no hard abort) | Pre-flight for parent mutations |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result)
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
 
 ### SCF-specific safety rules (rubric §4)
 
-1. `DeleteFunction` — function name + namespace + version/trigger count echo; cascade warning; confirm
-2. `DeleteFunctionTriggers` — trigger type + name + ARN echo; warn service disruption; confirm
-3. `DeleteNamespace` / `DeleteLayerVersion` — list dependents; warn cold-start failure; confirm
-4. `UpdateFunctionCode` / `UpdateFunctionConfiguration` — BEFORE/AFTER diff; warn env var overwrite; confirm
-5. `InvokeFunction` (side effects) — warn live execution; confirm for Event type
+The Critic checks 5 SCF-specific rules independently of which operation ran:
 
-Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+1. `DeleteFunction` — namespace + version + trigger count echo; cascade warning; literal confirm
+2. `DeleteFunctionTriggers` — trigger type + ARN echo; service disruption warning
+3. `DeleteNamespace` / `DeleteLayerVersion` — dependent function enumeration; cold-start failure warning
+4. `UpdateFunctionCode` / `UpdateFunctionConfiguration` — BEFORE/AFTER diff; env var overwrite warning
+5. `InvokeFunction` (Event type) — live execution warning; confirm for non-test payloads
+
+Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+
+### Worked example — `DeleteFunction` with active API Gateway trigger
+
+| Dimension | Score |
+|---|---|
+| Correctness | 0.5 (function deleted, but trigger orphan not surfaced) |
+| **Safety** | **0** (rule 1 violated — no trigger count echo) |
+| Idempotency | 1 |
+| Traceability | 0.5 |
+| Spec Compliance | 1 |
+
+`decision: ABORT`. Recovery suggestion: "Recreate function + rebind API Gateway trigger; check APIG for 502 errors."
+
+See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `GetFunction` and RETRY on `UpdateFunctionConfiguration` env var overwrite).
 
 ---
 

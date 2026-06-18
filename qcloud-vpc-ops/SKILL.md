@@ -632,25 +632,63 @@ Every **Delete VPC/Subnet** MUST have:
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate is a
+**runtime** scoring layer that audits each VPC execution against an explicit rubric, in
+addition to the build-time **Safety Gates** chapter above and the build-time **2-round
+self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
+VPC destructive ops are **graph operations** — deleting one node removes connectivity for
+many siblings — so a single bad `DeleteVpc` can take down production CLBs in another VPC
+via cross-VPC peering.
 
 | Property | Value | Source |
 |---|---|---|
 | GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
-| `max_iterations` | **2** | per-skill override |
+| `max_iterations` | **2** | per-skill override (matches AGENTS.md §8 default for `qcloud-vpc-ops`) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 VPC-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Destructive: `DeleteVpc`, `DeleteSubnet`, `DeleteRouteTable`, `DeleteRoutes` (default `0.0.0.0/0`), `ReleaseAddresses` (EIP), `DeleteSecurityGroup` | **yes** | Graph operations; one bad call removes connectivity for many sibling resources (CVM, CLB, NAT, peering) — needs scoring |
+| Mutating: `CreateVpc`, `CreateSubnet`, `CreateRouteTable`, `CreateRoutes`, `AssociateNetworkInterface`, `DisassociateNetworkInterface`, `CreateSecurityGroup`, `ModifySecurityGroupPolicies` | **yes** | State / graph-change risk; CIDR subset, zone-in-region, route-next-hop, SG-rule validation all need scoring |
+| Read-only: `DescribeVpcs`, `DescribeSubnets`, `DescribeRouteTables`, `DescribeSecurityGroups`, `DescribeAddresses`, `DescribeVpcResourceDashboard`, `DescribeSubnetResourceDashboard` | optional (max_iter=1, no hard abort) | Polling tails are part of the parent op's trace |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result)
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
 
 ### VPC-specific safety rules (rubric §4)
 
-1. `DeleteVpc` — enumerate subnets/SGs/resources; warn cascade; literal confirm
-2. `DeleteSubnet` — check running resources; warn connectivity loss; confirm with ID
-3. `ReleaseAddresses` (EIP) — check bound resource; warn public connectivity loss; confirm per EIP
-4. `DeleteRouteTable` / `DeleteRoutes` — list entries; warn default route drop = internet outage; confirm
-5. `DeleteSecurityGroup` — enumerate bound instances; warn rule loss; confirm
+The Critic checks 5 VPC-specific rules independently of which operation ran:
 
-Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+1. `DeleteVpc` (any) — VPC ID + Name + CIDR echo; enumerate ALL subnets, route tables, security groups, and dependent resources (CVM via `DescribeInstances --Filters Name=vpc-id`, CLB via `DescribeLoadBalancers --Filters Name=vpc-id`, NAT Gateway, Peering Connections) via `DescribeVpcResourceDashboard`; warn cascade (all subnets + route tables + default SGs removed); literal `CONFIRM DELETE VPC <vpc_id>`; `--DryRun=true` first for batch; cascade trace MUST capture parent + each child `RequestId`
+2. `DeleteSubnet` (any, especially with running resources) — Subnet ID + VPC ID + CIDR echo; check running resources via `DescribeSubnetResourceDashboard` or `DescribeInstances --Filters Name=subnet-id`; warn that all CVM/CLB/NAT in this subnet lose connectivity; confirm with subnet ID; verify subnet is not the VPC's default subnet
+3. `ReleaseAddresses` (EIP, single or batch) — EIP ID + IP echoed; check binding via `DescribeAddresses` (`InstanceId` / `NetworkInterfaceId` / `InstanceType`); warn that releasing a bound EIP terminates public internet connectivity and breaks DNS; confirm per EIP (NO batch confirm)
+4. `DeleteRouteTable` / `DeleteRoutes` (any, especially default `0.0.0.0/0`) — Route table ID + VPC ID + all entries listed via `DescribeRouteTables`; default-route delete warns "all internet-bound traffic drops (BLACKHOLE)"; non-default warns "specific traffic patterns fall through"; confirm with route table ID; verify the route table is not the VPC's main/default route table
+5. `DeleteSecurityGroup` (any with rules) — SG ID + Name + Inbound/Outbound rule count; enumerate bound instances via `DescribeSecurityGroupReferences`; default SG warns "auto-created new SG may differ"; warn that all bound instances lose those rules; confirm with SG ID; cross-VPC `sg-` references must be enumerated
+
+Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+
+### Worked example — `DeleteSubnet` with running CVMs (cascading connectivity loss)
+
+| Dimension | Score |
+|---|---|
+| Correctness | 0.5 (subnet was deleted, but the gate should have caught the situation) |
+| **Safety** | **0** (rule 2 violated) |
+| Idempotency | 1 |
+| Traceability | 1 |
+| Spec Compliance | 1 |
+
+`decision: ABORT`. The running CVM `ins-prod-db-01` lost its ENI. Recovery suggestion emitted:
+"Migrate the CVM's ENI to another subnet in the same VPC (`CreateNetworkInterface` + `AssociateNetworkInterface` + `DisassociateNetworkInterface`), or restore the subnet with the original CIDR if available. Going forward, add a hard pre-flight `DescribeInstances --Filters Name=SubnetId` gate to the skill's pre-flight for every `DeleteSubnet` call."
+
+See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `DeleteVpc` with confirmation and RETRY on `ReleaseAddresses` with bound CLB).
 
 ---
 

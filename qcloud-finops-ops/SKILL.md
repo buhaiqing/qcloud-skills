@@ -268,25 +268,63 @@ tccli voucher DescribeVoucherList --Status "unused" --Limit 100
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
+is a **runtime** scoring layer that audits each FinOps execution against an explicit rubric,
+in addition to the build-time **Safety Gates** above and the build-time **2-round
+self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
+
+> **Read-only / advisory skill.** This skill MUST NOT auto-execute billing changes or
+> resource mutations. GCL Safety dimension uses threshold **0.5** (not 1.0) for advisory
+> violations; destructive delegation to product skills requires Safety = 1.0.
 
 | Property | Value | Source |
 |---|---|---|
 | GCL applicability | **optional** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
 | `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-finops-ops`) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 FinOps-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Advisory with delegation risk: idle-resource recommendations that could trigger product-skill deletes | **yes** | Must enforce handoff-only, no auto-execute |
+| Billing report generation: cost breakdown, tag attribution, budget alerts | optional | Privacy masking still scored |
+| Read-only: `DescribeBillDetail`, `DescribeCostSummary`, CLS idle queries | optional (max_iter=1, no hard abort) | No side effects |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** on destructive delegation (rule 2 or 5 violated) ⇒ **ABORT** — advisory privacy violations score 0.5, RETRY not ABORT
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
 
 ### FinOps-specific rules (rubric §4)
 
-1. **Billing data privacy** — mask account IDs, invoice URLs, contacts in trace; no raw output
-2. **No auto-execute** — recommend only; delegate execution to product skills
-3. **Tag attribution timing** — warn future-only; confirm
-4. **Idle detection accuracy** — warn CLS query latency; verify before action
-5. **Resource recommendation delegation** — do NOT auto-execute; cross-skill handoff only
+The Critic checks 5 FinOps-specific rules independently of which operation ran:
 
-**This is a read-only/advisory skill.** Safety=0 does NOT trigger ABORT (no destructive ops).
+1. **Billing data privacy** — mask account IDs, invoice URLs, contacts in trace; no raw billing output
+2. **No auto-execute** — recommend only; delegate execution to product skills with explicit handoff
+3. **Tag attribution timing** — warn tags apply to future billing only; confirm before tag changes
+4. **Idle detection accuracy** — warn CLS query latency; verify idle window before recommending action
+5. **Resource recommendation delegation** — do NOT auto-execute; cross-skill handoff only with user confirmation
+
+**This is a read-only/advisory skill.** Privacy/threshold violations (rules 1, 3, 4) score Safety = 0.5 → RETRY, not ABORT. Rules 2 and 5 violations (auto-execute) score Safety = 0 → ABORT.
+
+### Worked example — idle CVM recommendation with auto-terminate attempt
+
+| Dimension | Score |
+|---|---|
+| Correctness | 0.5 (idle list correct, but action attempted) |
+| **Safety** | **0** (rule 5 violated — auto-executed terminate instead of handoff) |
+| Idempotency | 1 |
+| Traceability | 0.5 (billing data masked correctly) |
+| Spec Compliance | 0 |
+
+`decision: ABORT`. Recovery suggestion: "Revert any unintended termination via product skill; re-run as read-only report with handoff to `qcloud-cvm-ops`."
+
+See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on cost report and RETRY on unmasked invoice URL).
 
 ---
 

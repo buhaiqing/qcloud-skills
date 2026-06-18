@@ -1229,25 +1229,60 @@ Proceed? (yes/no)
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
+is a **runtime** scoring layer that audits each CLS execution against an explicit rubric,
+in addition to the build-time **Safety Gates** above and the build-time **2-round
+self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
 
 | Property | Value | Source |
 |---|---|---|
 | GCL applicability | **recommended** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
 | `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-cls-ops`) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CLS-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Destructive: `DeleteLogset`, `DeleteTopic`, `DeleteIndex` | **yes** | No recycle bin; cascade to shippers and alarms |
+| Sensitive mutating: `ModifyTopic` (retention reduction), `ModifyConfig`, `DeleteConfigAttachment` | **yes** | Hard-truncate historical data; collection gap |
+| Mutating: `CreateLogset`, `CreateTopic`, `CreateIndex`, `CreateShipper`, `ApplyConfigToMachineGroup` | **yes** | Cost / search availability / pipeline risk |
+| Read-only: `DescribeLogsets`, `DescribeTopics`, `DescribeIndex`, `SearchLog` | optional (max_iter=1, no hard abort) | Pre-flight for parent mutations |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result)
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
 
 ### CLS-specific safety rules (rubric §4)
 
-1. `DeleteLogset` — logset ID + Name + topic count echo; list topics; warn cascade; literal confirm
-2. `DeleteTopic` — topic ID + Name + data size echo; warn data loss; check shipping tasks; confirm
-3. `DeleteIndex` — index ID + Topic ID echo; warn data unsearchable; warn re-index cost; confirm
-4. `DeleteMachineGroup` / `DeleteConfigAttachment` — warn collection stop; check agents; confirm
-5. `ModifyConfig` — BEFORE/AFTER diff; warn apply delay + collection gap; confirm per field
+The Critic checks 5 CLS-specific rules independently of which operation ran:
 
-Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+1. `DeleteLogset` — topic count + data size echo; literal `CONFIRM DELETE LOGSET <name>`; shipper enumeration
+2. `DeleteTopic` — shipper + alarm count echo; pipeline break warning
+3. `ModifyTopic` (retention reduction) — projected data loss figure; hard-truncate warning
+4. `CreateIndex` (full-text) — projected monthly cost; `FullText` vs `KeyValue` conflict warning
+5. `ModifyConfig` / `DeleteConfigAttachment` — BEFORE/AFTER diff; 60s apply delay; collection stop warning
+
+Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+
+### Worked example — `DeleteLogset` with active COS shipper
+
+| Dimension | Score |
+|---|---|
+| Correctness | 0.5 (logset deleted, but cascade not surfaced) |
+| **Safety** | **0** (rule 1 violated — no shipper enumeration) |
+| Idempotency | 1 |
+| Traceability | 0.5 |
+| Spec Compliance | 1 |
+
+`decision: ABORT`. Recovery suggestion: "Restore from COS archive if available; recreate logset + topic + shipper pipeline."
+
+See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `CreateTopic` and SAFETY_FAIL on `ModifyTopic` retention reduction).
 
 ---
 

@@ -655,25 +655,64 @@ Every **Delete**, **Isolate**, or **irreversible** operation MUST have:
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
+is a **runtime** scoring layer that audits each PostgreSQL execution against an explicit
+rubric, in addition to the build-time **Safety Gates** above and the build-time
+**2-round self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
+
+> **Standard PostgreSQL has no UNDROP.** Unlike Oracle Flashback, a `DropDatabase` or
+> `REVOKE ALL` is immediately effective — running applications fail on the next query with
+> lazy privilege errors that look like transient auth failures.
 
 | Property | Value | Source |
 |---|---|---|
 | GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
-| `max_iterations` | **2** | per-skill override |
-| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 PG-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| `max_iterations` | **2** | per-skill override (matches AGENTS.md §8 default for `qcloud-postgres-ops`) |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 PostgreSQL-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Destructive: `IsolateDBInstance`, `DeleteDBInstance`, `RestoreDBInstance` (overwrite target), `DropDatabase` (data-plane boundary — HALT if via raw `psql`) | **yes** | Irreversible or recycle-bin window only; needs scoring |
+| Sensitive mutating: `ModifyDBInstanceSpec` (storage/memory change), `ResetAccountPassword` / `ModifyAccountPassword`, `ModifyAccountPrivileges` (`REVOKE ALL`) | **yes** | Restart / immediate connection drop / silent privilege loss; needs scoring |
+| Mutating: `CreateDBInstances`, `CreateAccount`, `UpgradeDBInstance`, `ModifyDBInstanceName`, `OpenWanService` / `CloseWanService` | **yes** | Cost / security / connectivity risk; needs scoring |
+| Read-only: `DescribeDBInstances`, `DescribeAccounts`, `DescribeDBBackups`, `DescribeSlowLogData`, `DescribeErrorLogData` | optional (max_iter=1, no hard abort) | Polling tails are part of the parent op's trace |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result)
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
 
 ### PostgreSQL-specific safety rules (rubric §4)
 
-1. `IsolateDBInstance` / `TerminateInstances` — ID + Name echo; warn recycle-bin window; check deletion protection
-2. `DropDatabase` / `DropTable` — DB/table name echo; warn CASCADE effect; no batch-drop
-3. `ModifyDBInstanceSpec` — warn restart + downtime; surface disk usage; storage reduction not supported
-4. `ResetPassword` / `ModifyAccountPassword` — warn immediate effect + connection drop; no-recovery for `postgres`
-5. `CreateAccount` (wildcard host) — surface account + host pattern; warn `Host=%` open access; confirm
+The Critic checks 5 PostgreSQL-specific rules independently of which operation ran:
 
-Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+1. `IsolateDBInstance` / `DeleteDBInstance` — ID+Name+Status echo, recycle-bin 7-day window warning, dependency check (read replicas / active sessions), `--DryRun` for batch
+2. `RestoreDBInstance` / restore-from-backup — `BackupId` named, overwrite warning, recovery point surfaced
+3. `UpgradeDBInstance` / `ModifyDBInstanceSpec` — BEFORE/AFTER spec diff, restart warning, **storage reduction REJECT** before API call
+4. `ResetAccountPassword` / `ModifyAccountPassword` — account echo, immediate effect + connection drop, **`postgres` superuser no-recovery** warning
+5. `CreateAccount` (wildcard host) / `ModifyAccountPrivileges` (`REVOKE ALL`) — host pattern audit, BEFORE/AFTER privilege diff, running-app failure warning
+
+Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+
+### Worked example — `ModifyAccountPrivileges` (`REVOKE ALL`) on running connections
+
+| Dimension | Score |
+|---|---|
+| Correctness | 1 (`ModifyAccountPrivileges` succeeded) |
+| **Safety** | **0** (rule 5 violated — no BEFORE/AFTER privilege diff, no running-connection warning) |
+| Idempotency | 1 |
+| Traceability | 0.5 (API call logged but no `DescribeAccounts` follow-up) |
+| Spec Compliance | 0.5 |
+
+`decision: ABORT`. Recovery suggestion: "Re-run with `DescribeAccounts` BEFORE/AFTER; warn that running apps connecting as `app_user` will fail on next query; require explicit confirmation with account name."
+
+See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `CreateDBInstances` and SAFETY_FAIL on `DeleteDBInstance` reflecting no-UNDROP).
 
 ---
 

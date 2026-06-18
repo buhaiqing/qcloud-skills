@@ -551,25 +551,61 @@ Every **DeleteInstance**, **DeleteIndex**, **DeleteClusterSnapshot**, or **irrev
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
+is a **runtime** scoring layer that audits each ES execution against an explicit
+rubric, in addition to the build-time **Safety Gates** above and the build-time
+**2-round self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
 
 | Property | Value | Source |
 |---|---|---|
 | GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
-| `max_iterations` | **2** | per-skill override |
+| `max_iterations` | **2** | per-skill override (matches AGENTS.md §8 default for `qcloud-es-ops`) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 ES-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Destructive: `DeleteInstance`, `DeleteIndex`, `DeleteDataStream`, `DeleteClusterSnapshot` (without prior verify), `RestoreClusterSnapshot` (without target verify) | **yes** | Irreversible; ES has no Tencent Cloud recycle bin; data loss is immediate |
+| Mutating: `CreateInstance`, `UpdateInstance` (vertical scale / disk expansion), `UpgradeInstance` (ES version), `RestartInstance`, `RestartNodes`, `UpdatePlugins`, `UpdateDictionaries`, `UpdateIndex` (settings / mapping), `UpdateInstanceSettings` (cluster dynamic settings), `ResetPassword` / `ModifyAccountPassword` | **yes** | Triggers rolling restart, password rotation, or cluster config change; needs scoring |
+| Read-only: `DescribeInstances`, `DescribeIndexList`, `DescribeIndexMeta`, `DescribeClusterSnapshot`, `DescribeViews`, `DescribeInstanceOperations`, `DescribeDiagnose`, `DescribePlugins`, `DiagnoseInstance` | optional (max_iter=1, no hard abort) | Polling tails are part of the parent op's trace |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result)
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
 
 ### ES-specific safety rules (rubric §4)
 
-1. `DeleteInstance` / `DeleteCluster` — ID + Name + index count echo; warn irreversible; confirm
-2. `DeleteIndex` / `DeleteDataStream` — warn ILM policy awareness; no batch-drop
-3. `UpdateInstanceSettings` / `ModifyClusterConfig` — config diff; warn stability risk; confirm per change
-4. `ResetPassword` / `ModifyAccountPassword` — warn immediate effect; no-recovery for `elastic`; confirm
-5. `UpgradeElasticsearchVersion` — show current → target; warn one-directional; plugin compat check; confirm
+The Critic checks 5 ES-specific rules independently of which operation ran:
 
-Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+1. `DeleteInstance` / `DeleteCluster` (any, batch or single) — ID + Name + EsVersion + active index count echoed; warn that all indices, data, snapshots, and Kibana configuration are permanently removed (no Tencent Cloud recycle bin); list active indices via `DescribeIndexList`; require explicit confirmation with cluster name
+2. `DeleteIndex` / `DeleteDataStream` (data-plane or API) — index name + shard count + document count + health status echoed; warn that the index may be part of an ILM policy / data stream / rollover alias; require explicit confirmation with index name; do NOT batch-drop
+3. `UpdateInstanceSettings` / `ModifyClusterConfig` (cluster dynamic settings: `YML`, `ESConfig`, breaker / thread-pool) — echo BEFORE vs AFTER diff; warn stability risk (wrong `indices.breaker.*` or `thread_pool.*` can OOM the cluster); require explicit confirmation per changed setting
+4. `ResetPassword` / `ModifyAccountPassword` (Kibana / ES built-in user, esp. `elastic`) — account name echoed; warn that change is immediate; warn there is no Tencent Cloud admin recovery path for `elastic` (cluster may need to be rebuilt); require confirmation with account name
+5. `UpgradeElasticsearchVersion` (ES version upgrade) — show current → target; warn that ES upgrades are one-directional (downgrade requires full snapshot-restore to a new cluster); list installed plugins and check compatibility with target; warn that incompatible plugins will be disabled; require explicit confirmation
+
+Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+
+### Worked example — `DeleteIndex` without ILM / data-stream check
+
+A user asked the agent to "delete the old logs". The agent called `DeleteIndex` for `log-2024.01` without first running `DescribeIndexList` to inspect whether the index was a rollover alias target for an ILM policy.
+
+| Dimension | Score |
+|---|---|
+| Correctness | 0.5 (index did delete, but gate should have caught the role) |
+| **Safety** | **0** (rule 2 violated) |
+| Idempotency | 1 (`ResourceNotFound` recognized on follow-up) |
+| Traceability | 1 |
+| Spec Compliance | 1 |
+
+`decision: ABORT`. Recovery suggestion emitted: recreate the index with the original mapping/settings, re-attach it as the ILM rollover alias target, then advance the ILM policy phase. Going forward, add a "check ILM / data-stream membership before delete" guard to the skill's pre-flight.
+
+See [`references/rubric.md`](references/rubric.md) §6 for two more examples.
 
 ---
 

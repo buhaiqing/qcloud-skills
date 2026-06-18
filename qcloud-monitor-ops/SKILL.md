@@ -458,25 +458,60 @@ Five-step flow per [Proactive Inspection Template](../qcloud-skill-generator/tem
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
+is a **runtime** scoring layer that audits each Monitor execution against an explicit
+rubric, in addition to the build-time **Safety Gates** above and the build-time
+**2-round self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
 
 | Property | Value | Source |
 |---|---|---|
 | GCL applicability | **recommended** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
 | `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-monitor-ops`) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 Monitor-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Destructive: `DeleteAlarmPolicy`, `DeleteAlarmNotices`, `UnbindAlarmRuleResource` | **yes** | Alert silence; coverage loss |
+| Sensitive mutating: `ModifyAlarmPolicy` (threshold/condition), `SetDefaultAlarmPolicy` | **yes** | BEFORE/AFTER threshold drift; default applies to future resources |
+| Mutating: `CreateAlarmPolicy`, `CreateAlarmNotice`, `BindingPolicyObject` | **yes** | Misconfiguration risk |
+| Read-only: `DescribeAlarmPolicies`, `DescribeAlarmHistories`, GCL trace aggregation | optional (max_iter=1, no hard abort) | Dashboard reads; no side effects |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result)
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
 
 ### Monitor-specific safety rules (rubric §4)
 
-1. `DeleteAlarmPolicy` — policy ID + Name + bound resource count echo; warn alert silence; literal confirm
-2. `UnbindAlarmRuleResource` — policy + resource ID echo; warn coverage loss; confirm
-3. `ModifyAlarmPolicy` (condition) — BEFORE/AFTER diff; warn threshold drift; confirm per field
-4. `DeleteAlarmNotices` — notice template + type echo; list referencing policies; warn notification silence; confirm
-5. `SetDefaultAlarmPolicy` / auto-remediation — warn default applies to ALL future resources; confirm
+The Critic checks 5 Monitor-specific rules independently of which operation ran:
 
-Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+1. `DeleteAlarmPolicy` — policy ID + Name + bound resource count echo; alert silence warning; literal confirm
+2. `UnbindAlarmRuleResource` — policy + resource ID echo; coverage loss warning
+3. `ModifyAlarmPolicy` (condition) — BEFORE/AFTER diff; threshold drift warning per field
+4. `DeleteAlarmNotices` — notice template + referencing policy list; notification silence warning
+5. `SetDefaultAlarmPolicy` / auto-remediation — warn default applies to ALL future resources
+
+Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+
+### Worked example — `DeleteAlarmPolicy` with 12 bound CVM instances
+
+| Dimension | Score |
+|---|---|
+| Correctness | 0.5 (policy deleted, but bound count not surfaced) |
+| **Safety** | **0** (rule 1 violated — no bound resource count echo) |
+| Idempotency | 1 |
+| Traceability | 1 |
+| Spec Compliance | 1 |
+
+`decision: ABORT`. Recovery suggestion: "Recreate policy via `CreateAlarmPolicy`; rebind 12 CVM instances from trace."
+
+See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `DescribeAlarmPolicies` and RETRY on `ModifyAlarmPolicy` threshold change without BEFORE snapshot).
 
 ### GCL quality dashboard (Phase 3)
 

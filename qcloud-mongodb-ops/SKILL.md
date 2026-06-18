@@ -868,25 +868,66 @@ Every **Delete**, **Terminate**, **Isolate**, **Offline**, or **irreversible** o
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
+is a **runtime** scoring layer that audits each MongoDB execution against an explicit
+rubric, in addition to the build-time **Safety Gates** above and the build-time
+**2-round self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
 
 | Property | Value | Source |
 |---|---|---|
 | GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
-| `max_iterations` | **2** | per-skill override |
+| `max_iterations` | **2** | per-skill override (matches AGENTS.md §8 default for `qcloud-mongodb-ops`) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 MongoDB-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Destructive instance: `TerminateDBInstances`, `IsolateDBInstance`, `OfflineIsolatedDBInstance`, `DestroyDBInstance` (and data-plane equivalents `DropDatabase` / `DropCollection`) | **yes** | **MongoDB has no `UNDROP`**; `TerminateDBInstances` (prepaid) is immediate + irreversible; `IsolateDBInstance` → `OfflineIsolatedDBInstance` has only a 7-day recycle-bin window. Termination of the primary strands all secondaries (oplog-replication coupling) |
+| Mutating: `CreateDBInstance` / `CreateDBInstanceHour`, `ModifyDBInstanceSpec`, `UpgradeDbInstanceVersion`, `FlashBackDBInstance`, `RestoreDBInstance`, `CreateAccountUser`, `ModifyAccountPassword`, `SetAccountUserPrivilege`, `EnableTransparentDataEncryption`, `ModifyDBInstanceSecurityGroup`, `KillOps`, `ModifyInstanceParams` | **yes** | Restart / data-overwrite / privilege-escalation / lockout risk; needs scoring |
+| Read-only: `DescribeDBInstances`, `DescribeSpecInfo`, `DescribeSlowLogs` / `DescribeSlowLogPatterns` / `DescribeDetailedSlowLogs`, `DescribeCurrentOp`, `DescribeClientConnections`, `DescribeDBInstanceURL`, `DescribeDBInstanceNamespace`, `DescribeDBBackups`, `DescribeInstanceParams`, `DescribeTransparentDataEncryptionStatus`, `DescribeAuditConfig`, `DescribeAuditLogs`, `DescribeSecurityGroup`, `DescribeInstanceSSL`, `InquirePriceCreateDBInstances` | optional (max_iter=1, no hard abort) | Polling tails are part of the parent op's trace |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result). Any password or `{{user.*}}-secret` field captured un-masked in trace is also an unconditional ABORT.
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
 
 ### MongoDB-specific safety rules (rubric §4)
 
-1. `IsolateDBInstance` / `DestroyDBInstance` — ID + Name echo; warn recycle-bin window (7d); check deletion protection
-2. `DropDatabase` / `DropCollection` — DB/collection name echo; warn irreversible; no batch-drop
-3. `ModifyDBInstanceSpec` — warn restart + downtime; for downgrade surface MemoryUsage; confirm
-4. `ModifyAccountPassword` — warn immediate effect; no-recovery-path for root; confirm with account name
-5. `ModifySecurityGroup` / network change — warn client lockout; for VPC change warn endpoint IP change
+The Critic checks 5 MongoDB-specific rules independently of which operation ran.
+These encode the two MongoDB-specific invariants that distinguish this skill from
+the CDB / CVM rubrics:
 
-Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+1. **`IsolateDBInstance` / `DestroyDBInstance` / `TerminateDBInstances` (any)** — Instance ID + Name + Status echo; warn recycle-bin window (7-day retention for pay-as-you-go, immediate for prepaid expired); for `DestroyDBInstance`: warn irreversible — the instance and all data are destroyed permanently; check deletion protection status via `SetDBInstanceDeletionProtection`; require explicit confirmation; for `TerminateDBInstances` on a replica-set primary (`NodeNum ≥ 3`), enumerate the 2 secondaries via `DescribeDBInstanceNodeProperty` and warn that terminating the primary strands them with no path to elect a new primary; for batch (`len(InstanceIds) > 1`) require `--DryRun` first
+2. **`DropDatabase` / `DropCollection` (data-plane equivalent)** — Database/collection name echoed; warn that **ALL documents, indexes, and user-defined roles** for that database/collection are permanently removed; require explicit confirmation; **do NOT batch-drop** — each database must be confirmed separately; surface current oplog window so the user understands replication lag impact
+3. **`ModifyDBInstanceSpec` (upgrade/downgrade of `Memory`, `Volume`, `NodeNum`)** — Show current spec → target spec; warn that spec changes trigger a primary-standby switchover (30-120s downtime); for **downgrade** (`Memory` or `Volume` reduction): warn that MongoDB data must fit in the new spec; surface current `RealInstanceUsage` (disk) and `MemoryUsage` from `DescribeDBInstanceNodeProperty` / Cloud Monitor; require explicit confirmation; enforce `new Volume ≥ 1.2 × current used disk` and `new Memory ≥ peak working-set size`
+4. **`ModifyAccountPassword` (any account, especially root / `mongouser`)** — Account name echoed; warn that the password change takes **immediate effect**; all active connections using the old password will be closed; for the root / `mongouser` account: warn that there is **no recovery path** — the old password is gone forever and Tencent Cloud has no admin-portal override; require confirmation with account name; never log the password value (only `<masked>`)
+5. **`ModifyDBInstanceSecurityGroup` / network change** — For security group change: show current SG ID(s) → target; warn that the wrong SG can lock out all client connections (the #1 MongoDB connectivity issue — 90% of "I can't connect" tickets are SG-related); surface current network ACL status; require explicit confirmation. For VPC / subnet change: warn that the instance's endpoint IP will change — DNS-connected applications will break until connection strings are updated
+
+Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+
+### Worked example — `TerminateDBInstances` with active oplog replay (prepaid, single primary)
+
+A user runs `tccli mongodb TerminateDBInstances --InstanceId cmgo-abc123` against a
+prepaid replica-set primary (`NodeNum=3`) while `DescribeClientConnections` shows
+40 active client sessions and the 2 secondaries (`cmgo-def456`, `cmgo-ghi789`) are
+still receiving oplog replay.
+
+| Dimension | Score |
+|---|---|
+| Correctness | 0.5 (instance did terminate — prepaid `TerminateDBInstances` is immediate — but the gate should have caught the situation) |
+| **Safety** | **0** (rule 1 violated on two counts: (a) `SetDBInstanceDeletionProtection` status was not checked; protection was enabled and the call should have been blocked; (b) `DescribeDBInstanceNodeProperty` was not called to enumerate the 2 secondaries, so the user was not warned that secondaries `cmgo-def456` and `cmgo-ghi789` would be stranded with no path to elect a new primary) |
+| Idempotency | 1 |
+| Traceability | 1 |
+| Spec Compliance | 1 |
+
+`decision: ABORT`. The instance is already destroyed (prepaid `TerminateDBInstances` is immediate and irreversible — MongoDB has **no UNDROP**, unlike some RDBMS offerings). Recovery suggestion emitted: (1) open a Tencent Cloud support ticket to attempt data recovery from the latest auto-backup via `DescribeDBBackups`; (2) immediately disable `SetDBInstanceDeletionProtection` on the surviving secondaries to prevent the same batch from re-firing on auto-retry; (3) going forward, add a `DescribeDBInstanceNodeProperty` step before any `TerminateDBInstances` / `IsolateDBInstance` to enumerate replica-set peers, and surface the deletion-protection status read before submitting.
+
+See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `CreateDBInstanceHour` and RETRY on `ModifyDBInstanceSpec` downgrade).
 
 ---
 

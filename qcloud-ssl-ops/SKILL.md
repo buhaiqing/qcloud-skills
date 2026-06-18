@@ -494,25 +494,60 @@ Every **Delete** or **irreversible** operation MUST have:
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
+is a **runtime** scoring layer that audits each SSL execution against an explicit rubric,
+in addition to the build-time **Safety Gates** above and the build-time **2-round
+self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
 
 | Property | Value | Source |
 |---|---|---|
 | GCL applicability | **recommended** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
 | `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-ssl-ops`) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 SSL-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Destructive: `DeleteCertificate` (deployed cert) | **yes** | Immediate TLS handshake failure on bound resources |
+| Sensitive mutating: `DeployCertificateInstance`, `ReplaceCertificate`, `UploadCertificate` | **yes** | Live traffic impact; chain completeness |
+| Mutating: `ApplyCertificate`, `DownloadCertificate`, `ModifyCertificateAlias` | **yes** | Validation timing / DNS access risk |
+| Read-only: `DescribeCertificates`, `DescribeCertificateDetail`, `DescribeDeployCertificateDetail` | optional (max_iter=1, no hard abort) | Pre-flight for deploy/delete |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result)
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
 
 ### SSL-specific safety rules (rubric §4)
 
-1. `DeleteCertificate` — cert ID + domain + deploy status echo; list deployed resources; literal confirm
-2. `DeployCertificateInstance` — show target resource; warn replace; surface current cert; confirm
-3. `ReplaceCertificate` — BEFORE/AFTER diff; warn immediate; check domain match; confirm
-4. `ApplyCertificate` — show domain + validation method; warn DV/OV timing; check DNS access; confirm
-5. `UploadCertificate` — show cert info; warn incomplete chain; reject < 2048-bit key; confirm
+The Critic checks 5 SSL-specific rules independently of which operation ran:
 
-Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+1. `DeleteCertificate` — deployed resource list echo; literal `CONFIRM DELETE CERT <id>`; expiry overlap check
+2. `DeployCertificateInstance` — target resource + current cert echo; immediate replace warning
+3. `ReplaceCertificate` — BEFORE/AFTER diff; domain SAN match; overlap window for dual-cert deploy
+4. `ApplyCertificate` — domain + validation method echo; DNS/HTTP access prerequisite check
+5. `UploadCertificate` — chain completeness check; reject < 2048-bit key; private key never in trace
+
+Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+
+### Worked example — `DeleteCertificate` still deployed on CLB
+
+| Dimension | Score |
+|---|---|
+| Correctness | 0.5 (cert deleted, but deploy status not checked) |
+| **Safety** | **0** (rule 1 violated — no deployed resource list) |
+| Idempotency | 1 |
+| Traceability | 0.5 |
+| Spec Compliance | 1 |
+
+`decision: ABORT`. Recovery suggestion: "Re-upload cert or deploy replacement via `DeployCertificateInstance` before users see TLS errors."
+
+See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `DescribeCertificates` and RETRY on `ReplaceCertificate` domain mismatch).
 
 ---
 

@@ -724,25 +724,62 @@ tccli ckafka DescribeTopicSubscribeGroup \
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
+is a **runtime** scoring layer that audits each CKafka execution against an explicit
+rubric, in addition to the build-time **Safety Gates** above and the build-time
+**2-round self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
 
 | Property | Value | Source |
 |---|---|---|
 | GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
-| `max_iterations` | **2** | per-skill override |
+| `max_iterations` | **2** | per-skill override (matches AGENTS.md §8 default for `qcloud-ckafka-ops`) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CKafka-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Destructive instance: `DeleteInstance` (single & batch) | **yes** | Irreversible; wipes **every** topic + message + consumer offset + ACL on the instance (no CKafka recycle bin, unlike CDB `IsolateDBInstance`) |
+| Destructive topic: `DeleteTopic` (single & batch) | **yes** | Fan-out irreversible: wipes committed offset for **every** subscribed consumer group — the canonical CKafka data-loss surface |
+| Sensitive mutating: `ModifyTopic` (partition increase > 2×), `ModifyInstanceAttributes` reducing `MsgRetentionTime` or changing `CleanUpPolicy` | **yes** | Partition rebalance causes duplicate / out-of-order delivery; retention drop can delete messages within minutes (the "minutes vs ms" footgun); `CleanUpPolicy` toggle is irreversible on existing segments |
+| Sensitive mutating ACL: `CreateAcl` with `Host=*`+`Operation=ALL`+`PermissionType=ALLOW`; `DeleteAcl` removing the last allow rule for an operation | **yes** | Open-cluster access pattern (rule 5); consumer lockout until a new rule is created |
+| Mutating: `CreateInstance`, `CreateTopic`, `CreatePartition`, `CreateConsumerGroup`, `CreateAcl`, `SendMessages`, `ModifyInstanceAttributes` (other config), `ModifyTopic` (partition ≤ 2×) | **yes** | Cost / state-change / quorum risk; needs scoring |
+| Read-only: `DescribeInstances`, `DescribeTopic`, `DescribeConsumerGroup`, `DescribeGroupInfo`, `DescribeTopicSubscribeGroup`, `DescribeACL`, `FetchMessageByOffset` | optional (max_iter=1, no hard abort) | Polling tails are part of the parent op's trace |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** OR any rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result). Credential leak in trace is also an unconditional ABORT.
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
 
 ### CKafka-specific safety rules (rubric §4)
 
-1. `DeleteInstance` — instance ID + Name echo; list topics + consumer groups before commit; literal confirm
-2. `DeleteTopic` — topic + partition + active consumer groups echo; confirm with topic name
-3. `ModifyTopic` (partition change) — warn one-directional; surface rebalancing impact; confirm if >2×
-4. `ModifyInstanceAttributes` (retention/config) — echo current → new; warn retention timing; warn CleanUpPolicy irreversibility
-5. `CreateAcl` / `DeleteAcl` — surface ACL rule; warn `Host=*` + `ALL` open access; warn last-rule lockout
+The Critic checks 5 CKafka-specific rules independently of which operation ran:
 
-Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+1. `DeleteInstance` (any, batch or single) — instance ID+Name echo; enumerate **all** topics via `DescribeTopic` AND **all** consumer groups via `DescribeConsumerGroup` AND **all** topic-group subscriptions via `DescribeTopicSubscribeGroup`; surface `ConsumeLag` for each group; require literal `CONFIRM DELETE <instance_id>`; block if any group has `ConsumeLag > 0` unless an explicit "ignore lag" rationale is captured; batch (n>1) MUST run `--DryRun` first. CKafka has **no recycle bin** — unlike CDB's `IsolateDBInstance`, instance deletion is permanent and no rollback exists.
+2. `DeleteTopic` (any, batch or single) — topic Name + `PartitionNum` + **all** subscribed consumer groups (via `DescribeTopicSubscribeGroup`) echoed; warn that all messages within retention AND committed offsets for **every** subscribed group are lost; require explicit confirmation with topic name; require that all subscribed groups have been notified (in real systems, "user has confirmed downstream consumers are aware their offsets will reset"). This is the #1 CKafka data-loss pattern — a user deleting a "temp" topic can take out a critical consumer group's progress.
+3. `ModifyTopic` (partition count change) — show current → target `PartitionNum`; warn that partition increase is **one-directional** (Kafka cannot shrink partitions); surface rebalancing impact on consumers (every consumer group for this topic will rebalance — potential duplicate redelivery or out-of-order delivery during the transition, in-flight commits lost); require confirmation when the increase > 2× current; verify the new partition count is bounded by the instance's broker count (replication factor for new partitions must fit — silent under-replication is the failure mode).
+4. `ModifyInstanceAttributes` (broker config: `MaxTopicNum`, `MsgRetentionTime`, `CleanUpPolicy`, `LogRetentionTime`, `MaxMessageBytes`, etc.) — echo current → new value for each modified attribute; for `MsgRetentionTime` reduction: warn that messages older than the new retention will be deleted at the **next** retention cycle (NOT at the next rotation — the most common misread); for `CleanUpPolicy` change (`delete`→`compact` or vice versa): warn that log cleanup behavior changes irreversibly for existing segments; require confirmation for each change; **unit-mismatch guard**: `MsgRetentionTime` is **minutes**, not milliseconds.
+5. `CreateAcl` / `DeleteAcl` (access control) — for `CreateAcl`: surface the rule tuple (`InstanceId`, `ResourceType`, `ResourceName`, `Principal`, `Host`, `Operation`, `PermissionType`); warn if `PermissionType=ALLOW`+`Operation=ALL`+`Host=*` (open cluster access pattern); require explicit confirmation for permissive ACLs. For `DeleteAcl`: surface the rule being removed; warn if the rule is the **only allow rule** for an operation — consumers may be locked out until a new ACL is created; require that the user has confirmed the consumer groups that depend on this rule have been notified.
+
+Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+
+### Worked example — `DeleteTopic` with consumer offset lag (silent progress loss)
+
+| Dimension | Score |
+|---|---|
+| Correctness | 1 (topic deleted; `DeleteTopic` API returned success) |
+| **Safety** | **0** (rule 2 violated — 2 subscribed consumer groups with non-zero `ConsumeLag` were not surfaced in the user-facing confirmation prompt) |
+| Idempotency | 1 (`DeleteTopic` retry is a no-op — topic gone) |
+| Traceability | 1 (pre-deletion `DescribeTopicSubscribeGroup` **was** in the trace — the gap was the user-facing prompt) |
+| Spec Compliance | 1 (region correct; topic name valid) |
+
+`decision: ABORT`. Recovery suggestion emitted: re-run the confirmation prompt with the full subscribed-group list (group name + `ConsumeLag` per group); require the user to acknowledge each group; after deletion, advise the user to manually rewind the affected consumer group to its last-known committed offset via `FetchMessageByOffset` (if the messages were still in retention) OR set `auto.offset.reset=earliest` on the next consumer start (which will replay the lagged messages, assuming they are still in retention). This is the canonical CKafka data-loss pattern: a user deletes a "temp" topic and silently takes out a critical consumer group's progress.
+
+See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `CreateTopic` with retention and SAFETY_FAIL on `DeleteInstance` with active consumers — the other half of the consumer-offset-loss cascade).
 
 ---
 

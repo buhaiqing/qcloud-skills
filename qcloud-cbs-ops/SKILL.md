@@ -954,25 +954,59 @@ Every **DeleteSnapshots**, **DetachDisks**, **ResizeDisk**, or **irreversible** 
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
+is a **runtime** scoring layer that audits each CBS execution against an explicit
+rubric, in addition to the build-time **Safety Gates** above and the build-time
+**2-round self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
 
 | Property | Value | Source |
 |---|---|---|
 | GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
-| `max_iterations` | **2** | per-skill override |
+| `max_iterations` | **2** | per-skill override (matches AGENTS.md §8 default for `qcloud-cbs-ops`) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CBS-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Destructive: `TerminateDisks`, `DeleteSnapshots`, `ApplySnapshot`, `DetachDisks` (force on running CVM), `ModifyDiskAttributes` (`DeleteWithInstance` toggle) | **yes** | Mostly irreversible or near-irreversible; data-loss or data-corruption risk; needs scoring |
+| Mutating: `CreateDisks`, `AttachDisks`, `DetachDisks` (clean), `ResizeDisk` (grow only — shrink blocked by rule 3), `CreateSnapshot`, `ModifyDiskAttributes` (other attrs) | **yes** | Cost / state-change risk; needs scoring |
+| Read-only: `DescribeDisks`, `DescribeSnapshots`, `DescribeDiskConfigQuota`, `DescribeSnapshotQuota` | optional (max_iter=1, no hard abort) | Polling tails are part of the parent op's trace |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result). Secret-content leak in trace is also an unconditional ABORT.
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
 
 ### CBS-specific safety rules (rubric §4)
 
-1. `TerminateDisks` (destroy) — ID + Name + Size echo; warn irreversible; surface `DeleteWithInstance` flag
-2. `DetachDisks` — warn running CVM data corruption risk without unmount
-3. `ResizeDisk` — EXPAND ONLY; reject shrink before API call
-4. `DeleteSnapshots` — snapshot-chain invalidation warning; `--DryRun` for batch
-5. `ModifyDiskAttributes` — `DeleteWithInstance` toggle warning; echo attributes per change
+The Critic checks 5 CBS-specific rules independently of which operation ran:
 
-Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+1. `TerminateDisks` (destroy) — Disk ID + Name + Size + Status echo; warn that disk destroy is irreversible (snapshot recovery is the only path); surface whether `DeleteWithInstance` is set; require explicit confirmation "yes, destroy `disk-xxx` (`prod-data-01`) permanently"
+2. `DetachDisks` (force detach) — Disk ID + attached CVM ID + status echo; warn that detaching a disk attached to a running CVM without unmount may cause data corruption; require user to confirm filesystem is unmounted first (or surface the `Force` flag as the fallback)
+3. `ResizeDisk` (any) — Show current size → target size; warn that CBS resize is **EXPAND ONLY** (cannot shrink except by creating a new smaller disk and migrating data); reject if `target < current` with "CBS does not support shrink" before the API call
+4. `DeleteSnapshots` (any) — Snapshot ID + Name + Size + CreatedTime echoed; warn that deleting the last snapshot removes the ability to recover from catastrophic data loss; for batch (`len(SnapshotIds) > 1`), require `--DryRun` first; require explicit confirmation "yes, delete snapshot `snap-xxx` (name)"
+5. `ModifyDiskAttributes` (changing `DiskName`, `ProjectId`, or `DeleteWithInstance`) — Echo new attributes BEFORE the call; for `DeleteWithInstance` toggle `FALSE` → `TRUE`: warn that the disk will auto-delete when the attached CVM is terminated; for `ProjectId` change: warn that billing/cost allocation shifts; require confirmation for each change
+
+Missing any of these ⇒ **Safety = 0** ⇒ **ABORT**.
+
+### Worked example — `ResizeDisk` shrink attempt (ExpandOnly violation)
+
+| Dimension | Score |
+|---|---|
+| Correctness | 0 (API rejected with `InvalidParameterValue.DiskSizeTooSmall`; agent should have caught this in Pre-flight and never submitted the call) |
+| **Safety** | **0** (rule 3 violated — Pre-flight did not enforce the ExpandOnly invariant) |
+| Idempotency | 1 |
+| Traceability | 1 |
+| Spec Compliance | 0 (`core-concepts.md` § "ExpandOnly invariant" was not consulted) |
+
+`decision: ABORT`. Recovery suggestion emitted: reject the shrink request with a clear "CBS does not support shrink — alternative: create a new 50GB disk, copy data with `rsync`, decommission the old one" message; do not submit the `ResizeDisk` call.
+
+See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `CreateSnapshot` with retention check and SAFETY_FAIL on `TerminateDisks` without snapshot).
 
 ---
 
