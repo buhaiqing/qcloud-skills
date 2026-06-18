@@ -376,6 +376,7 @@ Each skill may override `max_iter` in its own `SKILL.md` (under `## Quality Gate
   for Reflexion memory (`docs/failure-patterns.md`); `qcloud-skill-generator`
   Output table + Charter C7 now require `references/rubric.md` + `references/prompt-templates.md`
   + `## Quality Gate (GCL)` SKILL.md section for every GCL `required`/`recommended` skill.
+- **Phase 4.1** — Tier B/C/D conformance: bring all 24 skills to Tier A (8 rubric sections + 7 prompt sections + `## Quality Gate (GCL)` chapter). **Done (2026-06-19):** `scripts/check_gcl_conformance.py` is the durable CI gate; 19 under-conforming skills (15 Tier B + 3 Tier C + 1 Tier D) fleshed out to Tier A; `qcloud-skill-generator` (Tier D) gained `references/rubric.md`, `references/prompt-templates.md`, and `## Quality Gate (GCL)` SKILL.md chapter.
 
 ### 11. Relationship to existing 2-round self-review
 
@@ -396,6 +397,7 @@ does not exempt a sloppy skill update.
 |---|---|---|
 | 1.0.0 | 2026-06-04 | Initial GCL specification added to `AGENTS.md` (adapted from `jdcloud-skills/AGENTS.md`; per-skill defaults remapped to qcloud skill set; `tccli` / `tencentcloud-sdk-python` execution path; Phase 1 pilot scoped to `qcloud-cvm-ops`) |
 | 1.1.0 | 2026-06-18 | **Phase 4 completion:** `scripts/gcl_alarm_wire.py` (plan/apply/dry-run) + Cloud Monitor alarm policies; `scripts/gcl_runner_test.py` (35 unit tests); `failure_pattern` extraction in `gcl_runner.py` (Reflexion); `qcloud-skill-generator` Charter C7 + Output table GCL artifacts; `## Quality Gate (GCL)` template section |
+| 1.2.0 | 2026-06-19 | **Phase 4.1 Tier A conformance:** `scripts/check_gcl_conformance.py` (CI gate); 19 skills fleshed out to 8-section rubric + 7-section prompt-templates + Tier A SKILL.md Quality Gate chapter; `qcloud-skill-generator` (Tier D) gained full GCL artifacts |
 
 ### 13. See also
 

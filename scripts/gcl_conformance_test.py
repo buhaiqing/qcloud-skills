@@ -11,9 +11,8 @@ Covers:
 - check_all iterates all 24 skills, sorted by name.
 - Conformance: rubric, prompt, and Quality Gate are detected correctly.
 
-Note: ``test_all_24_pass`` is intentionally failing on master as of 2026-06-18
-(4 skills conform out of 24). It documents the audit baseline — subsequent
-phases of the Tier-A Conformance Plan will close the gap.
+Note: ``test_all_24_pass`` verifies full Tier-A conformance (24/24) after
+Phase 4.1 completion (2026-06-19).
 """
 
 from __future__ import annotations
@@ -85,10 +84,17 @@ class CheckSkillTests(unittest.TestCase):
         self.assertTrue(report["ok"])
 
     def test_check_skill_missing_files(self) -> None:
-        # qcloud-skill-generator is missing all three artifacts
-        report = gclc.check_skill(ROOT, "qcloud-skill-generator")
-        self.assertFalse(report["has_quality_gate"])
-        self.assertFalse(report["ok"])
+        """Non-existent skill dir reports all artifacts missing."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_root = Path(tmp)
+            (fake_root / "qcloud-fake-ops").mkdir()
+            (fake_root / "qcloud-fake-ops" / "SKILL.md").write_text("# Fake\n", encoding="utf-8")
+            report = gclc.check_skill(fake_root, "qcloud-fake-ops")
+            self.assertFalse(report["has_quality_gate"])
+            self.assertEqual(report["rubric_sections"], 0)
+            self.assertEqual(report["prompt_sections"], 0)
+            self.assertFalse(report["ok"])
 
 
 class CheckAllTests(unittest.TestCase):
@@ -101,12 +107,7 @@ class CheckAllTests(unittest.TestCase):
 
 class ConformanceTests(unittest.TestCase):
     def test_all_24_pass(self) -> None:
-        """Once this plan completes, the conformance check passes on all 24 skills.
-
-        As of 2026-06-18, only 4 skills (cvm, cdb, clb, cos) are fully conformant.
-        This test is expected to fail; subsequent phases of the Tier-A Conformance
-        Plan will close the gap. When this test passes, the gate is green.
-        """
+        """All 24 skills must pass Tier-A GCL conformance (Phase 4.1 gate)."""
         result = gclc.check_all(ROOT)
         failing = [r["skill"] for r in result if not r["ok"]]
         self.assertEqual(
