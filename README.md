@@ -385,6 +385,9 @@ python3 scripts/validate_product_assessment.py
 # SKILL.md frontmatter
 python3 scripts/validate_skills_frontmatter.py
 
+# Markdown 本地链接和仓库路径引用
+python3 scripts/check_markdown_links.py
+
 # GCL Orchestrator smoke (structural critic; CI/local smoke only, not a production quality pass)
 python3 scripts/gcl_runner.py run \
   --skill qcloud-cvm-ops \
@@ -392,9 +395,15 @@ python3 scripts/gcl_runner.py run \
   --command 'echo smoke' \
   --max-iter 1 \
   --structural-critic-only
+python3 scripts/gcl_trace_aggregate.py --since-hours 168
+
+# 脚本单测 / GCL conformance / 告警计划
+cd scripts && python3 -m unittest discover -p "*_test.py" -v && cd ..
+python3 scripts/check_gcl_conformance.py
+python3 scripts/gcl_alarm_wire.py plan
 ```
 
-GitHub Actions workflow: `.github/workflows/validate-skills.yml` runs the first two checks on every PR.
+GitHub Actions workflow: `.github/workflows/validate-skills.yml` runs the validation matrix on every PR: frontmatter, Well-Architected JSON examples, GCL smoke + trace aggregation, script unit tests, alarm wire plan, GCL Tier-A conformance, and Markdown path checks.
 
 ## 快速开始
 
