@@ -385,7 +385,7 @@ python3 scripts/validate_product_assessment.py
 # SKILL.md frontmatter
 python3 scripts/validate_skills_frontmatter.py
 
-# GCL Orchestrator smoke (structural critic)
+# GCL Orchestrator smoke (structural critic; CI/local smoke only, not a production quality pass)
 python3 scripts/gcl_runner.py run \
   --skill qcloud-cvm-ops \
   --request "read-only smoke" \

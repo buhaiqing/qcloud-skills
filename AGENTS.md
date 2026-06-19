@@ -39,6 +39,7 @@ Run `ls qcloud-*-ops/` for the canonical list. The `README.md` skill list is als
 - **Five Core Standards** (P0 quality gates, all skills must satisfy): Clear Boundaries, Structured I/O (`{{env.*}}` / `{{user.*}}` / `{{output.*}}` placeholders), Explicit Actionable Steps, Complete Failure Strategies (≥ 10 product-specific error codes with HALT vs retry), Absolute Single Responsibility.
 - **Token Efficiency** (P0 — 强制): 在保持 Agent 可执行性的前提下最小化 Token 消耗。规则包括 TE-1（API 查替代硬编码表）、TE-3（紧凑错误表 ≤3 列）、TE-4（JSON paths 集中声明）、TE-5（YAML anchors）、TE-6（消除跨文件重复）。详见下方 Round 1 检查清单。
 - **No web console as agent execution path.** The console may be referenced for product docs but never for state changes.
+- **Minimal-change principle.** Prefer owner-scoped, minimal diffs. Do not reformat, rename, or restructure unrelated skill files while updating one skill; defer broad cleanups to an explicit follow-up task.
 - **UX spec** in `qcloud-skill-generator/references/user-experience-spec.md` is mandatory for all generated skills.
 - **Asset & schema placement (mandatory)** — skill-owned artifacts MUST NOT be placed at repo root. Use this split:
 
@@ -124,7 +125,17 @@ python3 scripts/validate_skills_frontmatter.py
 
 Exit non-zero ⇒ fix finding ID / pillar mismatch before claiming done.
 
-**Runtime GCL (Phase 2):** `scripts/gcl_runner.py` implements the Orchestrator loop (trace → external Critic → PASS/RETRY/SAFETY_FAIL). Critic scores MUST be injected from an isolated agent context via `--critic-json` or stdin; use `--structural-critic-only` only for CI smoke tests.
+**Validation command matrix:**
+
+| Change scope | Required command |
+|---|---|
+| Any `SKILL.md` frontmatter or metadata change | `python3 scripts/validate_skills_frontmatter.py` |
+| Any `references/well-architected-assessment.md` Worker Output Contract example JSON change | `python3 scripts/validate_product_assessment.py` |
+| Any GCL rubric, prompt template, or `## Quality Gate (GCL)` section change | `python3 scripts/check_gcl_conformance.py` |
+| Any script test or GCL runner change | `cd scripts && python3 -m unittest discover -p "*_test.py" -v` |
+| Any GCL alarm wiring change | `python3 scripts/gcl_alarm_wire.py plan` |
+
+**Runtime GCL (Phase 2):** `scripts/gcl_runner.py` implements the Orchestrator loop (trace → external Critic → PASS/RETRY/SAFETY_FAIL). Critic scores MUST be injected from an isolated agent context via `--critic-json` or stdin. Production GCL MUST use externally supplied isolated Critic scores; `--structural-critic-only` is allowed only for CI/local structural smoke tests and MUST NOT be used for production execution, human acceptance, or quality pass decisions.
 
 ## Adding or modifying a skill
 
@@ -139,7 +150,10 @@ Exit non-zero ⇒ fix finding ID / pillar mismatch before claiming done.
   - `scripts/validate_product_assessment.py` — Well-Architected worker JSON regression
   - `scripts/validate_skills_frontmatter.py` — SKILL.md frontmatter checks
   - `scripts/gcl_runner.py` — GCL Orchestrator (Phase 2; external Critic required in production)
+  - `scripts/gcl_runner_test.py` — unit tests for GCL runner behavior
   - `scripts/gcl_trace_aggregate.py` — GCL trace → quality summary (Phase 3; feeds monitor-ops / inspection)
+  - `scripts/gcl_alarm_wire.py` — Cloud Monitor alarm wiring for GCL metrics
+  - `scripts/check_gcl_conformance.py` — GCL rubric/prompt/Quality Gate conformance check
   - `.github/workflows/validate-skills.yml` — CI for the above
 - No `CLAUDE.md`, `opencode.json`, `.cursorrules` in this repo.
 - `.omc/`, `.omo/`, `.codebuddy/`, `.omc/project-memory.json` are gitignored cache data — not source.
@@ -155,351 +169,43 @@ Exit non-zero ⇒ fix finding ID / pillar mismatch before claiming done.
 | `qcloud-skill-generator/references/governance-and-adversarial-review.md` | Governance & adversarial review — R1–R4 pre-merge security/resilience/UX scenarios |
 | `qcloud-skill-generator/references/qcloud-skill-template.md` | Canonical SKILL.md template |
 | `qcloud-skill-generator/references/user-experience-spec.md` | UX compliance requirements for all skills |
-| `docs/failure-patterns.md` | **Reflexion memory** — structured failure patterns for cross-session learning (§14 Reflexion Integration) |
+| `docs/gcl-spec.md` | **Runtime GCL spec** — rubric, trace schema, prompt templates, per-skill defaults, roadmap/changelog |
+| `docs/reflexion-memory.md` | **Reflexion rules** — lightweight cross-session failure-pattern memory governance |
+| `docs/failure-patterns.md` | **Reflexion memory store** — bounded structured failure patterns for cross-session learning |
 
 ---
 
-## Generator-Critic-Loop (GCL) — Adversarial Quality Gate
+## Runtime Quality Gates: GCL & Reflexion
 
-> Inspired by GAN's Generator/Discriminator idea, but deliberately **not** a real GAN.
-> Naming: **GCL (Generator-Critic-Loop)** to avoid misleading reviewers and LLM trainees.
-> Sourced from `jdcloud-skills/AGENTS.md` GCL spec, adapted for the Tencent Cloud (`tccli` / `tencentcloud-sdk-python`) execution path.
+Detailed runtime-quality specifications are intentionally externalized to reduce always-loaded context size:
 
-### 1. Purpose
-
-Apply an adversarial **Generator ↔ Critic** loop with a quantitative rubric to every skill execution.
-Most valuable in **high-side-effect cloud operations** (delete, stop, restore, CAM/KMS/DDL) where a single
-mistake is unrecoverable.
-
-| GAN (real) | GCL (this spec) |
+| Spec | Read before modifying |
 |---|---|
-| Discriminator learns sample distribution | Critic scores an **explicit rubric** |
-| No termination condition | Must terminate: **PASS / MAX_ITER / SAFETY_FAIL** |
-| G and D train in parallel | G and C run **sequentially** |
-| Goal: "fool the D" | Goal: "pass the rubric threshold" |
+| `docs/gcl-spec.md` | any `## Quality Gate (GCL)` section, `references/rubric.md`, `references/prompt-templates.md`, `scripts/gcl_runner.py`, `scripts/gcl_trace_aggregate.py`, `scripts/gcl_alarm_wire.py`, `scripts/check_gcl_conformance.py`, or GCL-related CI wiring |
+| `docs/reflexion-memory.md` | `docs/failure-patterns.md`, trace `failure_pattern` extraction, Reflexion retrieval/persistence logic, or failure-memory governance |
+| `docs/failure-patterns.md` | only when retrieving or updating reusable failure patterns; keep it bounded and deduplicated |
 
-### 2. Roles
+### GCL hard constraints
 
-| Role | Job | Input | Output | Forbidden |
-|---|---|---|---|---|
-| **Generator (G)** | Execute the cloud operation | user request + previous Critic feedback | result + execution trace | modifying the rubric; self-scoring |
-| **Critic (C)** | Independently audit G's output | G's result + trace + rubric | scores + suggestions | calling `tccli` / SDK / mutating anything |
-| **Orchestrator (O)** | Loop control, termination, final return | context + C scores + budget | continue / final result | executing or scoring on its own |
+- Production GCL requires isolated Generator and Critic contexts; shared-context G+C is banned.
+- Critic is read-only: it MUST NOT call `tccli`, use SDK clients, mutate resources, or self-score Generator output.
+- Critic MUST NOT see the raw user request; it may use sanitized `{{output.operation_intent}}`, Generator output, trace, and rubric.
+- Orchestrator owns `operation_intent` generation before Critic scoring; it MUST omit raw user wording, credentials, and unmasked sensitive identifiers.
+- `Safety = 0` / `SAFETY_FAIL` MUST abort immediately; never return partial or best-effort output.
+- Every GCL loop MUST be bounded by `max_iterations`; unbounded retry loops are banned.
+- Every GCL run MUST persist a masked trace under `audit-results/gcl-trace-*.json`.
+- Production GCL MUST use externally supplied isolated Critic scores; `--structural-critic-only` is allowed only for CI/local structural smoke tests and MUST NOT be used for production execution, human acceptance, or quality pass decisions.
+- GCL prompt templates MUST use `{{env.*}}` / `{{user.*}}` / `{{output.*}}`; bare `{...}` placeholders are banned.
+- GCL `required` / `recommended` skills MUST keep `## Quality Gate (GCL)` in `SKILL.md`, plus `references/rubric.md` and `references/prompt-templates.md`.
 
-**Hard constraint:** G and C MUST live in **isolated prompt contexts** (preferably isolated sessions
-or sub-agents). A shared context is a "pseudo-GCL" and is explicitly banned — see §9.
+### Reflexion hard constraints
 
-### 3. Rubric (mandatory per skill)
+- Reflexion retrieval is an optional hint, not a mandatory gate.
+- `docs/failure-patterns.md` MUST stay ≤ 200 lines; prune low-frequency entries when needed.
+- Deduplicate patterns by `skill` + `command` + `error`; increment `count` on matches.
+- Patterns MUST come from GCL trace `failure_pattern` fields or self-review findings, not ad-hoc subjective notes.
+- Promote high-frequency patterns to anti-pattern docs and remove duplicates from memory.
 
-Each `SKILL.md` MUST declare its skill-specific rubric. Minimum 5 dimensions:
+### Relationship to build-time self-review
 
-| Dimension | Meaning | Scale | Default threshold |
-|---|---|---|---|
-| **Correctness** | Resource id / state / config actually matches the request | 0 / 0.5 / 1 | ≥ 0.5 (1.0 required for `delete` / `stop` / CAM / KMS / DDL) |
-| **Safety** | Destructive op (`delete` / `stop` / `restore` / CAM / KMS / DDL) was confirmed or guarded | 0 / 1 | = 1 |
-| **Idempotency** | Retrying the same call will not cause duplicate side-effects | 0 / 0.5 / 1 | ≥ 0.5 |
-| **Traceability** | Output is auditable: command, params, raw response, errors all captured | 0 / 0.5 / 1 | ≥ 0.5 |
-| **Spec Compliance** | Conforms to the skill's `core-concepts.md` / `cli-usage.md` constraints | 0 / 0.5 / 1 | ≥ 0.5 |
-
-**Safety = 0 → ABORT immediately, regardless of total score.**
-
-### 4. Loop Flow
-
-```
-User Request
-     │
-     ▼
-[0] Pre-flight (Orchestrator)
-    - resolve env.* and user.* variables
-    - pick skill, load its rubric
-     │
-     ▼
-[1] Generate (G) ───────────────────────┐
-    - run tccli / tencentcloud-sdk-python │
-    - capture trace                     │
-     │                                  │
-     ▼                                  │
-[2] Critique (C)                       │
-    - isolated prompt context           │
-    - score every rubric dimension      │
-    - emit actionable suggestions       │
-     │                                  │
-     ▼                                  │
-[3] Decide (Orchestrator)              │
-    - Safety=0  → ABORT (no partial)   │
-    - all pass  → RETURN                │
-    - else & iter<max → inject         │
-       suggestions into G               │
-    - else → RETURN best + unresolved   │
-       rubric items                     │
-     └──────────────────────────────────┘
-```
-
-### 5. Termination (first match wins)
-
-| Condition | Behavior |
-|---|---|
-| **PASS** | Every rubric dimension meets its threshold → return G's result |
-| **MAX_ITER** | Reached `max_iterations` (default 3) → return **best-so-far** + unresolved rubric items |
-| **SAFETY_FAIL** | Safety = 0 → **ABORT**; never return partial or "best-effort" output |
-
-`max_iterations` defaults per skill class — see §8.
-
-### 6. Trace & Audit (mandatory)
-
-Every GCL run MUST persist a JSON trace:
-
-```json
-{
-  "skill": "qcloud-cvm-ops",
-  "request": "<sanitized user request>",
-  "rubric_version": "v1",
-  "iterations": [
-    {
-      "iter": 1,
-      "generator": { "command": "...", "args": {...}, "exit_code": 0, "result_excerpt": "..." },
-      "critic": {
-        "scores": {
-          "correctness": 1, "safety": 1, "idempotency": 0.5,
-          "traceability": 1, "spec_compliance": 1
-        },
-        "suggestions": ["..."],
-        "blocking": false
-      },
-      "decision": "RETRY"
-    }
-  ],
-  "final": { "status": "PASS", "iter": 2, "output": "..." }
-}
-```
-
-Path: `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` — unified with the existing
-`audit-results/` directory (e.g. `qcloud-finops-ops` reports, `qcloud-proactive-inspection` traces).
-
-### 7. Prompt Templates (mandatory per skill)
-
-Each skill's `references/prompt-templates.md` (or equivalent) MUST contain:
-
-1. **Generator Prompt Template** — placeholders: `{{user.request}}`, `{{output.critic_feedback}}`, `{{output.rubric}}`
-2. **Critic Prompt Template** — placeholders: `{{output.generator_output}}`, `{{output.trace}}`, `{{output.rubric}}`
-
-> **Placeholder syntax** MUST follow the repository-wide convention
-> (see top-level **Five Core Standards → Structured I/O**): `{{env.*}}` / `{{user.*}}` / `{{output.*}}`.
-> Bare `{...}` placeholders are NOT allowed in skill prompt templates.
-
-**Critic prompt must hide the raw user request** to prevent "answer-aligned" rubber-stamping.
-Recommended skeleton:
-
-```text
-You are an independent cloud-operation auditor.
-You will see one execution result and its trace. Score it STRICTLY against the rubric below.
-Do NOT consider the original user request — judge only what was actually done.
-
-rubric: {{output.rubric}}
-generator_output: {{output.generator_output}}
-trace: {{output.trace}}
-
-Return strict JSON:
-{
-  "scores": { "correctness": 0|0.5|1, "safety": 0|0.5|1, "idempotency": 0|0.5|1,
-              "traceability": 0|0.5|1, "spec_compliance": 0|0.5|1 },
-  "suggestions": ["≤ 3 concrete, executable improvements"],
-  "blocking": true|false
-}
-```
-
-### 8. Per-Skill Defaults (QCloud)
-
-Destructive workload → **required**, max_iter=2. Read-only / advisory → **optional**, max_iter=5. Meta → **optional**, max_iter=3.
-
-| Skill | GCL | Default max_iter | Notes |
-|---|---|---|---|
-| `qcloud-cvm-ops` | **required** | 2 | `TerminateInstances` / `StopInstances` are destructive |
-| `qcloud-cdb-ops` | **required** | 2 | `IsolateDBInstance` / `DropDB` / DDL |
-| `qcloud-clb-ops` | **required** | 2 | `DeleteLoadBalancers` / `DeleteListeners` cut traffic |
-| `qcloud-cos-ops` | **required** | 2 | `DELETE Bucket` / `DELETE Object` is irreversible |
-| `qcloud-es-ops` | **required** | 2 | `DeleteCluster` / `DeleteIndex` |
-| `qcloud-redis-ops` | **required** | 2 | `DestroyInstances` / `ClearInstance` (FLUSHALL) |
-| `qcloud-tke-ops` | **required** | 2 | `DeleteCluster` / `DeleteNode` |
-| `qcloud-vpc-ops` | **required** | 2 | `DeleteVpc` / `ReleaseAddresses` |
-| `qcloud-cam-ops` | **required** | 2 | `DetachPolicy` / `DeleteUser` / `RotateAccessKey` |
-| `qcloud-cdn-ops` | recommended | 3 | `DeleteCdnDomain` / purge cache |
-| `qcloud-cbs-ops` | **required** | 2 | `TerminateDisks` is destructive |
-| `qcloud-cls-ops` | recommended | 3 | `DeleteLogset` / `DeleteTopic` |
-| `qcloud-ckafka-ops` | **required** | 2 | `DeleteInstance` / `DeleteTopic` |
-| `qcloud-scf-ops` | recommended | 3 | `DeleteFunction` / `DeleteNamespace` |
-| `qcloud-mongodb-ops` | **required** | 2 | `DropDB` / `TerminateDBInstance` |
-| `qcloud-postgres-ops` | **required** | 2 | `DropDB` / `TerminateDBInstance` / DDL |
-| `qcloud-ssl-ops` | recommended | 3 | `DeleteCertificates` |
-| `qcloud-agsx-ops` | recommended | 3 | SDK-only skill; protect against `DeleteAgentPool` |
-| `qcloud-finops-ops` | optional | 3 | reports only; must NOT auto-execute billing changes |
-| `qcloud-monitor-ops` | recommended | 3 | `DeleteAlarmPolicy` / `UnbindAlarmRuleResource` |
-| `qcloud-aiops-diagnosis` | optional | 5 | read-only; cross-skill correlation |
-| `qcloud-proactive-inspection` | recommended | 3 | 5-step pipeline; idempotency is the main risk |
-| `qcloud-well-architected-review` | optional | 5 | advisory only; 4-pillar assessment |
-| `qcloud-skill-generator` | optional | 3 | meta; must enforce 2-round self-review |
-
-Each skill may override `max_iter` in its own `SKILL.md` (under `## Quality Gate`).
-
-### 9. Anti-Patterns (banned)
-
-- ❌ **Shared context G+C** — defeats independence → banned
-- ❌ **Subjective scoring** — Critic must use the rubric, not "vibes" → banned
-- ❌ **Unbounded loop** — always hard-cap iterations → banned
-- ❌ **Critic sees the user request** — encourages rubber-stamping → banned
-- ❌ **Silently downgrade on Safety fail** — must ABORT visibly → banned
-- ❌ **Trace not persisted** — no post-mortem possible → banned
-- ❌ **Critic mutates resources** — Critic is read-only by definition → banned
-
-### 10. Rollout Roadmap
-
-- **Phase 1 (this commit)** — add this section to `AGENTS.md`; pilot on **`qcloud-cvm-ops`** only
-  (most representative destructive workload: `TerminateInstances`, `StopInstances`,
-  `ResetInstances` with reset-image, and CAM-driven reset) with its `references/prompt-templates.md`
-  and `references/rubric.md`. `qcloud-cdb-ops` and `qcloud-cos-ops` follow in the next PR.
-- **Phase 2** — add `scripts/gcl_runner.py` as a reusable Orchestrator (wraps `tccli` calls
-  with isolated sub-agent Critic). **Done (2026-06-09):** orchestrator loop + trace persistence;
-  Critic via `--critic-json`/stdin; `--structural-critic-only` for CI.
-- **Phase 3** — feed `gcl-trace-*.json` into `qcloud-monitor-ops` (custom metric) and
-  `qcloud-proactive-inspection` for quality dashboards. **Done (2026-06-13):**
-  `scripts/gcl_trace_aggregate.py`, `qcloud-monitor-ops/assets/gcl-quality-summary.schema.json`,
-  `qcloud-monitor-ops/references/gcl-quality-dashboard.md`, inspection report embed in
-  `qcloud-proactive-inspection/references/reporting.md`; `gcl_trace_ref` on aiops bundles.
-- **Phase 4** — wire rubric pass-rate to Cloud Monitor alarms (real incidents refine thresholds). **Done (2026-06-18):**
-  `scripts/gcl_alarm_wire.py` (`plan` / `apply` / `--dry-run`) creates three idempotent
-  alarm policies (`gcl-quality-pass-rate-critical`, `gcl-quality-pass-rate-warn`,
-  `gcl-safety-fail-critical`) on the `qce/gcl_custom` namespace;
-  `qcloud-monitor-ops/references/gcl-quality-dashboard.md` Step 5 documents the
-  end-to-end wiring; `gcl_runner_test.py` covers 35 unit tests
-  (masking, structural_critic, decide, persist, end-to-end PASS/SAFETY_FAIL/MAX_ITER);
-  `failure_pattern` is extracted from Critic suggestions into `trace.final.failure_pattern`
-  for Reflexion memory (`docs/failure-patterns.md`); `qcloud-skill-generator`
-  Output table + Charter C7 now require `references/rubric.md` + `references/prompt-templates.md`
-  + `## Quality Gate (GCL)` SKILL.md section for every GCL `required`/`recommended` skill.
-- **Phase 4.1** — Tier B/C/D conformance: bring all 24 skills to Tier A (8 rubric sections + 7 prompt sections + `## Quality Gate (GCL)` chapter). **Done (2026-06-19):** `scripts/check_gcl_conformance.py` is the durable CI gate; 19 under-conforming skills (15 Tier B + 3 Tier C + 1 Tier D) fleshed out to Tier A; `qcloud-skill-generator` (Tier D) gained `references/rubric.md`, `references/prompt-templates.md`, and `## Quality Gate (GCL)` SKILL.md chapter.
-
-### 11. Relationship to existing 2-round self-review
-
-GCL is the **runtime** counterpart to the **build-time** "Mandatory rule: 2-round self-review after every skill update"
-above. They do not overlap:
-
-| Stage | Owner | Purpose |
-|---|---|---|
-| **Skill update (build time)** | skill author | Diff skill against template; 5 Core Standards; R1–R4 governance |
-| **Skill execution (runtime)** | Generator + Critic | Score a single execution against the skill's rubric; gate side-effects |
-
-Both gates must pass — a clean self-review does not exempt runtime scoring, and a perfect rubric
-does not exempt a sloppy skill update.
-
-### 12. Changelog
-
-| Version | Date | Change |
-|---|---|---|
-| 1.0.0 | 2026-06-04 | Initial GCL specification added to `AGENTS.md` (adapted from `jdcloud-skills/AGENTS.md`; per-skill defaults remapped to qcloud skill set; `tccli` / `tencentcloud-sdk-python` execution path; Phase 1 pilot scoped to `qcloud-cvm-ops`) |
-| 1.1.0 | 2026-06-18 | **Phase 4 completion:** `scripts/gcl_alarm_wire.py` (plan/apply/dry-run) + Cloud Monitor alarm policies; `scripts/gcl_runner_test.py` (35 unit tests); `failure_pattern` extraction in `gcl_runner.py` (Reflexion); `qcloud-skill-generator` Charter C7 + Output table GCL artifacts; `## Quality Gate (GCL)` template section |
-| 1.2.0 | 2026-06-19 | **Phase 4.1 Tier A conformance:** `scripts/check_gcl_conformance.py` (CI gate); 19 skills fleshed out to 8-section rubric + 7-section prompt-templates + Tier A SKILL.md Quality Gate chapter; `qcloud-skill-generator` (Tier D) gained full GCL artifacts |
-
-### 13. See also
-
-- Each skill's `references/rubric.md` (when shipped) — the rubric instance
-- Each skill's `references/prompt-templates.md` (when shipped) — the G/C/O prompt skeletons
-- `qcloud-skill-generator/references/governance-and-adversarial-review.md` — build-time R1–R4 review (sister gate)
-
-### 14. Reflexion Integration (Lightweight Reflexion)
-
-> **Purpose**: Enable cross-session learning from failure patterns, complementing the within-session
-> GCL loop with persistent failure memory. This is a lightweight adaptation of the Reflexion pattern
-> (Shinn et al. 2023) — using structured text files instead of vector memory.
-
-#### 14.1 Motivation
-
-| Gap | Current State | Reflexion Solution |
-|-----|---------------|-------------------|
-| tccli parameter errors repeat across sessions | GCL catches them per-execution, but doesn't remember | Extract from GCL traces → persist in `docs/failure-patterns.md` |
-| Skill generation repeats structural issues | Self-Review catches them per-session, but doesn't remember | Record in `failure-patterns.md` §2 → 预防 next generation |
-| Cross-skill composition failures | Documented in SKILL.md, but not centralized | Centralize in `failure-patterns.md` §3 |
-
-#### 14.2 Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    GCL Execution (per-session)                   │
-│   [0] Pre-flight → [1] Generate → [2] C → [3] Decide           │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                    failure_pattern (in trace)
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              Reflexion Memory (cross-session)                    │
-│   docs/failure-patterns.md (structured text, ≤200 lines)        │
-│   §1 CLI Parameter Errors | §2 Skill Generation | §3 Cross-Skill│
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                    Pre-flight retrieval (optional)
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              Prevention (next session)                           │
-│   Inject known patterns into Generator context                  │
-│   Agent avoids repeating known mistakes                          │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-#### 14.3 Failure Pattern Schema
-
-Each pattern in `docs/failure-patterns.md` follows this structure:
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `category` | enum | ✅ | `cli_parameter` \| `skill_generation` \| `cross_skill` \| `runtime` \| `token_efficiency` |
-| `skill` | string | ✅ | Skill name (e.g. `qcloud-cvm-ops`) |
-| `command` | string | ❌ | The command that failed (for CLI errors) |
-| `error` | string | ✅ | Error message or pattern description |
-| `fix` | string | ✅ | How to fix or prevent this error |
-| `count` | int | ✅ | Frequency count (pruned when < 3) |
-| `reusable` | bool | ✅ | Whether this pattern is generalizable |
-
-#### 14.4 Maintenance Rules
-
-| Rule | Description |
-|------|-------------|
-| **Token budget** | `docs/failure-patterns.md` ≤ 200 lines. When exceeded, prune patterns with `count < 3` |
-| **Dedup** | Before adding, check if pattern exists (match by `skill` + `command` + `error`). If exists, increment `count` |
-| **Source** | Patterns come from: (1) GCL trace `failure_pattern` field, (2) Self-Review Round 3 Lessons Learned |
-| **Review** | Patterns are reviewed monthly. Patterns with `count ≥ 10` are candidates for promotion to Anti-Patterns sections |
-
-#### 14.5 Pre-flight Retrieval (Optional)
-
-During GCL Pre-flight (§4 step [0]), the Orchestrator MAY load `docs/failure-patterns.md` (lazy-load, ~130 lines), filter by current skill name, and inject top-3 relevant patterns into Generator context as prevention hints:
-
-```text
-Known failure patterns for this skill:
-- InvalidParameter: Use --InstanceIds "[\"ins-xxx\"]" (JSON array, not comma-separated)
-- AuthFailure: Check TENCENTCLOUD_SECRET_ID/KEY env vars
-- redis-cli not found: Add idempotent install probe before execution
-```
-
-**This is a HINT, not a CONSTRAINT** — the Generator should use these patterns to avoid known mistakes, but is not required to follow them if the context differs.
-
-#### 14.6 Relationship with Other GCL Layers
-
-| Layer | Timing | Learning Scope | Reflexion Complement |
-|-------|--------|----------------|---------------------|
-| **GCL (Generator-Critic)** | Per-execution | Within-session | — |
-| **Self-Review (§11)** | Per-update | Skill authoring | Reflexion captures patterns from Self-Review discoveries |
-| **Reflexion Memory** | Cross-session | Persistent failure patterns | Aggregates from all sources above |
-
-#### 14.7 Anti-Patterns
-
-- ❌ **Reflexion as mandatory gate** — Pattern retrieval is optional, not a blocking gate
-- ❌ **Unbounded memory** — Hard cap at 200 lines; prune low-frequency patterns
-- ❌ **Subjective pattern extraction** — Patterns must come from structured GCL traces or Self-Review records, not ad-hoc observations
-- ❌ **Pattern hoarding** — If a pattern is promoted to Anti-Patterns sections, remove from `failure-patterns.md` to avoid duplication
-
-### 15. Changelog
-
-| Version | Date | Change |
-|---|---|---|
-| 1.0.0 | 2026-06-04 | Initial GCL specification added to `AGENTS.md` (adapted from `jdcloud-skills/AGENTS.md`; per-skill defaults remapped to qcloud skill set; `tccli` / `tencentcloud-sdk-python` execution path; Phase 1 pilot scoped to `qcloud-cvm-ops`) |
-| 1.1.0 | 2026-06-15 | **Lightweight Reflexion Integration (§14)**: Cross-session failure pattern learning. New `docs/failure-patterns.md` (centralized Reflexion memory). GCL trace schema extended with `failure_pattern` field. Pre-flight updated with optional pattern retrieval. AGENTS.md Key References updated. |
+Build-time 2-round self-review and runtime GCL are independent gates. A clean self-review does not exempt runtime scoring; a passing GCL rubric does not exempt sloppy skill updates.
