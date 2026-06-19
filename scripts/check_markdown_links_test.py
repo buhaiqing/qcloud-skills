@@ -27,13 +27,14 @@ class IterMarkdownFilesTests(unittest.TestCase):
             root = Path(tmp)
             agents = write(root / "AGENTS.md")
             readme = write(root / "README.md")
+            readme_cn = write(root / "README_CN.md")
             top_doc = write(root / "docs" / "gcl-spec.md")
             write(root / "docs" / "superpowers" / "plans" / "historical.md")
             write(root / "qcloud-cvm-ops" / "SKILL.md", "[bad](missing.md)")
             write(root / "qcloud-cvm-ops" / "references" / "cli-usage.md", "[bad](missing.md)")
 
             files = cml.iter_markdown_files(root)
-            self.assertEqual(files, [agents, readme, top_doc])
+            self.assertEqual(files, [agents, readme, readme_cn, top_doc])
 
 
 class PathDetectionTests(unittest.TestCase):
@@ -82,6 +83,7 @@ class CheckFileTests(unittest.TestCase):
             root = Path(tmp)
             write(root / "AGENTS.md", "ok\n")
             write(root / "README.md", "ok\n")
+            write(root / "README_CN.md", "[English](README.md)\n")
             write(root / "qcloud-cvm-ops" / "SKILL.md", "[legacy missing](references/old.md)\n")
             findings = []
             for path in cml.iter_markdown_files(root):

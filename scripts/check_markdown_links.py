@@ -32,6 +32,7 @@ IGNORED_MARKDOWN_PREFIXES = (
 PATH_PREFIXES = (
     "AGENTS.md",
     "README.md",
+    "README_CN.md",
     "LICENSE",
     "docs/",
     "scripts/",
@@ -56,9 +57,9 @@ def iter_markdown_files(root: Path) -> list[Path]:
 
     Product skill docs contain many historical/template relative links. This
     guard focuses on the docs that now act as navigation roots after AGENTS.md
-    token compression: AGENTS.md, README.md, and top-level docs/*.md files.
+    token compression: AGENTS.md, README.md, README_CN.md, and top-level docs/*.md files.
     """
-    candidates = [root / "AGENTS.md", root / "README.md"]
+    candidates = [root / "AGENTS.md", root / "README.md", root / "README_CN.md"]
     docs_dir = root / "docs"
     if docs_dir.is_dir():
         candidates.extend(sorted(docs_dir.glob("*.md")))
