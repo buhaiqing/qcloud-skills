@@ -18,6 +18,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Ruff Python lint
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: check --output-format=github .
+
       - name: Validate SKILL.md frontmatter
         run: python3 scripts/validate_skills_frontmatter.py
 

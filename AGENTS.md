@@ -40,6 +40,7 @@ Run `ls qcloud-*-ops/` for the canonical list. The `README.md` skill list is als
 - **Token Efficiency** (P0 — 强制): 在保持 Agent 可执行性的前提下最小化 Token 消耗。规则包括 TE-1（API 查替代硬编码表）、TE-3（紧凑错误表 ≤3 列）、TE-4（JSON paths 集中声明）、TE-5（YAML anchors）、TE-6（消除跨文件重复）。详见下方 Round 1 检查清单。
 - **No web console as agent execution path.** The console may be referenced for product docs but never for state changes.
 - **Minimal-change principle.** Prefer owner-scoped, minimal diffs. Do not reformat, rename, or restructure unrelated skill files while updating one skill; defer broad cleanups to an explicit follow-up task.
+- **Python lint gate.** After any `*.py` file change, run `ruff check <changed-python-files-or-dirs>` before declaring done; CI enforces `ruff check .` for regression coverage.
 - **UX spec** in `qcloud-skill-generator/references/user-experience-spec.md` is mandatory for all generated skills.
 - **Asset & schema placement (mandatory)** — skill-owned artifacts MUST NOT be placed at repo root. Use this split:
 
@@ -133,6 +134,7 @@ Exit non-zero ⇒ fix finding ID / pillar mismatch before claiming done.
 | Any `references/well-architected-assessment.md` Worker Output Contract example JSON change | `python3 scripts/validate_product_assessment.py` |
 | Any GCL rubric, prompt template, or `## Quality Gate (GCL)` section change | `python3 scripts/check_gcl_conformance.py` |
 | Any `scripts/gcl_runner.py` or `scripts/gcl_trace_aggregate.py` change | GCL smoke command in `.github/workflows/validate-skills.yml` + `python3 scripts/gcl_trace_aggregate.py --since-hours 168` |
+| Any Python file change | `ruff check <changed-python-files-or-dirs>` |
 | Any script test or GCL runner change | `cd scripts && python3 -m unittest discover -p "*_test.py" -v` |
 | Any GCL alarm wiring change | `python3 scripts/gcl_alarm_wire.py plan` |
 | Any Markdown spec, README, or path-reference change | `python3 scripts/check_markdown_links.py` |
@@ -148,7 +150,7 @@ Exit non-zero ⇒ fix finding ID / pillar mismatch before claiming done.
 ## Files that do NOT exist
 
 - No repo-root **`assets/`** directory — all skill schemas and handoff contracts live under `qcloud-*-ops/assets/` (see **Asset & schema placement** above).
-- No `package.json`, `Makefile`, CI configs, build scripts, linter, typechecker, or test runner — **except**:
+- No `package.json`, `Makefile`, CI configs, build scripts, typechecker, or non-stdlib test runner — **except**:
   - `scripts/validate_product_assessment.py` — Well-Architected worker JSON regression
   - `scripts/validate_skills_frontmatter.py` — SKILL.md frontmatter checks
   - `scripts/gcl_runner.py` — GCL Orchestrator (Phase 2; external Critic required in production)

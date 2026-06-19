@@ -18,13 +18,10 @@ Covers:
 from __future__ import annotations
 
 import json
-import os
-import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 # Ensure scripts/ is on sys.path when invoked as `python3 scripts/gcl_runner_test.py`
 _HERE = Path(__file__).resolve().parent

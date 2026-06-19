@@ -24,7 +24,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import shlex
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -256,7 +255,6 @@ def cmd_run(args: argparse.Namespace) -> int:
     }
 
     critic_feedback = ""
-    final_status = "MAX_ITER"
     command = args.command
 
     for iteration in range(1, max_iter + 1):
