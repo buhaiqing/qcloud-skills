@@ -130,13 +130,14 @@ Exit non-zero ⇒ fix finding ID / pillar mismatch before claiming done.
 
 | Change scope | Required command |
 |---|---|
+| Full local validation before PR / handoff | `python3 scripts/validate_local.py` |
 | Any `SKILL.md` frontmatter or metadata change | `python3 scripts/validate_skills_frontmatter.py` |
 | Any `references/well-architected-assessment.md` Worker Output Contract example JSON change | `python3 scripts/validate_product_assessment.py` |
 | Any GCL rubric, prompt template, or `## Quality Gate (GCL)` section change | `python3 scripts/check_gcl_conformance.py` |
 | Any `scripts/gcl_runner.py` or `scripts/gcl_trace_aggregate.py` change | GCL smoke command in `.github/workflows/validate-skills.yml` + `python3 scripts/gcl_trace_aggregate.py --since-hours 168` |
 | Any Python file change | `ruff check <changed-python-files-or-dirs>` |
 | Any script test or GCL runner change | `cd scripts && python3 -m unittest discover -p "*_test.py" -v` |
-| Any GCL alarm wiring change | `python3 scripts/gcl_alarm_wire.py plan` |
+| Any GCL alarm wiring change | `python3 scripts/gcl_alarm_wire.py plan --summary scripts/fixtures/gcl-quality-summary-healthy.json` |
 | Any Markdown spec, README, or path-reference change | `python3 scripts/check_markdown_links.py` |
 
 **Runtime GCL:** `scripts/gcl_runner.py` implements the Orchestrator loop (trace → external Critic → PASS/RETRY/SAFETY_FAIL). Critic scores MUST be injected from an isolated agent context via `--critic-json` or stdin. Production GCL MUST use externally supplied isolated Critic scores; `--structural-critic-only` is allowed only for CI/local structural smoke tests and MUST NOT be used for production execution, human acceptance, or quality pass decisions.
@@ -159,6 +160,8 @@ Exit non-zero ⇒ fix finding ID / pillar mismatch before claiming done.
   - `scripts/gcl_alarm_wire.py` — Cloud Monitor alarm wiring for GCL metrics
   - `scripts/check_gcl_conformance.py` — GCL rubric/prompt/Quality Gate conformance check
   - `scripts/check_markdown_links.py` — local Markdown path/reference existence check
+  - `scripts/te6_gcl_compress.py` — TE-6 maintenance tool for compressing duplicated GCL prompt/Quality Gate text
+  - `scripts/validate_local.py` — one-command local validation suite mirroring CI gates
   - `.github/workflows/validate-skills.yml` — CI for the above
 - No `CLAUDE.md`, `opencode.json`, `.cursorrules` in this repo.
 - `.omc/`, `.omo/`, `.codebuddy/`, `.omc/project-memory.json` are gitignored cache data — not source.

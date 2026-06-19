@@ -21,6 +21,7 @@ jobs:
       - name: Ruff Python lint
         uses: astral-sh/ruff-action@v3
         with:
+          version: 0.11.8
           args: check --output-format=github .
 
       - name: Validate SKILL.md frontmatter
@@ -48,7 +49,8 @@ jobs:
 
       - name: GCL alarm wire plan (no mutations)
         run: |
-          python3 scripts/gcl_alarm_wire.py plan
+          python3 scripts/gcl_alarm_wire.py plan \
+            --summary scripts/fixtures/gcl-quality-summary-healthy.json
 
       - name: GCL Tier-A conformance (Charter C7)
         run: |

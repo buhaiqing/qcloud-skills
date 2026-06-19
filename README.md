@@ -6,30 +6,21 @@
 
 ```
 qcloud-skills/
-├── qcloud-cdb-ops/            # 云数据库 MySQL 运维技能
-├── qcloud-clb-ops/            # 负载均衡运维技能
-├── qcloud-cos-ops/            # 对象存储运维技能
-├── qcloud-cvm-ops/            # 云服务器运维技能
-├── qcloud-es-ops/             # Elasticsearch 服务运维技能
-├── qcloud-monitor-ops/        # 云监控运维技能
-├── qcloud-redis-ops/          # 云缓存 Redis 运维技能
-├── qcloud-mongodb-ops/        # 云数据库 MongoDB 运维技能
-├── qcloud-postgres-ops/       # 云数据库 PostgreSQL 运维技能
-├── qcloud-skill-generator/    # 技能生成器（元技能）
-├── qcloud-tke-ops/            # 容器服务 TKE 运维技能
-├── qcloud-vpc-ops/            # 虚拟私有云运维技能
-├── qcloud-cam-ops/            # 访问管理 CAM 运维技能
-├── qcloud-cdn-ops/            # 内容分发 CDN 运维技能
-├── qcloud-cbs-ops/            # 云硬盘 CBS 运维技能
-├── qcloud-cls-ops/            # 日志服务 CLS 运维技能
-├── qcloud-ckafka-ops/         # 消息队列 CKafka 运维技能
-├── qcloud-scf-ops/            # 云函数 SCF 运维技能
-├── qcloud-aiops-diagnosis/   # AIOps 智能诊断（跨产品）
-├── qcloud-proactive-inspection/ # 主动巡检（跨产品）
-├── qcloud-well-architected-review/ # 卓越架构审查（跨产品）
+├── qcloud-*-ops/                   # 产品级运维技能目录（SKILL.md + assets/ + references/）
+├── qcloud-aiops-diagnosis/         # AIOps 智能诊断（跨产品）
+├── qcloud-proactive-inspection/    # 主动巡检（跨产品）
+├── qcloud-well-architected-review/ # 卓越架构审查（跨产品编排）
+├── qcloud-skill-generator/         # 技能生成器（元技能，非运行时运维 skill）
+├── scripts/                        # 共享校验、GCL、CI/本地验证脚本
+│   └── fixtures/                   # CI/local smoke 用固定输入 fixture
+├── docs/                           # GCL、Reflexion、failure-pattern 等跨技能规范
+├── .github/workflows/              # GitHub Actions 质量门禁
+├── ruff.toml                       # Python lint 配置（Ruff 0.11.8 / py311）
 ├── README.md
 └── LICENSE
 ```
+
+> Canonical 技能清单以仓库中的 `qcloud-*` 目录和 `AGENTS.md` 为准；下方概览用于快速导航，可能只保留核心说明。
 
 ## 技能概览
 
@@ -378,36 +369,25 @@ qcloud-skills/
 
 ## 本地校验
 
+提交或交接前，优先运行与 CI 质量门禁对齐的一键校验：
+
 ```bash
-# Worker Output Contract 示例 JSON
-python3 scripts/validate_product_assessment.py
-
-# SKILL.md frontmatter
-python3 scripts/validate_skills_frontmatter.py
-
-# Markdown 本地链接和仓库路径引用
-python3 scripts/check_markdown_links.py
-
-# GCL Orchestrator smoke (structural critic; CI/local smoke only, not a production quality pass)
-python3 scripts/gcl_runner.py run \
-  --skill qcloud-cvm-ops \
-  --request "read-only smoke" \
-  --command 'echo smoke' \
-  --max-iter 1 \
-  --structural-critic-only
-python3 scripts/gcl_trace_aggregate.py --since-hours 168
-
-# 脚本单测 / GCL conformance / 告警计划
-cd scripts && python3 -m unittest discover -p "*_test.py" -v && cd ..
-python3 scripts/check_gcl_conformance.py
-python3 scripts/gcl_alarm_wire.py plan
+python3 scripts/validate_local.py
 ```
 
-GitHub Actions workflow: `.github/workflows/validate-skills.yml` runs the validation matrix on every PR: frontmatter, Well-Architected JSON examples, GCL smoke + trace aggregation, script unit tests, alarm wire plan, GCL Tier-A conformance, and Markdown path checks.
+查看脚本将执行的具体命令：
+
+```bash
+python3 scripts/validate_local.py --list
+```
+
+其中包含 Ruff、frontmatter、Worker Output Contract、Markdown 本地链接、GCL smoke/trace aggregate、脚本单测、GCL alarm plan 和 Tier-A conformance 校验。GCL alarm plan 使用固定健康 summary fixture，避免被本地或 CI 的历史 `audit-results/` trace 污染。GCL smoke 使用 `--structural-critic-only`，仅用于 CI/local 结构冒烟，不可作为生产质量通过。
+
+GitHub Actions workflow: `.github/workflows/validate-skills.yml` 在每个 PR 上运行同一套质量门禁：Ruff（固定 0.11.8）、frontmatter、Well-Architected JSON examples、Markdown 路径检查、GCL smoke + trace aggregation、脚本单测、基于固定健康 fixture 的 alarm wire plan、GCL Tier-A conformance。
 
 ## 快速开始
 
-1. 确保已安装 [tccli](https://cloud.tencent.com/document/product/440) 和 Python 3.8+
+1. 确保已安装 [tccli](https://cloud.tencent.com/document/product/440)、Python 3.11（CI 基准；运行技能最低 Python 3.8+）和 Ruff 0.11.8
 2. 配置腾讯云凭据：
    ```bash
    export TENCENTCLOUD_SECRET_ID=your_secret_id

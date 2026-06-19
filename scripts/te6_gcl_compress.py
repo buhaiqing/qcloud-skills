@@ -362,11 +362,11 @@ def compress_quality_gate(skill: str, dry_run: bool) -> tuple[int, int]:
     return old_lines, new_lines
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--skill", action="append", dest="skills")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     skills = args.skills or sorted(GCL_META.keys())
 
     prompt_saved = qg_saved = 0

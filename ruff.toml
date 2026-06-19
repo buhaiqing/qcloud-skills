@@ -1,0 +1,11 @@
+target-version = "py311"
+line-length = 100
+
+exclude = [
+  ".git",
+  ".omc",
+  ".omo",
+  ".codebuddy",
+  ".ruff_cache",
+  "audit-results",
+]

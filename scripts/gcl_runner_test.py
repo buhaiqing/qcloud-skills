@@ -17,6 +17,8 @@ Covers:
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import sys
 import tempfile
@@ -29,6 +31,11 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 import gcl_runner  # noqa: E402
+
+
+def quiet_cmd_run(ns) -> int:
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        return gcl_runner.cmd_run(ns)
 
 
 class SecretMaskingTests(unittest.TestCase):
@@ -237,7 +244,7 @@ class FailurePatternTests(unittest.TestCase):
             "--max-iter", "2",
             "--critic-json", str(critic_file),
         ])
-        rc = gcl_runner.cmd_run(ns)
+        rc = quiet_cmd_run(ns)
         self.assertEqual(rc, 1)
         trace_files = list((tmp / "audit-results").glob("gcl-trace-*.json"))
         data = json.loads(trace_files[0].read_text())
@@ -267,7 +274,7 @@ class CmdRunEndToEndTests(unittest.TestCase):
             critic_file.write_text(json.dumps(critic_payload))
             args.extend(["--critic-json", str(critic_file)])
         ns = gcl_runner.build_parser().parse_args(args)
-        rc = gcl_runner.cmd_run(ns)
+        rc = quiet_cmd_run(ns)
         return rc, tmp
 
     def test_structural_pass(self) -> None:
