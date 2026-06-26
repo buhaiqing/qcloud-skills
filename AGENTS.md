@@ -40,6 +40,15 @@ Run `ls qcloud-*-ops/` for the canonical list. The `README.md` skill list is als
 - **Token Efficiency** (P0 — 强制): 在保持 Agent 可执行性的前提下最小化 Token 消耗。规则包括 TE-1（API 查替代硬编码表）、TE-3（紧凑错误表 ≤3 列）、TE-4（JSON paths 集中声明）、TE-5（YAML anchors）、TE-6（消除跨文件重复）。详见下方 Round 1 检查清单。
 - **No web console as agent execution path.** The console may be referenced for product docs but never for state changes.
 - **Minimal-change principle.** Prefer owner-scoped, minimal diffs. Do not reformat, rename, or restructure unrelated skill files while updating one skill; defer broad cleanups to an explicit follow-up task.
+- **Commit hygiene — default behavior.** Agent decides commit granularity autonomously unless a hard-stop condition below applies. Reasonable defaults: one commit per logical unit (a single skill's self-review fixes, a single new script, a single `.gitignore`/`AGENTS.md`/`CI` change). Cross-product or cross-class changes get split. Ask the user only when the call is genuinely ambiguous AND the cost of getting it wrong is high.
+- **Commit hygiene — hard stops (MUST pause and report).** Before `git commit` / `git push`, agent MUST stop and surface to the user when ANY of the following applies:
+  1. Credentials, secrets, or unmasked identifiers appear in the staged diff or in any output path (env dump, log, error message).
+  2. Irreversible destructive operation is being committed without an explicit user confirmation in the trace (e.g. `rm -rf`, `tccli` delete without `--DryRun` gate, schema drop, force-push to `main`).
+  3. A safety gate from the touched skill's rubric is being bypassed or weakened (e.g. dropping a DryRun step, removing a HARD-stop production block).
+  4. Push targets the wrong remote, wrong branch, or a protected branch without explicit user instruction.
+  5. Commit message / author / co-author contains sensitive information (customer name, internal host, ticket ID marked confidential).
+  6. The change set is destructive at scale (mass file deletion, mass rename, history rewrite via `git filter-branch` / `reset --hard` / force-push) — surface the affected file count and the rollback path before acting.
+  These are non-negotiable; "looks small" or "user said go ahead earlier" does not exempt them.
 - **Python lint gate.** After any `*.py` file change, run `ruff check <changed-python-files-or-dirs>` before declaring done; CI enforces `ruff check .` for regression coverage.
   After any `SKILL.md` or `references/*.md` edit that adds/modifies Python SDK code blocks, run `python3 scripts/check_markdown_python.py --root .` to catch Python-specific bugs in embedded snippets: bash `$()` expansion inside Python strings, `time.strftime`/`datetime` usage without corresponding import, redundant `json.loads(json.dumps(...))`, and f-string `{{...}}` placeholder errors. Exit non-zero ⇒ fix before declaring done.
 - **UX spec** in `qcloud-skill-generator/references/user-experience-spec.md` is mandatory for all generated skills.
