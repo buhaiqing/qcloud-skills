@@ -42,7 +42,7 @@ Run `ls qcloud-*-ops/` for the canonical list. The `README.md` skill list is als
 - **Minimal-change principle.** Prefer owner-scoped, minimal diffs. Do not reformat, rename, or restructure unrelated skill files while updating one skill; defer broad cleanups to an explicit follow-up task.
 - **Commit hygiene — default behavior.** Agent decides commit granularity autonomously unless a hard-stop condition below applies. Reasonable defaults: one commit per logical unit (a single skill's self-review fixes, a single new script, a single `.gitignore`/`AGENTS.md`/`CI` change). Cross-product or cross-class changes get split. Ask the user only when the call is genuinely ambiguous AND the cost of getting it wrong is high.
 - **Commit hygiene — hard stops (MUST pause and report).** Before `git commit` / `git push`, agent MUST stop and surface to the user when ANY of the following applies:
-  1. Credentials, secrets, or unmasked identifiers appear in the staged diff or in any output path (env dump, log, error message).
+  1. Credentials, secrets, or unmasked sensitive identifiers (API keys, SecretId/SecretKey, tokens, internal hostnames/IPs, customer account IDs, bucket/instance IDs when paired with account context) appear in the staged diff or in any output path (env dump, log, error message).
   2. Irreversible destructive operation is being committed without an explicit user confirmation in the trace (e.g. `rm -rf`, `tccli` delete without `--DryRun` gate, schema drop, force-push to `main`).
   3. A safety gate from the touched skill's rubric is being bypassed or weakened (e.g. dropping a DryRun step, removing a HARD-stop production block).
   4. Push targets the wrong remote, wrong branch, or a protected branch without explicit user instruction.
