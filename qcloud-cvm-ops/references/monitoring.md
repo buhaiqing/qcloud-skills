@@ -86,6 +86,7 @@ tccli monitor GetMonitorData \
 
 ```python
 from tencentcloud.monitor import monitor_client, models
+from datetime import datetime, timedelta
 
 def get_cpu_usage(client, instance_id, hours=24):
     # Get CPU usage for last N hours

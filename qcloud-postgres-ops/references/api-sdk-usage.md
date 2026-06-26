@@ -75,6 +75,8 @@ def describe_instances(instance_id=None):
 ### Create Backup
 
 ```python
+import datetime
+
 def create_backup(instance_id, backup_name=None):
     req = models.CreateBackupRequest()
     req.DBInstanceId = instance_id

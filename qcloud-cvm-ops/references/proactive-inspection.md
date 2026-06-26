@@ -139,6 +139,8 @@ tccli monitor GetMonitorData \
 ### 3.2 Batch Collection Script
 
 ```python
+from datetime import datetime, timedelta
+
 def collect_metrics_batch(resources: List[Resource], hours: int = 24) -> Dict:
     # Collect metrics for all resources in batch
     monitor_client = monitor_client.MonitorClient(cred, region)
@@ -509,6 +511,8 @@ def generate_inspection_report(
     anomalies: List[Anomaly],
     diagnosis_results: List[DiagnosisResult]
 ) -> str:
+    from datetime import datetime
+
     # Generate inspection report in Markdown
     
     report = []

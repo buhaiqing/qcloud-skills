@@ -27,6 +27,7 @@ def build_steps(python: str = sys.executable, github_output: bool = False) -> li
         Step("Validate SKILL.md frontmatter", (python, "scripts/validate_skills_frontmatter.py")),
         Step("Validate Well-Architected worker JSON examples", (python, "scripts/validate_product_assessment.py")),
         Step("Validate Markdown local links", (python, "scripts/check_markdown_links.py")),
+        Step("Lint Python in Markdown", (python, "scripts/check_markdown_python.py", "--root", ".")),
         Step(
             "GCL runner smoke test",
             (

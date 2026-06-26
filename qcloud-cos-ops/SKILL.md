@@ -316,7 +316,7 @@ req = models.DeleteObjectRequest()
 req.Bucket = "{{user.bucket_name}}"
 req.Key = "{{user.object_key}}"
 resp = client.DeleteObject(req)
-print(f"Deleted: {{user.object_key}}")
+print("Deleted: {{user.object_key}}")
 ```
 
 ### List Objects
@@ -418,7 +418,7 @@ if list_resp.Contents:
 del_req = models.DeleteBucketRequest()
 del_req.Bucket = "{{user.bucket_name}}"
 resp = client.DeleteBucket(del_req)
-print(f"Bucket deleted: {{user.bucket_name}}")
+print("Bucket deleted: {{user.bucket_name}}")
 ```
 
 ### Configure Lifecycle

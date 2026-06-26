@@ -436,6 +436,8 @@ tccli scf PublishVersion \
 #### Execution — Python SDK
 
 ```python
+import datetime
+
 req = models.PublishVersionRequest()
 req.FunctionName = os.environ.get("FUNCTION_NAME")
 req.Namespace = os.environ.get("NAMESPACE", "default")

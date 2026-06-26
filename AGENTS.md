@@ -41,6 +41,7 @@ Run `ls qcloud-*-ops/` for the canonical list. The `README.md` skill list is als
 - **No web console as agent execution path.** The console may be referenced for product docs but never for state changes.
 - **Minimal-change principle.** Prefer owner-scoped, minimal diffs. Do not reformat, rename, or restructure unrelated skill files while updating one skill; defer broad cleanups to an explicit follow-up task.
 - **Python lint gate.** After any `*.py` file change, run `ruff check <changed-python-files-or-dirs>` before declaring done; CI enforces `ruff check .` for regression coverage.
+  After any `SKILL.md` or `references/*.md` edit that adds/modifies Python SDK code blocks, run `python3 scripts/check_markdown_python.py --root .` to catch Python-specific bugs in embedded snippets: bash `$()` expansion inside Python strings, `time.strftime`/`datetime` usage without corresponding import, redundant `json.loads(json.dumps(...))`, and f-string `{{...}}` placeholder errors. Exit non-zero ⇒ fix before declaring done.
 - **UX spec** in `qcloud-skill-generator/references/user-experience-spec.md` is mandatory for all generated skills.
 - **Asset & schema placement (mandatory)** — skill-owned artifacts MUST NOT be placed at repo root. Use this split:
 
@@ -194,6 +195,7 @@ Exit non-zero ⇒ fix finding ID / pillar mismatch before claiming done.
 | Any script test or GCL runner change | `cd scripts && python3 -m unittest discover -p "*_test.py" -v` |
 | Any GCL alarm wiring change | `python3 scripts/gcl_alarm_wire.py plan --summary scripts/fixtures/gcl-quality-summary-healthy.json` |
 | Any Markdown spec, README, or path-reference change | `python3 scripts/check_markdown_links.py` |
+| Any SKILL.md / references/*.md edit with Python SDK code blocks | `python3 scripts/check_markdown_python.py --root .` |
 
 **Runtime GCL:** `scripts/gcl_runner.py` implements the Orchestrator loop (trace → external Critic → PASS/RETRY/SAFETY_FAIL). Critic scores MUST be injected from an isolated agent context via `--critic-json` or stdin. Production GCL MUST use externally supplied isolated Critic scores; `--structural-critic-only` is allowed only for CI/local structural smoke tests and MUST NOT be used for production execution, human acceptance, or quality pass decisions.
 
@@ -215,6 +217,7 @@ Exit non-zero ⇒ fix finding ID / pillar mismatch before claiming done.
   - `scripts/gcl_alarm_wire.py` — Cloud Monitor alarm wiring for GCL metrics
   - `scripts/check_gcl_conformance.py` — GCL rubric/prompt/Quality Gate conformance check
   - `scripts/check_markdown_links.py` — local Markdown path/reference existence check
+  - `scripts/check_markdown_python.py` — Python-in-Markdown lint: bash `$()` in strings, missing imports, json.loads(dumps()), f-string braces
   - `scripts/te6_gcl_compress.py` — TE-6 maintenance tool for compressing duplicated GCL prompt/Quality Gate text
   - `scripts/validate_local.py` — one-command local validation suite mirroring CI gates
   - `.github/workflows/validate-skills.yml` — CI for the above
