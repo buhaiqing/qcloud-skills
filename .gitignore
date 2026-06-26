@@ -40,6 +40,9 @@ pip-delete-this-directory.txt
 htmlcov/
 .tox/
 .nox/
+
+# Local agent runtime cache (NOT .pixi — that one is upstream's Pixi env)
+.pi/
 .coverage
 .coverage.*
 .cache

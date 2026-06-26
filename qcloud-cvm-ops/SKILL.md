@@ -16,8 +16,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.1.0"
-  last_updated: "2026-06-04"
+  version: "1.2.0"
+  last_updated: "2026-06-27"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/213"
@@ -261,6 +261,7 @@ tccli cvm DescribeInstances --Region ap-guangzhou
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial skill with RunInstances, DescribeInstances, Start/Stop/Reboot/Terminate, CBS disk operations, Snapshot/Image management |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL pilot: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CVM-specific safety rules), `references/prompt-templates.md` (Generator + Critic + Orchestrator, isolated-context enforcement). `max_iter=2` per AGENTS.md §8 |
+| 1.2.0 | 2026-06-27 | Round 1 self-review fixes: added ResetInstances execution flow (G1), TerminateInstances DryRun pre-flight (G2), SDK fallback for ResizeInstanceDisks/CreateSnapshot/CreateImage (G3-G5), StopInstances HARD gate (G6). Bumped version. |
 
 ---
 
@@ -401,7 +402,7 @@ tccli cvm DescribeInstances \
 #!/usr/bin/env python3
 from tencentcloud.common import credential
 from tencentcloud.cvm import cvm_client, models
-import os, json
+import os, json, time
 
 cred = credential.Credential(
     os.environ.get("TENCENTCLOUD_SECRET_ID"),
@@ -469,6 +470,7 @@ Poll until `RUNNING` (5s interval, 120s max).
 - **MUST** warn: stopping instance interrupts service
 - **MUST** confirm: `{{user.instance_id}}`, `{{user.instance_name}}`
 - Check for critical processes (optional suggestion to user)
+- **If `StopType=HARD`**: block on production instance (name matches `^(prod|prd|live)-` or tag `Role=production`); require user to re-confirm with literal `"yes, force stop prod"` — HARD is equivalent to pulling power
 
 #### Execution — CLI
 
@@ -514,6 +516,48 @@ resp = client.RebootInstances(req)
 print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 ```
 
+### Operation: ResetInstance (Re-image)
+
+> **⚠️ Destructive — re-images the instance OS.** This is NOT a restart. All data on the system disk is replaced. Use with extreme caution.
+
+#### Pre-flight (Safety Gate — per rubric Rule 5)
+
+- **MUST** confirm: `{{user.instance_id}}`, `{{user.instance_name}}` echoed by Agent
+- **MUST** verify `ImageId` differs from current image (`DescribeInstances` → `OsPublicIdsSet` or `OsName`)
+- **MUST** verify instance state is `STOPPED` or `SHUTDOWN`
+- **MUST** warn: system disk will be wiped; all data on system disk is lost
+- **MUST** suggest: snapshot of system disk before re-imaging
+- **MUST NOT** proceed if instance is `RUNNING`
+
+#### Execution — CLI
+
+```bash
+# Pre-flight: verify instance state and image
+tccli cvm DescribeInstances \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --InstanceIds "[\"{{user.instance_id}}\"]" | jq -r '.Response.InstanceSet[0].Status, .Response.InstanceSet[0].OsPublicIdsSet[0]'
+
+# Commit re-image (API: ResetInstance, singular)
+tccli cvm ResetInstance \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --InstanceId "{{user.instance_id}}" \
+  --ImageId "{{user.image_id}}"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.ResetInstanceRequest()
+req.InstanceId = "{{user.instance_id}}"
+req.ImageId = "{{user.image_id}}"
+resp = client.ResetInstance(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
+#### Validation
+
+Poll DescribeInstances until `RUNNING`, then confirm new OS matches `{{user.image_id}}`.
+
 ### Operation: TerminateInstances (Delete)
 
 #### Pre-flight (Safety Gate)
@@ -522,11 +566,19 @@ print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 - **MUST** warn: attached CBS disks may be deleted (check `DeleteWithInstance` flag)
 - **MUST** suggest: create snapshot before deletion for backup
 - **MUST NOT** proceed without clear user assent
+- **DryRun**: for batch (n>1), run `--DryRun` first and abort if it returns error; for single, run `--DryRun` first as a sanity gate
+- **Dependency check**: query CBS disks (`DescribeDisks`), CLB backend targets (`DescribeTargets`), and ASG membership (`DescribeAutoScalingInstances`) before commit
 
 #### Execution — CLI
 
 ```bash
-# Terminate (release) instance
+# DryRun sanity check (run before any commit)
+tccli cvm TerminateInstances \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --InstanceIds "[\"{{user.instance_id}}\"]" \
+  --DryRun
+
+# Commit only after DryRun passes and user confirmed
 tccli cvm TerminateInstances \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
   --InstanceIds "[\"{{user.instance_id}}\"]"
@@ -543,7 +595,8 @@ print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 
 #### Validation
 
-Poll DescribeInstances until:
+1. Run DryRun first: `DryRun=true`; abort if it returns error
+2. Poll DescribeInstances until:
 - Empty response (instance removed)
 - Status `TERMINATED` or 404
 
@@ -584,6 +637,21 @@ tccli cvm ResizeInstanceDisks \
   --DataDisks "[{\"DiskId\":\"{{user.disk_id}}\",\"DiskSize\":{{user.new_disk_size}}}]"
 ```
 
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.ResizeInstanceDisksRequest()
+req.InstanceId = "{{user.instance_id}}"
+req.DataDisks = [
+    models.DataDisk(
+        DiskId="{{user.disk_id}}",
+        DiskSize={{user.new_disk_size}}
+    )
+]
+resp = client.ResizeInstanceDisks(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
 ### Operation: CreateSnapshot (Backup)
 
 > **Note on CBS API Namespace:** The `CreateSnapshot` and disk-related operations below use the CBS (Cloud Block Storage) API namespace (`tccli cbs`) rather than the CVM API. These operations are within CVM scope because CBS disks are directly attached storage for CVM instances and are essential to the instance lifecycle (backup, restore, resize). Standalone CBS management (e.g., creating independent disks not attached to instances) is also covered by this skill since CBS is tightly coupled with CVM operations.
@@ -608,7 +676,27 @@ tccli cbs CreateSnapshot \
 
 Poll DescribeSnapshots until `SUCCESS` status.
 
+#### Execution — Python SDK (Fallback Path)
+
+```python
+import os, json, time
+
+req = models.CreateSnapshotRequest()
+req.DiskId = "{{user.disk_id}}"
+req.SnapshotName = "backup-" + "{{user.instance_id}}" + "-" + time.strftime("%Y%m%d-%H%M%S")
+resp = client.CreateSnapshot(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
 ### Operation: CreateImage (Custom Image)
+
+#### Pre-flight
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| Instance exists | DescribeInstances | Instance found | HALT |
+| Instance state | DescribeInstances | `RUNNING` or `SHUTDOWN` | HALT; imaging `PENDING`/`REBOOTING` is unsafe |
+| Image name unique | DescribeImages | No duplicate | Warn; proceed if intentional |
 
 #### Execution — CLI
 
@@ -618,6 +706,19 @@ tccli cvm CreateImage \
   --InstanceId "{{user.instance_id}}" \
   --ImageName "{{user.image_name}}" \
   --ImageDescription "Custom image created at $(date +%Y%m%d)"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+import os, json, time
+
+req = models.CreateImageRequest()
+req.InstanceId = "{{user.instance_id}}"
+req.ImageName = "{{user.image_name}}"
+req.ImageDescription = "Custom image created at " + time.strftime("%Y%m%d-%H%M%S")
+resp = client.CreateImage(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 ```
 
 ---
@@ -784,7 +885,7 @@ rubric, in addition to the build-time **Safety Gates** above and the build-time
 
 | Op class | Loop runs? | Why |
 |---|---|---|
-| Destructive: `TerminateInstances`, `ResetInstances`, `ResizeInstanceDisks` (shrink blocked by rule 3), `TerminateDisks` (CBS) | **yes** | Irreversible or near-irreversible; needs scoring |
+| Destructive: `TerminateInstances`, `ResetInstance`, `ResizeInstanceDisks` (shrink blocked by rule 3), `TerminateDisks` (CBS) | **yes** | Irreversible or near-irreversible; needs scoring |
 | Mutating: `RunInstances`, `StopInstances`, `RebootInstances`, `ModifyInstanceAttribute`, `ResizeInstanceDisks` (grow only), `CreateImage`, `CreateSnapshot` | **yes** | Cost / state-change risk; needs scoring |
 | Read-only: `DescribeInstances`, `DescribeImages`, `DescribeSnapshots`, `DescribeAccountQuota` | optional (max_iter=1, no hard abort) | Polling tails are part of the parent op's trace |
 
@@ -805,7 +906,7 @@ Full rules: [`references/rubric.md`](references/rubric.md) §4.
 | 2 | `StopInstances` with `--StopType HARD` | Block on production instance (heuristic: name matches `^(prod|prd|live)-` or any instance with `T... |
 | 3 | `ResizeInstanceDisks` | Target `DiskSize` ≥ current `DiskSize`; `DiskType` must be resizable (no `LOCAL_BASIC`/`LOCAL_SSD... |
 | 4 | `RunInstances` | `ClientToken` MUST be set; zone-instance type matrix MUST be validated (`DescribeZoneInstanceConf... |
-| 5 | `ResetInstances` | `ImageId` MUST differ from current; current state MUST be `STOPPED` or `SHUTDOWN`; explicit confi... |
+| 5 | `ResetInstance` | `ImageId` MUST differ from current; current state MUST be `STOPPED` or `SHUTDOWN`; explicit confi... |
 
 Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
