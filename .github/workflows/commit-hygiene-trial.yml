@@ -1,0 +1,45 @@
+name: Commit Hygiene Trial
+
+on:
+  schedule:
+    # Every Monday 09:00 UTC+8 (= 01:00 UTC). See docs/commit-hygiene-trial.md.
+    - cron: "0 1 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write  # weekly auto-commit of report + jsonl back to main
+
+jobs:
+  trial:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need full history to parse trailers across past 7 days.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Collect commits past 7 days
+        run: |
+          python3 scripts/commit_hygiene_trial.py collect --days 7
+
+      - name: Score window + emit weekly report
+        run: |
+          python3 scripts/commit_hygiene_trial.py report
+
+      - name: Commit weekly snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add audit-results/ docs/commit-hygiene-trial-*.md
+          # Only commit if there are changes (first week has no data).
+          if git diff --cached --quiet; then
+            echo "No new data; skipping commit."
+            exit 0
+          fi
+          today=$(date -u +%Y%m%d)
+          git commit -m "[trial] weekly snapshot ${today}"
+          git push origin main

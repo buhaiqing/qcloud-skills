@@ -43,24 +43,44 @@ def _git_log(since_iso: str) -> list[dict]:
     """Return list of commits since `since_iso`, newest first.
 
     Each item: {sha, subject, body, ts_iso}
+
+    Two-pass approach for reliability over `%x00` separators:
+      Pass 1: list SHAs + timestamps (single line per commit).
+      Pass 2: for each SHA, fetch full message with %B (preserves newlines).
+    Ponytail: simple beats clever — separate calls are slower but never
+    confuse empty fields or commit-message bodies containing arbitrary
+    characters.
     """
-    fmt = "%H%x00%s%x00%aI%x00%b"
-    out = subprocess.run(
-        ["git", "log", f"--since={since_iso}", f"--pretty=format:{fmt}", "--no-merges"],
+    list_out = subprocess.run(
+        ["git", "log", f"--since={since_iso}", "--pretty=format:%H%x00%aI", "--no-merges"],
         cwd=_ROOT,
         check=True,
         capture_output=True,
         text=True,
     ).stdout
-    commits = []
-    for line in out.split("\n"):
+    shas_ts: list[tuple[str, str]] = []
+    for line in list_out.splitlines():
         if not line:
             continue
-        parts = line.split("\x00", 3)
-        if len(parts) < 4:
-            continue
-        sha, subject, ts_iso, body = parts
-        commits.append({"sha": sha, "subject": subject, "ts_iso": ts_iso, "body": body})
+        parts = line.split("\x00", 1)
+        if len(parts) == 2:
+            shas_ts.append((parts[0], parts[1]))
+
+    commits: list[dict] = []
+    for sha, ts in shas_ts:
+        msg_out = subprocess.run(
+            ["git", "log", "-1", "--pretty=format:%B", sha],
+            cwd=_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        # %B = subject\n\nbody
+        if "\n\n" in msg_out:
+            subject, body = msg_out.split("\n\n", 1)
+        else:
+            subject, body = msg_out, ""
+        commits.append({"sha": sha, "subject": subject, "ts_iso": ts, "body": body})
     return commits
 
 
@@ -78,11 +98,20 @@ def _parse_trailers(body: str) -> dict[str, str]:
 
 
 def _record_from_commit(c: dict) -> dict:
-    """Map a git commit to a trial record."""
+    """Map a git commit to a trial record.
+
+    Missing trailer is normalized to 'partial' so it counts toward M2
+    (per P2: 'missing trailer = mild 👎, counts toward M2 but does not
+    terminate'). The raw missing_trailer flag is preserved for reporting.
+    """
     trailers = _parse_trailers(c["body"])
     verdict = trailers.get("Commit-Hygiene-Verdict", "")
+    missing = verdict == ""
     if verdict and verdict not in VALID_VERDICTS:
-        verdict = ""  # invalid → treat as missing
+        verdict = ""
+        missing = True
+    if missing:
+        verdict = "partial"  # normalize so M2 picks it up
     products_raw = trailers.get("Commit-Hygiene-Products", "")
     products = [p.strip() for p in products_raw.split(",") if p.strip()] if products_raw else []
     try:
@@ -102,7 +131,7 @@ def _record_from_commit(c: dict) -> dict:
         "files_modified": files_modified,
         "files_added": files_added,
         "reason": trailers.get("Commit-Hygiene-Reason", ""),
-        "missing_trailer": verdict == "",
+        "missing_trailer": missing,
     }
 
 
@@ -200,7 +229,7 @@ def _render_report(metrics: dict, recent: list[dict]) -> str:
         "|--------|---------|----------|----------|-------|--------|",
     ]
     for r in recent[-10:]:
-        verdict_disp = r["verdict"] or "(missing)"
+        verdict_disp = "(missing)" if r.get("missing_trailer") else r["verdict"]
         reason = r["reason"][:60].replace("|", "\\|")
         products = ",".join(r["products"]) or "—"
         lines.append(
