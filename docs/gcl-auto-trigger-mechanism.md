@@ -150,3 +150,141 @@ def auto_trigger_gcl(task):
 - **未来**：系统会自动识别编码任务并触发 GCL 架构
 
 **关键点**：规则已经加载，但**我需要主动应用**。这就是为什么在今天的测试中，我需要您提醒才能使用多子 Agent 架构。
+
+---
+
+## 彻底根治方案（2026-07-04 更新）
+
+### 问题根源分析
+
+| 层面 | 问题 | 现有机制 | 缺失 |
+|------|------|----------|------|
+| **配置层** | GCL 配置正确 | ✅ SKILL.md 配置完整 | - |
+| **规则层** | 触发条件明确 | ✅ AGENTS.md 有检查清单 | - |
+| **执行层** | Agent 未主动应用 | ⚠️ 有脚本但未强制执行 | **强制执行点** |
+| **验证层** | 无法验证 GCL 是否执行 | ❌ 无验证机制 | **验证脚本** |
+
+### 根治方案（4 步）
+
+#### Step 1: 强制执行检查点
+
+在 `AGENTS.md` 中添加强制执行指令：
+
+```markdown
+**⚠️ 强制执行指令（MANDATORY）：**
+
+在执行任何编码任务前，**必须**运行以下检查：
+
+```bash
+# Step 0: 强制执行检查点
+python3 scripts/check_gcl_trigger.py "<task_description>" <file1> <file2> ...
+```
+
+如果脚本返回 **必须触发 GCL**（退出码 1），则**必须**执行以下完整流程。
+```
+
+#### Step 2: 创建验证脚本
+
+创建 `scripts/verify_gcl_execution.py`，用于验证 GCL 是否被正确执行：
+
+```bash
+python3 scripts/verify_gcl_execution.py "<task_description>" <commit_hash>
+```
+
+验证内容：
+- 是否有 GCL 轨迹文件
+- 是否使用了 Multi sub-Agent 架构
+- 是否有 Critic 评审结果
+
+#### Step 3: 更新文档
+
+更新 `docs/gcl-auto-trigger-mechanism.md`，添加强制执行机制说明。
+
+#### Step 4: 执行流程
+
+**完整执行流程：**
+
+1. **执行前检查**
+   ```bash
+   python3 scripts/check_gcl_trigger.py "<task_description>" <files>
+   ```
+
+2. **如果需要触发 GCL**
+   - 创建 worktree
+   - 输出模型配置公示
+   - 启动 Generator + Critics 子 Agent
+   - 执行 GCL 循环
+   - 汇总结果
+
+3. **执行后验证**
+   ```bash
+   python3 scripts/verify_gcl_execution.py "<task_description>" <commit_hash>
+   ```
+
+### 验证机制
+
+**验证脚本功能：**
+
+1. **检查 GCL 轨迹文件**
+   - 查找 `audit-results/gcl-trace-*.json`
+   - 验证轨迹文件完整性
+
+2. **检查 Multi sub-Agent 架构**
+   - 验证是否使用了多个 Agent
+   - 验证 Agent 角色分配
+
+3. **检查 Critic 评审**
+   - 验证是否有 Critic 评审记录
+   - 验证评审维度覆盖
+
+4. **检查 Git 提交**
+   - 验证提交信息是否包含 GCL 标记
+
+### 当前状态
+
+1. **规则自动加载**：✅ 已实现
+2. **强制执行检查点**：✅ 已添加到 AGENTS.md
+3. **验证脚本**：✅ 已创建 `scripts/verify_gcl_execution.py`
+4. **自动触发机制**：✅ 已完善
+
+### 执行示例
+
+**示例 1：新增 Service Mesh Skill**
+
+```bash
+# 1. 执行前检查
+python3 scripts/check_gcl_trigger.py "新增 Service Mesh Skill" qcloud-service-mesh-ops/SKILL.md
+
+# 输出：
+# ✅ 必须触发 GCL: 修改 GCL 核心文件: qcloud-service-mesh-ops/SKILL.md
+
+# 2. 执行 GCL 流程（Multi sub-Agent 架构）
+# ... (创建 worktree、启动 Agent、执行循环)
+
+# 3. 执行后验证
+python3 scripts/verify_gcl_execution.py "新增 Service Mesh Skill" abc1234
+
+# 输出：
+# ✅ GCL 执行验证通过
+```
+
+### 总结
+
+**彻底根治方案的核心：**
+
+1. **强制执行点**：在执行前必须运行检查脚本
+2. **验证机制**：在执行后必须运行验证脚本
+3. **完整流程**：从检查到执行到验证的完整闭环
+
+**关键改进：**
+
+- ✅ 添加了强制执行指令到 AGENTS.md
+- ✅ 创建了验证脚本 `verify_gcl_execution.py`
+- ✅ 完善了自动触发机制文档
+- ✅ 建立了完整的执行和验证流程
+
+**效果：**
+
+- Agent 在执行任务前**必须**检查是否需要触发 GCL
+- Agent 在执行任务后**必须**验证 GCL 是否被正确执行
+- 建立了完整的闭环机制，确保 GCL Multi sub-Agent 架构被正确应用

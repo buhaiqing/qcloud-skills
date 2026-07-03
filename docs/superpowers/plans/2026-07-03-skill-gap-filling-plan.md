@@ -298,24 +298,24 @@ git commit -m "feat(proactive-inspection): add oncall handover checklist operati
 - Create: `qcloud-cicd-ops/assets/example-config.yaml`
 - Create: `qcloud-cicd-ops/assets/eval_queries.json`
 
-- [ ] **Step 1: 调研 API 覆盖**
+- [x] **Step 1: 调研 API 覆盖**
 
 ```bash
-tccli codepipeline help
-tccli coding help
-tccli cloudstudio help
+tccli codepipeline help   # Returns "Invalid choice"
+tccli coding help         # Returns "Invalid choice"
+tccli cloudstudio help    # Available for IDE workspaces only
 ```
 
-验证 CLI 支持哪些 CI/CD 相关操作，确定 `cli_applicability` 为 `dual-path`。
+验证结果：`cli_applicability` 确定为 `sdk-only` (tccli 不支持 CI/CD pipeline 操作)
 
-- [ ] **Step 2: 使用 skill-generator 脚手架创建目录**
+- [x] **Step 2: 使用 skill-generator 脚手架创建目录**
 
 ```bash
 # 按 skill-generator 的 Step 3 创建目录结构
 mkdir -p qcloud-cicd-ops/{references,assets}
 ```
 
-- [ ] **Step 3: 编写 SKILL.md**
+- [x] **Step 3: 编写 SKILL.md**
 
 ```markdown
 ---
@@ -711,7 +711,7 @@ tccli codepipeline DescribePipelines --Region ap-guangzhou
 - [Integration](references/integration.md)
 ```
 
-- [ ] **Step 4: 创建 reference 文件**
+- [x] **Step 4: 创建 reference 文件**
 
 创建 `references/core-concepts.md`（CI/CD 架构、流水线概念、CODING DevOps 概述）
 
@@ -856,34 +856,43 @@ pipeline:
 ]
 ```
 
-- [ ] **Step 5: 创建 `references/cli-usage.md`**
+- [x] **Step 5: 创建 `references/api-sdk-usage.md`**
+
+> 注：由于 `tccli` 不支持 CI/CD pipeline 操作，改为创建 SDK 使用指南。
 
 ```markdown
-# CLI Usage Guide
+# API & SDK Usage Guide
 
-## Command Map
-
-| Operation | CLI Command | SDK Method |
-|-----------|------------|------------|
-| Create Pipeline | `tccli codepipeline CreatePipeline` | `CreatePipeline` |
-| List Pipelines | `tccli codepipeline DescribePipelines` | `DescribePipelines` |
-| Delete Pipeline | `tccli codepipeline DeletePipeline` | `DeletePipeline` |
-| Start Pipeline | `tccli codepipeline StartPipeline` | `StartPipeline` |
-| Stop Pipeline | `tccli codepipeline StopPipeline` | `StopPipeline` |
-| View Build Logs | `tccli codepipeline DescribeBuildLogs` | `DescribeBuildLogs` |
-
-## Common Patterns
+## SDK Installation
 
 ```bash
-# List all pipelines
-tccli codepipeline DescribePipelines --Region ap-guangzhou
+pip install tencentcloud-sdk-python
+```
 
-# Filter by name
-tccli codepipeline DescribePipelines --Filters "Name=pipeline-name,Values=my-pipeline"
+## Basic SDK Pattern
+
+```python
+#!/usr/bin/env python3
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+import os, json
+
+def call_api():
+    try:
+        cred = credential.Credential(
+            os.environ.get("TENCENTCLOUD_SECRET_ID"),
+            os.environ.get("TENCENTCLOUD_SECRET_KEY")
+        )
+        # Client initialization depends on specific service module
+        # response = client.SomeAction(request)
+        # return response
+    except TencentCloudSDKException as e:
+        print(f"API Error: {e}")
+        raise
 ```
 ```
 
-- [ ] **Step 6: 运行 2 轮自审**
+- [x] **Step 6: 运行 2 轮自审**
 
 ```bash
 # Round 1: Five Core Standards + Token Efficiency
@@ -898,7 +907,7 @@ ruff check scripts/check_markdown_python.py
 # R4 UX: Quick Start present, error format correct
 ```
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add qcloud-cicd-ops/
@@ -924,48 +933,36 @@ git commit -m "feat(cicd): add qcloud-cicd-ops skill for CI/CD pipeline manageme
 - Create: `qcloud-service-mesh-ops/assets/example-config.yaml`
 - Create: `qcloud-service-mesh-ops/assets/eval_queries.json`
 
-- [ ] **Step 1: 调研 API 覆盖**
+- [x] **Step 1: 调研 API 覆盖**
 
 ```bash
-tccli tcm help
-tccli mesh help
+tccli tcm help   # Returns: CreateMesh, DeleteMesh, DescribeMesh, DescribeMeshList, LinkClusterList, ModifyMesh, ModifyTracingConfig
 ```
 
-验证 TCM (Tencent Cloud Mesh) CLI 支持。
+验证结果：`cli_applicability` 确定为 `dual-path` (tccli tcm 支持完整操作)
 
-- [ ] **Step 2: 创建 SKILL.md（与 cicd 模板一致，差异在 Operations 部分）**
+- [x] **Step 2: 创建 SKILL.md（与 cicd 模板一致，差异在 Operations 部分）**
 
 关键差异：
 - **Trigger:** 服务网格、TCM、Istio、Sidecar、流量治理、灰度发布、mTLS、链路追踪
-- **Operations:** CreateMesh, DescribeMeshes, DeleteMesh, CreateSidecarInject, CreateVirtualService, CreateDestinationRule, 查询链路追踪
+- **Operations:** CreateMesh, DeleteMesh, DescribeMeshList, LinkClusterList, UnlinkCluster, ModifyMesh, ModifyTracingConfig
 - **Delegation:** 底层 K8s 集群 → `qcloud-tke-ops`；监控指标 → `qcloud-monitor-ops`
 - **GCL:** `required`（DeleteMesh 为破坏性操作）
 
-- [ ] **Step 3: 创建 reference 文件**
+- [x] **Step 3: 创建 reference 文件**
 
-核心概念文档需包含：
+核心概念文档已包含：
 - Mesh vs K8s 关系
 - Sidecar 注入原理
 - 流量治理（VirtualService, DestinationRule, Gateway）
 - 安全策略（mTLS, RBAC）
 - 可观测性（链路追踪, 指标, 日志）
 
-- [ ] **Step 4: 创建 eval_queries.json**
+- [x] **Step 4: 创建 eval_queries.json**
 
-```json
-[
-  { "query": "创建服务网格", "should_trigger": true },
-  { "query": "配置灰度发布策略", "should_trigger": true },
-  { "query": "开启 Sidecar 自动注入", "should_trigger": true },
-  { "query": "配置服务间 mTLS", "should_trigger": true },
-  { "query": "查看网格链路追踪", "should_trigger": true },
-  { "query": "K8s 集群节点管理", "should_trigger": false },
-  { "query": "创建负载均衡", "should_trigger": false },
-  { "query": "配置告警策略", "should_trigger": false }
-]
-```
+已创建 13 个测试用例（8 positive + 5 negative）
 
-- [ ] **Step 5: 运行 2 轮自审 + 提交**
+- [x] **Step 5: 运行 2 轮自审 + 提交**
 
 ---
 
@@ -1135,7 +1132,7 @@ tccli dc help
 - Modify: `qcloud-aiops-diagnosis/SKILL.md`
 - Create: `qcloud-aiops-diagnosis/references/mttr-tracking.md`
 
-- [ ] **Step 1: 创建 MTTR 追踪文档**
+- [x] **Step 1: 创建 MTTR 追踪文档**
 
 `references/mttr-tracking.md` 包含：
 
@@ -1170,9 +1167,9 @@ ORDER BY avg_mttr_minutes DESC
 ```
 ```
 
-- [ ] **Step 2: 在 SKILL.md 的故障诊断流程末尾新增 MTTR 记录步骤**
+- [x] **Step 2: 在 SKILL.md 的故障诊断流程末尾新增 MTTR 记录步骤**
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ---
 
