@@ -84,7 +84,9 @@
 - [x] 在 SKILL.md 新增 SD-WAN 场景操作
 - [x] 提交
 
-**提交记录：** `8ab576a feat(ccn-ops): 补充 SD-WAN 场景文档和操作流程`
+**提交记录：**
+- `8ab576a feat(ccn-ops): 补充 SD-WAN 场景文档和操作流程`
+- `29940d8 fix(ccn-ops): 添加VPN网关创建命令的Type参数`
 
 ### 6. vpn-ops — 多分支 VPN 拓扑模板
 **综合评分:** 11 | **预计工作量:** 0.5 天
