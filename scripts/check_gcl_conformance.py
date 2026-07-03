@@ -28,8 +28,13 @@ from pathlib import Path
 from typing import Any
 
 
-#: Canonical 24-skill set declared in ``AGENTS.md`` §8. Order is irrelevant
-#: (we always sort on output); immutability prevents accidental mutation.
+#: Canonical GCL-applicable skill set. Order is irrelevant (we always sort on
+#: output); immutability prevents accidental mutation. When adding a new
+#: `qcloud-*-ops` skill that ships a `## Quality Gate (GCL)` chapter plus
+#: `references/rubric.md` (8 sections) and `references/prompt-templates.md`
+#: (7 sections), add it here. Cross-skill meta-skills (e.g. `qcloud-aiops-diagnosis`,
+#: `qcloud-proactive-inspection`, `qcloud-well-architected-review`,
+#: `qcloud-skill-generator`) participate too.
 GCL_SKILLS: frozenset[str] = frozenset({
     "qcloud-cvm-ops",
     "qcloud-cdb-ops",
@@ -55,6 +60,8 @@ GCL_SKILLS: frozenset[str] = frozenset({
     "qcloud-proactive-inspection",
     "qcloud-well-architected-review",
     "qcloud-skill-generator",
+    "qcloud-ccn-ops",
+    "qcloud-vpn-ops",
 })
 
 

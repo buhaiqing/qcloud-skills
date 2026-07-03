@@ -1,0 +1,56 @@
+# Example config for qcloud-vpn-ops
+# All keys shown are placeholders; replace with real values at deploy time.
+
+env_defaults: &env_defaults
+  TENCENTCLOUD_REGION: ap-guangzhou
+
+# --- VPN Gateway ---
+vpn_gateway:
+  name: to-onprem-1
+  vpc_id: vpc-xxxx
+  bandwidth_mbps: 100
+  zone: ap-guangzhou-3
+  instance_charge_type: POSTPAID_BY_HOUR
+
+# --- Customer Gateway (on-prem peer) ---
+customer_gateway:
+  name: onprem-fw-1
+  ip_address: 1.2.3.4
+
+# --- IPSec VPN Connection ---
+vpn_connection:
+  name: tunnel-to-onprem-1
+  vpn_proto: IPsec
+  local_cidr_blocks:
+    - 10.0.0.0/16
+  remote_cidr_blocks:
+    - 192.168.0.0/16
+  pre_shared_key: '<16-32 char secret, source from $PSK env var, never inline>'
+  ike_settings:
+    ike_version: IKEV2
+    exchange_mode: AGGRESSIVE
+    lifetime_seconds: 86400
+    encryption_algorithm: AES-256
+    integrity_algorithm: SHA1
+    dh_group: GROUP2
+  ipsec_settings:
+    sa_lifetime_seconds: 3600
+
+# --- SSL VPN Server (optional) ---
+ssl_vpn_server:
+  name: ops-ssl
+  local_address: 10.0.0.0/16
+  remote_address: 172.20.0.0/22
+  protocol: UDP
+  port: 1194
+
+# --- SSL VPN Clients (optional) ---
+ssl_vpn_clients:
+  - name: alice
+  - name: bob
+
+# Credentials live in env, not in this file
+# export TENCENTCLOUD_SECRET_ID=...
+# export TENCENTCLOUD_SECRET_KEY=...
+# export TENCENTCLOUD_REGION=ap-guangzhou
+# export PSK='<16-32 char secret>'   # used by CreateVpnConnection; unset after use

@@ -1,0 +1,50 @@
+[
+  {
+    "id": "vpn-001",
+    "query": "我想在腾讯云 VPC 和我们公司 IDC 之间建一条 IPSec VPN 隧道，IDC 端防火墙公网 IP 是 1.2.3.4。",
+    "should_trigger": true,
+    "reason": "Site-to-site hybrid cloud IPSec VPN setup."
+  },
+  {
+    "id": "vpn-002",
+    "query": "Create a VPN Gateway in vpc-xxx with 200 Mbps bandwidth, then register a customer gateway for peer 5.6.7.8 and create a tunnel.",
+    "should_trigger": true,
+    "reason": "Full VPN gateway + customer gateway + tunnel creation flow."
+  },
+  {
+    "id": "vpn-003",
+    "query": "我们的 IPSec 隧道 (vpnx-abc) 已经 DOWN 半小时了，PSK 改了之后还没起来，帮忙看看。",
+    "should_trigger": true,
+    "reason": "Tunnel troubleshooting — common case for VPN ops."
+  },
+  {
+    "id": "vpn-004",
+    "query": "Set up SSL VPN so my remote O&M engineers can connect to a VPC.",
+    "should_trigger": true,
+    "reason": "SSL VPN server + client provisioning for remote access."
+  },
+  {
+    "id": "vpn-005",
+    "query": "How do I connect two VPCs in ap-guangzhou and ap-shanghai, same account?",
+    "should_trigger": false,
+    "reason": "Cross-region VPC interconnect → qcloud-ccn-ops, not VPN."
+  },
+  {
+    "id": "vpn-006",
+    "query": "We need a 10 Gbps dedicated line between our IDC and Tencent Cloud.",
+    "should_trigger": false,
+    "reason": "Direct Connect is out of scope for qcloud-vpn-ops."
+  },
+  {
+    "id": "vpn-007",
+    "query": "两个 VPC 都在广州同一个账号下，怎么打通？",
+    "should_trigger": false,
+    "reason": "Same-region same-account → VPC Peering, not VPN; delegate to qcloud-vpc-ops."
+  },
+  {
+    "id": "vpn-008",
+    "query": "What's the hourly cost of a 100 Mbps VPN Gateway?",
+    "should_trigger": false,
+    "reason": "Pricing question → qcloud-finops-ops (or the billing console). VPN skill does not own pricing."
+  }
+]
