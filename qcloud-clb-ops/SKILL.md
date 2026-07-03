@@ -16,8 +16,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.1.0"
-  last_updated: "2026-06-04"
+  version: "1.2.0"
+  last_updated: "2026-07-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/214"
@@ -214,12 +214,24 @@ tccli clb DescribeLoadBalancers --Region {{env.TENCENTCLOUD_REGION}}
 | RegisterTargets | Bind backend servers to listener | Medium | Medium |
 | DescribeTargetHealth | Check backend server health | Low | None |
 
+### Quick Diagnosis Scenarios
+
+| Scenario | Trigger | Target MTTR | Key Steps | Reference |
+|----------|---------|-------------|-----------|-----------|
+| **SLB 5xx — Backend Health Failure** | `HttpCode5XX` ↑ AND `HealthCheckFailedNum` > 0 | < 15 min | Triage → Identify unhealthy backends → Check SG/health config → Fix/re-register | [slb-5xx-diagnosis-optimized.md](references/slb-5xx-diagnosis-optimized.md) §2A |
+| **SLB 5xx — Traffic Overload** | `HttpCode5XX` ↑ AND `ClientConnum` spike | < 15 min | Triage → Analyze traffic pattern → Scale backends | [slb-5xx-diagnosis-optimized.md](references/slb-5xx-diagnosis-optimized.md) §2C |
+| **SLB 5xx — Backend Application Error** | `HttpCode5XX` ↑ AND all backends healthy | < 20 min | Triage → Check backend logs/process → Rollback or fix app | [slb-5xx-diagnosis-optimized.md](references/slb-5xx-diagnosis-optimized.md) §2B |
+| **SLB 5xx — LB Not Running** | `LB Status` ≠ 2 | < 5 min | Triage → Check LB status → Wait or contact support | [slb-5xx-diagnosis-optimized.md](references/slb-5xx-diagnosis-optimized.md) §2D |
+| **Backend Health Check Failures** | `HealthCheckFailedNum` > 0 | < 10 min | Check health config → Verify port/SG → Fix | [troubleshooting.md](references/troubleshooting.md)#health-check-failures |
+| **Connection Failures** | Clients cannot reach backend | < 15 min | Verify LB status → Check listener → Verify backend binding | [troubleshooting.md](references/troubleshooting.md)#connection-failures |
+
 ## Changelog
 
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial CLB skill with dual-path CLI/SDK support |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CLB-specific safety rules incl. listener-delete traffic cut, mass-deregister drain, Internet↔Internal flip guard), `references/prompt-templates.md` (Generator + Critic + Orchestrator, isolated-context enforcement). `max_iter=2` per AGENTS.md §8 |
+| 1.2.0 | 2026-07-04 | SLB 5xx fast diagnosis optimization: added `references/slb-5xx-diagnosis-optimized.md` (4-phase runbook, MTTR < 30 min target), updated `references/troubleshooting.md` with quick 5xx triage path, added Quick Diagnosis Scenarios table to SKILL.md |
 
 ---
 
@@ -555,6 +567,7 @@ Poll DescribeLoadBalancers until LB returns empty or 404.
 - [API & SDK Usage](references/api-sdk-usage.md) — API operation map and Python SDK
 - [CLI Usage](references/cli-usage.md) — `tccli clb` commands
 - [Troubleshooting Guide](references/troubleshooting.md) — Common issues and solutions
+- [SLB 5xx Fast Diagnosis](references/slb-5xx-diagnosis-optimized.md) — Optimized 5xx runbook (MTTR < 30 min)
 - [Monitoring & Alerts](references/monitoring.md) — CLB metrics (QCE/LB_PUBLIC namespace)
 - [Integration](references/integration.md) — Cross-skill integration and setup
 

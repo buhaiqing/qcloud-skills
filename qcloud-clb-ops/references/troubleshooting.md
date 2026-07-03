@@ -1,5 +1,74 @@
 # CLB Troubleshooting Guide
 
+## Quick Diagnosis: 5xx Errors (MTTR < 30 min)
+
+> **When `HttpCode5XX` alarm fires**, use the fast diagnosis path below instead of general troubleshooting.
+
+### Fast Triage (2 min)
+
+1. **Query 5xx metric trend + backend health in parallel:**
+
+```bash
+# 5xx trend (last 15 min)
+# Cross-platform: macOS uses date -v-15M, Linux uses date -d '-15 minutes'
+START_TIME=$(date -u -v-15M +%Y-%m-%dT%H:%M:%S+00:00 2>/dev/null || date -u -d '-15 minutes' +%Y-%m-%dT%H:%M:%S+00:00)
+tccli monitor GetMonitorData \
+  --Namespace "QCE/LB_PUBLIC" \
+  --MetricName "HttpCode5XX" \
+  --Dimensions "[{\"Name\":\"LoadBalancerId\",\"Value\":\"{{user.loadbalancer_id}}\"}]" \
+  --Period 60 \
+  --StartTime "$START_TIME" \
+  --EndTime "$(date -u +%Y-%m-%dT%H:%M:%S+00:00)"
+
+# Backend health status
+tccli clb DescribeTargetHealth \
+  --LoadBalancerId "{{user.loadbalancer_id}}"
+```
+
+2. **Route by condition:**
+
+| 5xx + HealthCheckFailedNum > 0 | Route to: [Health Check Failures](#health-check-failures) |
+|---|---|
+| 5xx + ClientConnum spike + health OK | Route to: [Traffic Overload](#traffic-overload) |
+| 5xx + LB Status != 2 | Route to: [LB Not Running](#lb-not-running) |
+| 5xx + all backends healthy | Route to: [Backend Application Error](#backend-application-error) |
+
+3. **Detailed decision tree:** See [SLB 5xx Fast Diagnosis](slb-5xx-diagnosis-optimized.md) for the full Phase 1–4 runbook.
+
+### Traffic Overload
+
+**Symptom:** `HttpCode5XX` spikes with `ClientConnum` 3–10x normal, backends healthy
+
+**Quick Fix:**
+```bash
+# Check current capacity
+tccli clb DescribeTargets --LoadBalancerId "{{user.loadbalancer_id}}" \
+  | jq '[.Response.Targets[] | {InstanceId, Weight, HealthStatus}]'
+
+# Scale: register additional backends
+tccli clb RegisterTargets \
+  --LoadBalancerId "{{user.loadbalancer_id}}" \
+  --ListenerId "{{user.listener_id}}" \
+  --Targets "[{\"InstanceId\":\"{{user.new_instance_id}}\",\"Port\":{{user.target_port}},\"Weight\":10}]"
+```
+
+### Backend Application Error
+
+**Symptom:** `HttpCode5XX` spikes, all backends healthy, `ClientConnum` normal
+
+**Quick Check:**
+- Was there a recent deployment? → Rollback
+- Backend OOM? → Scale instance memory
+- Upstream dependency failure? → Fix upstream; add circuit breaker
+
+### LB Not Running
+
+**Symptom:** `DescribeLoadBalancers` returns `Status` ≠ 2
+
+**Action:** Wait up to 5 min if `Status=1` (creating). If stuck, contact Tencent Cloud support.
+
+---
+
 ## Common Issues and Solutions
 
 ### Health Check Failures
@@ -9,7 +78,7 @@
 **Diagnostic Steps:**
 1. Check health check configuration
 ```bash
-tccli clb DescribeListeners --LoadBalancerId lb-xxx | jq '.Response.ListenerSet[0].HealthCheck'
+tccli clb DescribeListeners --LoadBalancerId "{{user.loadbalancer_id}}" | jq '.Response.ListenerSet[0].HealthCheck'
 ```
 2. Verify backend port is open
 ```bash
@@ -18,7 +87,13 @@ curl -v http://<backend-ip>:<port>/health-check-path
 ```
 3. Check security group rules
 ```bash
-tccli vpc DescribeSecurityGroups --SecurityGroupIds "[\"sg-xxx\"]"
+# Extract SG IDs from LB, then check rules
+SG_IDS=$(tccli clb DescribeLoadBalancers \
+  --LoadBalancerIds "[\"{{user.loadbalancer_id}}\"]" \
+  | jq -r '.Response.LoadBalancerSet[0].SecurityGroups[]')
+for SG_ID in $SG_IDS; do
+  tccli vpc DescribeSecurityGroups --SecurityGroupIds "[\"$SG_ID\"]"
+done
 ```
 
 **Root Causes:**
@@ -36,15 +111,15 @@ tccli vpc DescribeSecurityGroups --SecurityGroupIds "[\"sg-xxx\"]"
 **Diagnostic Steps:**
 1. Verify CLB status
 ```bash
-tccli clb DescribeLoadBalancers --LoadBalancerIds "[\"lb-xxx\"]" | jq '.Response.LoadBalancerSet[0].Status'
+tccli clb DescribeLoadBalancers --LoadBalancerIds "[\"{{user.loadbalancer_id}}\"]" | jq '.Response.LoadBalancerSet[0].Status'
 ```
 2. Check listener configuration
 ```bash
-tccli clb DescribeListeners --LoadBalancerId lb-xxx
+tccli clb DescribeListeners --LoadBalancerId "{{user.loadbalancer_id}}"
 ```
 3. Verify backend binding
 ```bash
-tccli clb DescribeTargets --LoadBalancerId lb-xxx
+tccli clb DescribeTargets --LoadBalancerId "{{user.loadbalancer_id}}"
 ```
 
 **Root Causes:**
@@ -62,7 +137,7 @@ tccli clb DescribeTargets --LoadBalancerId lb-xxx
 **Diagnostic Steps:**
 1. Verify certificate ID
 ```bash
-tccli ssl DescribeCertificates --CertificateIds "[\"cert-xxx\"]"
+tccli ssl DescribeCertificates --CertificateIds "[\"{{user.certificate_id}}\"]"
 ```
 2. Check certificate expiration
 ```bash
@@ -83,11 +158,11 @@ tccli ssl DescribeCertificates --CertificateIds "[\"cert-xxx\"]"
 **Diagnostic Steps:**
 1. Check backend weights
 ```bash
-tccli clb DescribeTargets --LoadBalancerId lb-xxx | jq '.Response.Targets[].Weight'
+tccli clb DescribeTargets --LoadBalancerId "{{user.loadbalancer_id}}" | jq '.Response.Targets[].Weight'
 ```
 2. Verify health status
 ```bash
-tccli clb DescribeTargetHealth --LoadBalancerId lb-xxx
+tccli clb DescribeTargetHealth --LoadBalancerId "{{user.loadbalancer_id}}"
 ```
 
 **Root Causes:**
@@ -104,7 +179,7 @@ tccli clb DescribeTargetHealth --LoadBalancerId lb-xxx
 **Diagnostic Steps:**
 1. Verify VPC configuration
 ```bash
-tccli vpc DescribeVpcs --VpcIds "[\"vpc-xxx\"]"
+tccli vpc DescribeVpcs --VpcIds "[\"{{user.vpc_id}}\"]"
 ```
 
 **Root Causes:**
