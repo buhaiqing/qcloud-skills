@@ -1,0 +1,47 @@
+# Service Mesh example configuration
+mesh:
+  name: production-mesh
+  version: "1.18.1-istio"
+  region: ap-guangzhou
+  
+  # Cluster configuration
+  clusters:
+    - id: cls-main
+      vpc_id: vpc-xxx
+      subnet_id: subnet-xxx
+    - id: cls-backup
+      vpc_id: vpc-yyy
+      subnet_id: subnet-yyy
+  
+  # Tracing configuration
+  tracing:
+    enable: true
+    sampling: 1.0
+    backend: jaeger
+    address: jaeger.monitoring:9411
+  
+  # Access logs
+  access_logs:
+    enable: true
+    destination: cls
+    cls_topic_id: topic-xxx
+  
+  # Prometheus integration
+  prometheus:
+    enable: true
+    prometheus_id: prom-xxx
+  
+  # Security settings
+  security:
+    mtls_mode: strict  # or permissive
+    auto_mtls: true
+  
+  # Sidecar defaults
+  sidecar:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi

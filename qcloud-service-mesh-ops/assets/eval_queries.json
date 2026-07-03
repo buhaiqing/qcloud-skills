@@ -1,0 +1,15 @@
+[
+  { "query": "创建服务网格", "should_trigger": true },
+  { "query": "配置灰度发布策略", "should_trigger": true },
+  { "query": "开启 Sidecar 自动注入", "should_trigger": true },
+  { "query": "配置服务间 mTLS", "should_trigger": true },
+  { "query": "查看网格链路追踪", "should_trigger": true },
+  { "query": "Istio 流量治理", "should_trigger": true },
+  { "query": "金丝雀发布配置", "should_trigger": true },
+  { "query": "服务网格多集群", "should_trigger": true },
+  { "query": "K8s 集群节点管理", "should_trigger": false },
+  { "query": "创建负载均衡", "should_trigger": false },
+  { "query": "配置告警策略", "should_trigger": false },
+  { "query": "创建 CI/CD 流水线", "should_trigger": false },
+  { "query": "查看云服务器监控", "should_trigger": false }
+]
