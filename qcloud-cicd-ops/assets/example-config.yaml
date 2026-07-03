@@ -1,0 +1,60 @@
+# CI/CD example configuration
+pipeline:
+  name: example-pipeline
+  description: "Example CI/CD pipeline configuration"
+  
+  triggers:
+    - type: webhook
+      branch: main
+    - type: schedule
+      cron: "0 2 * * *"  # Daily at 2 AM
+  
+  stages:
+    - name: source
+      steps:
+        - checkout:
+            repo_url: "https://github.com/example/app.git"
+            branch: main
+            
+    - name: build
+      steps:
+        - script:
+            commands:
+              - npm install
+              - npm run build
+              - npm run test
+      cache:
+        paths:
+          - node_modules
+          - .npm
+          
+    - name: deploy-staging
+      steps:
+        - deploy:
+            target: staging
+            strategy: rolling
+      approval:
+        required: false
+        
+    - name: deploy-production
+      steps:
+        - deploy:
+            target: production
+            strategy: blue-green
+      approval:
+        required: true
+        approvers:
+          - team: platform
+          
+  notifications:
+    - channel: email
+      on:
+        - failure
+        - success
+      recipients:
+        - devops@example.com
+        
+    - channel: webhook
+      on:
+        - failure
+      url: "https://hooks.example.com/ci-cd"

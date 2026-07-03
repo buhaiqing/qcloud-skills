@@ -1,0 +1,17 @@
+[
+  { "query": "创建一条 CI/CD 流水线", "should_trigger": true },
+  { "query": "帮我配置持续集成和持续部署", "should_trigger": true },
+  { "query": "DevOps 流水线管理", "should_trigger": true },
+  { "query": "查看构建日志", "should_trigger": true },
+  { "query": "如何自动化部署到 K8s 集群", "should_trigger": true },
+  { "query": "启动流水线构建", "should_trigger": true },
+  { "query": "停止正在运行的流水线", "should_trigger": true },
+  { "query": "配置代码仓库自动触发", "should_trigger": true },
+  { "query": "制品库管理", "should_trigger": true },
+  { "query": "帮我查一下数据库慢查询", "should_trigger": false },
+  { "query": "K8s 集群节点扩容", "should_trigger": false },
+  { "query": "配置负载均衡健康检查", "should_trigger": false },
+  { "query": "查看本月账单", "should_trigger": false },
+  { "query": "SSL 证书续期", "should_trigger": false },
+  { "query": "创建云服务器实例", "should_trigger": false }
+]
