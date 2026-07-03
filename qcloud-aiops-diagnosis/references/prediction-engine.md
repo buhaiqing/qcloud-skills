@@ -93,8 +93,8 @@ Resolve target metrics (anomaly-detection.md §2)
 Simple trend extrapolation using least squares regression:
 
 ```python
-def linear_regression预测(historical_data: list[float]) -> dict:
-    """Fit linear regression model and predict future values."""
+def linear_regression_predict(historical_data: list[float]) -> dict:
+    # Fit linear regression model and predict future values
     n = len(historical_data)
     x = list(range(n))
     y = historical_data
@@ -133,8 +133,8 @@ def linear_regression预测(historical_data: list[float]) -> dict:
 For data with seasonal patterns or high volatility:
 
 ```python
-def moving_average预测(historical_data: list[float], window: int = 7) -> float:
-    """Predict using weighted moving average."""
+def moving_average_predict(historical_data: list[float], window: int = 7) -> float:
+    # Predict using weighted moving average
     if len(historical_data) < window:
         return sum(historical_data) / len(historical_data)
     
@@ -156,12 +156,12 @@ def moving_average预测(historical_data: list[float], window: int = 7) -> float
 For data with trend and seasonality:
 
 ```python
-def exponential_smoothing预测(
+def exponential_smoothing_predict(
     historical_data: list[float], 
     alpha: float = 0.3, 
     beta: float = 0.1
 ) -> dict:
-    """Holt's linear exponential smoothing."""
+    # Holt's linear exponential smoothing
     if len(historical_data) < 2:
         return {"level": historical_data[0], "trend": 0}
     
