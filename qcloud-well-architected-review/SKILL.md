@@ -9,7 +9,8 @@ description: >-
   assessment by delegating product discovery to qcloud-cvm-ops, qcloud-clb-ops,
   qcloud-cdb-ops, qcloud-redis-ops, qcloud-tke-ops, qcloud-vpc-ops, qcloud-cos-ops,
   qcloud-es-ops, qcloud-mongodb-ops, qcloud-postgres-ops, qcloud-ssl-ops, qcloud-cdn-ops,
-  qcloud-agsx-ops, qcloud-cam-ops, qcloud-monitor-ops, and qcloud-finops-ops workers;
+  qcloud-agsx-ops, qcloud-cam-ops, qcloud-monitor-ops, qcloud-finops-ops,
+  qcloud-ccn-ops, and qcloud-vpn-ops workers;
   aggregates four-pillar scores and cross-product findings. Also triggers on architecture
   review requests, compliance checks, or performance/cost analysis. Not for resource CRUD
   (use product ops skills) or proactive inspection (use qcloud-proactive-inspection).
@@ -20,8 +21,8 @@ compatibility:
   - tencentcloud-api-credentials
 metadata:
   author: qcloud
-  version: "1.3.4"
-  last_updated: "2026-06-09"
+  version: "1.3.5"
+  last_updated: "2026-07-03"
   type: cross-cutting-assessment
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   tags:
@@ -235,6 +236,8 @@ Pillar orchestration guides (worker mapping only — no inline CLI):
 | `cls` | `qcloud-cls-ops` |同上 |
 | `cbs` | `qcloud-cbs-ops` | Standalone disks / snapshot policies (attached disks also in `cvm` worker) |
 | `finops` | `qcloud-finops-ops` | Cost/billing worker (§ Worker Output Contract) |
+| `ccn` | `qcloud-ccn-ops` | Multi-region / cross-account backbone (CCN instance, attachments, routes, bandwidth limits) |
+| `vpn` | `qcloud-vpn-ops` | Hybrid cloud (VPN Gateway, IPSec / SSL VPN, customer gateway) |
 | _(security)_ | `qcloud-cam-ops` | Cross-cutting |
 | _(metrics)_ | `qcloud-monitor-ops` | Cross-cutting (GetMonitorData, alarms) |
 
@@ -328,6 +331,7 @@ Exclude `not_assessed` pillars from weight denominator; document excluded pillar
 | 1.1.0 | 2026-06-04 | GCL rollout |
 | 1.2.0 | 2026-06-09 | Quick Start, error table, GCL templates |
 | 1.3.0 | 2026-06-09 | Orchestrator + Worker architecture |
+| 1.3.5 | 2026-07-03 | Added `ccn` and `vpn` workers (`qcloud-ccn-ops`, `qcloud-vpn-ops`) to the dispatch table. |
 | 1.3.1 | 2026-06-09 | Worker registry: es, mongodb, postgres, ssl, cdn, agsx |
 | 1.3.2 | 2026-06-09 | worker-output-schema v1.1; product well-architected-assessment.md aligned |
 | 1.3.3 | 2026-06-09 | `qcloud-finops-ops` well-architected-assessment.md (Cost worker) |
