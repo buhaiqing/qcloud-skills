@@ -74,15 +74,17 @@
 
 **提交记录：** `f976972 fix(te): fix all Token Efficiency violations (TE-1 to TE-7)`
 
-### 5. ccn-ops — SD-WAN 场景补充
+### ~~5. ccn-ops — SD-WAN 场景补充~~ ✅ 已完成
 **综合评分:** 11 | **预计工作量:** 0.5 天
 **来源：** 2026-07-03-skill-gap-filling-plan.md Task 7
-**状态：** ⏳ 未开始
+**状态：** ✅ 已完成
 
 **任务清单：**
-- [ ] 创建 SD-WAN 场景文档（references/sdwan-scenarios.md）
-- [ ] 在 SKILL.md 新增 SD-WAN 场景操作
-- [ ] 提交
+- [x] 创建 SD-WAN 场景文档（references/sdwan-scenarios.md）
+- [x] 在 SKILL.md 新增 SD-WAN 场景操作
+- [x] 提交
+
+**提交记录：** `8ab576a feat(ccn-ops): 补充 SD-WAN 场景文档和操作流程`
 
 ### 6. vpn-ops — 多分支 VPN 拓扑模板
 **综合评分:** 11 | **预计工作量:** 0.5 天
