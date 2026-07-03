@@ -20,5 +20,9 @@
   {"query": "查看告警历史", "should_trigger": false},
   {"query": "创建CAM用户并分配权限", "should_trigger": false},
   {"query": "全站四支柱架构评估", "should_trigger": false},
-  {"query": "Well-Architected review for production", "should_trigger": false}
+  {"query": "Well-Architected review for production", "should_trigger": false},
+  {"query": "值班交接检查清单", "should_trigger": true},
+  {"query": "交接班时帮我检查系统健康状态", "should_trigger": true},
+  {"query": "今天夜班交接需要检查什么", "should_trigger": true},
+  {"query": "创建一条告警策略", "should_trigger": false}
 ]

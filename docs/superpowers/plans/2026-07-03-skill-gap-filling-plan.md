@@ -138,7 +138,7 @@ git commit -m "feat(finops): add cross-account cost view (module 9)"
 - Modify: `qcloud-proactive-inspection/SKILL.md`
 - Modify: `qcloud-proactive-inspection/assets/eval_queries.json`
 
-- [ ] **Step 1: 创建值班交接清单参考文档**
+- [x] **Step 1: 创建值班交接清单参考文档**
 
 `references/oncall-handover.md`：
 
@@ -203,7 +203,7 @@ git commit -m "feat(finops): add cross-account cost view (module 9)"
 | 发现未记录的 P0 故障 | 立即启动应急响应，通知 SRE 团队 |
 ```
 
-- [ ] **Step 2: 在 SKILL.md 新增交接清单操作**
+- [x] **Step 2: 在 SKILL.md 新增交接清单操作**
 
 在 SKILL.md 的 Operations 中新增：
 
@@ -267,14 +267,14 @@ tccli billing DescribeAccountBalance \
 ]
 ```
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 ```bash
 python3 scripts/check_markdown_python.py --root .
 python3 scripts/validate_skills_frontmatter.py
 ```
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add qcloud-proactive-inspection/references/oncall-handover.md qcloud-proactive-inspection/SKILL.md qcloud-proactive-inspection/assets/eval_queries.json

@@ -195,6 +195,57 @@ Default thresholds (override via `{{user.thresholds}}`):
 
 ---
 
+## Operations
+
+### Operation: 值班交接健康检查
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| Credentials | `test -n "$TENCENTCLOUD_SECRET_ID"` | Non-empty | HALT |
+| On-call schedule | Ask user for shift time + personnel | Known | Ask user |
+
+#### Execution
+
+执行 [7×24 值班交接检查清单](references/oncall-handover.md) 中的系统健康摘要：
+
+```bash
+# 1. 查询未恢复告警
+tccli monitor DescribeAlarmHistory \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --StartTime "$(date -d '-24 hours' -u +%Y-%m-%dT%H:%M:%S+08:00)" \
+  --EndTime "$(date -u +%Y-%m-%dT%H:%M:%S+08:00)"
+
+# 2. 查询证书到期
+tccli ssl DescribeCertificates \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --ExpireTimeRange '["30"]'
+
+# 3. 查询账户余额
+tccli billing DescribeAccountBalance \
+  --Region "{{env.TENCENTCLOUD_REGION}}"
+```
+
+#### Post-execution Validation
+
+生成交接摘要 JSON，确认所有必填字段已填充：
+
+| 字段 | 来源 | 必填 |
+|------|------|------|
+| `health_summary.status` | 根据告警/资源水位综合判断 | 是 |
+| `ongoing_incidents` | AIOps 诊断记录 + 值班群 | 是 |
+| `pending_changes` | 用户提供 | 否 |
+
+#### Failure Recovery
+
+| Error pattern | Recovery |
+|---|---|
+| `UnauthorizedOperation` | HALT; 确认账号有 monitor/billing/ssl 只读权限 |
+| API rate limit | Backoff retry (2s,4s,8s) |
+
+---
+
 ## Changelog
 
 | Version | Date | Changes |
@@ -204,6 +255,7 @@ Default thresholds (override via `{{user.thresholds}}`):
 | 1.2.0 | 2026-06-09 | Product skill delegation for Discovery; boundary vs `qcloud-well-architected-review` |
 | 1.3.0 | 2026-06-09 | `inspection-output-schema.md`; 20 product `proactive-inspection.md` checklists |
 | 1.4.0 | 2026-06-13 | GCL Phase 3: embed `gcl-quality-summary` in inspection report (`reporting.md`) |
+| 1.5.0 | 2026-07-03 | Add Operation: 值班交接健康检查 (oncall handover checklist) |
 
 ## Quality Gate (GCL)
 
