@@ -621,6 +621,195 @@ Poll `DescribeCCNs` for the ID; expect absent within 60s.
 | `ResourceInUse.Ccn` | Attachments or route-table entries still reference this CCN; detach / clean routes first |
 | `InvalidStatus.CcnIsolated` | CCN is already isolated due to overdue bill; settle then retry |
 
+### Operation: SD-WAN Hub-Spoke 拓扑部署
+
+> **场景说明：** 使用 CCN 构建 Hub-Spoke 网络拓扑，实现总部与分支机构的互联。
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| VPC CIDR 规划 | 检查所有 VPC 的 CIDR 是否重叠 | 无重叠 | HALT；重新规划 CIDR |
+| 区域规划 | 确认所有区域支持 CCN | 区域支持 | HALT；选择支持区域 |
+
+#### Execution Steps
+
+1. **创建 CCN 实例**（使用 `CreateCCN` 操作）
+2. **关联总部 VPC（Hub）**（使用 `AttachCcnInstances` 操作）
+3. **关联分支机构 VPC（Spokes）**（使用 `AttachCcnInstances` 操作）
+4. **验证路由传播**（使用 `DescribeCcnRoutes` 操作）
+
+#### Post-execution Validation
+
+```bash
+# 验证所有 VPC 已关联
+tccli vpc DescribeCcnAttachedInstances \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Filters "Name=ccn-id,Values={{output.ccn_id}}"
+
+# 验证路由表已学习所有 VPC 路由
+tccli vpc DescribeCcnRoutes \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --CcnId "{{output.ccn_id}}"
+```
+
+#### Failure Recovery
+
+| Error pattern | Recovery |
+|---|---|
+| `InvalidParameter.CidrConflict` | 检查 VPC CIDR 是否重叠，重新规划网段 |
+| `ResourceQuotaExceeded.Instance` | HALT；提升 CCN 附件配额 |
+
+### Operation: QoS 策略配置
+
+> **场景说明：** 为不同业务流量配置 QoS 策略，保障关键业务带宽。
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| CCN 状态 | `DescribeCCNs` | `AVAILABLE` | HALT；恢复 CCN |
+| 区域对带宽 | 确认区域对支持带宽限制 | 支持 | HALT；选择支持区域对 |
+
+#### Execution Steps
+
+1. **查看当前带宽限制**（使用 `DescribeCcnRegionBandwidthLimits` 操作）
+2. **配置带宽限制**（使用 `SetCcnRegionBandwidthLimits` 操作）
+3. **验证配置**（使用 `DescribeCcnRegionBandwidthLimits` 操作）
+
+#### Post-execution Validation
+
+```bash
+# 验证带宽限制已生效
+tccli vpc DescribeCcnRegionBandwidthLimits \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --CcnId "{{output.ccn_id}}"
+```
+
+#### Failure Recovery
+
+| Error pattern | Recovery |
+|---|---|
+| `InvalidParameter.BandwidthRange` | 检查带宽值是否在支持范围内 |
+| `ResourceNotFound.Ccn` | 验证 CCN ID |
+
+### Operation: 混合云互联（VPN over CCN）
+
+> **场景说明：** 通过 VPN Gateway 关联到 CCN，实现公有云与私有云/数据中心互联。
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| CCN 状态 | `DescribeCCNs` | `AVAILABLE` | HALT；恢复 CCN |
+| VPN 网关规划 | 确认 VPN 网关配置 | 配置完整 | HALT；完善 VPN 配置 |
+
+#### Execution Steps
+
+1. **创建 VPN 网关**（使用 `qcloud-vpn-ops` 技能）
+2. **关联 VPN 网关到 CCN**（使用 `AttachCcnInstances` 操作，`InstanceType=VPNGW`）
+3. **配置 IPSec 隧道**（使用 `qcloud-vpn-ops` 技能）
+4. **配置路由**（使用 `CreateCcnRoute` 操作）
+
+#### Post-execution Validation
+
+```bash
+# 验证 VPN 网关已关联
+tccli vpc DescribeCcnAttachedInstances \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Filters "Name=ccn-id,Values={{output.ccn_id}},Name=instance-type,Values=VPNGW"
+
+# 验证路由配置
+tccli vpc DescribeCcnRoutes \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --CcnId "{{output.ccn_id}}"
+```
+
+#### Failure Recovery
+
+| Error pattern | Recovery |
+|---|---|
+| `InvalidParameter.InvalidInstanceType` | 确保 `InstanceType` 为 `VPNGW` |
+| `ResourceNotFound.Instance` | 验证 VPN 网关 ID 和区域 |
+
+### Operation: 故障切换（主备 CCN）
+
+> **场景说明：** 配置主备 CCN 实例，实现高可用性故障切换。
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| 主备 CCN 状态 | `DescribeCCNs` | 两者均 `AVAILABLE` | HALT；恢复故障 CCN |
+| 路由规划 | 确认主备路由策略 | 策略明确 | HALT；制定路由策略 |
+
+#### Execution Steps
+
+1. **检测主 CCN 故障**（使用 `DescribeCcnAttachedInstances` 操作）
+2. **切换流量到备用 CCN**：
+   - 更新 VPC 路由表指向备用 CCN（使用 `qcloud-vpc-ops` 技能）
+   - 或修改 DNS 解析指向备用区域
+3. **验证切换**（使用连通性测试）
+
+#### Post-execution Validation
+
+```bash
+# 检查分支连通性
+ping <hub-vpc-gateway>
+traceroute <core-service-ip>
+
+# 验证路由切换
+tccli vpc DescribeCcnAttachedInstances \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Filters "Name=ccn-id,Values={{user.backup_ccn_id}}"
+```
+
+#### Failure Recovery
+
+| Error pattern | Recovery |
+|---|---|
+| `ResourceNotFound.Ccn` | 验证备用 CCN ID |
+| 路由未切换 | 检查 VPC 路由表配置 |
+
+### Operation: 应用感知路由配置
+
+> **场景说明：** 基于应用类型配置不同 QoS 策略，实现应用感知路由。
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| CCN 状态 | `DescribeCCNs` | `AVAILABLE` | HALT；恢复 CCN |
+| 应用分类 | 确认应用 CIDR 规划 | 规划完整 | HALT；制定应用分类 |
+
+#### Execution Steps
+
+1. **定义应用分类**（基于 CIDR 和 DSCP 值）
+2. **配置带宽限制**（使用 `SetCcnRegionBandwidthLimits` 操作）
+3. **配置静态路由**（使用 `CreateCcnRoute` 操作）
+4. **验证策略**（使用 `DescribeCcnRoutes` 操作）
+
+#### Post-execution Validation
+
+```bash
+# 验证路由配置
+tccli vpc DescribeCcnRoutes \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --CcnId "{{output.ccn_id}}"
+
+# 验证带宽限制
+tccli vpc DescribeCcnRegionBandwidthLimits \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --CcnId "{{output.ccn_id}}"
+```
+
+#### Failure Recovery
+
+| Error pattern | Recovery |
+|---|---|
+| `InvalidParameter.CidrInvalid` | 检查 CIDR 格式 |
+| `InvalidParameter.RouteConflict` | 检查路由冲突 |
+
 ---
 
 ## Prerequisites
