@@ -48,3 +48,11 @@ See [`output-schemas.md`](output-schemas.md) for JSON paths.
 | Errors / HALT / retry | [`troubleshooting.md`](troubleshooting.md) |
 | GCL rubric | [`rubric.md`](rubric.md) |
 | GCL prompts | [`prompt-templates.md`](prompt-templates.md) |
+| **GCL Multi sub-Agent 架构** | [`multi-agent-gcl-architecture.md`](multi-agent-gcl-architecture.md) |
+
+## MTTR & Reporting
+
+| Topic | File |
+|-------|------|
+| MTTR 自动追踪 | [`mttr-tracking.md`](mttr-tracking.md) |
+| MTTR 改进报告模板 | [`mttr-improvement-report.md`](mttr-improvement-report.md) |

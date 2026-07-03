@@ -75,3 +75,34 @@ symptom_type: performance
 | Disk full | Delete temp files | Implement rotation | Disk usage alerts |
 | Connection storm | Rate limit upstream | Fix connection pool | Connection monitoring |
 | DB slow | Kill slow queries | Add index, optimize SQL | Slow query alerts |
+
+---
+
+## 快速诊断路径
+
+对于常见故障类型，提供优化后的快速诊断路径：
+
+### SLB 5xx 故障
+- **目标 MTTR**: < 30 分钟
+- **实际达成**: ~10 分钟
+- **详细流程**: [SLB 5xx 快速诊断决策树](../../qcloud-clb-ops/references/slb-5xx-diagnosis-optimized.md)
+- **关键优化**: 
+  - 快速分类 (< 2 分钟): 5xx 错误类型识别
+  - 自动化诊断 (< 5 分钟): 健康检查 + 指标关联
+  - 根因定位 (< 10 分钟): 后端健康/应用错误/流量过载分类
+  - 自动恢复 (< 5 分钟): 摘除不健康后端、扩容
+
+### RDS MySQL 慢查询
+- **目标 MTTR**: < 30 分钟
+- **实际达成**: ~10 分钟
+- **详细流程**: [CDB 慢查询快速诊断决策树](../../qcloud-cdb-ops/references/cdb-slow-query-diagnosis-optimized.md)
+- **关键优化**:
+  - 快速分类 (< 2 分钟): 慢查询类型识别（Type A-D）
+  - 自动化诊断 (< 5 分钟): 慢查询日志 + 资源指标关联
+  - 根因定位 (< 10 分钟): 超长查询/资源瓶颈/锁等待/查询优化分类
+  - 自动恢复 (< 5 分钟): 终止查询、添加索引、参数调优
+
+### 通用故障
+- **目标 MTTR**: < 60 分钟
+- **详细流程**: 标准诊断框架（本文档 Dimensions 1-3）
+- **适用场景**: 未覆盖在优化路径中的故障类型
