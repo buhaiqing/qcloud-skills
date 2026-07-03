@@ -17,7 +17,7 @@ compatibility: >-
   log analysis, valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "2.5.0"
+  version: "2.5.2"
   last_updated: "2026-07-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   type: cross-cutting-diagnosis
@@ -89,6 +89,15 @@ Read-only cross-product diagnosis: correlate metrics, logs, alarms, and changes 
 | SCF / CDN | RCA Bundle | [`product-rca-rules.md`](references/product-rca-rules.md) O–P |
 | Impact + historical cases | KB record | [`incident-knowledge.md`](references/incident-knowledge.md) |
 | FinOps / inspection handoff | Cross-Skill Bundle | [`cross-skill-orchestration.md`](references/cross-skill-orchestration.md) |
+
+### 快速诊断场景
+
+| 场景 | 目标 MTTR | 快速诊断路径 | 状态 |
+|------|-----------|--------------|------|
+| SLB 5xx 故障 | < 30 分钟 | [SLB 快速诊断](../qcloud-clb-ops/references/slb-5xx-diagnosis-optimized.md) | ✅ 已优化 (~10分钟) |
+| RDS MySQL 慢查询 | < 30 分钟 | [MySQL 快速诊断](../qcloud-cdb-ops/references/cdb-slow-query-diagnosis-optimized.md) | ✅ 已优化 (~10分钟) |
+| CVM 性能问题 | < 45 分钟 | 标准诊断框架 | 🔄 待优化 |
+| TKE Pod 问题 | < 30 分钟 | [TKE 诊断](../qcloud-tke-ops/references/troubleshooting.md) | 🔄 待优化 |
 
 ### Prerequisites
 - [ ] `tccli` available for read-only Monitor/TKE/CLS queries
@@ -322,15 +331,51 @@ After diagnosis completes, record incident time metrics for MTTR tracking per [`
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot with **Multi sub-Agent Architecture**.
 
 | Property | Value | Source |
 |---|---|---|
-| GCL applicability | **optional** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
 | `max_iterations` | **5** | per-skill override |
+| Architecture | **Multi sub-Agent** | [`references/multi-agent-gcl-architecture.md`](references/multi-agent-gcl-architecture.md) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 8 rules (read-only skill) |
 | Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### Multi sub-Agent GCL Execution
+
+When this skill is modified, the following Multi sub-Agent GCL process MUST be triggered per [AGENTS.md §GCL 自动触发强制提醒](../../AGENTS.md#gcl-自动触发强制提醒):
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Main Agent (Orchestrator)                  │
+│  - Coordinates all sub-agents                               │
+│  - Aggregates results and makes final decision              │
+│  - Controls iteration count (max 5)                         │
+│  - Persists trace for audit                                 │
+└──────────┬──────────────────────────────────────┬──────────┘
+           │ spawn Generator Agent                │ spawn Critic Agents
+           ▼                                      ▼
+┌──────────────────────┐           ┌──────────────────────────┐
+│  Generator Agent     │           │    Critic Agents (3+)    │
+│  - Generates output  │ ──notify─►│                          │
+│  - Uses domain logic │  ◄─feedback│  1. Data Quality Critic  │
+│  - Captures trace    │           │  2. Safety Rules Critic    │
+└──────────────────────┘           │  3. Spec Compliance Critic │
+                                   └──────────────────────────┘
+```
+
+**Critic Agents (并行执行):**
+1. **Data Quality Critic**: 验证输入数据质量、字段完整性
+2. **Safety Rules Critic**: 验证安全规则合规性 (Safety = 0 → ABORT)
+3. **Spec Compliance Critic**: 验证 OpenSpec 规范符合性
+4. **Token Efficiency Critic**: 验证 TE-1/TE-3/TE-4/TE-5/TE-6 合规性
+
+**决策逻辑:**
+- Safety = 0 或阻塞性问题 → **ABORT**
+- 当前轮次 >= max_iterations → **MAX_ITER** (返回最佳结果)
+- 所有维度阈值达标 → **PASS**
+- 否则 → **RETRY** (注入反馈到下一轮 Generator)
 
 ### GCL trace export (Phase 3)
 
