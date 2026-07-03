@@ -4,10 +4,25 @@
 
 本文档定义了 **Generator-Critic-Loop (GCL) 多子 Agent 架构**的强制执行规则。该规则确保所有编码任务和运维配置变更都使用多子 Agent 架构进行质量保证。
 
-## 规则位置
+## 规则位置（重要：单一来源）
+
+**规则只在一个位置**：`/Users/bohaiqing/.codebuddy/rules/generator-critic-loop.md`
+
+**不要复制规则到具体项目！** 规则应该只有一个来源，便于统一管理和更新。
+
+### 正确的架构
 
 ```
-/Users/bohaiqing/.codebuddy/rules/generator-critic-loop.md
+~/.codebuddy/rules/
+└── generator-critic-loop.md  # 全局规则（唯一位置）
+
+/path/to/project-a/
+├── .gcl-enforcement.yaml     # 项目级配置（引用全局规则）
+└── ...
+
+/path/to/project-b/
+├── .gcl-enforcement.yaml     # 项目级配置（引用全局规则）
+└── ...
 ```
 
 ## 核心要求
@@ -53,23 +68,24 @@ GCL Orchestrator (主 Agent)
 
 ## 应用到其他项目
 
-### 步骤1：复制规则文件
+### 步骤1：确认全局规则已安装
 
-```bash
-# 复制规则到目标项目
-cp /Users/bohaiqing/.codebuddy/rules/generator-critic-loop.md /path/to/target-project/.codebuddy/rules/
-```
+确保 `/Users/bohaiqing/.codebuddy/rules/generator-critic-loop.md` 包含多子 Agent 架构要求。
 
-### 步骤2：配置项目级设置
+### 步骤2：创建项目级配置
 
-在目标项目根目录创建 `.gcl-enforcement.yaml`：
+在目标项目根目录创建 `.gcl-enforcement.yaml`（**不是复制规则文件**）：
 
 ```yaml
-# GCL 强制执行配置
+# GCL 强制执行配置（项目级）
 gcl_enforcement:
   enabled: true
   strict_mode: true
   
+  # 引用全局规则（不需要复制）
+  global_rule: "~/.codebuddy/rules/generator-critic-loop.md"
+  
+  # 项目特定的配置覆盖（可选）
   architecture:
     must_use_multiple_subagents: true
     must_parallelize_critics: true
@@ -91,9 +107,9 @@ gcl_enforcement:
 ### 步骤4：培训团队
 
 确保团队成员了解：
-1. 多子 Agent 架构的要求
-2. 强制执行机制
-3. 违规处理流程
+1. 全局规则的位置和内容
+2. 项目级配置的作用
+3. 强制执行机制和违规处理
 
 ## 验证脚本
 
@@ -101,11 +117,31 @@ gcl_enforcement:
 
 ```python
 #!/usr/bin/env python3
-"""validate_gcl_architecture.py - 验证 GCL 架构合规性"""
+"""validate_gcl_architecture.py - 验证 GCL 架构合规性
+
+此脚本验证当前执行是否符合全局 GCL 多子 Agent 架构规则。
+规则位置：/Users/bohaiqing/.codebuddy/rules/generator-critic-loop.md
+"""
+
+import yaml
+from pathlib import Path
 
 def validate_gcl_architecture():
     """验证 GCL 架构合规性"""
     
+    # 1. 检查全局规则是否存在
+    global_rule_path = Path.home() / ".codebuddy/rules/generator-critic-loop.md"
+    if not global_rule_path.exists():
+        print("❌ 全局 GCL 规则不存在")
+        return False
+    
+    # 2. 检查项目配置
+    project_config = load_project_config()
+    if not project_config.get("gcl_enforcement", {}).get("enabled", False):
+        print("⚠️ 项目未启用 GCL 强制执行")
+        return True  # 不强制，但警告
+    
+    # 3. 验证架构要求
     checks = [
         check_multiple_subagents(),
         check_parallel_execution(),
@@ -116,44 +152,24 @@ def validate_gcl_architecture():
     
     return all(checks)
 
-def check_multiple_subagents():
-    """检查是否使用了多个子 Agent"""
-    # 实现检查逻辑
-    pass
+def load_project_config():
+    """加载项目配置"""
+    config_path = Path(".gcl-enforcement.yaml")
+    if config_path.exists():
+        with open(config_path) as f:
+            return yaml.safe_load(f)
+    return {}
 
-def check_parallel_execution():
-    """检查是否并行执行"""
-    # 实现检查逻辑
-    pass
-
-def check_role_separation():
-    """检查角色是否分离"""
-    # 实现检查逻辑
-    pass
-
-def check_orchestrator_independence():
-    """检查编排器是否独立"""
-    # 实现检查逻辑
-    pass
-
-def check_trace_recording():
-    """检查是否记录了 trace"""
-    # 实现检查逻辑
-    pass
-
-if __name__ == "__main__":
-    if validate_gcl_architecture():
-        print("✅ GCL 架构合规")
-    else:
-        print("❌ GCL 架构不合规")
-        exit(1)
+# ... 其他检查函数保持不变
 ```
 
 ### 集成到项目
 
 ```bash
-# 将验证脚本添加到项目
+# 将验证脚本添加到项目（脚本本身是项目特定的）
 cp validate_gcl_architecture.py /path/to/target-project/scripts/
+
+# 脚本会自动查找全局规则，不需要复制规则文件
 ```
 
 ## 监控和告警
