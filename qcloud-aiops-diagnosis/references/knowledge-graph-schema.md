@@ -14,6 +14,8 @@ The knowledge graph provides:
 - **Intelligent reasoning**: Graph-based root cause analysis
 - **Knowledge reuse**: Learning from historical incidents
 
+> **Note:** All examples in this document use placeholder data (e.g., `ins-xxx`, `fault-001`) for illustration purposes. Real implementations will use actual resource IDs and fault patterns from production environments.
+
 ### 1.2 Core Entities
 
 | Entity Type | Description | Example |

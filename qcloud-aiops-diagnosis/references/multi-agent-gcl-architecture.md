@@ -396,6 +396,66 @@ knowledge_graph_gcl:
 
 ---
 
+## Quality Gate (GCL)
+
+This architecture participates in the **Generator-Critic-Loop (GCL)** at the **generation-time**
+layer. The loop audits the **architecture design** (agent roles, workflow, scoring),
+not cloud resources.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **optional** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **3** | per-skill override |
+| Rubric instance | [`references/rubric.md`](rubric.md) | 5 dimensions + architecture-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+
+### Why this architecture is `optional` (not `required`)
+
+The GCL architecture **does not mutate cloud resources**. Its output is an
+architecture design document checked into git. Safety is enforced by the **build-time**
+2-round self-review (already mandatory above) and by the **Charter C7 enforcement**
+that requires generated skills to ship with their own Tier A rubric.md +
+prompt-templates.md + Quality Gate chapter. The GCL loop on this architecture is
+therefore a **double-check**: it verifies that the architecture was designed
+correctly.
+
+### Architecture-specific safety rules (rubric §4)
+
+1. **Rule ARCH1**: Generator and Critic agents MUST run in isolated contexts
+2. **Rule ARCH2**: Critic agents MUST NOT see the original user request
+3. **Rule ARCH3**: All agent interactions MUST be traced and auditable
+4. **Rule ARCH4**: Safety=0 MUST trigger immediate ABORT (no partial results)
+5. **Rule ARCH5**: Max iterations MUST be bounded (no infinite loops)
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
+
+### Model selection requirements
+
+| Agent Type | Model Requirement | Vendor Requirement | Reason |
+|---|---|---|---|
+| **Generator** | Medium model (economical) | Vendor A | Coding tasks consume many tokens; use economical model |
+| **Critic** | Stronger model (flagship) | Vendor B (different) | Review requires stronger reasoning; heterogeneous models avoid bias |
+
+- **MUST** use models from different vendors (e.g., Generator: Claude Sonnet, Critic: Gemini Pro)
+- **MUST** ensure Critic model capability ≥ Generator model capability
+
+### Worked example — designing a prediction GCL architecture
+
+| Dimension | Score |
+|---|---|
+| Correctness | 1 (agent roles properly defined) |
+| **Safety** | **1** (all 5 rules satisfied) |
+| Idempotency | 1 |
+| Traceability | 1 |
+| Spec Compliance | 0.5 (missing model vendor specification) |
+
+`decision: RETRY`. Recovery suggestion: "Add explicit model vendor requirements in §2 Agent Types."
+
+See [`references/rubric.md`](rubric.md) §6 for two more examples.
+
+---
+
 ## Reference
 
 - [AGENTS.md §10 GCL spec](../../AGENTS.md#10-generator-critic-loop-gcl--adversarial-quality-gate)

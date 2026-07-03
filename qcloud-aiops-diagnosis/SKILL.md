@@ -1,13 +1,15 @@
 ---
 name: qcloud-aiops-diagnosis
 description: >-
-  Use when the user needs intelligent diagnosis, root cause analysis, or anomaly
-  detection for Tencent Cloud resources — CPU/memory spikes, connection failures,
-  alarm storms, timeout patterns, OOM detection, slow queries, log pattern
-  recognition, multi-metric correlation, or proactive anomaly identification.
+  Use when the user needs intelligent diagnosis, root cause analysis, rule-based
+  anomaly detection, or predictive analytics for Tencent Cloud resources —
+  CPU/memory spikes, connection failures, alarm storms, timeout patterns,
+  OOM detection, slow queries, log pattern recognition, multi-metric correlation,
+  proactive anomaly identification, capacity forecasting, or failure prediction.
   Triggers on phrases like "排查问题", "帮我诊断", "CPU 突然飙高", "告警风暴",
-  "分析日志异常", "找出根因", or any scenario requiring automated fault detection
-  across CVM, Redis, CDB, ES, TKE, CLB, VPC, COS, CKafka, MongoDB, Postgres, SCF, CDN products. Not for live resource
+  "分析日志异常", "找出根因", "容量预测", "故障预测", or any scenario requiring
+  automated fault detection across CVM, Redis, CDB, ES, TKE, CLB, VPC, COS,
+  CKafka, MongoDB, Postgres, SCF, CDN products. Not for live resource
   CRUD operations unless paired with a product-specific ops skill.
 license: MIT
 compatibility: >-
@@ -15,8 +17,8 @@ compatibility: >-
   log analysis, valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "2.4.0"
-  last_updated: "2026-06-13"
+  version: "2.5.0"
+  last_updated: "2026-07-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   type: cross-cutting-diagnosis
   python_version_minimum: "3.8"
