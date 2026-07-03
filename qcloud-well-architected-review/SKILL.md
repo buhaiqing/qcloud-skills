@@ -214,6 +214,80 @@ Pillar orchestration guides (worker mapping only — no inline CLI):
 | Worker missing for product | NOT ASSESSED; recommend adding worker skill |
 | All workers fail | HALT; see Error Code Reference |
 
+---
+
+## Operation: Generate Executive Report
+
+> Generate a strategic summary for CTO/VP consumption from assessment results.
+> See [executive-report.md](references/executive-report.md) for full template.
+
+### Pre-flight
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| Assessment complete | `{{output.worker_results}}` exists | Non-empty | HALT; run assessment first |
+| Worker results valid | Schema validation against worker-output-schema.md | Valid | HALT; fix schema issues |
+
+### Execute — Aggregate for Management
+
+1. **Score Aggregation**:
+   ```python
+   pillar_scores = {
+       "reliability": average(worker.reliability for worker in results),
+       "security": average(worker.security for worker in results),
+       "cost": average(worker.cost for worker in results),
+       "efficiency": average(worker.efficiency for worker in results)
+   }
+   overall_score = weighted_average(pillar_scores, weights)
+   ```
+
+2. **Risk Ranking**:
+   - Extract all CRITICAL and HIGH severity findings
+   - Sort by: Severity × Impact Scope × Remediation Cost
+   - Map to business impact (downtime, data loss, compliance)
+
+3. **ROI Calculation**:
+   | Input | Source |
+   |-------|--------|
+   | Remediation effort | Engineering estimate (person-days) |
+   | Risk reduction | Severity × probability reduction |
+   | Cost savings | Detected waste + avoided incidents |
+
+### Output — Executive Summary
+
+```json
+{
+  "report_type": "executive-summary",
+  "generated_at": "2026-07-03T12:00:00Z",
+  "overall_health": {
+    "score": 4.2,
+    "trend": "↑",
+    "summary": "架构整体健康，发现3个关键风险需优先处理"
+  },
+  "pillar_scores": {
+    "reliability": { "score": 4.0, "trend": "→", "top_finding": "..." },
+    "security": { "score": 4.5, "trend": "↑", "top_finding": "..." },
+    "cost": { "score": 3.8, "trend": "↓", "top_finding": "..." },
+    "efficiency": { "score": 4.5, "trend": "↑", "top_finding": "..." }
+  },
+  "top_risks": [
+    { "rank": 1, "description": "...", "severity": "Critical", "roi": "10x" }
+  ],
+  "recommendations": [
+    { "priority": "P0", "action": "...", "investment": "5人天", "roi": "10x" }
+  ],
+  "action_plan": {
+    "phase_1_q3": [...],
+    "phase_2_q4": [...]
+  }
+}
+```
+
+### Reference
+
+- Full template: [references/executive-report.md](references/executive-report.md)
+- Report generation logic: see `executive-report.md` §生成方法
+
 ## Product Worker Registry
 
 | `user.products` code | delegate-to | Worker section |

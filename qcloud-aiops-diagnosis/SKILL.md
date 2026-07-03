@@ -262,6 +262,33 @@ symptom=performance
 ### Step 5: Resolution
 Provide prioritized recovery actions with effort estimates. Prefix `RECOMMENDATION (not execution)`; set `delegate_to` per [`delegation-matrix.md`](references/delegation-matrix.md). Output schema: [`output-schemas.md`](references/output-schemas.md).
 
+### Step 6: MTTR Recording
+After diagnosis completes, record incident time metrics for MTTR tracking per [`mttr-tracking.md`](references/mttr-tracking.md):
+
+| Field | Value | Source |
+|-------|-------|--------|
+| `incident_id` | {{output.incident_id}} | Generated at detection |
+| `detected_at` | {{alarm.trigger_time}} | Monitor alarm trigger time |
+| `diagnosis_at` | {{output.diagnosis_completed_at}} | This diagnosis completion |
+| `product` | {{output.affected_product}} | Diagnosis result |
+| `severity` | {{alarm.severity}} | Monitor alarm severity |
+| `root_cause` | {{output.root_cause.category}} | Diagnosis root cause |
+| `mttd` | Minutes from detected_at to diagnosis_at | Auto-calculated |
+
+```json
+{
+  "incident_id": "{{output.incident_id}}",
+  "detected_at": "{{alarm.trigger_time}}",
+  "diagnosis_at": "{{output.diagnosis_completed_at}}",
+  "product": "{{output.affected_product}}",
+  "severity": "{{alarm.severity}}",
+  "root_cause": "{{output.root_cause.category}}",
+  "mttd_minutes": "{{output.metrics.mttd_minutes}}"
+}
+```
+
+**Note**: MTTR (full recovery time) is recorded when user confirms resolution.
+
 ## Anti-Patterns
 
 | Anti-Pattern | Manifestation | Correction |
@@ -349,6 +376,7 @@ For detailed diagnosis patterns, see [`references/README.md`](references/README.
 - [Network RCA](references/network-rca.md) — Rule G VPC security group, route, NAT path diagnosis
 - [Incident Knowledge](references/incident-knowledge.md) — Impact assessment, similar cases, KB persistence, feedback loop
 - [Cross-Skill Orchestration](references/cross-skill-orchestration.md) — FinOps + proactive inspection joint workflows, Cross-Skill Bundle
+- [MTTR Tracking](references/mttr-tracking.md) — 故障诊断后自动记录 MTTD/MTTR 时间指标
 - [CLI Usage](references/cli-usage.md) — CLI-first read-only collection
 - [API & SDK Usage](references/api-sdk-usage.md) — Python SDK fallback (dual-path)
-- [Delegation Matrix](references/delegation-matrix.md) — Cross-skill diagnosis routing
+ [Delegation Matrix](references/delegation-matrix.md) — Cross-skill diagnosis routing

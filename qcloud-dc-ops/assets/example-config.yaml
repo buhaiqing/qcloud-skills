@@ -1,0 +1,32 @@
+# Direct Connect example configuration
+direct_connect:
+  name: example-dc
+  access_point_id: ap-guangzhou-1
+  line_operator: ChinaTelecom
+  bandwidth: 1000  # Mbps
+  
+tunnel:
+  name: example-tunnel
+  direct_connect_gateway_id: dcg-xxx
+  network_type: VPC
+  network_region: ap-guangzhou
+  route_type: BGP
+  bgp_config:
+    my_asn: 65001
+    peer_asn: 45090
+    auth_key: "bgp-password"
+
+gateway:
+  name: example-dcg
+  gateway_type: NORMAL
+  vpc_id: vpc-xxx
+
+# High availability config
+ha_config:
+  primary_dc: dc-primary
+  backup_dc: dc-backup
+  backup_type: VPN  # or another DC
+  health_check:
+    enabled: true
+    interval: 10
+    threshold: 3

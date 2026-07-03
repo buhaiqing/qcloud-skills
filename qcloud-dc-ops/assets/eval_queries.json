@@ -1,0 +1,90 @@
+{
+  "skill": "qcloud-dc-ops",
+  "version": "1.0.0",
+  "description": "意图分类测试集。should_trigger=true 表示应触发本 Skill（Direct Connect 场景），false 表示应路由到其他 Skill 或不触发。",
+  "notes": [
+    "本测试集用于验证 Agent 能否正确识别 Direct Connect 相关 query 并路由到 qcloud-dc-ops。",
+    "should_trigger=true 的 query 应被路由到本 Skill 处理。",
+    "should_trigger=false 的 query 应被路由到其他 skill（如 qcloud-vpn-ops、qcloud-ccn-ops、qcloud-vpc-ops 等）。",
+    "expected_skill 标注当 should_trigger=false 时，应路由到哪个 Skill（如适用）。"
+  ],
+  "test_cases": [
+    {
+      "id": "dc-001",
+      "query": "申请专线接入",
+      "should_trigger": true,
+      "description": "创建物理专线"
+    },
+    {
+      "id": "dc-002",
+      "query": "配置专用通道",
+      "should_trigger": true,
+      "description": "创建 DC 隧道"
+    },
+    {
+      "id": "dc-003",
+      "query": "专线故障排查",
+      "should_trigger": true,
+      "description": "专线连通性问题"
+    },
+    {
+      "id": "dc-004",
+      "query": "查看专线监控",
+      "should_trigger": true,
+      "description": "DC 监控查看"
+    },
+    {
+      "id": "dc-005",
+      "query": "创建专线网关",
+      "should_trigger": true,
+      "description": "DC 网关创建"
+    },
+    {
+      "id": "dc-006",
+      "query": "物理专线带宽扩容",
+      "should_trigger": true,
+      "description": "DC 带宽调整"
+    },
+    {
+      "id": "dc-007",
+      "query": "配置 BGP 路由",
+      "should_trigger": true,
+      "description": "DC BGP 配置"
+    },
+    {
+      "id": "dc-008",
+      "query": "配置 VPN 隧道",
+      "should_trigger": false,
+      "expected_skill": "qcloud-vpn-ops",
+      "description": "VPN - 应路由到 vpn-ops"
+    },
+    {
+      "id": "dc-009",
+      "query": "创建云联网实例",
+      "should_trigger": false,
+      "expected_skill": "qcloud-ccn-ops",
+      "description": "CCN - 应路由到 ccn-ops"
+    },
+    {
+      "id": "dc-010",
+      "query": "VPC 对等连接",
+      "should_trigger": false,
+      "expected_skill": "qcloud-vpc-ops",
+      "description": "VPC 对等连接 - 应路由到 vpc-ops"
+    },
+    {
+      "id": "dc-011",
+      "query": "配置负载均衡",
+      "should_trigger": false,
+      "expected_skill": "qcloud-clb-ops",
+      "description": "负载均衡 - 应路由到 clb-ops"
+    },
+    {
+      "id": "dc-012",
+      "query": "K8s 集群管理",
+      "should_trigger": false,
+      "expected_skill": "qcloud-tke-ops",
+      "description": "K8s - 应路由到 tke-ops"
+    }
+  ]
+}

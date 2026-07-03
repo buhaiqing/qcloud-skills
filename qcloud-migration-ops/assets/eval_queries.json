@@ -1,0 +1,77 @@
+{
+  "skill": "qcloud-migration-ops",
+  "version": "1.0.0",
+  "description": "意图分类测试集。should_trigger=true 表示应触发本 Skill（Migration 场景），false 表示应路由到其他 Skill 或不触发。",
+  "notes": [
+    "本测试集用于验证 Agent 能否正确识别 Migration 相关 query 并路由到 qcloud-migration-ops。",
+    "should_trigger=true 的 query 应被路由到本 Skill 处理。",
+    "should_trigger=false 的 query 应被路由到其他 skill。",
+    "expected_skill 标注当 should_trigger=false 时，应路由到哪个 Skill（如适用）。"
+  ],
+  "test_cases": [
+    {
+      "id": "msp-001",
+      "query": "迁移上云评估",
+      "should_trigger": true,
+      "description": "迁移评估"
+    },
+    {
+      "id": "msp-002",
+      "query": "主机迁移到腾讯云",
+      "should_trigger": true,
+      "description": "CVM 主机迁移"
+    },
+    {
+      "id": "msp-003",
+      "query": "数据库 DTS 迁移",
+      "should_trigger": true,
+      "description": "数据库迁移"
+    },
+    {
+      "id": "msp-004",
+      "query": "存储数据迁移到 COS",
+      "should_trigger": true,
+      "description": "存储迁移"
+    },
+    {
+      "id": "msp-005",
+      "query": "AWS 迁移到腾讯云",
+      "should_trigger": true,
+      "description": "跨云迁移"
+    },
+    {
+      "id": "msp-006",
+      "query": "查看迁移任务进度",
+      "should_trigger": true,
+      "description": "迁移进度查询"
+    },
+    {
+      "id": "msp-007",
+      "query": "创建云服务器实例",
+      "should_trigger": false,
+      "expected_skill": "qcloud-cvm-ops",
+      "description": "CVM 创建 - 应路由到 cvm-ops"
+    },
+    {
+      "id": "msp-008",
+      "query": "配置 CI/CD 流水线",
+      "should_trigger": false,
+      "expected_skill": "qcloud-cicd-ops",
+      "description": "CI/CD - 应路由到 cicd-ops"
+    },
+    {
+      "id": "msp-009",
+      "query": "查看数据库监控",
+      "should_trigger": false,
+      "expected_skill": "qcloud-monitor-ops",
+      "description": "监控 - 应路由到 monitor-ops"
+    },
+    {
+      "id": "msp-010",
+      "query": "配置负载均衡",
+      "should_trigger": false,
+      "expected_skill": "qcloud-clb-ops",
+      "description": "负载均衡 - 应路由到 clb-ops"
+    }
+  ]
+}

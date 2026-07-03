@@ -1,0 +1,38 @@
+# Migration example configuration
+migration:
+  task_name: example-migration
+  task_type: CVM  # CVM, DATABASE, STORAGE
+  
+  source:
+    platform: on-premise  # on-premise, aws, aliyun
+    region: us-east-1
+    credentials:
+      access_key: "${SOURCE_ACCESS_KEY}"
+      secret_key: "${SOURCE_SECRET_KEY}"
+    resources:
+      - type: cvm
+        instance_id: i-xxxxxxxx
+        os: CentOS-7.6
+      
+  target:
+    region: ap-guangzhou
+    vpc_id: vpc-xxx
+    subnet_id: subnet-xxx
+    instance_type: S5.LARGE8
+    
+  options:
+    migration_mode: online  # online, offline
+    sync_strategy: incremental  # full, incremental
+    bandwidth_limit: 100  # Mbps
+    compression: true
+    
+  schedule:
+    start_time: "2026-07-10T02:00:00Z"  # Off-peak hours
+    maintenance_window: "02:00-06:00"
+    
+  validation:
+    checksum_verification: true
+    smoke_tests:
+      - ping_test
+      - port_connectivity
+      - application_health

@@ -654,6 +654,7 @@ tccli vpc DescribeCCNs --Region ap-guangzhou
 - [Troubleshooting](references/troubleshooting.md)
 - [Well-Architected Assessment](references/well-architected-assessment.md)
 - [Integration](references/integration.md)
+- [SD-WAN Scenarios](references/sdwan-scenarios.md) — Hub-Spoke拓扑、QoS配置、故障切换
 - [FinOps Cost Optimization](references/finops-cost-optimization.md)
 - [SecOps Security Operations](references/secops-security-operations.md)
 - [AIOps Best Practices](references/aiops-best-practices.md)

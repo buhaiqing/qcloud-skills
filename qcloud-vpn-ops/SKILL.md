@@ -656,6 +656,7 @@ tccli vpc DescribeVpnGateways --Region ap-guangzhou
 - [Troubleshooting](references/troubleshooting.md)
 - [Well-Architected Assessment](references/well-architected-assessment.md)
 - [Integration](references/integration.md)
+- [Multi-Branch Topology](references/multi-branch-topology.md) — Hub-Spoke拓扑、主备故障切换、混合方案
 - [FinOps Cost Optimization](references/finops-cost-optimization.md)
 - [SecOps Security Operations](references/secops-security-operations.md)
 - [AIOps Best Practices](references/aiops-best-practices.md)
