@@ -2,12 +2,15 @@
 name: qcloud-vpc-ops
 description: >-
   Use when the user needs to deploy, configure, troubleshoot, or monitor Tencent
-  Cloud VPC (Virtual Private Cloud) — VPC, Subnet, Route Table lifecycle,
-  configuration, and diagnostics. User mentions VPC, 私有网络, Private Network,
+  Cloud VPC (Virtual Private Cloud) — VPC, Subnet, Route Table, and VPC Peering
+  Connection lifecycle, configuration, and diagnostics. User mentions VPC,
+  私有网络, Private Network, VPC peering, 同地域对等连接, peering connection,
   or describes network-related scenarios (e.g., subnet creation, CIDR planning,
-  routing configuration, connectivity issues) even without naming the product
-  directly. Not for billing, CAM, or related products that have their own ops
-  skills.
+  routing configuration, cross-VPC connectivity, connectivity issues) even
+  without naming the product directly. Not for billing, CAM, multi-region /
+  multi-account network orchestration (use `qcloud-ccn-ops`), VPN / Direct
+  Connect hybrid cloud (use `qcloud-vpn-ops`), or related products that have
+  their own ops skills.
 license: MIT
 compatibility: >-
   Official Tencent Cloud CLI (`tccli`, Python tool, pip installable),
@@ -15,8 +18,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.1.0"
-  last_updated: "2026-06-04"
+  version: "1.2.0"
+  last_updated: "2026-07-03"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "2024-01-01 - https://cloud.tencent.com/document/api/215"
@@ -71,10 +74,18 @@ Every generated skill MUST satisfy these five standards. Use them as a design ch
 ### SHOULD Use This Skill When
 
 - User mentions "Tencent Cloud VPC" OR "私有网络" OR "Virtual Private Cloud" OR "Private Network"
-- Task involves CRUD or lifecycle operations on **VPC, Subnet, Route Table** (create, describe, modify, delete, list)
-- Task keywords: subnet, CIDR, route table, network ACL, NAT gateway, VPN, peering connection, Direct Connect
+- Task involves CRUD or lifecycle operations on **VPC, Subnet, Route Table, VPC Peering Connection** (create, describe, modify, delete, list)
+- Task keywords: subnet, CIDR, route table, network ACL, NAT gateway, peering connection, 对等连接, 同地域对等, cross-VPC connectivity, inter-VPC routing
 - User asks to deploy, configure, or troubleshoot network topology **via API, SDK, CLI, or automation**
-- User describes connectivity issues, IP address planning, or network isolation requirements
+- User describes connectivity issues, IP address planning, network isolation, or **same-region cross-VPC / cross-account VPC peering** requirements
+
+### Out of scope (delegate to a sibling skill)
+
+| Scenario | Delegate to |
+|---|---|
+| Multi-region VPC interconnect, multi-VPC hub-and-spoke, cross-account network orchestration, hybrid cloud over the public internet backbone | `qcloud-ccn-ops` |
+| IPSec VPN / SSL VPN tunnel to on-prem, VPN Gateway lifecycle, Customer Gateway, hybrid cloud over encrypted tunnel | `qcloud-vpn-ops` |
+| Dedicated physical line (Direct Connect) | `qcloud-vpn-ops` (if added later) or raise a follow-up skill |
 
 ### SHOULD NOT Use This Skill When
 
@@ -203,6 +214,7 @@ tccli vpc CreateVpc --Region ap-guangzhou --VpcName "my-vpc" --CidrBlock "10.0.0
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial VPC skill with dual-path execution |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 VPC-specific safety rules incl. VPC cascade delete, subnet resource dependency, EIP bound-release, route blackhole, SG rule loss), `references/prompt-templates.md`. `max_iter=2` per AGENTS.md §8 |
+| 1.2.0 | 2026-07-03 | Scope split per `qcloud-skill-generator` Single Responsibility: this skill keeps **VPC/Subnet/RouteTable + same-region VPC Peering Connection**; multi-region / cross-account orchestration moved to new `qcloud-ccn-ops`; IPSec / SSL VPN / hybrid cloud moved to new `qcloud-vpn-ops`. Added 4 peering execution flows (`CreateVpcPeeringConnection` / `AcceptVpcPeeringConnection` / `DescribeVpcPeeringConnections` / `DeleteVpcPeeringConnection`) and 4 peering-specific error codes. Bumped `last_updated`. |
 
 ---
 
@@ -567,6 +579,205 @@ Poll DescribeRouteTables until 404 or empty response (max 60s).
 
 ---
 
+### Operation: Create VPC Peering Connection (VpcPeeringConnection)
+
+> **Scope boundary:** This operation covers **same-region, same- or cross-account VPC peering only**. For cross-region, multi-VPC hub-and-spoke, or internet-grade multi-account orchestration, use `qcloud-ccn-ops`. Peering is **non-transitive**: VPC A ↔ VPC B and VPC B ↔ VPC C do **not** enable A ↔ C.
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| Both VPCs exist | `tccli vpc DescribeVpcs` for initiator + acceptor | Both `AVAILABLE` | HALT; create or recover missing VPC |
+| Region match | Both `Region` fields equal | Same region | HALT — different regions require `qcloud-ccn-ops` |
+| CIDR disjointness | Compute `{{user.local_cidr}}` ∩ `{{user.peer_cidr}}` | Empty intersection | HALT — overlap is rejected by API; would also break routing even if accepted |
+| Quota | `tccli vpc DescribeVpcPeeringConnections` (count by region) | ≤ region quota | HALT; raise quota |
+| Cross-account approval | Confirm peer account has the request accepted (or auto-accept flag set) | Approval path clear | For cross-account: HALT until requester has `AccepterUin` and peer account runs `AcceptVpcPeeringConnection` |
+
+#### Execution — CLI
+
+```bash
+# Initiator side: create the peering request
+tccli vpc CreateVpcPeeringConnection \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --VpcId "{{user.local_vpc_id}}" \
+  --PeerVpcId "{{user.peer_vpc_id}}" \
+  --PeerRegion "{{env.TENCENTCLOUD_REGION}}" \
+  --PeeringConnectionName "{{user.peering_name}}" \
+  --PeerAccountId "{{user.peer_account_id}}"  # omit if same account
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.CreateVpcPeeringConnectionRequest()
+req.VpcId = "{{user.local_vpc_id}}"
+req.PeerVpcId = "{{user.peer_vpc_id}}"
+req.PeerRegion = os.environ.get("TENCENTCLOUD_REGION")
+req.PeeringConnectionName = "{{user.peering_name}}"
+if "{{user.peer_account_id}}":
+    req.PeerAccountId = "{{user.peer_account_id}}"
+resp = client.CreateVpcPeeringConnection(req)
+print(json.dumps(resp.to_json_string(), indent=2))
+```
+
+#### Post-execution Validation
+
+1. Capture `{{output.peering_connection_id}}` from `$.Response.PeeringConnectionId` (initial state: `PENDING_ACCEPTANCE` for cross-account, `ACTIVE` for same-account).
+2. If cross-account, run the **Accept** flow below from the acceptor side; then **both** sides must add a route table entry to make the path routable (peering is a wire, **not** a route).
+3. Poll until `Status = ACTIVE`:
+
+```bash
+for i in $(seq 1 24); do
+  STATUS=$(tccli vpc DescribeVpcPeeringConnections \
+    --PeeringConnectionIds "[\"{{output.peering_connection_id}}\"]" | \
+    jq -r '.Response.PcSet[0].Status')
+  case "$STATUS" in
+    ACTIVE)            echo "peering active"; break ;;
+    REJECTED|EXPIRED|DELETED) echo "terminal failure: $STATUS"; exit 1 ;;
+  esac
+  sleep 5
+done
+```
+
+#### Failure Recovery
+
+| Error pattern | Recovery |
+|---|---|
+| `InvalidParameter.CidrConflict` | The two VPC CIDR blocks overlap; pick a non-overlapping peer VPC or migrate one VPC's CIDR (irreversible) |
+| `InvalidParameter.InvalidRegion` | Cross-region peering requested; delegate to `qcloud-ccn-ops` |
+| `ResourceQuotaExceeded.PeerConn` | HALT; raise peering quota via console |
+| `InvalidVpc.NotFound` | Verify `{{user.peer_vpc_id}}`; same-account only — for cross-account, use peer account's VPC ID |
+
+---
+
+### Operation: Accept VPC Peering Connection (cross-account)
+
+> **Required when:** initiator and acceptor belong to different accounts. The initiator creates a `PENDING_ACCEPTANCE` request; only the acceptor's credentials (running against their `TENCENTCLOUD_SECRET_ID/KEY`) can flip it to `ACTIVE`.
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| Peer request pending | `DescribeVpcPeeringConnections` filtered by `PeeringConnectionName` | Status `PENDING_ACCEPTANCE` | HALT; nothing to accept |
+| Accepting credentials | `TENCENTCLOUD_SECRET_ID` belongs to the **peer (acceptor) account** | Match | HALT; switch credentials to the accepting account |
+| Accepting region | Run from a region in the same country/region family as the initiator | Same-region API endpoint | If API returns `InvalidParameter`, retry with the initiator's region |
+
+#### Execution — CLI
+
+```bash
+# Run with ACCEPTOR's credentials
+tccli vpc AcceptVpcPeeringConnection \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --PeeringConnectionId "{{user.peering_connection_id}}"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.AcceptVpcPeeringConnectionRequest()
+req.PeeringConnectionId = "{{user.peering_connection_id}}"
+resp = client.AcceptVpcPeeringConnection(req)
+print(json.dumps(resp.to_json_string(), indent=2))
+```
+
+#### Post-execution Validation
+
+Poll `DescribeVpcPeeringConnections` until `Status = ACTIVE` (max 60s). Then remind the user to **add route table entries on both sides** (peering is up but not yet routable).
+
+#### Failure Recovery
+
+| Error pattern | Recovery |
+|---|---|
+| `InvalidParameter.PendingAcceptanceNotFound` | Peering already accepted, expired, or deleted; re-query |
+| `UnauthorizedOperation` | Running with initiator's credentials, not acceptor's; switch credentials |
+
+---
+
+### Operation: Describe VPC Peering Connections
+
+#### Execution — CLI
+
+```bash
+tccli vpc DescribeVpcPeeringConnections \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --PeeringConnectionIds "[\"{{user.peering_connection_id}}\"]"
+```
+
+Filter by VPC ID (one-side pagination):
+
+```bash
+tccli vpc DescribeVpcPeeringConnections \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Filters "Name=vpc-id,Values={{user.vpc_id}}"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.DescribeVpcPeeringConnectionsRequest()
+req.Filters = [{"Name": "vpc-id", "Values": ["{{user.vpc_id}}"]}]
+req.Offset = 0
+req.Limit = 100
+resp = client.DescribeVpcPeeringConnections(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
+#### Present to User
+
+| Field | Path |
+|-------|------|
+| Peering ID | `$.Response.PcSet[].PeeringConnectionId` |
+| Name | `$.Response.PcSet[].PeeringConnectionName` |
+| Local VPC | `$.Response.PcSet[].VpcId` |
+| Peer VPC | `$.Response.PcSet[].PeerVpcId` |
+| Peer account | `$.Response.PcSet[].PeerAccountId` (Uin) |
+| Region | `$.Response.PcSet[].PeerRegion` |
+| Status | `$.Response.PcSet[].Status` (`PENDING_ACCEPTANCE` / `ACTIVE` / `REJECTED` / `EXPIRED` / `DELETED`) |
+| Created | `$.Response.PcSet[].CreatedTime` |
+
+---
+
+### Operation: Delete VPC Peering Connection
+
+> **Important:** Deleting a peering connection does **not** automatically remove the route table entries that point at it. After deletion, those routes become blackholes and must be cleaned up — see [troubleshooting](references/troubleshooting.md).
+
+#### Pre-flight (Safety Gate)
+
+- **MUST** obtain explicit user confirmation with both VPC IDs and the peering name.
+- **MUST** list active route table entries that use the peering as next hop (via `DescribeRouteTables` on both sides); warn user that those routes will become blackholes unless they are removed **before or right after** the delete.
+- **MUST** warn: any running CVM-to-CVM cross-VPC traffic over this peering will drop.
+
+#### Execution — CLI
+
+```bash
+tccli vpc DeleteVpcPeeringConnection \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --PeeringConnectionId "{{user.peering_connection_id}}"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+```python
+req = models.DeleteVpcPeeringConnectionRequest()
+req.PeeringConnectionId = "{{user.peering_connection_id}}"
+resp = client.DeleteVpcPeeringConnection(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
+#### Post-execution Validation
+
+Poll `DescribeVpcPeeringConnections` for the ID; expect empty / 404 within 60s.
+
+#### Failure Recovery
+
+| Error pattern | Recovery |
+|---|---|
+| `ResourceNotFound.PeerConn` | Already deleted; treat as success |
+| `ResourceInUse.PeerConn` | A route table still references the peering as next hop; delete the routes first, then retry |
+| `InvalidStatus.NotActive` | Peering is `PENDING_ACCEPTANCE`; either accept first or have the initiator cancel |
+
+---
+
 ## Prerequisites
 
 1. **Install `tccli` CLI:**
@@ -618,6 +829,10 @@ tccli vpc DescribeVpcs --Region ap-guangzhou
 | `InvalidSecretKey` | Credential invalid | HALT; fix credentials |
 | `RequestLimitExceeded` | API rate limit | Exponential backoff (3x) |
 | `InternalError` | Server error | Retry with RequestId (3x) |
+| `InvalidParameter.CidrConflict` | Peering: local and peer VPC CIDR blocks overlap | Pick a non-overlapping peer VPC or migrate one VPC's CIDR |
+| `InvalidParameter.InvalidRegion` | Peering: cross-region request sent to this skill | Delegate to `qcloud-ccn-ops` for cross-region interconnect |
+| `ResourceQuotaExceeded.PeerConn` | Peering: per-region peering quota exceeded | HALT; raise quota via console |
+| `ResourceInUse.PeerConn` | Peering: route table still references peering as next hop | Delete the dependent routes first, then retry |
 
 ## Safety Gates (Destructive Operations)
 
