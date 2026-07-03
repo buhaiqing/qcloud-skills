@@ -43,7 +43,7 @@ Self-healing enables automatic recovery from installation and configuration erro
 import sys
 
 def check_python_version():
-    """Pre-flight: Python version ≥ 3.8"""
+    # Pre-flight: Python version ≥ 3.8
     version = sys.version_info
     if version.major < 3 or (version.major == 3 and version.minor < 8):
         return False, "Python 3.8+ required"
@@ -76,7 +76,7 @@ check_tccli() {
 
 ```python
 def check_sdk():
-    """Pre-flight: tencentcloud SDK installed"""
+    # Pre-flight: tencentcloud SDK installed
     try:
         import tencentcloud
         return True, "SDK installed"
@@ -169,7 +169,7 @@ install_tccli() {
 
 ```python
 def install_sdk():
-    """Multi-path SDK installation recovery"""
+    # Multi-path SDK installation recovery
     import subprocess
     
     paths = [

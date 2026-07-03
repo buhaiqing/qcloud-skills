@@ -62,23 +62,11 @@ Tencent Cloud ES provides a fully managed, elastically scalable cloud-native sea
 
 ### Node Type Matrix
 
-| Type | vCPU | Memory (GB) | Disk Range (GB) | Use Case |
-|------|------|-------------|-----------------|----------|
-| ES.S1.MEDIUM2 | 2 | 4 | 100-500 | Dev/test, light search |
-| ES.S1.MEDIUM4 | 2 | 8 | 100-1000 | Small production clusters |
-| ES.S1.LARGE4 | 4 | 8 | 100-2000 | General production |
-| ES.S1.LARGE8 | 4 | 16 | 100-3000 | Medium workloads |
-| ES.S1.2XLARGE8 | 8 | 16 | 100-3000 | Heavy indexing |
-| ES.S1.2XLARGE16 | 8 | 32 | 100-3000 | Search-heavy workloads |
-| ES.S1.4XLARGE16 | 16 | 32 | 100-3000 | Large-scale clusters |
-| ES.S1.4XLARGE32 | 16 | 64 | 100-3000 | Memory-intensive workloads |
+> **Use API for latest specs:** `tccli es DescribeInstanceTypeConfig --Region <region>` returns available node types with vCPU, memory, and disk ranges.
 
 ### Dedicated Master Node Types
 
-| Type | vCPU | Memory (GB) | Disk (GB) |
-|------|------|-------------|-----------|
-| ES.S1.MEDIUM2 | 2 | 4 | 20 |
-| ES.S1.MEDIUM4 | 2 | 8 | 50 |
+> **Use API for latest specs:** `tccli es DescribeInstanceTypeConfig --Region <region>` returns available master node types.
 
 > **Recommendation:** For production clusters with ≥ 6 data nodes, enable dedicated master nodes (3 nodes recommended) to prevent cluster instability.
 
@@ -99,14 +87,7 @@ Tencent Cloud ES provides a fully managed, elastically scalable cloud-native sea
 
 ## 4. Elasticsearch Versions
 
-| Version | Tencent Cloud Support | Notes |
-|---------|----------------------|-------|
-| 7.5.x | Available | Legacy, upgrade recommended |
-| 7.10.x | Available | Stable, widely used |
-| 7.14.x | Available | **Recommended** — latest 7.x features |
-| 8.x (when available) | Available | Newer features, breaking changes from 7.x |
-
-> Version 7.14.2 is the recommended default for new clusters.
+> **Use API for latest versions:** `tccli es DescribeInstanceVersionConfig --Region <region>` returns available ES versions.
 
 ---
 
@@ -122,25 +103,13 @@ tccli es DescribeInstances --Region ap-guangzhou --Limit 1
 
 Common ES-supported regions:
 
-| Region | Zone ID | Nodes per Cluster (Max) | Kibana Enabled |
-|--------|---------|------------------------|----------------|
-| Guangzhou | ap-guangzhou-3, ap-guangzhou-6 | 50 | Yes |
-| Shanghai | ap-shanghai-4, ap-shanghai-5 | 50 | Yes |
-| Beijing | ap-beijing-3, ap-beijing-7 | 50 | Yes |
-| Singapore | ap-singapore-1 | 30 | Yes |
-| Silicon Valley | na-siliconvalley-1 | 30 | Yes |
+> **Use API for latest availability:** `tccli es DescribeInstances --Region <region> --Limit 1` to verify ES support in a region.
 
 ---
 
 ## 6. Quotas and Limits
 
-| Resource | Default Limit | How to Raise |
-|----------|--------------|--------------|
-| ES clusters per account | 20 | Submit ticket to Tencent Cloud |
-| Nodes per cluster | 50 | Submit ticket |
-| Disk per node | 3000 GB | Depends on disk type |
-| Snapshot backups per cluster | 100 | Submit ticket |
-| Max indices per cluster | 1000 (recommended by ES) | Depends on heap size |
+> **Use API for latest quotas:** `tccli es DescribeInstances --Region <region>` returns current resource limits per account.
 
 ---
 

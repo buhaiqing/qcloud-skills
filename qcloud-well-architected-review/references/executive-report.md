@@ -54,10 +54,8 @@ import json
 from datetime import datetime
 
 def generate_executive_report(worker_outputs):
-    """
-    worker_outputs: List of product assessment outputs
+    # worker_outputs: List of product assessment outputs
     Returns: Executive summary dict
-    """
     # Aggregate pillar scores
     pillar_scores = {
         "reliability": [],

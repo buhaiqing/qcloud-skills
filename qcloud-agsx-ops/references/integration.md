@@ -40,7 +40,7 @@ mcp = FastMCP("agsx-code")
 
 @mcp.tool()
 def execute_python(code: str) -> str:
-    """Run Python in AGSX sandbox."""
+    # Run Python in AGSX sandbox.
     with Sandbox() as sbx:
         return sbx.run_code(code).logs.stdout
 

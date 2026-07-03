@@ -30,7 +30,7 @@ Every generated skill SHOULD consider FinOps patterns:
 
 ```python
 def detect_cost_anomaly(cost_history: List[Dict]) -> List[CostAnomaly]:
-    """Detect cost anomalies from billing history"""
+    # Detect cost anomalies from billing history
     anomalies = []
     
     # Calculate baseline
@@ -85,7 +85,7 @@ def detect_cost_anomaly(cost_history: List[Dict]) -> List[CostAnomaly]:
 
 ```python
 def project_monthly_cost(cost_history: List[Dict], days_remaining: int) -> Dict:
-    """Project end-of-month cost"""
+    # Project end-of-month cost
     # Linear regression on daily costs
     x = list(range(len(cost_history)))
     y = [c['total_cost'] for c in cost_history]
@@ -147,7 +147,7 @@ budget_alerts:
 
 ```python
 def calculate_cost_by_tag(billing_data: List[Dict], tag_key: str) -> Dict:
-    """Calculate cost breakdown by tag"""
+    # Calculate cost breakdown by tag
     cost_by_tag = {}
     
     for item in billing_data:
@@ -164,7 +164,7 @@ def calculate_cost_by_tag(billing_data: List[Dict], tag_key: str) -> Dict:
     }
 
 def generate_tag_recommendation(cost_breakdown: Dict) -> str:
-    """Generate tagging improvement recommendation"""
+    # Generate tagging improvement recommendation
     untagged_ratio = cost_breakdown.get('untagged', 0) / sum(cost_breakdown.values())
     
     if untagged_ratio > 0.3:
@@ -205,7 +205,7 @@ tagging_policy:
 
 ```python
 def analyze_ri_eligibility(instance_history: List[Dict]) -> List[RIRecommendation]:
-    """Analyze which instances should use Reserved Instance"""
+    # Analyze which instances should use Reserved Instance
     recommendations = []
     
     for instance in instance_history:

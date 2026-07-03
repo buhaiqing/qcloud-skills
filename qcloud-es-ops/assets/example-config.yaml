@@ -1,26 +1,29 @@
 # ES Example Configurations
 # 10 common scenarios for Tencent Cloud Elasticsearch Service
 
+# Default values for common fields
+x-defaults: &defaults
+  Zone: "ap-guangzhou-3"
+  NodeType: "ES.S1.LARGE8"
+  EsVersion: "7.14.2"
+
 - name: "es-cluster-minimal"
   description: "Minimal ES cluster for development"
   params:
-    Zone: "ap-guangzhou-3"
-    NodeType: "ES.S1.MEDIUM4"
+    <<: *defaults
+    NodeType: "ES.S1.MEDIUM4"  # Override default
     NodeNum: 1
     DiskSize: 100
     DiskType: "CLOUD_PREMIUM"
-    EsVersion: "7.14.2"
     InstanceName: "dev-es-cluster"
 
 - name: "es-cluster-production"
   description: "Production ES cluster with dedicated master nodes"
   params:
-    Zone: "ap-guangzhou-3"
-    NodeType: "ES.S1.LARGE8"
+    <<: *defaults
     NodeNum: 5
     DiskSize: 500
     DiskType: "CLOUD_SSD"
-    EsVersion: "7.14.2"
     EnableDedicatedMaster: true
     MasterNodeNum: 3
     MasterNodeType: "ES.S1.MEDIUM4"
@@ -30,12 +33,10 @@
 - name: "es-cluster-write-heavy"
   description: "ES cluster optimized for write-heavy indexing workloads"
   params:
-    Zone: "ap-guangzhou-3"
-    NodeType: "ES.S1.LARGE8"
+    <<: *defaults
     NodeNum: 5
     DiskSize: 1000
     DiskType: "CLOUD_HSSD"
-    EsVersion: "7.14.2"
     EnableDedicatedMaster: true
     MasterNodeNum: 3
     InstanceName: "write-heavy-es"
@@ -44,12 +45,10 @@
   description: "Multi-region DR setup with cross-region snapshot"
   params:
     primary_cluster:
-      Zone: "ap-guangzhou-3"
-      NodeType: "ES.S1.LARGE8"
+      <<: *defaults
       NodeNum: 5
       DiskSize: 500
       DiskType: "CLOUD_SSD"
-      EsVersion: "7.14.2"
       InstanceName: "es-primary"
     dr_snapshot_config:
       schedule: "daily 02:00"

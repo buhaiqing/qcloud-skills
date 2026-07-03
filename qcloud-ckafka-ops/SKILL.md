@@ -664,22 +664,22 @@ tccli ckafka FetchMessageByOffset \
 
 ### CKafka-Specific Error Codes
 
-| Error Code | Description | Agent Action | UX Message |
-|------------|-------------|--------------|------------|
-| `InvalidParameterValue` | Invalid parameter value | Fix and retry | `Invalid parameter value. Check and correct input.` |
-| `ResourceNotFound` | Resource not found | HALT | `Resource not found. Verify ID and region.` |
-| `ResourceUnavailable` | Resource temporarily unavailable | Retry with backoff | `Resource temporarily unavailable. Retrying...` |
-| `ResourceInsufficient` | Quota exceeded | HALT | `Quota limit reached. Request quota increase.` |
-| `ResourceInUse` | Resource in use | Wait or force | `Resource in use. Wait for completion or use force flag.` |
-| `TopicAlreadyExists` | Topic already exists | Skip or use existing | `Topic already exists. Use existing or choose different name.` |
-| `ConsumerGroupNotExist` | Consumer group not found | HALT | `Consumer group not found. Create it first.` |
-| `InstanceNotExist` | Instance not found | HALT | `Instance not found. Verify ID and region.` |
-| `OperationDenied` | Operation not allowed | HALT | `Operation not permitted. Check permissions.` |
-| `FailedOperation` | Operation failed | Retry or escalate | `Operation failed. Retry or contact support.` |
-| `UnauthorizedOperation` | Unauthorized operation | Check CAM | `Unauthorized. Verify IAM permissions.` |
-| `LimitExceeded` | Rate limit exceeded | Backoff and retry | `Rate limit exceeded. Retrying with backoff.` |
-| `InternalError` | Internal server error | Retry 3x then HALT | `Internal error. Retry or escalate with RequestId.` |
-| `InvalidInstanceStatus` | Invalid instance status | Wait for ready | `Instance not ready. Wait for status=1 (running).` |
+| Error Code | Description | Recovery |
+|------------|-------------|----------|
+| `InvalidParameterValue` | Invalid parameter value | Fix and retry `Invalid parameter value. Check and correct input.` |
+| `ResourceNotFound` | Resource not found | HALT `Resource not found. Verify ID and region.` |
+| `ResourceUnavailable` | Resource temporarily unavailable | Retry with backoff `Resource temporarily unavailable. Retrying...` |
+| `ResourceInsufficient` | Quota exceeded | HALT `Quota limit reached. Request quota increase.` |
+| `ResourceInUse` | Resource in use | Wait or force `Resource in use. Wait for completion or use force flag.` |
+| `TopicAlreadyExists` | Topic already exists | Skip or use existing `Topic already exists. Use existing or choose different name.` |
+| `ConsumerGroupNotExist` | Consumer group not found | HALT `Consumer group not found. Create it first.` |
+| `InstanceNotExist` | Instance not found | HALT `Instance not found. Verify ID and region.` |
+| `OperationDenied` | Operation not allowed | HALT `Operation not permitted. Check permissions.` |
+| `FailedOperation` | Operation failed | Retry or escalate `Operation failed. Retry or contact support.` |
+| `UnauthorizedOperation` | Unauthorized operation | Check CAM `Unauthorized. Verify IAM permissions.` |
+| `LimitExceeded` | Rate limit exceeded | Backoff and retry `Rate limit exceeded. Retrying with backoff.` |
+| `InternalError` | Internal server error | Retry 3x then HALT `Internal error. Retry or escalate with RequestId.` |
+| `InvalidInstanceStatus` | Invalid instance status | Wait for ready `Instance not ready. Wait for status=1 (running).` |
 
 ---
 

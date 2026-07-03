@@ -1043,19 +1043,19 @@ Error response:
 
 ## Variables
 
-| Variable | Source | Description | Example |
-|----------|--------|-------------|---------|
-| `{{env.TENCENTCLOUD_SECRET_ID}}` | Environment | Tencent Cloud Secret ID | `AKID...` |
-| `{{env.TENCENTCLOUD_SECRET_KEY}}` | Environment | Tencent Cloud Secret Key | `***` (masked) |
-| `{{env.TENCENTCLOUD_REGION}}` | Environment | Region code | `ap-guangzhou` |
-| `{{user.zone}}` | User | Availability zone | `ap-guangzhou-3` |
-| `{{user.disk_name}}` | User | Disk name | `data-disk-01` |
-| `{{user.disk_id}}` | User | Disk ID | `disk-xxx` |
-| `{{user.disk_size}}` | User | Disk size in GB | `100` |
-| `{{user.disk_type}}` | User | Disk type | `CLOUD_SSD` |
-| `{{user.instance_id}}` | User | CVM instance ID | `ins-xxx` |
-| `{{user.snapshot_name}}` | User | Snapshot name | `backup-20260528` |
-| `{{user.snapshot_id}}` | User | Snapshot ID | `snap-xxx` |
-| `{{output.disk_id}}` | API Response | Created disk ID | `disk-xxx` |
-| `{{output.snapshot_id}}` | API Response | Created snapshot ID | `snap-xxx` |
-| `{{output.request_id}}` | API Response | Request tracking ID | `abc123` |
+| Variable | Source | Example |
+|----------|--------|---------|
+| `{{env.TENCENTCLOUD_SECRET_ID}}` | Environment | `AKID...` |
+| `{{env.TENCENTCLOUD_SECRET_KEY}}` | Environment | `***` (masked) |
+| `{{env.TENCENTCLOUD_REGION}}` | Environment | `ap-guangzhou` |
+| `{{user.zone}}` | User | `ap-guangzhou-3` |
+| `{{user.disk_name}}` | User | `data-disk-01` |
+| `{{user.disk_id}}` | User | `disk-xxx` |
+| `{{user.disk_size}}` | User | `100` |
+| `{{user.disk_type}}` | User | `CLOUD_SSD` |
+| `{{user.instance_id}}` | User | `ins-xxx` |
+| `{{user.snapshot_name}}` | User | `backup-20260528` |
+| `{{user.snapshot_id}}` | User | `snap-xxx` |
+| `{{output.disk_id}}` | API Response | `disk-xxx` |
+| `{{output.snapshot_id}}` | API Response | `snap-xxx` |
+| `{{output.request_id}}` | API Response | `abc123` |

@@ -21,7 +21,7 @@ Every generated skill MUST implement SecOps patterns:
 
 ```python
 def query_cam_audit_logs(start_time: str, end_time: str) -> List[AuditEvent]:
-    """Query CAM (Cloud Access Management) audit logs"""
+    # Query CAM (Cloud Access Management) audit logs
     # Use CloudAudit API
     request = models.LookUpEventsRequest()
     request.StartTime = start_time
@@ -48,7 +48,7 @@ def query_cam_audit_logs(start_time: str, end_time: str) -> List[AuditEvent]:
     return security_events
 
 def is_security_event(event_name: str) -> bool:
-    """Filter security-relevant events"""
+    # Filter security-relevant events
     security_actions = [
         'CreateUser',
         'DeleteUser',
@@ -71,7 +71,7 @@ def is_security_event(event_name: str) -> bool:
 
 ```python
 def analyze_audit_logs(events: List[AuditEvent]) -> SecurityReport:
-    """Analyze audit logs for security insights"""
+    # Analyze audit logs for security insights
     report = SecurityReport()
     
     # Count by action type
@@ -184,7 +184,7 @@ Your credentials will expire soon:
 
 ```python
 def audit_security_groups(sgs: List[SecurityGroup]) -> List[SecurityIssue]:
-    """Audit security groups for best practices"""
+    # Audit security groups for best practices
     issues = []
     
     for sg in sgs:

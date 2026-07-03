@@ -128,19 +128,19 @@ Orchestrates read-only Well-Architected assessment across products — **workers
 
 ## Variables
 
-| Variable | Source | Description | Example |
-|----------|--------|-------------|---------|
-| `{{env.TENCENTCLOUD_SECRET_ID}}` | Environment | Tencent Cloud Secret ID | `AKID...` |
-| `{{env.TENCENTCLOUD_SECRET_KEY}}` | Environment | Secret Key (masked in output) | `***` |
-| `{{env.TENCENTCLOUD_REGION}}` | Environment | Region code | `ap-guangzhou` |
-| `{{user.products}}` | User | Comma-separated product codes | `cvm,clb,cdb` |
-| `{{user.scope}}` | User | `single-resource` or `account-wide` | `account-wide` |
-| `{{user.pillars}}` | User | `all` or subset | `reliability,security` |
-| `{{user.config_path}}` | User | Thresholds YAML | `assets/example-config.yaml` |
-| `{{user.mode}}` | Orchestrator → Worker | Always `well-architected-readonly` when dispatching workers | `well-architected-readonly` |
-| `{{output.worker_results}}` | Aggregated | Array of worker `product_assessment` objects | JSON array |
-| `{{output.overall_score}}` | Computed | Weighted four-pillar score | `82` |
-| `{{output.assessment_date}}` | Computed | ISO 8601 timestamp | `2026-06-09T10:00:00+08:00` |
+| Variable | Source | Example |
+|----------|--------|---------|
+| `{{env.TENCENTCLOUD_SECRET_ID}}` | Environment | `AKID...` |
+| `{{env.TENCENTCLOUD_SECRET_KEY}}` | Environment | `***` |
+| `{{env.TENCENTCLOUD_REGION}}` | Environment | `ap-guangzhou` |
+| `{{user.products}}` | User | `cvm,clb,cdb` |
+| `{{user.scope}}` | User | `account-wide` |
+| `{{user.pillars}}` | User | `reliability,security` |
+| `{{user.config_path}}` | User | `assets/example-config.yaml` |
+| `{{user.mode}}` | Orchestrator → Worker | `well-architected-readonly` |
+| `{{output.worker_results}}` | Aggregated | JSON array |
+| `{{output.overall_score}}` | Computed | `82` |
+| `{{output.assessment_date}}` | Computed | `2026-06-09T10:00:00+08:00` |
 
 ### Credential Masking (MANDATORY)
 

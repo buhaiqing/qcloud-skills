@@ -421,7 +421,7 @@ Next step: {Specific action to take}
 
 ```python
 def diagnose_disk(client, disk_id):
-    """Round 1: Basic existence and state check"""
+    # Round 1: Basic existence and state check
     from tencentcloud.cbs import cbs_client, models
     
     req = models.DescribeDisksRequest()
@@ -449,7 +449,7 @@ def diagnose_disk(client, disk_id):
 
 ```python
 def diagnose_attachment(cbs_client, cvm_client, disk_id, instance_id=None):
-    """Round 2: Check attachment compatibility"""
+    # Round 2: Check attachment compatibility
     from tencentcloud.cbs import models as cbs_models
     from tencentcloud.cvm import models as cvm_models
     
@@ -490,7 +490,7 @@ def diagnose_attachment(cbs_client, cvm_client, disk_id, instance_id=None):
 
 ```python
 def diagnose_quota_and_performance(cbs_client, disk_id):
-    """Round 3: Check quota and performance metrics"""
+    # Round 3: Check quota and performance metrics
     from tencentcloud.cbs import models
     
     # Check disk quota
@@ -544,7 +544,7 @@ For any CBS issue:
 
 ```python
 def retry_with_backoff(func, max_retries=3):
-    """Execute function with exponential backoff"""
+    # Execute function with exponential backoff
     import time
     from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
     

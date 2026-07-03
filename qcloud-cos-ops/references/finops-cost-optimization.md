@@ -106,7 +106,7 @@ done
 import os, json, subprocess
 
 def collect_cos_buckets(region: str) -> list:
-    """采集所有 COS 桶的元数据"""
+    # 采集所有 COS 桶的元数据
     result = subprocess.run(
         ["tccli", "cos", "DescribeBuckets", "--Region", region],
         capture_output=True, text=True
@@ -237,7 +237,7 @@ PRICING = {
 }
 
 def query_storage_distribution(topic_id: str, region: str) -> list:
-    """通过 CLS 查询存储分布"""
+    # 通过 CLS 查询存储分布
     from_ts = int((datetime.now() - timedelta(days=30)).timestamp()) * 1000
     to_ts = int(datetime.now().timestamp()) * 1000
 
@@ -912,7 +912,7 @@ if __name__ == "__main__":
 """COS 优化建议生成器"""
 
 def generate_recommendations(analysis: dict) -> list:
-    """基于分析结果生成优化建议"""
+    # 基于分析结果生成优化建议
     recommendations = []
 
     # P0: 闲置桶清理

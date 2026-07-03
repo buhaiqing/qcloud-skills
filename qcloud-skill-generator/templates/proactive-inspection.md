@@ -53,7 +53,7 @@ class ResourceDiscovery(ABC):
     
     @abstractmethod
     def discover(self, filters: Optional[Dict] = None) -> List[Resource]:
-        """执行资源发现"""
+        # 执行资源发现
         pass
 
 
@@ -64,7 +64,7 @@ class CVMResourceDiscovery(ResourceDiscovery):
         self.client = client
     
     def discover(self, filters: Optional[Dict] = None) -> List[Resource]:
-        """发现 CVM 实例"""
+        # 发现 CVM 实例
         resources = []
         
         # 查询所有区域
@@ -111,7 +111,7 @@ class CVMResourceDiscovery(ResourceDiscovery):
         return resources
     
     def _get_zones(self) -> List[str]:
-        """获取所有可用区"""
+        # 获取所有可用区
         response = self.client.DescribeZones(models.DescribeZonesRequest())
         return [z.Zone for z in response.ZoneSet]
 
@@ -123,7 +123,7 @@ class MySQLResourceDiscovery(ResourceDiscovery):
         self.client = client
     
     def discover(self, filters: Optional[Dict] = None) -> List[Resource]:
-        """发现 MySQL 实例"""
+        # 发现 MySQL 实例
         resources = []
         
         request = models.DescribeDBInstancesRequest()
@@ -156,11 +156,11 @@ class DiscoveryPipeline:
         self.discoveries: List[ResourceDiscovery] = []
     
     def register(self, discovery: ResourceDiscovery):
-        """注册发现器"""
+        # 注册发现器
         self.discoveries.append(discovery)
     
     def run(self, filters: Optional[Dict] = None) -> Dict[str, List[Resource]]:
-        """执行所有发现"""
+        # 执行所有发现
         results = {}
         
         for discovery in self.discoveries:
@@ -171,7 +171,7 @@ class DiscoveryPipeline:
         return results
     
     def export_inventory(self, results: Dict, filepath: str):
-        """导出资源清单"""
+        # 导出资源清单
         import json
         
         inventory = {
@@ -278,15 +278,13 @@ class MetricCollector:
         self.executor = ThreadPoolExecutor(max_workers=10)
     
     def collect(self, tasks: List[CollectionTask]) -> Dict[str, List[MetricData]]:
-        """
-        并行采集指标
+        # 并行采集指标
         
         Args:
             tasks: 采集任务列表
             
         Returns:
             按资源 ID 组织的指标数据
-        """
         results = {}
         
         # 提交所有任务
@@ -307,7 +305,7 @@ class MetricCollector:
         return results
     
     def _collect_single(self, task: CollectionTask) -> List[MetricData]:
-        """单个资源指标采集"""
+        # 单个资源指标采集
         metrics_data = []
         
         for metric_name in task.metrics:
@@ -342,7 +340,7 @@ class MetricCollector:
         return metrics_data
     
     def _get_namespace(self, resource_type: str) -> str:
-        """获取监控命名空间"""
+        # 获取监控命名空间
         namespaces = {
             'CVM': 'QCE/CVM',
             'CBS': 'QCE/CBS',
@@ -353,7 +351,7 @@ class MetricCollector:
         return namespaces.get(resource_type, '')
     
     def _get_dimension_name(self, resource_type: str) -> str:
-        """获取维度名称"""
+        # 获取维度名称
         dimensions = {
             'CVM': 'InstanceId',
             'CBS': 'DiskId',
@@ -423,7 +421,7 @@ class AnomalyDetector:
         self.thresholds = config.get('thresholds', {})
     
     def detect(self, metrics: Dict[str, List[MetricData]]) -> List[Anomaly]:
-        """检测所有资源异常"""
+        # 检测所有资源异常
         anomalies = []
         
         for resource_id, metric_list in metrics.items():
@@ -446,7 +444,7 @@ class AnomalyDetector:
         metric_name: str, 
         values: List[MetricData]
     ) -> Optional[Anomaly]:
-        """单指标异常检测"""
+        # 单指标异常检测
         # 获取阈值配置
         threshold_config = self.thresholds.get(metric_name, {})
         if not threshold_config:
@@ -489,7 +487,7 @@ class AnomalyDetector:
         )
     
     def _get_recommendation(self, metric_name: str, severity: str) -> str:
-        """获取优化建议"""
+        # 获取优化建议
         recommendations = {
             'CPUUsage': {
                 'HIGH': '立即扩容或优化应用性能',
@@ -571,7 +569,7 @@ class Diagnostician:
         self.clients = clients
     
     def diagnose(self, anomalies: List[Anomaly]) -> List[DiagnosisResult]:
-        """诊断所有异常"""
+        # 诊断所有异常
         results = []
         
         for anomaly in anomalies:
@@ -582,7 +580,7 @@ class Diagnostician:
         return results
     
     def _diagnose_single(self, anomaly: Anomaly) -> Optional[DiagnosisResult]:
-        """单异常诊断"""
+        # 单异常诊断
         # 根据资源类型和异常类型选择诊断策略
         strategy = self._get_strategy(anomaly)
         
@@ -604,7 +602,7 @@ class Diagnostician:
         )
     
     def _get_strategy(self, anomaly: Anomaly) -> Optional[callable]:
-        """获取诊断策略"""
+        # 获取诊断策略
         strategies = {
             ('CVM', 'CPUUsage'): self._diagnose_cpu_high,
             ('CVM', 'MemUsage'): self._diagnose_memory_high,
@@ -614,7 +612,7 @@ class Diagnostician:
         return strategies.get((anomaly.resource_type, anomaly.metric_name))
     
     def _diagnose_cpu_high(self, anomaly: Anomaly) -> Tuple[str, List[str]]:
-        """CPU 使用率过高诊断"""
+        # CPU 使用率过高诊断
         cvm_client = self.clients['cvm']
         
         # 检查进程状态
@@ -643,7 +641,7 @@ class Diagnostician:
         return root_cause, evidence
     
     def _diagnose_memory_high(self, anomaly: Anomaly) -> Tuple[str, List[str]]:
-        """内存使用率过高诊断"""
+        # 内存使用率过高诊断
         evidence = []
         root_causes = []
         
@@ -660,7 +658,7 @@ class Diagnostician:
         return root_cause, evidence
     
     def _diagnose_slow_query(self, anomaly: Anomaly) -> Tuple[str, List[str]]:
-        """慢查询诊断"""
+        # 慢查询诊断
         mysql_client = self.clients['mysql']
         
         evidence = []
@@ -674,7 +672,7 @@ class Diagnostician:
         return root_cause, evidence
     
     def _generate_action_plan(self, anomaly: Anomaly, root_cause: str) -> List[str]:
-        """生成行动计划"""
+        # 生成行动计划
         plans = {
             'CPUUsage': [
                 '1. 分析当前进程 CPU 占用',
@@ -699,7 +697,7 @@ class Diagnostician:
         return plans.get(anomaly.metric_name, ['请人工介入分析'])
     
     def _assess_impact(self, anomaly: Anomaly) -> str:
-        """评估影响"""
+        # 评估影响
         severity_impact = {
             'HIGH': '严重影响业务可用性,需立即处理',
             'MEDIUM': '影响性能,建议尽快处理',
@@ -729,7 +727,7 @@ class ReportGenerator:
     """报告生成器"""
     
     def generate(self, diagnosis_results: List[DiagnosisResult], output_format: str = 'markdown') -> str:
-        """生成报告"""
+        # 生成报告
         if output_format == 'markdown':
             return self._generate_markdown(diagnosis_results)
         elif output_format == 'json':
@@ -738,7 +736,7 @@ class ReportGenerator:
             raise ValueError(f'不支持的格式: {output_format}')
     
     def _generate_markdown(self, results: List[DiagnosisResult]) -> str:
-        """生成 Markdown 报告"""
+        # 生成 Markdown 报告
         report = []
         
         # 标题
@@ -790,7 +788,7 @@ class ReportGenerator:
         return '\n'.join(report)
     
     def _generate_json(self, results: List[DiagnosisResult]) -> str:
-        """生成 JSON 报告"""
+        # 生成 JSON 报告
         report_data = {
             'inspection_time': datetime.now().isoformat(),
             'total_issues': len(results),

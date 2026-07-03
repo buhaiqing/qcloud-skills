@@ -1143,29 +1143,29 @@ Format results as structured Markdown tables:
 ## Error Code Reference
 
 
-| Error Code | Description | Retry | Agent Action | User Message |
-|------------|-------------|-------|--------------|--------------|
-| `InvalidParameter` | Parameter format invalid | 0 | Fix per API spec; retry | `[ERROR] Parameter invalid → Check format → Retry` |
-| `InvalidParameterValue` | Parameter value invalid | 0 | Fix value; retry | `[ERROR] Invalid value → Correct input → Retry` |
-| `ResourceNotFound.LogsetNotExist` | Logset does not exist | 0 | HALT; verify logset ID | `[ERROR] Logset not found → Verify LogsetId` |
-| `ResourceNotFound.TopicNotExist` | Topic does not exist | 0 | HALT; verify topic ID | `[ERROR] Topic not found → Verify TopicId` |
-| `ResourceNotFound.IndexNotExist` | Index does not exist | 0 | HALT; create index first | `[ERROR] Index not found → Create index first` |
-| `ResourceNotFound.MachineGroupNotExist` | Machine group not found | 0 | HALT; verify group ID | `[ERROR] Machine group not found → Verify GroupId` |
-| `ResourceInUse.LogsetName` | Logset name already exists | 0 | Use unique name | `[ERROR] Logset name in use → Choose unique name` |
-| `ResourceInUse.TopicName` | Topic name already exists | 0 | Use unique name | `[ERROR] Topic name in use → Choose unique name` |
-| `ResourceInUse.IndexAlreadyExist` | Index already exists | 0 | Use ModifyIndex or delete first | `[ERROR] Index exists → Modify or delete first` |
-| `QuotaExceeded.Logset` | Logset quota exceeded | 0 | HALT; request quota increase | `[ERROR] Logset quota exceeded → Request increase` |
-| `QuotaExceeded.Topic` | Topic quota exceeded | 0 | HALT; request quota increase | `[ERROR] Topic quota exceeded → Request increase` |
-| `LimitExceeded.SearchTimeRange` | Search time range too large | 0 | Reduce to max 31 days | `[ERROR] Time range too large → Max 31 days` |
-| `InvalidParameter.QuerySyntax` | Log query syntax error | 0 | Fix query syntax | `[ERROR] Query syntax error → Check syntax` |
-| `RequestLimitExceeded` | API rate limit exceeded | 3 | Exponential backoff | `⚠️ Rate limit → Retrying...` |
-| `OperationConflict` | Concurrent operation conflict | 3 | Wait; retry | `⚠️ Operation in progress → Waiting...` |
-| `InternalError` | Internal server error | 3 | Retry; HALT if persists | `[ERROR] Internal error → Retry → Escalate` |
-| `UnauthorizedOperation` | Permission denied | 0 | HALT; check CAM permissions | `[ERROR] Permission denied → Check CAM` |
-| `InvalidParameter.Bucket` | COS bucket parameter invalid | 0 | Verify bucket name and region | `[ERROR] Invalid COS bucket → Verify name/region` |
-| `ResourceNotFound.BucketNotExist` | COS bucket not found | 0 | HALT; verify bucket exists | `[ERROR] COS bucket not found → Verify bucket` |
-| `ResourceInUse.CosRechargeAlreadyExist` | COS import task exists | 0 | Use ModifyCosRecharge or delete first | `[ERROR] Import task exists → Modify or delete first` |
-| `QuotaExceeded.CosRecharge` | COS import task quota reached | 0 | HALT; delete unused import tasks | `[ERROR] Import task quota exceeded → Clean up tasks` |
+| Error Code | Description | Recovery |
+|------------|-------------|----------|
+| `InvalidParameter` | Parameter format invalid | Fix per API spec; retry `[ERROR] Parameter invalid → Check format → Retry` |
+| `InvalidParameterValue` | Parameter value invalid | Fix value; retry `[ERROR] Invalid value → Correct input → Retry` |
+| `ResourceNotFound.LogsetNotExist` | Logset does not exist | HALT; verify logset ID `[ERROR] Logset not found → Verify LogsetId` |
+| `ResourceNotFound.TopicNotExist` | Topic does not exist | HALT; verify topic ID `[ERROR] Topic not found → Verify TopicId` |
+| `ResourceNotFound.IndexNotExist` | Index does not exist | HALT; create index first `[ERROR] Index not found → Create index first` |
+| `ResourceNotFound.MachineGroupNotExist` | Machine group not found | HALT; verify group ID `[ERROR] Machine group not found → Verify GroupId` |
+| `ResourceInUse.LogsetName` | Logset name already exists | Use unique name `[ERROR] Logset name in use → Choose unique name` |
+| `ResourceInUse.TopicName` | Topic name already exists | Use unique name `[ERROR] Topic name in use → Choose unique name` |
+| `ResourceInUse.IndexAlreadyExist` | Index already exists | Use ModifyIndex or delete first `[ERROR] Index exists → Modify or delete first` |
+| `QuotaExceeded.Logset` | Logset quota exceeded | HALT; request quota increase `[ERROR] Logset quota exceeded → Request increase` |
+| `QuotaExceeded.Topic` | Topic quota exceeded | HALT; request quota increase `[ERROR] Topic quota exceeded → Request increase` |
+| `LimitExceeded.SearchTimeRange` | Search time range too large | Reduce to max 31 days `[ERROR] Time range too large → Max 31 days` |
+| `InvalidParameter.QuerySyntax` | Log query syntax error | Fix query syntax `[ERROR] Query syntax error → Check syntax` |
+| `RequestLimitExceeded` | API rate limit exceeded | Exponential backoff `⚠️ Rate limit → Retrying...` |
+| `OperationConflict` | Concurrent operation conflict | Wait; retry `⚠️ Operation in progress → Waiting...` |
+| `InternalError` | Internal server error | Retry; HALT if persists `[ERROR] Internal error → Retry → Escalate` |
+| `UnauthorizedOperation` | Permission denied | HALT; check CAM permissions `[ERROR] Permission denied → Check CAM` |
+| `InvalidParameter.Bucket` | COS bucket parameter invalid | Verify bucket name and region `[ERROR] Invalid COS bucket → Verify name/region` |
+| `ResourceNotFound.BucketNotExist` | COS bucket not found | HALT; verify bucket exists `[ERROR] COS bucket not found → Verify bucket` |
+| `ResourceInUse.CosRechargeAlreadyExist` | COS import task exists | Use ModifyCosRecharge or delete first `[ERROR] Import task exists → Modify or delete first` |
+| `QuotaExceeded.CosRecharge` | COS import task quota reached | HALT; delete unused import tasks `[ERROR] Import task quota exceeded → Clean up tasks` |
 
 ## Safety Gates
 

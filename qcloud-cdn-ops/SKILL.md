@@ -87,13 +87,13 @@ CDN (Content Delivery Network) is Tencent Cloud's content delivery service provi
 
 ## Variables
 
-| Variable | Source | Description | Example |
-|----------|--------|-------------|---------|
-| `{{env.TENCENTCLOUD_SECRET_ID}}` | Environment | Tencent Cloud Secret ID | `AKID...` |
-| `{{env.TENCENTCLOUD_SECRET_KEY}}` | Environment | Tencent Cloud Secret Key | `***` (masked) |
-| `{{user.domain}}` | User | CDN domain name | `cdn.example.com` |
-| `{{user.urls}}` | User | URLs to purge/pre-warm | JSON array |
-| `{{user.origin_type}}` | User | Origin type (COS, CVM, CLB) | `cos` |
+| Variable | Source | Example |
+|----------|--------|---------|
+| `{{env.TENCENTCLOUD_SECRET_ID}}` | Environment | `AKID...` |
+| `{{env.TENCENTCLOUD_SECRET_KEY}}` | Environment | `***` (masked) |
+| `{{user.domain}}` | User | `cdn.example.com` |
+| `{{user.urls}}` | User | JSON array |
+| `{{user.origin_type}}` | User | `cos` |
 
 ## Five Core Standards (Quality Gates)
 

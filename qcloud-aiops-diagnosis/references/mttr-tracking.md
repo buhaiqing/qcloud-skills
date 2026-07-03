@@ -170,7 +170,7 @@ import sqlite3
 from datetime import datetime
 
 def record_incident(incident_data):
-    """记录故障数据"""
+    # 记录故障数据
     conn = sqlite3.connect('incidents.db')
     cursor = conn.cursor()
     
@@ -195,7 +195,7 @@ def record_incident(incident_data):
     conn.close()
 
 def generate_monthly_report(year, month):
-    """生成月报"""
+    # 生成月报
     conn = sqlite3.connect('incidents.db')
     cursor = conn.cursor()
     

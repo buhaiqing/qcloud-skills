@@ -105,14 +105,14 @@ Pass `{{user.mode}}=inspection-readonly` (implicit); product skills MUST NOT mut
 
 ## Variables
 
-| Variable | Source | Description | Example |
-|----------|--------|-------------|---------|
-| `{{env.TENCENTCLOUD_SECRET_ID}}` | Environment | Tencent Cloud Secret ID | `AKID...` |
-| `{{env.TENCENTCLOUD_SECRET_KEY}}` | Environment | Tencent Cloud Secret Key | `***` (masked) |
-| `{{env.TENCENTCLOUD_REGION}}` | Environment | Region code | `ap-guangzhou` |
-| `{{user.products}}` | User | Products to inspect (cvm, redis, cdb, tke, etc.) | `cvm,redis` |
-| `{{user.thresholds}}` | User | Custom thresholds override | JSON |
-| `{{user.report_format}}` | User | Output format (markdown, json) | `markdown` |
+| Variable | Source | Example |
+|----------|--------|---------|
+| `{{env.TENCENTCLOUD_SECRET_ID}}` | Environment | `AKID...` |
+| `{{env.TENCENTCLOUD_SECRET_KEY}}` | Environment | `***` (masked) |
+| `{{env.TENCENTCLOUD_REGION}}` | Environment | `ap-guangzhou` |
+| `{{user.products}}` | User | `cvm,redis` |
+| `{{user.thresholds}}` | User | JSON |
+| `{{user.report_format}}` | User | `markdown` |
 
 ## Five Core Standards (Quality Gates)
 

@@ -366,7 +366,7 @@ All list APIs follow the same pagination pattern:
 
 ```python
 def paginate_all(instance_id):
-    """Fetch all items with pagination."""
+    # Fetch all items with pagination.
     all_items = []
     offset = 0
     limit = 100
@@ -397,7 +397,7 @@ def paginate_all(instance_id):
 from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
 
 def safe_api_call(func, *args, max_retries=3, **kwargs):
-    """Retry wrapper for ES API calls."""
+    # Retry wrapper for ES API calls.
     last_error = None
     for attempt in range(max_retries):
         try:

@@ -31,7 +31,7 @@ Skills involving monitoring/diagnosis MUST implement log intelligence patterns:
 
 ```python
 def detect_log_patterns(log_lines: List[str]) -> List[LogAnomaly]:
-    """Detect anomalous patterns in log stream"""
+    # Detect anomalous patterns in log stream
     patterns = {
         'error_spike': r'(ERROR|ERR).{10,}',
         'exception': r'Exception:\s*(\w+)',
@@ -59,7 +59,7 @@ def detect_log_patterns(log_lines: List[str]) -> List[LogAnomaly]:
     return aggregate_anomalies(anomalies)
 
 def aggregate_anomalies(anomalies: List[LogAnomaly]) -> List[LogAnomalySummary]:
-    """Aggregate similar log anomalies"""
+    # Aggregate similar log anomalies
     pattern_counts = Counter(a.pattern for a in anomalies)
     
     summaries = []
@@ -85,7 +85,7 @@ def aggregate_anomalies(anomalies: List[LogAnomaly]) -> List[LogAnomalySummary]:
 
 ```python
 def detect_log_volume_anomaly(log_counts: List[int]) -> Optional[VolumeAnomaly]:
-    """Detect abnormal log volume"""
+    # Detect abnormal log volume
     # Calculate baseline
     baseline = statistics.mean(log_counts[-60:])  # Last 60 minutes
     
@@ -110,7 +110,7 @@ def detect_log_volume_anomaly(log_counts: List[int]) -> Optional[VolumeAnomaly]:
 
 ```python
 def detect_error_rate_anomaly(total_logs: int, error_logs: int) -> Optional[ErrorRateAnomaly]:
-    """Detect abnormal error rate"""
+    # Detect abnormal error rate
     error_rate = error_logs / total_logs if total_logs > 0 else 0
     
     # Thresholds
@@ -183,7 +183,7 @@ root_cause_inference:
 ```python
 def build_evidence_chain(log_anomalies: List[LogAnomaly], 
                           metrics: Dict[str, float]) -> EvidenceChain:
-    """Build evidence chain from logs and metrics"""
+    # Build evidence chain from logs and metrics
     chain = EvidenceChain()
     
     # Add log evidence
@@ -232,7 +232,7 @@ def build_evidence_chain(log_anomalies: List[LogAnomaly],
 ```python
 def correlate_logs_metrics(log_anomalies: List[LogAnomaly],
                            metrics: Dict[str, List[float]]) -> Dict:
-    """Correlate log patterns with metric anomalies"""
+    # Correlate log patterns with metric anomalies
     correlations = {}
     
     # OOM logs + Memory metric

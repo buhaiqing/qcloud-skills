@@ -956,16 +956,16 @@ Error response:
 
 ## Variables
 
-| Variable | Source | Description | Example |
-|----------|--------|-------------|---------|
-| `{{env.TENCENTCLOUD_SECRET_ID}}` | Environment | Tencent Cloud Secret ID | `AKID...` |
-| `{{env.TENCENTCLOUD_SECRET_KEY}}` | Environment | Tencent Cloud Secret Key | `***` (masked) |
-| `{{env.TENCENTCLOUD_REGION}}` | Environment | Region code | `ap-guangzhou` |
-| `{{user.zone}}` | User | Availability zone | `ap-guangzhou-3` |
-| `{{user.instance_type}}` | User | Instance type | `S5.SMALL1` |
-| `{{user.image_id}}` | User | Image ID | `img-xxx` |
-| `{{user.instance_name}}` | User | Instance name | `my-cvm` |
-| `{{user.instance_id}}` | User | Instance ID | `ins-xxx` |
-| `{{user.disk_size}}` | User | Disk size (GB) | `50` |
-| `{{output.instance_id}}` | API Response | Created instance ID | `ins-xxx` |
+| Variable | Source | Example |
+|----------|--------|---------|
+| `{{env.TENCENTCLOUD_SECRET_ID}}` | Environment | `AKID...` |
+| `{{env.TENCENTCLOUD_SECRET_KEY}}` | Environment | `***` (masked) |
+| `{{env.TENCENTCLOUD_REGION}}` | Environment | `ap-guangzhou` |
+| `{{user.zone}}` | User | `ap-guangzhou-3` |
+| `{{user.instance_type}}` | User | `S5.SMALL1` |
+| `{{user.image_id}}` | User | `img-xxx` |
+| `{{user.instance_name}}` | User | `my-cvm` |
+| `{{user.instance_id}}` | User | `ins-xxx` |
+| `{{user.disk_size}}` | User | `50` |
+| `{{output.instance_id}}` | API Response | `ins-xxx` |
 | `{{output.request_id}}` | API Response | Request tracking ID | `abc123` |

@@ -31,7 +31,7 @@ Skills involving monitoring, alarm, or diagnosis MUST implement AIOps patterns:
 
 ```python
 def correlate_metrics(metrics: Dict[str, List[float]]) -> Dict:
-    """Multi-metric correlation analysis"""
+    # Multi-metric correlation analysis
     correlations = {}
     
     # CPU + Network correlation
@@ -58,7 +58,7 @@ def correlate_metrics(metrics: Dict[str, List[float]]) -> Dict:
     return correlations
 
 def interpret_correlation(value: float) -> str:
-    """Interpret correlation value"""
+    # Interpret correlation value
     if value > 0.7:
         return 'Strong positive correlation - likely same root cause'
     elif value > 0.3:
@@ -151,7 +151,7 @@ class DiagnosisDecisionTree:
         self.tree = self._load_tree()
     
     def diagnose(self, resource_type: str, metrics: Dict) -> DiagnosisResult:
-        """Execute diagnosis based on decision tree"""
+        # Execute diagnosis based on decision tree
         # Load appropriate skill
         skill = self._load_skill(resource_type)
         
@@ -172,7 +172,7 @@ class DiagnosisDecisionTree:
         return DiagnosisResult(diagnosis='unknown', actions=[], confidence=0)
     
     def _load_skill(self, resource_type: str) -> Skill:
-        """Load appropriate skill for resource type"""
+        # Load appropriate skill for resource type
         skill_map = {
             'CVM': 'qcloud-cvm-ops',
             'MySQL': 'qcloud-mysql-ops',
@@ -307,7 +307,7 @@ proactive_alerts:
 
 ```python
 def detect_alarm_storm(alarm_events: List[AlarmEvent]) -> Optional[AlarmStorm]:
-    """Detect alarm storm condition"""
+    # Detect alarm storm condition
     # Group alarms by resource and time
     recent_alarms = [
         a for a in alarm_events 

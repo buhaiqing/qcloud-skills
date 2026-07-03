@@ -84,14 +84,14 @@ CAM (Cloud Access Management) is Tencent Cloud's identity and access management 
 
 ## Variables
 
-| Variable | Source | Description | Example |
-|----------|--------|-------------|---------|
-| `{{env.TENCENTCLOUD_SECRET_ID}}` | Environment | Tencent Cloud Secret ID | `AKID...` |
-| `{{env.TENCENTCLOUD_SECRET_KEY}}` | Environment | Tencent Cloud Secret Key | `***` (masked) |
-| `{{user.policy_name}}` | User | Policy name | `QcloudCVMReadOnlyAccess` |
-| `{{user.user_name}}` | User | CAM user name | `dev-user` |
-| `{{user.role_name}}` | User | Role name | `TkeAdminRole` |
-| `{{user.policy_document}}` | User | Policy document (JSON) | JSON string |
+| Variable | Source | Example |
+|----------|--------|---------|
+| `{{env.TENCENTCLOUD_SECRET_ID}}` | Environment | `AKID...` |
+| `{{env.TENCENTCLOUD_SECRET_KEY}}` | Environment | `***` (masked) |
+| `{{user.policy_name}}` | User | `QcloudCVMReadOnlyAccess` |
+| `{{user.user_name}}` | User | `dev-user` |
+| `{{user.role_name}}` | User | `TkeAdminRole` |
+| `{{user.policy_document}}` | User | JSON string |
 
 ## Five Core Standards (Quality Gates)
 
