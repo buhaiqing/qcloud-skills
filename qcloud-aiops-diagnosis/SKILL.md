@@ -313,6 +313,7 @@ After diagnosis completes, record incident time metrics for MTTR tracking per [`
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.5.0 | 2026-07-04 | GCL Rubric expanded to 8 rules: added Rules 6–8 (Product RCA coverage H–P, Network path validation Rule G, Cross-product topology) |
 | 2.4.0 | 2026-06-13 | **Phase F (cont.):** Rules O (SCF), P (CDN) |
 | 2.3.0 | 2026-06-13 | Rules K–N (COS, CKafka, MongoDB, Postgres) |
 | 2.2.0 | 2026-06-13 | Split SDK to `api-sdk-usage.md`; GCL Phase 3 trace export + monitor aggregate hook |
@@ -327,7 +328,7 @@ This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
 |---|---|---|
 | GCL applicability | **optional** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
 | `max_iterations` | **5** | per-skill override |
-| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 rules (read-only skill) |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 8 rules (read-only skill) |
 | Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
 
@@ -358,6 +359,9 @@ Delegate quality regression alerting to [`qcloud-monitor-ops`](../qcloud-monitor
 3. **Time-range correlation** — surface diagnosis window; warn non-overlapping windows
 4. **Data recency** — surface last-updated time; warn stale data
 5. **Recommendation boundary** — prefix "RECOMMENDATION (not execution)"; delegate to product skill
+6. **Product RCA coverage** — invoke Rules H–P for CDB/Redis/ES/COS/CKafka/MongoDB/Postgres/SCF/CDN symptoms
+7. **Network path validation** — apply Rule G when connectivity symptoms present but compute/data normal
+8. **Cross-product topology** — build cross-product topology when symptoms span multiple products
 
 **Read-only skill.** No hard ABORT on Safety=0 (no destructive ops).
 
