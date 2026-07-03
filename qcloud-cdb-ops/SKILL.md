@@ -197,6 +197,49 @@ tccli cdb DescribeDBInstances --Region {{env.TENCENTCLOUD_REGION}} --Limit 10
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial API/SDK-oriented template with tccli CLI support |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CDB-specific safety rules incl. `ModifyAccountPrivileges` `Host=%` guard), `references/prompt-templates.md` (Generator + Critic + Orchestrator, isolated-context enforcement, password + Host='%' hygiene, SQL data-plane out-of-scope guard). `max_iter=2` per AGENTS.md §8 |
+| 1.2.0 | 2026-07-04 | Added slow query quick diagnosis decision tree: `references/cdb-slow-query-diagnosis-optimized.md` with automated recovery strategies, MTTD/MTTR metrics, and 4-type classification. Updated `references/troubleshooting.md` with quick diagnosis path. |
+
+---
+
+## Slow Query Quick Diagnosis (快速诊断)
+
+> **推荐**: 对于慢查询问题，使用 [CDB 慢查询快速诊断决策树](references/cdb-slow-query-diagnosis-optimized.md) 进行结构化诊断。
+
+### 快速诊断场景
+
+| 场景 | 特征 | 诊断时间 | 恢复时间 | 参考文档 |
+|------|------|----------|----------|----------|
+| **超长查询** | QueryTime > 10s | ≤ 2 分钟 | ≤ 5 分钟 | [决策树 §4.1](references/cdb-slow-query-diagnosis-optimized.md#41-type-a-超长查询诊断) |
+| **资源瓶颈** | CPU > 80% | ≤ 3 分钟 | ≤ 15 分钟 | [决策树 §4.2](references/cdb-slow-query-diagnosis-optimized.md#42-type-b-资源瓶颈诊断) |
+| **锁等待** | LockTime/QueryTime > 50% | ≤ 2 分钟 | ≤ 5 分钟 | [决策树 §4.3](references/cdb-slow-query-diagnosis-optimized.md#43-type-c-锁等待诊断) |
+| **查询优化** | QueryTime 1-10s | ≤ 3 分钟 | ≤ 10 分钟 | [决策树 §4.4](references/cdb-slow-query-diagnosis-optimized.md#44-type-d-查询优化诊断) |
+
+### 自动化恢复策略优先级
+
+| 优先级 | 策略 | 适用场景 | MTTR |
+|--------|------|----------|------|
+| P0 | 终止超长查询 | Type A, 紧急情况 | ≤ 5 分钟 |
+| P1 | 参数调优 | Type B, Type C | ≤ 15 分钟 |
+| P2 | SQL 重写 | Type D | ≤ 10 分钟 |
+| P3 | 规格升级 | Type B, 长期方案 | ≤ 30 分钟 |
+
+### 快速检查命令
+
+```bash
+# 确认慢查询是否存在 (最近 1 小时)
+tccli cdb DescribeSlowLogData \
+  --InstanceId "{{user.instance_id}}" \
+  --StartTime "$(date -v-1H +'%Y-%m-%d %H:%M:%S')" \
+  --EndTime "$(date +'%Y-%m-%d %H:%M:%S')" \
+  --Limit 5 \
+  --OrderBy "QueryTime" \
+  --Order "DESC"
+
+# 检查慢查询日志是否开启
+tccli cdb DescribeInstanceParams \
+  --InstanceId "{{user.instance_id}}" \
+  --ParamNames '["slow_query_log","long_query_time"]'
+```
 
 ---
 

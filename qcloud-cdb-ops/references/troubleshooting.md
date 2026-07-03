@@ -133,31 +133,82 @@ tccli cdb DescribeDBInstances --InstanceIds '["cdb-xxxxxx"]' | python3 -c "impor
 
 **Symptoms:** Application timeouts, high response time, increased database CPU.
 
-**Diagnosis:**
+**快速诊断路径 (MTTD ≤ 5 分钟):**
+
+> **推荐**: 对于慢查询问题，请使用 [CDB 慢查询快速诊断决策树](cdb-slow-query-diagnosis-optimized.md) 进行结构化诊断。
+
+**快速检查:**
 ```bash
-# Get slow query log
+# 1. 确认慢查询是否存在 (最近 1 小时)
 tccli cdb DescribeSlowLogData \
   --InstanceId "cdb-xxxxxx" \
-  --StartTime "2026-05-20 00:00:00" \
-  --EndTime "2026-05-21 00:00:00" \
-  --Limit 20
+  --StartTime "$(date -v-1H +'%Y-%m-%d %H:%M:%S')" \
+  --EndTime "$(date +'%Y-%m-%d %H:%M:%S')" \
+  --Limit 5 \
+  --OrderBy "QueryTime" \
+  --Order "DESC"
 
-# Check instance CPU/memory
+# 2. 检查慢查询日志是否开启
+tccli cdb DescribeInstanceParams \
+  --InstanceId "cdb-xxxxxx" \
+  --ParamNames '["slow_query_log","long_query_time"]'
+```
+
+**慢查询分类 (基于决策树):**
+
+| 类型 | 特征 | 优先级 | 自动化恢复 |
+|------|------|--------|------------|
+| **Type A: 超长查询** | QueryTime > 10s | P0 | 终止查询 |
+| **Type B: 资源瓶颈** | CPU > 80% | P1 | 参数调优/规格升级 |
+| **Type C: 锁等待** | LockTime/QueryTime > 50% | P1 | 终止阻塞事务 |
+| **Type D: 查询优化** | QueryTime 1-10s | P2 | SQL 重写/添加索引 |
+
+**详细诊断:**
+```bash
+# 获取慢查询详情
+tccli cdb DescribeSlowLogData \
+  --InstanceId "cdb-xxxxxx" \
+  --StartTime "$(date -v-1H +'%Y-%m-%d %H:%M:%S')" \
+  --EndTime "$(date +'%Y-%m-%d %H:%M:%S')" \
+  --Limit 20 \
+  --OrderBy "QueryTime" \
+  --Order "DESC"
+
+# 检查实例 CPU/内存
 tccli monitor GetMonitorData \
   --Namespace QCE/CDB \
   --MetricName CpuUseRate \
   --Dimensions '[{"Name":"InstanceId","Value":"cdb-xxxxxx"}]' \
-  --StartTime 2026-05-20T00:00:00+08:00 \
-  --EndTime 2026-05-21T00:00:00+08:00 \
+  --StartTime "$(date -v-1H +'%Y-%m-%dT%H:%M:%S+08:00')" \
+  --EndTime "$(date +'%Y-%m-%dT%H:%M:%S+08:00')" \
   --Period 300
 ```
 
-**Solutions:**
-1. **Missing indexes:** Add indexes for slow queries based on slow log analysis
-2. **Insufficient specs:** Upgrade to larger instance: `UpgradeDBInstance`
-3. **Long-running queries:** Kill via MySQL: `CALL mysql.rds_kill(thread_id)`
-4. **Connection pooling:** Implement or tune application-side connection pool
-5. **Parameter tuning:** Adjust `innodb_buffer_pool_size`, `max_connections`
+**快速恢复策略 (MTTR ≤ 15 分钟):**
+
+| 策略 | 适用场景 | 命令 |
+|------|----------|------|
+| 终止超长查询 | Type A | `CALL mysql.rds_kill(<thread_id>)` |
+| 添加索引 | Type D | `CREATE INDEX idx_xxx ON table(col)` |
+| 参数调优 | Type B/C | `ModifyInstanceParam` |
+| 规格升级 | Type B (长期) | `UpgradeDBInstance` |
+
+**验证恢复效果:**
+```bash
+# 等待 5 分钟后重新检查
+sleep 300
+tccli cdb DescribeSlowLogData \
+  --InstanceId "cdb-xxxxxx" \
+  --StartTime "$(date -v-5M +'%Y-%m-%d %H:%M:%S')" \
+  --EndTime "$(date +'%Y-%m-%d %H:%M:%S')" \
+  --Limit 5 \
+  --OrderBy "QueryTime" \
+  --Order "DESC"
+```
+
+**参考文档:**
+- [CDB 慢查询快速诊断决策树](cdb-slow-query-diagnosis-optimized.md) - 完整诊断流程和自动化恢复策略
+- [CDB 监控配置](monitoring.md) - 慢查询告警配置
 
 ### Issue 3: High CPU Usage
 
