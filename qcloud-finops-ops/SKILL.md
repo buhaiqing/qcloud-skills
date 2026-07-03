@@ -198,6 +198,54 @@ def is_anomaly(current, history_3m, budget):
 
 → 完整异常根因报告示例见 `references/cost-analysis-queries.md` §6
 
+### 模块 9：跨账号统一成本视图（多账号）
+
+> **能力等级：** P1（扩展功能，需提前配置子账号 CAM 委托）
+> **原理：** 通过 CAM 角色委托（Role）获取多个子账号的只读账单数据，合并为统一视图。
+
+#### 前置条件
+
+| 检查 | 方法 | 预期 | 失败处理 |
+|------|------|------|----------|
+| 主账号 CAM Role | `tccli cam ListRoles` | 存在 FinOps 只读角色 | HALT；创建角色 |
+| 子账号列表 | `tccli organization DescribeOrganizationMembers` | 非空 | HALT；未加入组织 |
+| 子账号委托 | 每个子账号已授予主账号角色 | 委托状态 `ACTIVE` | HALT；配置委托 |
+
+#### 执行 — 汇总脚本
+
+```bash
+#!/bin/bash
+# 遍历子账号，汇总月度账单
+# 需要子账号 SecretId/SecretKey 或 CAM Role 委托
+ACCOUNTS=("$@")
+echo "# 跨账号成本报告"
+echo "| 账号 | 产品 | 月度费用(元) | 环比 |"
+echo "|------|------|------------|------|"
+for ACCOUNT in "${ACCOUNTS[@]}"; do
+  export TENCENTCLOUD_SECRET_ID="${ACCOUNT}_SECRET_ID"
+  export TENCENTCLOUD_SECRET_KEY="${ACCOUNT}_SECRET_KEY"
+  tccli billing DescribeBillSummaryByMonth \
+    --Month "$(date +%Y-%m)" \
+    --Region ap-guangzhou
+done
+```
+
+#### 输出
+
+| 字段 | 路径 |
+|------|------|
+| 账号维度汇总 | `$.Response.SummaryTotal[*].RealTotalCost` |
+| 按产品汇总 | `$.Response.SummaryByProduct[*]` |
+| 环比变化 | `$.Response.SummaryTotal[*].RealTotalCostRate` |
+
+#### 失败恢复
+
+| 错误码 | 处理 |
+|--------|------|
+| `UnauthorizedOperation` | HALT；检查 CAM 委托配置 |
+| `OrganizationNotExists` | HALT；账号未加入组织 |
+| `ResourceNotFound.Role` | HALT；创建 FinOps 只读角色 |
+
 ## 核心工作流（Pre-check → Execute → Verify → Recover）
 
 ```
@@ -263,6 +311,7 @@ tccli voucher DescribeVoucherList --Status "unused" --Limit 100
 |---------|------|---------|
 | 1.0.0 | 2026-06-04 | Phase 1 GCL rollout |
 | 1.1.0 | 2026-06-09 | Added `references/well-architected-assessment.md` (Cost worker + schema-aligned output) |
+| 1.2.0 | 2026-07-03 | Added module 9: cross-account unified cost view (multi-account via CAM role delegation) |
 
 ---
 

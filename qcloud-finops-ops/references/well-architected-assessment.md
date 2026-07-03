@@ -238,6 +238,33 @@ Use `{{user.month}}` as `YYYY-MM` — do not hardcode calendar months (TE-1).
 
 ---
 
+## 7. Cross-account cost visibility (module 9)
+
+| 评估项 | 理想状态 | 检查方法 | 评分标准 |
+|--------|----------|----------|----------|
+| 多账号统一账单 | 组织内所有账号账单可统一查看 | `tccli organization DescribeOrganization` | 有=5, 部分=3, 无=0 |
+| 成本分摊标签 | 所有资源强制打标签 | `tccli tag GetTagValues` | 强制=5, 推荐=3, 无=0 |
+| 预算告警覆盖 | 每个账号/项目有预算 | `tccli monitor DescribeAlarmPolicies` | 全覆盖=5, 部分=3, 无=0 |
+
+### 7.1 Cross-account checklist
+
+| Check | Read-only API | Pass criteria |
+|-------|---------------|---------------|
+| Organization membership | `organization DescribeOrganization` | Non-empty member list |
+| Cross-account billing aggregation | Module 9 script via CAM role | All member account summaries accessible |
+| Per-account budget coverage | `monitor DescribeAlarmPolicies` per account | Each account has ≥1 budget alarm |
+
+### 7.2 Scoring
+
+| Score | Criteria |
+|-------|----------|
+| 90-100 | Full multi-account billing visibility, all accounts budget-covered, tags enforced |
+| 70-89 | Most accounts aggregated, minor tag gaps |
+| 50-69 | Partial coverage, some accounts inaccessible |
+| < 50 | No cross-account aggregation |
+
+---
+
 ## References
 
 - [billing-api-mapping.md](billing-api-mapping.md)

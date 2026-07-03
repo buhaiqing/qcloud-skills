@@ -309,6 +309,27 @@
       "should_trigger": true,
       "expected_module": "module-7+4",
       "description": "复杂多意图：报告 + 预算 + 预测"
+    },
+    {
+      "id": "finops-044",
+      "query": "帮我看看所有子账号的账单汇总",
+      "should_trigger": true,
+      "expected_module": "module-9",
+      "description": "模块 9：跨账号成本视图 - 多账号账单汇总"
+    },
+    {
+      "id": "finops-045",
+      "query": "跨账号成本统一视图",
+      "should_trigger": true,
+      "expected_module": "module-9",
+      "description": "模块 9：跨账号成本视图"
+    },
+    {
+      "id": "finops-046",
+      "query": "配置子账号的CAM角色委托",
+      "should_trigger": false,
+      "expected_skill": "qcloud-cam-ops",
+      "description": "反例：CAM 角色委托属于 CAM skill，非 FinOps 范围"
     }
   ]
 }
