@@ -284,3 +284,111 @@ Detailed runtime-quality specifications are intentionally externalized to reduce
 ### Relationship to build-time self-review
 
 Build-time 2-round self-review and runtime GCL are independent gates. A clean self-review does not exempt runtime scoring; a passing GCL rubric does not exempt sloppy skill updates.
+
+---
+
+## GCL 自动触发强制提醒
+
+**重要：** 每次收到编码任务时，必须先执行以下检查，再开始执行。
+
+### 检查流程
+
+```
+收到任务
+    ↓
+执行 GCL 触发检查清单
+    ↓
+如果任何一项为"是" → 启动 GCL 多子 Agent 架构
+    ↓
+如果所有项为"否" → 直接在主 Agent 中执行
+```
+
+### 检查清单（必须逐项检查）
+
+#### 1. 任务类型检查
+- [ ] 任务是否包含以下关键词之一？
+  - 修复、新增、重构、变更、优化、测试
+  - fix, add, refactor, change, optimize, test
+- **如果是 → 必须触发 GCL**
+
+#### 2. 代码行数检查
+- [ ] 预计代码变更是否 > 5 行？
+- **如果是 → 必须触发 GCL**
+
+#### 3. 文件类型检查
+- [ ] 是否修改以下文件之一？
+  - `*/SKILL.md`
+  - `*/references/rubric.md`
+  - `*/references/prompt-templates.md`
+  - `AGENTS.md`
+  - `qcloud-skill-generator/SKILL.md`
+  - `docs/gcl-spec.md`
+  - `docs/reflexion-memory.md`
+- **如果是 → 必须触发 GCL**
+
+#### 4. 运维配置检查
+- [ ] 是否修改以下类型的配置文件？
+  - YAML (.yaml, .yml)
+  - JSON (.json)
+  - TOML (.toml)
+  - HCL (.hcl)
+  - Terraform (.tf)
+  - Kubernetes manifests
+  - Ansible playbooks
+  - Docker Compose
+- **如果是 → 必须触发 GCL（无例外）**
+
+### 自动化验证脚本
+
+可以使用以下脚本自动检查是否需要触发 GCL：
+
+```bash
+python3 scripts/check_gcl_trigger.py <task_description> [file1] [file2] ...
+```
+
+脚本会自动检查任务描述和文件列表，返回是否需要触发 GCL。
+
+### 如果触发 GCL，必须执行以下步骤
+
+1. **创建 worktree**
+   ```bash
+   git worktree add ../<repo>-<feature> -b feature/<feature>
+   ```
+
+2. **输出模型配置公示**
+   ```
+   ╔══════════════════════════════════════════╗
+   ║      Generator-Critic-Loop 模型配置       ║
+   ╠══════════════════════════════════════════╣
+   ║ Generator: [模型名]  (厂商: [厂商名])     ║
+   ║ Critic:    [模型名]  (厂商: [厂商名])     ║
+   ║ 不同厂商: ✅ / ❌                        ║
+   ║ Critic ≥ Generator: ✅ / ❌              ║
+   ║ 最大轮次: 3                               ║
+   ╚══════════════════════════════════════════╝
+   ```
+
+3. **启动 Generator 子 Agent**
+   - 使用 `run_in_background: true`
+   - 在 worktree 中独立开发
+
+4. **启动至少 2 个 Critic 子 Agent**
+   - 使用 `run_in_background: true`
+   - 并行评审代码质量
+   - 每个 Critic 专注于不同维度
+
+5. **执行 GCL 循环（最多 3 轮）**
+   - Generator 编码 → Critic 评审 → Generator 修复 → Critic 再评审
+   - 每轮结束后向用户输出进度摘要
+
+6. **汇总结果并提交**
+   - 主 Agent 做出最终 PASS/RETRY/ABORT 决策
+   - 合并到主分支
+   - 删除 worktree
+
+### 例外情况（仅限代码变更）
+
+- 小于 5 行的 typo 修复 / 注释改动
+- 纯文档/格式化改动
+
+**不得跳过任何检查步骤！**
