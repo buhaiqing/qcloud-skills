@@ -1,15 +1,96 @@
-[
-  { "query": "创建服务网格", "should_trigger": true },
-  { "query": "配置灰度发布策略", "should_trigger": true },
-  { "query": "开启 Sidecar 自动注入", "should_trigger": true },
-  { "query": "配置服务间 mTLS", "should_trigger": true },
-  { "query": "查看网格链路追踪", "should_trigger": true },
-  { "query": "Istio 流量治理", "should_trigger": true },
-  { "query": "金丝雀发布配置", "should_trigger": true },
-  { "query": "服务网格多集群", "should_trigger": true },
-  { "query": "K8s 集群节点管理", "should_trigger": false },
-  { "query": "创建负载均衡", "should_trigger": false },
-  { "query": "配置告警策略", "should_trigger": false },
-  { "query": "创建 CI/CD 流水线", "should_trigger": false },
-  { "query": "查看云服务器监控", "should_trigger": false }
-]
+{
+  "skill": "qcloud-service-mesh-ops",
+  "version": "1.0.0",
+  "description": "意图分类测试集。should_trigger=true 表示应触发本 Skill（Service Mesh 场景），false 表示应路由到其他 Skill 或不触发。",
+  "notes": [
+    "本测试集用于验证 Agent 能否正确识别 Service Mesh 相关 query 并路由到 qcloud-service-mesh-ops。",
+    "should_trigger=true 的 query 应被路由到本 Skill 处理。",
+    "should_trigger=false 的 query 应被路由到其他 skill（如 qcloud-tke-ops、qcloud-monitor-ops、qcloud-vpc-ops 等）。",
+    "expected_skill 标注当 should_trigger=false 时，应路由到哪个 Skill（如适用）。"
+  ],
+  "test_cases": [
+    {
+      "id": "tcm-001",
+      "query": "创建服务网格",
+      "should_trigger": true,
+      "description": "创建 TCM 服务网格"
+    },
+    {
+      "id": "tcm-002",
+      "query": "配置灰度发布策略",
+      "should_trigger": true,
+      "description": "灰度发布/金丝雀发布"
+    },
+    {
+      "id": "tcm-003",
+      "query": "开启 Sidecar 自动注入",
+      "should_trigger": true,
+      "description": "Sidecar 注入配置"
+    },
+    {
+      "id": "tcm-004",
+      "query": "配置服务间 mTLS",
+      "should_trigger": true,
+      "description": "mTLS 加密配置"
+    },
+    {
+      "id": "tcm-005",
+      "query": "查看网格链路追踪",
+      "should_trigger": true,
+      "description": "分布式链路追踪"
+    },
+    {
+      "id": "tcm-006",
+      "query": "Istio 流量治理",
+      "should_trigger": true,
+      "description": "Istio 流量管理"
+    },
+    {
+      "id": "tcm-007",
+      "query": "金丝雀发布配置",
+      "should_trigger": true,
+      "description": "金丝雀发布"
+    },
+    {
+      "id": "tcm-008",
+      "query": "服务网格多集群",
+      "should_trigger": true,
+      "description": "多集群网格"
+    },
+    {
+      "id": "tcm-009",
+      "query": "K8s 集群节点管理",
+      "should_trigger": false,
+      "expected_skill": "qcloud-tke-ops",
+      "description": "K8s 节点管理 - 应路由到 tke-ops"
+    },
+    {
+      "id": "tcm-010",
+      "query": "创建负载均衡",
+      "should_trigger": false,
+      "expected_skill": "qcloud-clb-ops",
+      "description": "负载均衡 - 应路由到 clb-ops"
+    },
+    {
+      "id": "tcm-011",
+      "query": "配置告警策略",
+      "should_trigger": false,
+      "expected_skill": "qcloud-monitor-ops",
+      "description": "告警配置 - 应路由到 monitor-ops"
+    },
+    {
+      "id": "tcm-012",
+      "query": "创建 CI/CD 流水线",
+      "should_trigger": false,
+      "expected_skill": "qcloud-cicd-ops",
+      "description": "CI/CD - 应路由到 cicd-ops"
+    },
+    {
+      "id": "tcm-013",
+      "query": "查看云服务器监控",
+      "should_trigger": false,
+      "expected_skill": "qcloud-monitor-ops",
+      "description": "监控查看 - 应路由到 monitor-ops"
+    }
+  ]
+}

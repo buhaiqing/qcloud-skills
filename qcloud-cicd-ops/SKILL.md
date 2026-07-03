@@ -356,3 +356,5 @@ python3 -c "from tencentcloud.common import credential; print('OK')"
 - [Troubleshooting](references/troubleshooting.md)
 - [Well-Architected Assessment](references/well-architected-assessment.md)
 - [Integration](references/integration.md)
+
+> Note: This skill uses `cli_applicability: sdk-only` as `tccli codepipeline` is not available. CLI operations are not documented.

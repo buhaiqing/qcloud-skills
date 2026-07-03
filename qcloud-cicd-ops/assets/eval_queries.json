@@ -1,17 +1,109 @@
-[
-  { "query": "创建一条 CI/CD 流水线", "should_trigger": true },
-  { "query": "帮我配置持续集成和持续部署", "should_trigger": true },
-  { "query": "DevOps 流水线管理", "should_trigger": true },
-  { "query": "查看构建日志", "should_trigger": true },
-  { "query": "如何自动化部署到 K8s 集群", "should_trigger": true },
-  { "query": "启动流水线构建", "should_trigger": true },
-  { "query": "停止正在运行的流水线", "should_trigger": true },
-  { "query": "配置代码仓库自动触发", "should_trigger": true },
-  { "query": "制品库管理", "should_trigger": true },
-  { "query": "帮我查一下数据库慢查询", "should_trigger": false },
-  { "query": "K8s 集群节点扩容", "should_trigger": false },
-  { "query": "配置负载均衡健康检查", "should_trigger": false },
-  { "query": "查看本月账单", "should_trigger": false },
-  { "query": "SSL 证书续期", "should_trigger": false },
-  { "query": "创建云服务器实例", "should_trigger": false }
-]
+{
+  "skill": "qcloud-cicd-ops",
+  "version": "1.0.0",
+  "description": "意图分类测试集。should_trigger=true 表示应触发本 Skill（CI/CD 场景），false 表示应路由到其他 Skill 或不触发。",
+  "notes": [
+    "本测试集用于验证 Agent 能否正确识别 CI/CD 相关 query 并路由到 qcloud-cicd-ops。",
+    "should_trigger=true 的 query 应被路由到本 Skill 处理。",
+    "should_trigger=false 的 query 应被路由到其他 skill（如 qcloud-tke-ops、qcloud-scf-ops、qcloud-monitor-ops 等）。",
+    "expected_skill 标注当 should_trigger=false 时，应路由到哪个 Skill（如适用）。"
+  ],
+  "test_cases": [
+    {
+      "id": "cicd-001",
+      "query": "创建一条 CI/CD 流水线",
+      "should_trigger": true,
+      "description": "创建流水线 - 核心操作"
+    },
+    {
+      "id": "cicd-002",
+      "query": "帮我配置持续集成和持续部署",
+      "should_trigger": true,
+      "description": "配置 CI/CD - 场景描述"
+    },
+    {
+      "id": "cicd-003",
+      "query": "DevOps 流水线管理",
+      "should_trigger": true,
+      "description": "DevOps 场景"
+    },
+    {
+      "id": "cicd-004",
+      "query": "查看构建日志",
+      "should_trigger": true,
+      "description": "查看构建日志"
+    },
+    {
+      "id": "cicd-005",
+      "query": "如何自动化部署到 K8s 集群",
+      "should_trigger": true,
+      "description": "自动化部署 - CI/CD 场景"
+    },
+    {
+      "id": "cicd-006",
+      "query": "启动流水线构建",
+      "should_trigger": true,
+      "description": "触发流水线构建"
+    },
+    {
+      "id": "cicd-007",
+      "query": "停止正在运行的流水线",
+      "should_trigger": true,
+      "description": "停止流水线"
+    },
+    {
+      "id": "cicd-008",
+      "query": "配置代码仓库自动触发",
+      "should_trigger": true,
+      "description": "配置 webhook 触发"
+    },
+    {
+      "id": "cicd-009",
+      "query": "制品库管理",
+      "should_trigger": true,
+      "description": "制品库管理"
+    },
+    {
+      "id": "cicd-010",
+      "query": "帮我查一下数据库慢查询",
+      "should_trigger": false,
+      "expected_skill": "qcloud-cdb-ops",
+      "description": "数据库查询 - 应路由到 cdb-ops"
+    },
+    {
+      "id": "cicd-011",
+      "query": "K8s 集群节点扩容",
+      "should_trigger": false,
+      "expected_skill": "qcloud-tke-ops",
+      "description": "K8s 节点管理 - 应路由到 tke-ops"
+    },
+    {
+      "id": "cicd-012",
+      "query": "配置负载均衡健康检查",
+      "should_trigger": false,
+      "expected_skill": "qcloud-clb-ops",
+      "description": "负载均衡配置 - 应路由到 clb-ops"
+    },
+    {
+      "id": "cicd-013",
+      "query": "查看本月账单",
+      "should_trigger": false,
+      "expected_skill": "qcloud-finops-ops",
+      "description": "账单查询 - 应路由到 finops-ops"
+    },
+    {
+      "id": "cicd-014",
+      "query": "SSL 证书续期",
+      "should_trigger": false,
+      "expected_skill": "qcloud-ssl-ops",
+      "description": "证书管理 - 应路由到 ssl-ops"
+    },
+    {
+      "id": "cicd-015",
+      "query": "创建云服务器实例",
+      "should_trigger": false,
+      "expected_skill": "qcloud-cvm-ops",
+      "description": "创建 CVM - 应路由到 cvm-ops"
+    }
+  ]
+}
