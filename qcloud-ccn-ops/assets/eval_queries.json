@@ -1,0 +1,156 @@
+{
+  "skill_id": "qcloud-ccn-ops",
+  "description": "Intent classification test cases for CCN (Cloud Connect Network) operations skill",
+  "test_cases": [
+    {
+      "query": "Create a CCN instance for multi-region VPC connectivity",
+      "should_trigger": true,
+      "reason": "Explicit CCN creation request"
+    },
+    {
+      "query": "Attach my VPC to the cloud connect network",
+      "should_trigger": true,
+      "reason": "VPC attachment to CCN"
+    },
+    {
+      "query": "Set up 云联网 between Guangzhou and Shanghai regions",
+      "should_trigger": true,
+      "reason": "云联网 is CCN in Chinese"
+    },
+    {
+      "query": "Configure cross-account network using CCN",
+      "should_trigger": true,
+      "reason": "Cross-account CCN usage"
+    },
+    {
+      "query": "Delete the CCN backbone instance ccn-abc123",
+      "should_trigger": true,
+      "reason": "CCN deletion request"
+    },
+    {
+      "query": "Detach VPC from cloud connect network",
+      "should_trigger": true,
+      "reason": "CCN detachment operation"
+    },
+    {
+      "query": "Set bandwidth limit for inter-region CCN traffic",
+      "should_trigger": true,
+      "reason": "CCN bandwidth configuration"
+    },
+    {
+      "query": "Add a static route to the CCN route table",
+      "should_trigger": true,
+      "reason": "CCN route table operation"
+    },
+    {
+      "query": "Troubleshoot why my CCN attachment is stuck in PENDING",
+      "should_trigger": true,
+      "reason": "CCN troubleshooting"
+    },
+    {
+      "query": "List all CCN instances in my account",
+      "should_trigger": true,
+      "reason": "CCN listing/describe operation"
+    },
+    {
+      "query": "How do I set up hub-and-spoke network topology on Tencent Cloud?",
+      "should_trigger": true,
+      "reason": "Hub-and-spoke is CCN's primary use case"
+    },
+    {
+      "query": "Configure 多地域互联 for my VPCs",
+      "should_trigger": true,
+      "reason": "多地域互联 (multi-region interconnect) is CCN's purpose"
+    },
+    {
+      "query": "I need 跨账号组网 for my organization",
+      "should_trigger": true,
+      "reason": "跨账号组网 (cross-account networking) is CCN's capability"
+    },
+    {
+      "query": "Check CCN route table and show me the learned routes",
+      "should_trigger": true,
+      "reason": "CCN route inspection"
+    },
+    {
+      "query": "Why can't my VPC in Beijing talk to my VPC in Shanghai?",
+      "should_trigger": true,
+      "reason": "Cross-region VPC connectivity issue - CCN is the solution"
+    },
+    {
+      "query": "Create a VPC peering connection between two VPCs in the same region",
+      "should_trigger": false,
+      "reason": "Same-region peering should use qcloud-vpc-ops, not CCN"
+    },
+    {
+      "query": "Set up an IPSec VPN to my on-premise datacenter",
+      "should_trigger": false,
+      "reason": "IPSec VPN should use qcloud-vpn-ops"
+    },
+    {
+      "query": "Create a new VPC with subnets",
+      "should_trigger": false,
+      "reason": "VPC creation should use qcloud-vpc-ops"
+    },
+    {
+      "query": "Configure CAM policies for my users",
+      "should_trigger": false,
+      "reason": "CAM should use qcloud-cam-ops"
+    },
+    {
+      "query": "Check my Tencent Cloud bill and costs",
+      "should_trigger": false,
+      "reason": "Billing should use qcloud-billing-ops or qcloud-finops-ops"
+    },
+    {
+      "query": "Create a CVM instance in Guangzhou",
+      "should_trigger": false,
+      "reason": "CVM operations should use qcloud-cvm-ops"
+    },
+    {
+      "query": "Set up a CLB load balancer",
+      "should_trigger": false,
+      "reason": "CLB operations should use qcloud-clb-ops"
+    },
+    {
+      "query": "Configure Direct Connect gateway",
+      "should_trigger": false,
+      "reason": "Direct Connect lifecycle not yet in scope (future qcloud-dc-ops)"
+    },
+    {
+      "query": "Monitor my CCN bandwidth usage",
+      "should_trigger": false,
+      "reason": "Monitoring should use qcloud-monitor-ops"
+    },
+    {
+      "query": "What is the pricing for CCN?",
+      "should_trigger": false,
+      "reason": "Pricing queries should use qcloud-finops-ops"
+    },
+    {
+      "query": "Create a CCN",
+      "should_trigger": true,
+      "reason": "Short explicit CCN creation"
+    },
+    {
+      "query": "Delete ccn-xxxxxxxx",
+      "should_trigger": true,
+      "reason": "CCN ID pattern indicates CCN operation"
+    },
+    {
+      "query": "Attach vpc-xxx to ccn-yyy",
+      "should_trigger": true,
+      "reason": "VPC to CCN attachment pattern"
+    },
+    {
+      "query": "Show me all attached instances for my cloud connect network",
+      "should_trigger": true,
+      "reason": "CCN attachment inspection"
+    },
+    {
+      "query": "Update bandwidth limits between ap-guangzhou and ap-shanghai",
+      "should_trigger": true,
+      "reason": "Inter-region bandwidth is CCN-specific"
+    }
+  ]
+}

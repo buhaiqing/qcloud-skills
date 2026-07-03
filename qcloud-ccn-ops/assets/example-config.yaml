@@ -1,0 +1,44 @@
+# Example config for qcloud-ccn-ops
+# All keys shown are placeholders; replace with real values at deploy time.
+
+# Anchored defaults
+env_defaults: &env_defaults
+  TENCENTCLOUD_REGION: ap-guangzhou
+
+# --- CCN instance ---
+ccn:
+  name: global-mesh
+  description: Production multi-region backbone
+  bandwidth_caps:
+    - src_region: ap-guangzhou
+      dest_region: ap-shanghai
+      bandwidth_mbps: 200
+    - src_region: ap-guangzhou
+      dest_region: ap-beijing
+      bandwidth_mbps: 100
+
+# --- VPC attachments ---
+attachments:
+  - vpc_id: vpc-xxxx-1
+    region: ap-guangzhou
+    account_uin: null  # same account
+  - vpc_id: vpc-yyyy-2
+    region: ap-shanghai
+    account_uin: null  # same account
+  - vpc_id: vpc-zzzz-3
+    region: ap-beijing
+    account_uin: "123456789"  # cross-account, must be accepted by peer
+
+# --- Static routes (optional) ---
+static_routes:
+  - destination: 10.50.0.0/16
+    next_hop_type: VPC
+    next_hop_instance_id: vpc-xxxx-1
+  - destination: 192.168.0.0/16
+    next_hop_type: VPNGW
+    next_hop_instance_id: vpngw-xxx
+
+# Credentials live in env, not in this file
+# export TENCENTCLOUD_SECRET_ID=...
+# export TENCENTCLOUD_SECRET_KEY=...
+# export TENCENTCLOUD_REGION=ap-guangzhou
