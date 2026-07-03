@@ -348,7 +348,41 @@ python3 scripts/check_gcl_trigger.py <task_description> [file1] [file2] ...
 
 脚本会自动检查任务描述和文件列表，返回是否需要触发 GCL。
 
-### 如果触发 GCL，必须执行以下步骤
+### 如果触发 GCL，必须执行以下步骤 (Multi sub-Agent 架构)
+
+**⚠️ 强制执行指令（MANDATORY）：**
+
+在执行任何编码任务前，**必须**运行以下检查：
+
+```bash
+# Step 0: 强制执行检查点
+python3 scripts/check_gcl_trigger.py "<task_description>" <file1> <file2> ...
+```
+
+如果脚本返回 **必须触发 GCL**（退出码 1），则**必须**执行以下完整流程。
+
+**架构图:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Main Agent (Orchestrator)                  │
+│  - Coordinates all sub-agents                               │
+│  - Aggregates Critic results                                │
+│  - Makes final PASS/RETRY/ABORT decision                    │
+│  - Controls iteration count (max 3)                         │
+│  - Persists trace for audit                                 │
+└──────────┬──────────────────────────────────────┬──────────┘
+           │ spawn Generator Agent                │ spawn Critic Agents (并行)
+           ▼                                      ▼
+┌──────────────────────┐           ┌──────────────────────────┐
+│  Generator Agent     │           │    Critic Agents (N≥2)   │
+│  - Generates output  │ ──notify─►│                          │
+│  - Uses domain logic │  ◄─feedback│  - Data Quality Critic   │
+│  - Captures trace    │           │  - Safety Rules Critic   │
+└──────────────────────┘           │  - Spec Compliance Critic│
+                                   └──────────────────────────┘
+```
+
+**执行步骤:**
 
 1. **创建 worktree**
    ```bash
@@ -357,32 +391,39 @@ python3 scripts/check_gcl_trigger.py <task_description> [file1] [file2] ...
 
 2. **输出模型配置公示**
    ```
-   ╔══════════════════════════════════════════╗
-   ║      Generator-Critic-Loop 模型配置       ║
-   ╠══════════════════════════════════════════╣
-   ║ Generator: [模型名]  (厂商: [厂商名])     ║
-   ║ Critic:    [模型名]  (厂商: [厂商名])     ║
-   ║ 不同厂商: ✅ / ❌                        ║
-   ║ Critic ≥ Generator: ✅ / ❌              ║
-   ║ 最大轮次: 3                               ║
-   ╚══════════════════════════════════════════╝
+   ╔══════════════════════════════════════════════════════════╗
+   ║      Multi sub-Agent GCL 模型配置                         ║
+   ╠══════════════════════════════════════════════════════════╣
+   ║ Generator: [模型名]  (厂商: [厂商名])                     ║
+   ║ Critics:   [模型名]  (厂商: [厂商名]) × N 个并行          ║
+   ║ 不同厂商: ✅ / ❌ (Generator 与 Critics 必须不同厂商)      ║
+   ║ Critic ≥ Generator: ✅ / ❌                              ║
+   ║ 最大轮次: 3                                               ║
+   ║ Critic 数量: ≥2 (建议 3-4 个，覆盖不同维度)                ║
+   ╚══════════════════════════════════════════════════════════╝
    ```
 
 3. **启动 Generator 子 Agent**
    - 使用 `run_in_background: true`
    - 在 worktree 中独立开发
+   - 负责编码实现
 
-4. **启动至少 2 个 Critic 子 Agent**
+4. **启动至少 2 个 Critic 子 Agent (并行)**
    - 使用 `run_in_background: true`
-   - 并行评审代码质量
-   - 每个 Critic 专注于不同维度
+   - 所有 Critics **并行**运行，非串行
+   - 每个 Critic 专注于不同维度：
+     * **Critic 1 (Data Quality)**: 数据完整性、准确性
+     * **Critic 2 (Safety Rules)**: 安全规则、凭证保护
+     * **Critic 3 (Spec Compliance)**: 规范符合性
+     * **Critic 4 (Token Efficiency)**: TE-1/TE-3/TE-4/TE-5/TE-6
 
 5. **执行 GCL 循环（最多 3 轮）**
-   - Generator 编码 → Critic 评审 → Generator 修复 → Critic 再评审
+   - Generator 编码 → Critics **并行**评审 → Generator 修复 → Critics 再评审
    - 每轮结束后向用户输出进度摘要
+   - Orchestrator 聚合所有 Critic 评分，做出决策
 
 6. **汇总结果并提交**
-   - 主 Agent 做出最终 PASS/RETRY/ABORT 决策
+   - Main Agent 做出最终 PASS/RETRY/ABORT 决策
    - 合并到主分支
    - 删除 worktree
 
@@ -390,5 +431,13 @@ python3 scripts/check_gcl_trigger.py <task_description> [file1] [file2] ...
 
 - 小于 5 行的 typo 修复 / 注释改动
 - 纯文档/格式化改动
+
+### 验证机制（强制）
+
+任务完成后，**必须**运行验证脚本确认 GCL 被正确执行：
+
+```bash
+python3 scripts/verify_gcl_execution.py "<task_description>" <commit_hash>
+```
 
 **不得跳过任何检查步骤！**
