@@ -140,7 +140,8 @@ tccli vpc SetCcnRegionBandwidthLimits \
      --Region "{{env.TENCENTCLOUD_REGION}}" \
      --VpcId "{{user.vpc_id}}" \
      --VpnGatewayName "hybrid-vpn-gw" \
-     --InternetMaxBandwidthOut 100
+     --InternetMaxBandwidthOut 100 \
+     --Type "IPSEC"
    ```
 
 2. **关联 VPN 网关到 CCN**:
