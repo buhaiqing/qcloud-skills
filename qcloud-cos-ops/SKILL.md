@@ -170,21 +170,9 @@ coscmd download /bucket-name/path/file.txt ./local-file.txt
 
 #### CLI Execution
 
-```bash
-tccli cos PutBucket \
-  --Bucket "{{user.bucket_name}}" \
-  --Region "{{env.TENCENTCLOUD_REGION}}"
-```
+**CLI** (`tccli cos PutBucket`): 见 [execution-flows.md §1](references/execution-flows.md#1-createbucket)
 
-#### SDK Fallback
-
-```python
-from tencentcloud.cos import cos_client, models
-client = cos_client.CosClient(cred, region)
-req = models.PutBucketRequest()
-req.Bucket = "{{user.bucket_name}}"
-resp = client.PutBucket(req)
-```
+**SDK** (Python): 见 [execution-flows.md §1](references/execution-flows.md#1-createbucket)
 
 #### Validation
 
@@ -210,39 +198,9 @@ Parse `$.Response.Location`, verify bucket exists via GetBucket.
 
 #### CLI (coscmd)
 
-```bash
-coscmd upload "{{user.local_file}}" "/{{user.bucket_name}}/{{user.object_key}}"
-```
+**CLI** (`coscmd upload`): 见 [execution-flows.md §2](references/execution-flows.md#2-uploadobject)
 
-#### Large File (>5GB): Multipart Upload
-
-```bash
-coscmd upload --multipart "{{user.local_file}}" "/{{user.bucket_name}}/{{user.object_key}}"
-```
-
-#### SDK Fallback
-
-```python
-#!/usr/bin/env python3
-import os
-from tencentcloud.common import credential
-from tencentcloud.cos import cos_client, models
-
-cred = credential.Credential(
-    os.environ.get("TENCENTCLOUD_SECRET_ID"),
-    os.environ.get("TENCENTCLOUD_SECRET_KEY")
-)
-client = cos_client.CosClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-req = models.PutObjectRequest()
-req.Bucket = "{{user.bucket_name}}"
-req.Key = "{{user.object_key}}"
-req.Body = file_content
-req.StorageClass = "{{user.storage_class}}"
-resp = client.PutObject(req)
-etag = resp.ETag
-print(f"Upload successful. ETag: {etag}")
-```
+**SDK** (Python): 见 [execution-flows.md §2](references/execution-flows.md#2-uploadobject)
 
 ### Get Object (Download)
 
@@ -255,34 +213,9 @@ print(f"Upload successful. ETag: {etag}")
 
 #### CLI (coscmd)
 
-```bash
-coscmd download "/{{user.bucket_name}}/{{user.object_key}}" "{{user.local_file}}"
-```
+**CLI** (`coscmd download`): 见 [execution-flows.md §3](references/execution-flows.md#3-getobject)
 
-#### SDK Fallback
-
-```python
-#!/usr/bin/env python3
-import os
-from tencentcloud.common import credential
-from tencentcloud.cos import cos_client, models
-
-cred = credential.Credential(
-    os.environ.get("TENCENTCLOUD_SECRET_ID"),
-    os.environ.get("TENCENTCLOUD_SECRET_KEY")
-)
-client = cos_client.CosClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-req = models.GetObjectRequest()
-req.Bucket = "{{user.bucket_name}}"
-req.Key = "{{user.object_key}}"
-resp = client.GetObject(req)
-
-# Save to file
-with open("{{user.local_file}}", "wb") as f:
-    f.write(resp.Body.read())
-print("Download successful")
-```
+**SDK** (Python): 见 [execution-flows.md §3](references/execution-flows.md#3-getobject)
 
 ### Delete Object
 
@@ -294,30 +227,9 @@ print("Download successful")
 
 #### CLI (coscmd)
 
-```bash
-coscmd delete "/{{user.bucket_name}}/{{user.object_key}}"
-```
+**CLI** (`coscmd delete`): 见 [execution-flows.md §4](references/execution-flows.md#4-deleteobject)
 
-#### SDK Fallback
-
-```python
-#!/usr/bin/env python3
-import os
-from tencentcloud.common import credential
-from tencentcloud.cos import cos_client, models
-
-cred = credential.Credential(
-    os.environ.get("TENCENTCLOUD_SECRET_ID"),
-    os.environ.get("TENCENTCLOUD_SECRET_KEY")
-)
-client = cos_client.CosClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-req = models.DeleteObjectRequest()
-req.Bucket = "{{user.bucket_name}}"
-req.Key = "{{user.object_key}}"
-resp = client.DeleteObject(req)
-print("Deleted: {{user.object_key}}")
-```
+**SDK** (Python): 见 [execution-flows.md §4](references/execution-flows.md#4-deleteobject)
 
 ### List Objects
 
@@ -329,32 +241,9 @@ print("Deleted: {{user.object_key}}")
 
 #### CLI (coscmd)
 
-```bash
-coscmd list "{{user.bucket_name}}"
-```
+**CLI** (`coscmd list`): 见 [execution-flows.md §5](references/execution-flows.md#5-listobjects)
 
-#### SDK Fallback
-
-```python
-#!/usr/bin/env python3
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.cos import cos_client, models
-
-cred = credential.Credential(
-    os.environ.get("TENCENTCLOUD_SECRET_ID"),
-    os.environ.get("TENCENTCLOUD_SECRET_KEY")
-)
-client = cos_client.CosClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-req = models.ListObjectsRequest()
-req.Bucket = "{{user.bucket_name}}"
-req.MaxKeys = 1000
-resp = client.ListObjects(req)
-
-for obj in resp.Contents:
-    print(f"{obj.Key} - {obj.Size} bytes")
-```
+**SDK** (Python): 见 [execution-flows.md §5](references/execution-flows.md#5-listobjects)
 
 #### Present to User
 
@@ -374,60 +263,17 @@ for obj in resp.Contents:
 2. **MUST** warn: deletion irreversible
 3. **MUST** confirm: user approval with bucket name displayed
 
-```bash
-# Pre-check
-OBJECT_COUNT=$(coscmd list "{{user.bucket_name}}" | wc -l)
-if [ "$OBJECT_COUNT" -gt 0 ]; then
-  echo "Bucket not empty. Delete objects first."
-  exit 1
-fi
+#### CLI
 
-# Confirm
-echo "Delete bucket: {{user.bucket_name}}? (yes/no)"
-read CONFIRM
-[ "$CONFIRM" = "yes" ] || exit 0
+**CLI** (`tccli cos DeleteBucket`): 见 [execution-flows.md §6](references/execution-flows.md#6-deletebucket)
 
-tccli cos DeleteBucket --Bucket "{{user.bucket_name}}"
-```
-
-#### SDK Fallback
-
-```python
-#!/usr/bin/env python3
-import os
-from tencentcloud.common import credential
-from tencentcloud.cos import cos_client, models
-
-cred = credential.Credential(
-    os.environ.get("TENCENTCLOUD_SECRET_ID"),
-    os.environ.get("TENCENTCLOUD_SECRET_KEY")
-)
-client = cos_client.CosClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-# First check if bucket is empty
-list_req = models.ListObjectsRequest()
-list_req.Bucket = "{{user.bucket_name}}"
-list_req.MaxKeys = 1
-list_resp = client.ListObjects(list_req)
-
-if list_resp.Contents:
-    print("Bucket not empty. Delete objects first.")
-    exit(1)
-
-# Delete bucket
-del_req = models.DeleteBucketRequest()
-del_req.Bucket = "{{user.bucket_name}}"
-resp = client.DeleteBucket(del_req)
-print("Bucket deleted: {{user.bucket_name}}")
-```
+**SDK** (Python): 见 [execution-flows.md §6](references/execution-flows.md#6-deletebucket)
 
 ### Configure Lifecycle
 
-```bash
-tccli cos PutBucketLifecycle \
-  --Bucket "{{user.bucket_name}}" \
-  --LifecycleConfiguration '{"Rule":[{"ID":"archive-rule","Status":"Enabled","Filter":{"Prefix":""},"Transition":{"Days":30,"StorageClass":"ARCHIVE"}}]}'
-```
+**CLI** (`tccli cos PutBucketLifecycle`): 见 [execution-flows.md §7](references/execution-flows.md#7-configurelifecycle)
+
+**SDK** (Python): 见 [execution-flows.md §7](references/execution-flows.md#7-configurelifecycle)
 
 ---
 
@@ -450,240 +296,29 @@ Full automated COS FinOps analysis via CLI — collects COS metadata, queries CL
 
 **Phase 1: Collect COS Metadata**
 
-```bash
-#!/bin/bash
-echo "=== Phase 1: COS Metadata Collection ==="
+**CLI** (5-phase bash): 见 [execution-flows.md §8](references/execution-flows.md#8-finopsanalysis)
 
-# List all buckets
-BUCKETS=$(tccli cos DescribeBuckets --Region {{env.TENCENTCLOUD_REGION}} | jq -r '.Response.Buckets[].Name')
-BUCKET_COUNT=$(echo "$BUCKETS" | wc -l | tr -d ' ')
-echo "Buckets found: $BUCKET_COUNT"
-
-# For each bucket: check logging, lifecycle, tags
-HAS_LOGGING=0
-HAS_LIFECYCLE=0
-for bucket in $BUCKETS; do
-  LOGGING=$(tccli cos GetBucketLogging --Bucket "$bucket" --Region {{env.TENCENTCLOUD_REGION}} 2>/dev/null)
-  if echo "$LOGGING" | jq -e '.Response.BucketLoggingStatus.TargetBucket' > /dev/null 2>&1; then
-    HAS_LOGGING=$((HAS_LOGGING + 1))
-  fi
-  LIFECYCLE=$(tccli cos GetBucketLifecycle --Bucket "$bucket" --Region {{env.TENCENTCLOUD_REGION}} 2>/dev/null)
-  RULES=$(echo "$LIFECYCLE" | jq '.Response.Rules | length // 0')
-  if [ "$RULES" -gt 0 ]; then
-    HAS_LIFECYCLE=$((HAS_LIFECYCLE + 1))
-  fi
-done
-
-echo "Buckets with logging enabled: $HAS_LOGGING / $BUCKET_COUNT"
-echo "Buckets with lifecycle rules: $HAS_LIFECYCLE / $BUCKET_COUNT"
-echo "Phase 1 complete."
-```
+**SDK** (Python): 见 [execution-flows.md §8](references/execution-flows.md#8-finopsanalysis)
 
 **Phase 2: Verify CLS COS Log Import**
 
-```bash
-echo "=== Phase 2: CLS COS Log Verification ==="
-
-# Check if CLS COS import exists
-RECHARGES=$(tccli cls DescribeCosRecharges \
-  --Region {{env.TENCENTCLOUD_REGION}} \
-  --TopicId "{{user.topic_id}}" 2>/dev/null | jq '.Response.CosRecharges | length // 0')
-
-if [ "$RECHARGES" -eq 0 ]; then
-  echo "⚠️  No COS import task found for this topic."
-  echo "→ Delegate to qcloud-cls-ops: ImportCOSAccessLogs"
-  echo "→ Required: {{user.cos_bucket}}, {{user.cos_region}}, {{user.topic_id}}"
-else
-  echo "✅ COS import task exists ($RECHARGES task(s))"
-fi
-
-# Check if index exists for COS fields
-INDEX_STATUS=$(tccli cls DescribeIndex \
-  --Region {{env.TENCENTCLOUD_REGION}} \
-  --TopicId "{{user.topic_id}}" 2>/dev/null | jq -r '.Response.Status // "not found"')
-echo "Index status: $INDEX_STATUS"
-echo "Phase 2 complete."
-```
+**CLI** (Phase 2): 见 [execution-flows.md §8](references/execution-flows.md#8-finopsanalysis)
 
 **Phase 3: Execute CLS Cost Queries**
 
-```bash
-echo "=== Phase 3: CLS Cost Analysis ==="
-
-FROM_TIME=$(date -d '{{user.cost_time_range}}' +%s)000
-TO_TIME=$(date +%s)000
-TOPIC_ID="{{user.topic_id}}"
-REGION="{{env.TENCENTCLOUD_REGION}}"
-
-# 3a. Storage class distribution
-echo "--- 3a. Storage Class Distribution ---"
-tccli cls SearchLog \
-  --Region "$REGION" --TopicId "$TOPIC_ID" \
-  --From $FROM_TIME --To $TO_TIME \
-  --Query 'eventName:PutObject | select storageClass, count(*) as count, round(sum(objectSize)/1073741824, 2) as totalGB, round(avg(objectSize)/1048576, 2) as avgSizeMB group by storageClass order by totalGB desc' \
-  --Limit 100
-
-# 3b. Request cost by operation type
-echo "--- 3b. Request Cost by Operation ---"
-tccli cls SearchLog \
-  --Region "$REGION" --TopicId "$TOPIC_ID" \
-  --From $FROM_TIME --To $TO_TIME \
-  --Query '| select eventName, count(*) as count, round(sum(reqBytesSent)/1073741824, 2) as uploadGB, round(sum(resBytesSent)/1073741824, 2) as downloadGB group by eventName order by count desc' \
-  --Limit 100
-
-# 3c. Traffic TOP consumers
-echo "--- 3c. Traffic TOP 10 Consumers ---"
-tccli cls SearchLog \
-  --Region "$REGION" --TopicId "$TOPIC_ID" \
-  --From $FROM_TIME --To $TO_TIME \
-  --Query '| select remoteIp, round(sum(resBytesSent)/1073741824, 2) as downloadGB, round(sum(reqBytesSent)/1073741824, 2) as uploadGB, count(*) as count group by remoteIp order by downloadGB desc limit 10'
-
-# 3d. Infrequent storage check
-echo "--- 3d. IA Storage Access Check ---"
-tccli cls SearchLog \
-  --Region "$REGION" --TopicId "$TOPIC_ID" \
-  --From $FROM_TIME --To $TO_TIME \
-  --Query 'storageClass:STANDARD_IA | select eventName, count(*) as count, round(sum(resBytesSent)/1048576, 2) as totalMB group by eventName order by count desc'
-
-# 3e. Daily storage delta
-echo "--- 3e. Daily Storage Delta Trend ---"
-tccli cls SearchLog \
-  --Region "$REGION" --TopicId "$TOPIC_ID" \
-  --From $(date -d '30 days ago' +%s)000 \
-  --To $TO_TIME \
-  --Query '| select date_trunc('day', eventTime) as day, round(sum(deltaDataSize)/1073741824, 2) as deltaGB, count(*) as count group by day order by day'
-
-echo "Phase 3 complete."
-```
+**CLI** (Phase 3 CLS queries): 见 [execution-flows.md §8](references/execution-flows.md#8-finopsanalysis)
 
 **Phase 4: Idle Resource Detection**
 
-```bash
-echo "=== Phase 4: Idle Resource Detection ==="
-
-# 4a. Detect empty buckets
-echo "--- 4a. Empty Bucket Detection ---"
-for bucket in $(tccli cos DescribeBuckets --Region {{env.TENCENTCLOUD_REGION}} | jq -r '.Response.Buckets[].Name'); do
-  OBJ_COUNT=$(tccli cos GetBucket --Bucket "$bucket" --Region {{env.TENCENTCLOUD_REGION}} --MaxKeys 1 2>/dev/null | jq '.Response.Contents | length // 0')
-  if [ "$OBJ_COUNT" -eq 0 ]; then
-    echo "  🔴 Empty bucket: $bucket"
-  fi
-done
-
-# 4b. Detect buckets with no recent access (via CLS)
-echo "--- 4b. Bucket Access Summary (30d) ---"
-tccli cls SearchLog \
-  --Region {{env.TENCENTCLOUD_REGION}} \
-  --TopicId "{{user.topic_id}}" \
-  --From $(date -d '30 days ago' +%s)000 \
-  --To $(date +%s)000 \
-  --Query 'eventName:GetObject | select bucketName, count(*) as accessCount group by bucketName order by accessCount'
-
-# 4c. Detect large unused objects
-echo "--- 4c. Large Files (>1GB) with Low Access ---"
-tccli cls SearchLog \
-  --Region {{env.TENCENTCLOUD_REGION}} \
-  --TopicId "{{user.topic_id}}" \
-  --From $(date -d '{{user.cost_time_range}}' +%s)000 \
-  --To $(date +%s)000 \
-  --Query '| select reqPath, round(objectSize/1073741824, 2) as sizeGB, count(*) as accessCount, storageClass, max(eventTime) as lastAccess group by reqPath, sizeGB, storageClass having sizeGB > 1 order by accessCount asc limit 20'
-
-echo "Phase 4 complete."
-```
+**CLI** (Phase 4 idle detection): 见 [execution-flows.md §8](references/execution-flows.md#8-finopsanalysis)
 
 **Phase 5: Generate FinOps Report**
 
-```bash
-echo "=== Phase 5: Generating FinOps Report ==="
-
-REPORT_FILE="/tmp/cos-finops-report-$(date +%Y%m%d).md"
-
-cat > "$REPORT_FILE" << REPORT_EOF
-# COS FinOps Analysis Report
-**Generated**: $(date '+%Y-%m-%d %H:%M:%S')
-**Region**: {{env.TENCENTCLOUD_REGION}}
-**Analysis Window**: {{user.cost_time_range}}
-
-## Quick Summary
-- **Buckets**: $BUCKET_COUNT | **Logging**: $HAS_LOGGING/$BUCKET_COUNT | **Lifecycle**: $HAS_LIFECYCLE/$BUCKET_COUNT
-- **Storage Cost**: Refer to finops-cost-optimization.md Section 2 for calculation
-- **Request Cost**: Refer to finops-cost-optimization.md Section 3 for calculation
-- **Traffic Cost**: Refer to finops-cost-optimization.md Section 4 for calculation
-
-## Key Findings
-1. **Idle Resources**: Check Phase 4 output for empty buckets and unused objects
-2. **Storage Optimization**: Check Phase 3d for IA storage access frequency
-3. **Cost Anomalies**: Check Phase 3e for daily storage delta spikes
-4. **Traffic Consumers**: Check Phase 3c for top bandwidth users
-
-## Recommendations
-- Run `tccli cos PutBucketLifecycle` to set lifecycle rules for unconfigured buckets
-- Run `tccli cls SearchLog` with cost analysis queries (see finops-cost-optimization.md)
-- Review idle buckets and consider deletion or data migration
-REPORT_EOF
-
-echo "✅ Report generated: $REPORT_FILE"
-echo "{{output.finops_report_path}} = $REPORT_FILE"
-```
+**CLI** (Phase 5 report generation): 见 [execution-flows.md §8](references/execution-flows.md#8-finopsanalysis)
 
 #### Execution — Python SDK (Full Automation)
 
-```python
-#!/usr/bin/env python3
-"""
-COS FinOps: Full automated cost analysis
-"""
-import os, json, subprocess, datetime
-from tencentcloud.common import credential
-from tencentcloud.cos import cos_client, models
-from tencentcloud.cls import cls_client as cls_sdk, models as cls_models
-
-# --- Config ---
-REGION = os.environ.get("TENCENTCLOUD_REGION", "ap-guangzhou")
-TOPIC_ID = os.environ.get("TOPIC_ID")
-COST_DAYS = int(os.environ.get("COST_DAYS", "30"))
-
-cred = credential.Credential(
-    os.environ.get("TENCENTCLOUD_SECRET_ID"),
-    os.environ.get("TENCENTCLOUD_SECRET_KEY")
-)
-cos_client_inst = cos_client.CosClient(cred, REGION)
-cls_client_inst = cls_sdk.ClsClient(cred, REGION)
-
-# Phase 1: Collect COS metadata
-print("=== Phase 1: COS Metadata ===")
-req = models.DescribeBucketsRequest()
-resp = json.loads(cos_client_inst.DescribeBuckets(req).to_json_string())
-buckets = resp.get('Response', {}).get('Buckets', [])
-print(f"Buckets: {len(buckets)}")
-
-# Phase 2: Check CLS setup
-print("\n=== Phase 2: CLS Verification ===")
-cos_req = cls_models.DescribeCosRechargesRequest()
-cos_req.TopicId = TOPIC_ID
-recharges = json.loads(cls_client_inst.DescribeCosRecharges(cos_req).to_json_string())
-recharge_count = len(recharges.get('Response', {}).get('CosRecharges', []))
-print(f"COS import tasks: {recharge_count}")
-
-# Phase 3: CLS Cost Queries
-print("\n=== Phase 3: CLS Cost Analysis ===")
-search_req = cls_models.SearchLogRequest()
-search_req.TopicId = TOPIC_ID
-search_req.From = int(datetime.datetime.now().timestamp()) - (COST_DAYS * 86400)
-search_req.To = int(datetime.datetime.now().timestamp())
-
-try:
-    search_req.Query = 'eventName:PutObject | select storageClass, count(*) as c, round(sum(objectSize)/1073741824, 2) as tGB group by storageClass'
-    search_req.Limit = 100
-    resp = json.loads(cls_client_inst.SearchLog(search_req).to_json_string())
-    results = resp.get('Response', {}).get('Results', [])
-    print(f"Storage class distribution: {len(results)} entries")
-except Exception as e:
-    print(f"CLS query failed: {e} (index may not be ready)")
-
-print("\n✅ FinOps Analysis Complete")
-print("See references/finops-cost-optimization.md for full cost calculations")
-```
+**SDK** (Python): 见 [execution-flows.md §8](references/execution-flows.md#8-finopsanalysis)
 
 #### Post-execution Validation
 
@@ -860,6 +495,7 @@ See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PA
 - [Core Concepts](references/core-concepts.md)
 - [API & SDK](references/api-sdk-usage.md)
 - [CLI Usage](references/cli-usage.md)
+- [Execution Flows](references/execution-flows.md) — CLI/SDK command blocks (What vs. How separation)
 - [Troubleshooting](references/troubleshooting.md)
 - [Well-Architected](references/well-architected-assessment.md)
 - [Integration](references/integration.md)
