@@ -242,55 +242,16 @@ Every operation: **Pre-flight → Execute (CLI and SDK) → Validate → Recover
 
 #### Execution — CLI (`tccli`) (Primary Path)
 
-```bash
-# Create single data disk
-tccli cbs CreateDisks \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --Placement '{"Zone":"{{user.zone}}"}' \
-  --DiskSize {{user.disk_size}} \
-  --DiskType "{{user.disk_type}}" \
-  --DiskName "{{user.disk_name}}" \
-  --DiskChargeType "POSTPAID_BY_HOUR" \
-  --ClientToken "$(date +%s%N)" > /tmp/response.json
-
-# Capture disk ID from response
-DISK_ID=$(jq -r '.Response.DiskIdSet[0]' /tmp/response.json)
-echo "Created disk: $DISK_ID"
-```
+See [execution-flows.md](references/execution-flows.md) §1 CLI.
 
 #### Execution — Python SDK (Fallback Path)
 
-```python
-# See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
-
-req = models.CreateDisksRequest()
-req.Placement = models.Placement()
-req.Placement.Zone = "{{user.zone}}"
-req.DiskSize = {{user.disk_size}}
-req.DiskType = "{{user.disk_type}}"
-req.DiskName = "{{user.disk_name}}"
-req.DiskChargeType = "POSTPAID_BY_HOUR"
-req.ClientToken = str(int(time.time() * 1000000))
-
-resp = client.CreateDisks(req)
-result = json.loads(resp.to_json_string())
-print(json.dumps(result, indent=2))
-```
+See [execution-flows.md](references/execution-flows.md) §1 SDK.
 
 #### Post-execution Validation
 
 1. Capture `{{output.disk_id}}` from `$.Response.DiskIdSet[0]`
-2. Poll DescribeDisks until `UNATTACHED`:
-
-```bash
-for i in $(seq 1 24); do
-  STATE=$(tccli cbs DescribeDisks --Region {{env.TENCENTCLOUD_REGION}} --DiskIds "[\"{{output.disk_id}}\"]" | jq -r '.Response.DiskSet[0].DiskState')
-  [ "$STATE" = "UNATTACHED" ] && echo "✅ Disk ready (UNATTACHED)" && break
-  echo "⏳ Waiting for disk... current state: $STATE"
-  sleep 5
-done
-```
-
+2. Poll DescribeDisks until `UNATTACHED`: see [execution-flows.md](references/execution-flows.md) §1 Validation Poll
 3. Report disk ID, size, and type to user
 
 #### Failure Recovery
@@ -321,42 +282,15 @@ done
 
 #### Execution — CLI (`tccli`) (Primary Path)
 
-```bash
-# Attach disk to instance
-tccli cbs AttachDisks \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --DiskIds '["{{user.disk_id}}"]' \
-  --InstanceId "{{user.instance_id}}" > /tmp/response.json
-
-echo "Attach request submitted: $(jq -r '.Response.RequestId' /tmp/response.json)"
-```
+See [execution-flows.md](references/execution-flows.md) §2 CLI.
 
 #### Execution — Python SDK (Fallback Path)
 
-```python
-# See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
-
-req = models.AttachDisksRequest()
-req.DiskIds = ["{{user.disk_id}}"]
-req.InstanceId = "{{user.instance_id}}"
-
-resp = client.AttachDisks(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+See [execution-flows.md](references/execution-flows.md) §2 SDK.
 
 #### Post-execution Validation
 
-1. Poll DescribeDisks until `ATTACHED`:
-
-```bash
-for i in $(seq 1 24); do
-  STATE=$(tccli cbs DescribeDisks --Region {{env.TENCENTCLOUD_REGION}} --DiskIds "[\"{{user.disk_id}}\"]" | jq -r '.Response.DiskSet[0].DiskState')
-  INSTANCE=$(tccli cbs DescribeDisks --Region {{env.TENCENTCLOUD_REGION}} --DiskIds "[\"{{user.disk_id}}\"]" | jq -r '.Response.DiskSet[0].InstanceId')
-  [ "$STATE" = "ATTACHED" ] && [ "$INSTANCE" = "{{user.instance_id}}" ] && echo "✅ Disk attached to {{user.instance_id}}" && break
-  echo "⏳ Attaching disk... current state: $STATE"
-  sleep 5
-done
-```
+1. Poll DescribeDisks until `ATTACHED`: see [execution-flows.md](references/execution-flows.md) §2 Validation Poll
 
 #### Failure Recovery
 
@@ -388,39 +322,15 @@ done
 
 #### Execution — CLI (`tccli`) (Primary Path)
 
-```bash
-# Detach disk from instance
-tccli cbs DetachDisks \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --DiskIds '["{{user.disk_id}}"]' > /tmp/response.json
-
-echo "Detach request submitted: $(jq -r '.Response.RequestId' /tmp/response.json)"
-```
+See [execution-flows.md](references/execution-flows.md) §3 CLI.
 
 #### Execution — Python SDK (Fallback Path)
 
-```python
-# See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
-
-req = models.DetachDisksRequest()
-req.DiskIds = ["{{user.disk_id}}"]
-
-resp = client.DetachDisks(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+See [execution-flows.md](references/execution-flows.md) §3 SDK.
 
 #### Post-execution Validation
 
-1. Poll DescribeDisks until `UNATTACHED`:
-
-```bash
-for i in $(seq 1 24); do
-  STATE=$(tccli cbs DescribeDisks --Region {{env.TENCENTCLOUD_REGION}} --DiskIds "[\"{{user.disk_id}}\"]" | jq -r '.Response.DiskSet[0].DiskState')
-  [ "$STATE" = "UNATTACHED" ] && echo "✅ Disk detached (UNATTACHED)" && break
-  echo "⏳ Detaching disk... current state: $STATE"
-  sleep 5
-done
-```
+1. Poll DescribeDisks until `UNATTACHED`: see [execution-flows.md](references/execution-flows.md) §3 Validation Poll
 
 #### Failure Recovery
 
@@ -447,43 +357,15 @@ done
 
 #### Execution — CLI (`tccli`) (Primary Path)
 
-```bash
-# Resize disk to new size
-tccli cbs ResizeDisk \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --DiskId "{{user.disk_id}}" \
-  --DiskSize {{user.new_disk_size}} > /tmp/response.json
-
-echo "Resize request submitted: $(jq -r '.Response.RequestId' /tmp/response.json)"
-```
+See [execution-flows.md](references/execution-flows.md) §4 CLI.
 
 #### Execution — Python SDK (Fallback Path)
 
-```python
-# See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
-
-req = models.ResizeDiskRequest()
-req.DiskId = "{{user.disk_id}}"
-req.DiskSize = {{user.new_disk_size}}
-
-resp = client.ResizeDisk(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+See [execution-flows.md](references/execution-flows.md) §4 SDK.
 
 #### Post-execution Validation
 
-1. Poll DescribeDisks until size matches target:
-
-```bash
-for i in $(seq 1 60); do
-  SIZE=$(tccli cbs DescribeDisks --Region {{env.TENCENTCLOUD_REGION}} --DiskIds "[\"{{user.disk_id}}\"]" | jq -r '.Response.DiskSet[0].DiskSize')
-  STATE=$(tccli cbs DescribeDisks --Region {{env.TENCENTCLOUD_REGION}} --DiskIds "[\"{{user.disk_id}}\"]" | jq -r '.Response.DiskSet[0].DiskState')
-  [ "$SIZE" = "{{user.new_disk_size}}" ] && [ "$STATE" != "EXPANDING" ] && echo "✅ Disk resized to ${SIZE}GB" && break
-  echo "⏳ Resizing disk... current size: ${SIZE}GB, state: $STATE"
-  sleep 5
-done
-```
-
+1. Poll DescribeDisks until size matches target: see [execution-flows.md](references/execution-flows.md) §4 Validation Poll
 2. **Inform user**: After cloud-side resize, must extend filesystem inside OS using appropriate tools (e.g., `resize2fs` for ext4, `xfs_growfs` for XFS)
 
 #### Failure Recovery
@@ -511,45 +393,16 @@ done
 
 #### Execution — CLI (`tccli`) (Primary Path)
 
-```bash
-# Create snapshot
-tccli cbs CreateSnapshot \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --DiskId "{{user.disk_id}}" \
-  --SnapshotName "{{user.snapshot_name}}" > /tmp/response.json
-
-# Capture snapshot ID
-SNAPSHOT_ID=$(jq -r '.Response.SnapshotId' /tmp/response.json)
-echo "Created snapshot: $SNAPSHOT_ID"
-```
+See [execution-flows.md](references/execution-flows.md) §5 CLI.
 
 #### Execution — Python SDK (Fallback Path)
 
-```python
-# See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
-
-req = models.CreateSnapshotRequest()
-req.DiskId = "{{user.disk_id}}"
-req.SnapshotName = "{{user.snapshot_name}}"
-
-resp = client.CreateSnapshot(req)
-result = json.loads(resp.to_json_string())
-print(json.dumps(result, indent=2))
-```
+See [execution-flows.md](references/execution-flows.md) §5 SDK.
 
 #### Post-execution Validation
 
 1. Capture `{{output.snapshot_id}}` from `$.Response.SnapshotId`
-2. Poll DescribeSnapshots until `NORMAL`:
-
-```bash
-for i in $(seq 1 120); do
-  STATE=$(tccli cbs DescribeSnapshots --Region {{env.TENCENTCLOUD_REGION}} --SnapshotIds "[\"{{output.snapshot_id}}\"]" | jq -r '.Response.SnapshotSet[0].SnapshotState')
-  [ "$STATE" = "NORMAL" ] && echo "✅ Snapshot created successfully" && break
-  echo "⏳ Creating snapshot... current state: $STATE"
-  sleep 5
-done
-```
+2. Poll DescribeSnapshots until `NORMAL`: see [execution-flows.md](references/execution-flows.md) §5 Validation Poll
 
 #### Failure Recovery
 
@@ -578,39 +431,15 @@ done
 
 #### Execution — CLI (`tccli`) (Primary Path)
 
-```bash
-# Delete snapshot
-tccli cbs DeleteSnapshots \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --SnapshotIds '["{{user.snapshot_id}}"]' > /tmp/response.json
-
-echo "Delete request submitted: $(jq -r '.Response.RequestId' /tmp/response.json)"
-```
+See [execution-flows.md](references/execution-flows.md) §6 CLI.
 
 #### Execution — Python SDK (Fallback Path)
 
-```python
-# See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
-
-req = models.DeleteSnapshotsRequest()
-req.SnapshotIds = ["{{user.snapshot_id}}"]
-
-resp = client.DeleteSnapshots(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+See [execution-flows.md](references/execution-flows.md) §6 SDK.
 
 #### Post-execution Validation
 
-1. Poll DescribeSnapshots until 404 or empty response:
-
-```bash
-for i in $(seq 1 24); do
-  COUNT=$(tccli cbs DescribeSnapshots --Region {{env.TENCENTCLOUD_REGION}} --SnapshotIds "[\"{{user.snapshot_id}}\"]" | jq -r '.Response.SnapshotSet | length')
-  [ "$COUNT" = "0" ] && echo "✅ Snapshot deleted" && break
-  echo "⏳ Deleting snapshot..."
-  sleep 5
-done
-```
+1. Poll DescribeSnapshots until 404 or empty response: see [execution-flows.md](references/execution-flows.md) §6 Validation Poll
 
 #### Failure Recovery
 
