@@ -127,14 +127,14 @@ Enables you to create and manage Tencent Cloud Service Mesh (TCM) — configure 
 
 ### Verify Setup
 ```bash
-tccli tcm DescribeMeshList --Region ap-guangzhou
+tccli tcm DescribeMeshList --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ### Your First Command
 ```bash
 # Create a service mesh
 tccli tcm CreateMesh \
-  --Region "ap-guangzhou" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --MeshName "my-mesh" \
   --MeshVersion "1.18.1-istio"
 ```
@@ -331,17 +331,36 @@ Every **DeleteMesh** MUST have:
 3. Pre-warning about configuration loss
 4. Post-delete verification (poll until absent)
 
-## GCL (Governance Check Loop)
+## Quality Gate (GCL)
 
-This skill is marked `gcl: required` with `max_iter: 2` for destructive operations.
+This skill participates in the **Generator-Critic-Loop (GCL)**. The Quality Gate
+is a **runtime** scoring layer that audits each TCM execution against an explicit
+rubric, in addition to the build-time **Safety Gates** above and the build-time
+**2-round self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
 
-### Generator/Critic/Orchestrator Prompt Reference
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **2** | per-skill override |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, TCM-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
 
-See [references/prompt-templates.md](references/prompt-templates.md) for GCL prompt skeletons.
+### When the loop runs
 
-### Rubric
+| Op class | Loop runs? | Why |
+|---|---|---|
+| Destructive: `DeleteMesh`, `UnlinkCluster` | **yes** | Irreversible; removes mesh config or severs cluster link |
+| Sensitive mutating: `ModifyMesh` (version/config change) | **yes** | Configuration drift risk |
+| Mutating: `CreateMesh`, `LinkClusterList` | **yes** | Cost/state-change risk |
+| Read-only: `DescribeMesh`, `DescribeMeshList`, `ModifyTracingConfig` | optional (max_iter=1) | Polling tails are part of the parent op |
 
-See [references/rubric.md](references/rubric.md) for scoring criteria.
+### Decision flow (first match wins)
+
+1. **Safety = 0** OR any rubric rule violation on destructive op ⇒ **ABORT** (no partial result). Missing user confirmation for DeleteMesh ⇒ ABORT.
+2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+3. **All thresholds met** ⇒ **PASS**
+4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
 
 ---
 
@@ -365,7 +384,7 @@ export TENCENTCLOUD_REGION="ap-guangzhou"
 3. **Verify:**
 
 ```bash
-tccli tcm DescribeMeshList --Region ap-guangzhou
+tccli tcm DescribeMeshList --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ## Reference Directory

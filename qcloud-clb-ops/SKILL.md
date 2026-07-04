@@ -188,7 +188,7 @@ This skill enables you to deploy, configure, troubleshoot, and monitor CLB (Load
 ### Verify Setup
 ```bash
 # Check CLI and credentials
-tccli clb DescribeLoadBalancers --Region ap-guangzhou
+tccli clb DescribeLoadBalancers --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ### Your First Command
@@ -385,7 +385,7 @@ Poll DescribeLoadBalancers until LB returns empty or 404.
 
 4. **Verify Configuration**:
    ```bash
-   tccli clb DescribeLoadBalancers --Region ap-guangzhou
+   tccli clb DescribeLoadBalancers --Region "{{env.TENCENTCLOUD_REGION}}"
    ```
 
 ## Reference Directory

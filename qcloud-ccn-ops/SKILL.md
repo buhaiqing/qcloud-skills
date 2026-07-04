@@ -159,14 +159,14 @@ Enables you to plan, deploy, and operate a CCN instance — attach multiple VPCs
 
 ### Verify Setup
 ```bash
-tccli vpc DescribeCCNs --Region ap-guangzhou
+tccli vpc DescribeCCNs --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ### Your First Command
 ```bash
 # Create a CCN instance
 tccli vpc CreateCCN \
-  --Region "ap-guangzhou" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --CcnName "global-mesh" \
   --CcnDescription "Production multi-region backbone" \
   --ClientToken "$(date +%s%N)"
@@ -227,7 +227,7 @@ export TENCENTCLOUD_REGION="ap-guangzhou"
 3. **Verify:**
 
 ```bash
-tccli vpc DescribeCCNs --Region ap-guangzhou
+tccli vpc DescribeCCNs --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ## Reference Directory

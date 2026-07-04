@@ -181,13 +181,13 @@ This skill enables you to deploy, configure, and manage VPC network environments
 
 ### Verify Setup
 ```bash
-tccli vpc DescribeVpcs --Region ap-guangzhou
+tccli vpc DescribeVpcs --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ### Your First Command
 ```bash
 # Create a VPC with default CIDR
-tccli vpc CreateVpc --Region ap-guangzhou --VpcName "my-vpc" --CidrBlock "10.0.0.0/16"
+tccli vpc CreateVpc --Region "{{env.TENCENTCLOUD_REGION}}" --VpcName "my-vpc" --CidrBlock "10.0.0.0/16"
 ```
 
 ### Next Steps
@@ -694,7 +694,7 @@ export TENCENTCLOUD_REGION="ap-guangzhou"
 3. **Verify:**
 
 ```bash
-tccli vpc DescribeVpcs --Region ap-guangzhou
+tccli vpc DescribeVpcs --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ## Reference Directory

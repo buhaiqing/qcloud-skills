@@ -30,7 +30,8 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
-  gcl: optional
+  gcl: required
+  gcl_max_iter: 2
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).
@@ -286,6 +287,37 @@ Every **DeregisterMigrationTask** MUST have:
 
 ---
 
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** quality gate for all mutation operations.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | frontmatter `gcl: required` |
+| max_iterations | **2** | frontmatter `gcl_max_iter: 2` |
+| Rubric instance | `references/rubric.md` | 5 dimensions, Migration-specific safety rules |
+| Prompt templates | `references/prompt-templates.md` | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | per AGENTS.md §7 |
+
+### When the loop runs
+
+| Operation | Loop required? | Reason |
+|---|---|---|
+| `RegisterMigrationTask` | Yes | Creates new migration |
+| `ModifyMigrationTaskStatus` | Yes (blocking) | Status change may affect data transfer |
+| `DeregisterMigrationTask` | Yes (blocking) | Data loss risk, metadata removal |
+| `ListMigrationTask` | No | Read-only |
+| `DescribeMigrationTask` | No | Read-only |
+
+### Decision flow (first match wins)
+
+1. **Safety=0** → `ABORT` — immediate halt, no output
+2. **current_iter >= max_iterations** → `MAX_ITER` — return best result, blocking=true
+3. **All thresholds met** → `PASS` — output accepted
+4. **Otherwise** → `RETRY` — inject suggestions, increment iter
+
+---
+
 ## Prerequisites
 
 1. **Install `tccli` CLI:**
@@ -306,7 +338,7 @@ export TENCENTCLOUD_REGION="ap-guangzhou"
 3. **Verify:**
 
 ```bash
-tccli msp ListMigrationTask --Region ap-guangzhou
+tccli msp ListMigrationTask --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ## Reference Directory

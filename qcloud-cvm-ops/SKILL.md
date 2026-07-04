@@ -103,7 +103,7 @@ When `{{user.mode}}=well-architected-readonly`: read-only Describe*/GetMonitorDa
 
 ```bash
 # Verify (Cloud Shell or local)
-tccli cvm DescribeZones --Region ap-guangzhou && python3 -c "from tencentcloud.cvm import cvm_client"
+tccli cvm DescribeZones --Region "{{env.TENCENTCLOUD_REGION}}" && python3 -c "from tencentcloud.cvm import cvm_client"
 
 # First command
 tccli cvm DescribeInstances --Region {{env.TENCENTCLOUD_REGION}}

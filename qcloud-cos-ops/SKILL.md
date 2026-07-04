@@ -126,7 +126,7 @@ COS (Cloud Object Storage) on Tencent Cloud provides scalable, secure, and highl
 
 ```bash
 # Create bucket
-tccli cos PutBucket --Bucket "my-bucket-12345" --Region ap-guangzhou
+tccli cos PutBucket --Bucket "my-bucket-12345" --Region "{{env.TENCENTCLOUD_REGION}}"
 
 # Upload object (coscmd recommended)
 coscmd upload local-file.txt /bucket-name/path/file.txt

@@ -29,6 +29,8 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  gcl: required
+  gcl_max_iter: 2
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).
@@ -266,6 +268,38 @@ Every **DeletePipeline** MUST have:
 2. Dependency check (running builds; dependent webhooks)
 3. Pre-warning about automation loss
 4. Post-delete verification (poll until absent)
+
+---
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** quality gate for all mutation operations.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | frontmatter `gcl: required` |
+| max_iterations | **2** | frontmatter `gcl_max_iter: 2` |
+| Rubric instance | `references/rubric.md` | 5 dimensions, CI/CD-specific safety rules |
+| Prompt templates | `references/prompt-templates.md` | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | per AGENTS.md §7 |
+
+### When the loop runs
+
+| Operation | Loop required? | Reason |
+|---|---|---|
+| `CreatePipeline` | Yes | Creates new automation |
+| `DeletePipeline` | Yes (blocking) | Removes automation, cancels builds |
+| `StartPipeline` | Yes (blocking) | Triggers builds, may cause duplicate runs |
+| `StopPipeline` | Yes (blocking) | Aborts running builds |
+| `DescribePipelines` | No | Read-only |
+| `DescribeBuildLogs` | No | Read-only |
+
+### Decision flow (first match wins)
+
+1. **Safety=0** → `ABORT` — immediate halt, no output
+2. **current_iter >= max_iterations** → `MAX_ITER` — return best result, blocking=true
+3. **All thresholds met** → `PASS` — output accepted
+4. **Otherwise** → `RETRY` — inject suggestions, increment iter
 
 ---
 

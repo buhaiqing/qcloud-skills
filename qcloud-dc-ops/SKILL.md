@@ -129,13 +129,13 @@ Enables you to create and manage Tencent Cloud Direct Connect — establish dedi
 
 ### Verify Setup
 ```bash
-tccli dc DescribeDirectConnects --Region ap-guangzhou
+tccli dc DescribeDirectConnects --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ### Your First Command
 ```bash
 # List available access points
-tccli dc DescribeAccessPoints --Region ap-guangzhou
+tccli dc DescribeAccessPoints --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ### Next Steps
@@ -330,9 +330,38 @@ Every **DeleteDirectConnect** MUST have:
 3. Pre-warning about physical disconnection requirements
 4. Post-delete verification (poll until absent)
 
-## GCL (Governance Check Loop)
+## Quality Gate (GCL)
 
-This skill is marked `gcl: required` with `max_iter: 2` for destructive operations.
+This skill participates in the **Generator-Critic-Loop (GCL)** quality gate for all mutation operations.
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | frontmatter `gcl: required` |
+| max_iterations | **2** | frontmatter `gcl_max_iter: 2` |
+| Rubric instance | `references/rubric.md` | 5 dimensions, DC-specific safety rules |
+| Prompt templates | `references/prompt-templates.md` | Generator + Critic + Orchestrator |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | per AGENTS.md §7 |
+
+### When the loop runs
+
+| Operation | Loop required? | Reason |
+|---|---|---|
+| `CreateDirectConnect` | Yes | Creates new DC |
+| `DeleteDirectConnect` | Yes (blocking) | Physical disconnection, tunnel cleanup required |
+| `CreateDirectConnectTunnel` | Yes | Creates tunnel |
+| `DeleteDirectConnectTunnel` | Yes (blocking) | Cuts connection |
+| `CreateDirectConnectGateway` | Yes | Creates gateway |
+| `DeleteDirectConnectGateway` | Yes (blocking) | Removes routing, dependency cleanup required |
+| `DescribeDirectConnects` | No | Read-only |
+| `DescribeDirectConnectTunnels` | No | Read-only |
+| `DescribeDirectConnectGateways` | No | Read-only |
+
+### Decision flow (first match wins)
+
+1. **Safety=0** → `ABORT` — immediate halt, no output
+2. **current_iter >= max_iterations** → `MAX_ITER` — return best result, blocking=true
+3. **All thresholds met** → `PASS` — output accepted
+4. **Otherwise** → `RETRY` — inject suggestions, increment iter
 
 ---
 
@@ -356,7 +385,7 @@ export TENCENTCLOUD_REGION="ap-guangzhou"
 3. **Verify:**
 
 ```bash
-tccli dc DescribeDirectConnects --Region ap-guangzhou
+tccli dc DescribeDirectConnects --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ## Reference Directory
