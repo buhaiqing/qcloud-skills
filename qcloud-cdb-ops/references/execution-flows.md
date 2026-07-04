@@ -45,7 +45,6 @@ tccli cdb CreateDBInstance \
 
 ```python
 from __future__ import annotations
-import json
 from tencentcloud.cdb.v20170320 import models, CdbClient
 from tencentcloud.common import Credential
 from tencentcloud.common.profile import HttpProfile, ClientProfile
@@ -94,7 +93,6 @@ tccli cdb DescribeDBInstances --ProjectId 0
 
 ```python
 from __future__ import annotations
-import json
 from tencentcloud.cdb.v20170320 import models, CdbClient
 from tencentcloud.common import Credential
 from tencentcloud.common.profile import HttpProfile, ClientProfile
@@ -134,7 +132,6 @@ tccli cdb UpgradeDBInstance \
 
 ```python
 from __future__ import annotations
-import json
 from tencentcloud.cdb.v20170320 import models, CdbClient
 from tencentcloud.common import Credential
 from tencentcloud.common.profile import HttpProfile, ClientProfile
@@ -169,7 +166,6 @@ tccli cdb RestartDBInstances --InstanceIds '["{{user.instance_id}}"]'
 
 ```python
 from __future__ import annotations
-import json
 from tencentcloud.cdb.v20170320 import models, CdbClient
 from tencentcloud.common import Credential
 from tencentcloud.common.profile import HttpProfile, ClientProfile
@@ -217,7 +213,6 @@ tccli cdb CreateBackup \
 
 ```python
 from __future__ import annotations
-import json
 from tencentcloud.cdb.v20170320 import models, CdbClient
 from tencentcloud.common import Credential
 from tencentcloud.common.profile import HttpProfile, ClientProfile
@@ -264,7 +259,6 @@ tccli cdb ModifyInstanceParam \
 
 ```python
 from __future__ import annotations
-import json
 from tencentcloud.cdb.v20170320 import models, CdbClient
 from tencentcloud.common import Credential
 from tencentcloud.common.profile import HttpProfile, ClientProfile
@@ -310,7 +304,6 @@ tccli cdb CreateAccounts \
 
 ```python
 from __future__ import annotations
-import json
 from tencentcloud.cdb.v20170320 import models, CdbClient
 from tencentcloud.common import Credential
 from tencentcloud.common.profile import HttpProfile, ClientProfile
@@ -350,7 +343,6 @@ tccli cdb DescribeAccounts --InstanceId "{{user.instance_id}}" --Limit 20
 
 ```python
 from __future__ import annotations
-import json
 from tencentcloud.cdb.v20170320 import models, CdbClient
 from tencentcloud.common import Credential
 from tencentcloud.common.profile import HttpProfile, ClientProfile
@@ -386,7 +378,6 @@ tccli cdb ModifyAccountPassword \
 
 ```python
 from __future__ import annotations
-import json
 from tencentcloud.cdb.v20170320 import models, CdbClient
 from tencentcloud.common import Credential
 from tencentcloud.common.profile import HttpProfile, ClientProfile
@@ -431,7 +422,7 @@ tccli cdb DescribeSlowLogData \
 # Confirm slow queries exist (last 1 hour)
 tccli cdb DescribeSlowLogData \
   --InstanceId "{{user.instance_id}}" \
-  --StartTime "$(date -v-1H +'%Y-%m-%d %H:%M:%S')" \
+  --StartTime "$(date -d '1 hour ago' +'%Y-%m-%d %H:%M:%S')" \
   --EndTime "$(date +'%Y-%m-%d %H:%M:%S')" \
   --Limit 5 \
   --OrderBy "QueryTime" \
