@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.2.0"
-  last_updated: "2026-06-09"
+  version: "1.3.0"
+  last_updated: "2026-07-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/362"
@@ -198,86 +198,21 @@ This skill enables you to deploy, configure, troubleshoot, and monitor CBS cloud
 | **Local CLI** | Install tccli + credentials | Development, automation |
 | **Local SDK** | Python 3.8+ + SDK package | Complex operations, batch processing |
 
-### Option 1: Cloud Shell (Recommended for Quick Start)
-
-**Zero-setup execution environment**:
-
-1. Login to [Tencent Cloud Console](https://console.cloud.tencent.com)
-2. Click **Cloud Shell** icon (top right toolbar)
-3. Terminal opens with pre-installed `tccli` and SDK
-
-```bash
-# Cloud Shell is pre-authenticated - no credential setup needed
-tccli cbs DescribeDisks --Region ap-guangzhou
-
-# Save scripts to persistent storage
-mkdir -p /data/scripts
-# Files in /data/ persist across sessions
-```
-
-**Cloud Shell Features**:
-- Pre-installed: `tccli`, `tencentcloud-sdk-python`, common tools
-- Pre-authenticated: Uses console login credentials
-- Persistent: 10GB storage in `/data/`
-- Free: No additional cost
-
-### Option 2: Local CLI Setup
-
-**Prerequisites**:
-- [ ] `tccli` CLI installed (`pip install tccli`)
-- [ ] Credentials configured: `TENCENTCLOUD_SECRET_ID`, `TENCENTCLOUD_SECRET_KEY`
-- [ ] Region set: `TENCENTCLOUD_REGION`
-
-### Option 3: Python SDK Setup
-
-**Prerequisites**:
-- [ ] Python 3.8+ runtime
-- [ ] SDK installed: `pip install tencentcloud-sdk-python-cbs`
-- [ ] Credentials configured
-
-### Verify Setup (All Environments)
-
-```bash
-# Check CLI version
-tccli version
-
-# Test API access
-tccli cbs DescribeDisks --Region ap-guangzhou --Limit 1
-
-# Expected output (JSON)
-# {"Response": {"DiskSet": [...], "RequestId": "..."}}
-```
-
-### Your First Command
-
-```bash
-# List all disks in current region
-tccli cbs DescribeDisks --Region {{env.TENCENTCLOUD_REGION}} --Limit 100
-
-# Cloud Shell: Use explicit region
-tccli cbs DescribeDisks --Region ap-guangzhou --Limit 100
-```
-
-### Next Steps
-- [Core Concepts](references/core-concepts.md) — Understand CBS architecture and limits
-- [Common Operations](#execution-flows) — Create, attach, resize, and delete disks
-- [CLI Usage Guide](references/cli-usage.md) — Detailed CLI command reference
-- [Integration Guide](references/integration.md) — Cloud Shell, SDK setup, automation
-- [Troubleshooting](references/troubleshooting.md) — Fix common CBS issues
+See [Integration](references/integration.md) for Cloud Shell, local CLI, and SDK setup instructions.
 
 ## Capabilities at a Glance
 
-| Operation | Description | Complexity | Risk Level |
-|-----------|-------------|------------|------------|
-| CreateDisks | Create new cloud disk(s) | Low | Low |
-| AttachDisks | Attach disk to CVM instance | Low | Low |
-| DetachDisks | Detach disk from instance | Low | Medium (data access interruption) |
-| ResizeDisk | Expand disk capacity | Medium | Medium (requires unmount/remount) |
-| CreateSnapshot | Create disk backup | Low | Low |
-| DeleteSnapshots | Remove snapshots | Low | High (irreversible) |
-| ApplySnapshot | Restore disk from snapshot | Medium | High (data overwrite) |
-| DescribeDisks | View disk details | Low | None |
-| DescribeSnapshots | View snapshot details | Low | None |
+| Operation | Risk Level |
+|-----------|------------|
+| CreateDisks | Low |
+| AttachDisks | Low |
+| DetachDisks | Medium (data access interruption) |
+| ResizeDisk | Medium (requires unmount/remount) |
+| CreateSnapshot | Low |
+| DeleteSnapshots | High (irreversible) |
+| ApplySnapshot | High (data overwrite) |
+| DescribeDisks | None |
+| DescribeSnapshots | None |
 
 ## Changelog
 
@@ -285,6 +220,7 @@ tccli cbs DescribeDisks --Region ap-guangzhou --Limit 100
 |---------|------|---------|
 | 1.0.0 | 2026-05-28 | Initial skill with CreateDisks, AttachDisks, DetachDisks, ResizeDisk, CreateSnapshot, DeleteSnapshots, dual-path execution |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CBS-specific safety rules incl. disk-destroy irreversibility, detach-without-unmount guard, resize-shrink rejection, snapshot-chain warning, DeleteWithInstance toggle guard), `references/prompt-templates.md` (Generator + Critic + Orchestrator). `max_iter=2` per AGENTS.md §8 |
+| 1.3.0 | 2026-07-04 | Token Efficiency: compressed Quick Start (integration ref), Capabilities table (2 cols), 6 SDK blocks (sdk-templates.md ref); removed duplicate Prerequisites; added ApplySnapshot execution flow |
 
 ---
 
@@ -324,45 +260,23 @@ echo "Created disk: $DISK_ID"
 
 #### Execution — Python SDK (Fallback Path)
 
+> See [SDK Templates](references/sdk-templates.md) for Common Init / Polling / Try-Except boilerplate.
+
 ```python
-#!/usr/bin/env python3
-"""
-SDK fallback for CreateDisks when CLI parameter handling is complex
-"""
-import os, json, time
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cbs import cbs_client, models
+req = models.CreateDisksRequest()
+req.Placement = models.Placement()
+req.Placement.Zone = os.environ.get("ZONE", "ap-guangzhou-3")
+req.DiskSize = int(os.environ.get("DISK_SIZE", "50"))
+req.DiskType = os.environ.get("DISK_TYPE", "CLOUD_PREMIUM")
+req.DiskName = os.environ.get("DISK_NAME", "data-disk")
+req.DiskChargeType = "POSTPAID_BY_HOUR"
+req.ClientToken = str(int(time.time() * 1000000))
 
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cbs_client.CbsClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.CreateDisksRequest()
-        req.Placement = models.Placement()
-        req.Placement.Zone = os.environ.get("ZONE", "ap-guangzhou-3")
-        req.DiskSize = int(os.environ.get("DISK_SIZE", "50"))
-        req.DiskType = os.environ.get("DISK_TYPE", "CLOUD_PREMIUM")
-        req.DiskName = os.environ.get("DISK_NAME", "data-disk")
-        req.DiskChargeType = "POSTPAID_BY_HOUR"
-        req.ClientToken = str(int(time.time() * 1000000))
-
-        resp = client.CreateDisks(req)
-        result = json.loads(resp.to_json_string())
-        print(json.dumps(result, indent=2))
-        
-        # Capture disk ID
-        disk_id = result["Response"]["DiskIdSet"][0]
-        print(f"Created disk: {disk_id}")
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+resp = client.CreateDisks(req)
+result = json.loads(resp.to_json_string())
+disk_id = result["Response"]["DiskIdSet"][0]
+print(json.dumps(result, indent=2))
+print(f"Created disk: {disk_id}")
 ```
 
 #### Post-execution Validation
@@ -421,33 +335,15 @@ echo "Attach request submitted: $(jq -r '.Response.RequestId' /tmp/response.json
 
 #### Execution — Python SDK (Fallback Path)
 
+> See [SDK Templates](references/sdk-templates.md) for Common Init / Polling / Try-Except boilerplate.
+
 ```python
-#!/usr/bin/env python3
-"""SDK fallback for AttachDisks"""
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cbs import cbs_client, models
+req = models.AttachDisksRequest()
+req.DiskIds = [os.environ.get("DISK_ID")]
+req.InstanceId = os.environ.get("INSTANCE_ID")
 
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cbs_client.CbsClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.AttachDisksRequest()
-        req.DiskIds = [os.environ.get("DISK_ID")]
-        req.InstanceId = os.environ.get("INSTANCE_ID")
-
-        resp = client.AttachDisks(req)
-        print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+resp = client.AttachDisks(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 ```
 
 #### Post-execution Validation
@@ -505,32 +401,14 @@ echo "Detach request submitted: $(jq -r '.Response.RequestId' /tmp/response.json
 
 #### Execution — Python SDK (Fallback Path)
 
+> See [SDK Templates](references/sdk-templates.md) for Common Init / Polling / Try-Except boilerplate.
+
 ```python
-#!/usr/bin/env python3
-"""SDK fallback for DetachDisks"""
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cbs import cbs_client, models
+req = models.DetachDisksRequest()
+req.DiskIds = [os.environ.get("DISK_ID")]
 
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cbs_client.CbsClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.DetachDisksRequest()
-        req.DiskIds = [os.environ.get("DISK_ID")]
-
-        resp = client.DetachDisks(req)
-        print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+resp = client.DetachDisks(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 ```
 
 #### Post-execution Validation
@@ -583,33 +461,15 @@ echo "Resize request submitted: $(jq -r '.Response.RequestId' /tmp/response.json
 
 #### Execution — Python SDK (Fallback Path)
 
+> See [SDK Templates](references/sdk-templates.md) for Common Init / Polling / Try-Except boilerplate.
+
 ```python
-#!/usr/bin/env python3
-"""SDK fallback for ResizeDisk"""
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cbs import cbs_client, models
+req = models.ResizeDiskRequest()
+req.DiskId = os.environ.get("DISK_ID")
+req.DiskSize = int(os.environ.get("NEW_DISK_SIZE"))
 
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cbs_client.CbsClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.ResizeDiskRequest()
-        req.DiskId = os.environ.get("DISK_ID")
-        req.DiskSize = int(os.environ.get("NEW_DISK_SIZE"))
-
-        resp = client.ResizeDisk(req)
-        print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+resp = client.ResizeDisk(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 ```
 
 #### Post-execution Validation
@@ -667,37 +527,18 @@ echo "Created snapshot: $SNAPSHOT_ID"
 
 #### Execution — Python SDK (Fallback Path)
 
+> See [SDK Templates](references/sdk-templates.md) for Common Init / Polling / Try-Except boilerplate.
+
 ```python
-#!/usr/bin/env python3
-"""SDK fallback for CreateSnapshot"""
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cbs import cbs_client, models
+req = models.CreateSnapshotRequest()
+req.DiskId = os.environ.get("DISK_ID")
+req.SnapshotName = os.environ.get("SNAPSHOT_NAME", "backup-snapshot")
 
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cbs_client.CbsClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.CreateSnapshotRequest()
-        req.DiskId = os.environ.get("DISK_ID")
-        req.SnapshotName = os.environ.get("SNAPSHOT_NAME", "backup-snapshot")
-
-        resp = client.CreateSnapshot(req)
-        result = json.loads(resp.to_json_string())
-        print(json.dumps(result, indent=2))
-        
-        snapshot_id = result["Response"]["SnapshotId"]
-        print(f"Created snapshot: {snapshot_id}")
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+resp = client.CreateSnapshot(req)
+result = json.loads(resp.to_json_string())
+snapshot_id = result["Response"]["SnapshotId"]
+print(json.dumps(result, indent=2))
+print(f"Created snapshot: {snapshot_id}")
 ```
 
 #### Post-execution Validation
@@ -752,32 +593,14 @@ echo "Delete request submitted: $(jq -r '.Response.RequestId' /tmp/response.json
 
 #### Execution — Python SDK (Fallback Path)
 
+> See [SDK Templates](references/sdk-templates.md) for Common Init / Polling / Try-Except boilerplate.
+
 ```python
-#!/usr/bin/env python3
-"""SDK fallback for DeleteSnapshots"""
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cbs import cbs_client, models
+req = models.DeleteSnapshotsRequest()
+req.SnapshotIds = [os.environ.get("SNAPSHOT_ID")]
 
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cbs_client.CbsClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.DeleteSnapshotsRequest()
-        req.SnapshotIds = [os.environ.get("SNAPSHOT_ID")]
-
-        resp = client.DeleteSnapshots(req)
-        print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+resp = client.DeleteSnapshots(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 ```
 
 #### Post-execution Validation
@@ -804,79 +627,71 @@ done
 
 ---
 
-## Prerequisites
+### Operation: ApplySnapshot (Restore Disk from Snapshot)
 
-### Option A: Cloud Shell (Zero Setup)
+> **Warning:** This operation overwrites disk data with snapshot contents. Data on the disk since the snapshot was taken will be lost.
 
-**Browser-based execution environment with pre-installed tools**:
+#### Pre-flight Checks
 
-1. **Access Cloud Shell**:
-   - Login to [Tencent Cloud Console](https://console.cloud.tencent.com)
-   - Click **Cloud Shell** icon (top right toolbar)
-   - Terminal opens automatically
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| CLI install | `tccli version` | Exit 0 | Install: `pip install tccli` |
+| Credentials | Check `TENCENTCLOUD_SECRET_ID/KEY` env | Non-empty | HALT; configure env |
+| Region | `tccli cbs DescribeDisks --Region {{env.TENCENTCLOUD_REGION}} --Limit 1` | Valid response | HALT; set valid region |
+| Snapshot exists | `tccli cbs DescribeSnapshots --SnapshotIds "[\"{{user.snapshot_id}}\"]"` | Snapshot in `NORMAL` state | HALT; snapshot not found or not ready |
+| Target disk exists | `tccli cbs DescribeDisks --DiskIds "[\"{{user.disk_id}}\"]"` | Disk exists | HALT; invalid disk ID |
+| User confirmation | Prompt: "Restore disk {{user.disk_id}} from snapshot {{user.snapshot_id}}? This overwrites current data." | Explicit "yes" | HALT; user declined |
 
-2. **Pre-installed Components**:
-   - `tccli` CLI (latest version)
-   - `tencentcloud-sdk-python` (full SDK)
-   - Python 3.8+
-   - Common tools: jq, vim, curl
-
-3. **Pre-authenticated**: Uses console login credentials automatically
-
-4. **Persistent Storage**: Save scripts in `/data/` (10GB)
+#### Execution — CLI (`tccli`) (Primary Path)
 
 ```bash
-# In Cloud Shell - no setup required
-tccli cbs DescribeDisks --Region ap-guangzhou
+tccli cbs ApplySnapshot \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --DiskId "{{user.disk_id}}" \
+  --SnapshotId "{{user.snapshot_id}}" > /tmp/response.json
 
-# Save scripts for reuse
-mkdir -p /data/scripts
-vim /data/scripts/create_disk.sh
+echo "Restore request submitted: $(jq -r '.Response.RequestId' /tmp/response.json)"
 ```
 
-**Cloud Shell Limitations**:
-- 30 min idle timeout (reconnect after)
-- Max 10 concurrent sessions
-- Browser-based (not for CI/CD)
+#### Execution — Python SDK (Fallback Path)
 
-### Option B: Local CLI Installation
+> See [SDK Templates](references/sdk-templates.md) for Common Init / Polling / Try-Except boilerplate.
 
-1. **Install `tccli` CLI**:
+```python
+req = models.ApplySnapshotRequest()
+req.DiskId = os.environ.get("DISK_ID")
+req.SnapshotId = os.environ.get("SNAPSHOT_ID")
+
+resp = client.ApplySnapshot(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
+#### Post-execution Validation
+
+1. Poll DescribeDisks until state is not `ROLLBACKING`:
 
 ```bash
-pip install tccli
-
-# Or via Homebrew (macOS)
-brew install tccli
+for i in $(seq 1 60); do
+  STATE=$(tccli cbs DescribeDisks --Region {{env.TENCENTCLOUD_REGION}} --DiskIds "[\"{{user.disk_id}}\"]" | jq -r '.Response.DiskSet[0].DiskState')
+  [ "$STATE" != "ROLLBACKING" ] && [ "$STATE" != "ATTACHING" ] && echo "✅ Disk restored from snapshot (state: $STATE)" && break
+  echo "⏳ Applying snapshot... current state: $STATE"
+  sleep 5
+done
 ```
 
-2. **Bootstrap Python runtime** (SDK fallback):
+2. Report restored disk ID and snapshot ID to user
 
-```bash
-python3 --version  # ≥ 3.8
-pip install tencentcloud-sdk-python-cbs
-```
+#### Failure Recovery
 
-3. **Configure Credentials**:
+| Error pattern | Retry Strategy | Recovery |
+|--------------|----------------|----------|
+| `InvalidSnapshot.NotFound` | 0 | HALT. Snapshot already deleted or invalid ID |
+| `InvalidDisk.NotFound` | 0 | HALT. Disk ID invalid |
+| `InvalidSnapshot.NotCompleted` | 3, 30s | Retry; wait for snapshot to reach `NORMAL` state |
+| `OperationConflict.SnapshotOperationConflict` | 3, 30s | Retry; another operation in progress |
+| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
 
-```bash
-export TENCENTCLOUD_SECRET_ID="AKIDxxxx"
-export TENCENTCLOUD_SECRET_KEY="xxxxx"
-export TENCENTCLOUD_REGION="ap-guangzhou"
-```
-
-4. **Verify Configuration**:
-
-```bash
-tccli cbs DescribeDisks --Region ap-guangzhou --Limit 1
-```
-
-### Quick Environment Check
-
-```bash
-# One-line verification (works in Cloud Shell and Local)
-python3 -c "from tencentcloud.cbs import cbs_client; print('✅ SDK OK')" && tccli version
-```
+---
 
 ## Reference Directory
 
