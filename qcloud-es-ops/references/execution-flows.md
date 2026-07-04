@@ -84,7 +84,7 @@ def main():
         req.EsVersion = "7.14.2"
         req.VpcId = "{{user.vpc_id}}"
         req.SubnetId = "{{user.subnet_id}}"
-        req.Password = os.environ.get("TENCENTCLOUD_SECRET_KEY")  # Use env var in production
+        req.Password = "{{user.password}}"
         req.InstanceName = "{{user.cluster_name}}"
 
         resp = client.CreateInstance(req)
