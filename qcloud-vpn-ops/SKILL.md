@@ -226,59 +226,15 @@ Every operation: **Pre-flight → Execute (CLI and SDK) → Validate → Recover
 | Quota | `DescribeVpnGateways` (count per VPC) | ≤ quota | HALT; raise quota |
 | Bandwidth supported | Spec allows 5/10/20/50/100/200/500/1000 Mbps | Match | HALT; ask user for valid value |
 
-#### Execution — CLI (`tccli`) (Primary Path)
+#### Execution
 
-```bash
-tccli vpc CreateVpnGateway \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --VpcId "{{user.vpc_id}}" \
-  --VpnGatewayName "{{user.vpn_gateway_name}}" \
-  --Bandwidth {{user.bandwidth}} \
-  --Zone "{{user.zone}}" \
-  --InstanceChargeType "POSTPAID_BY_HOUR" \
-  --ClientToken "$(date +%s%N)"
-```
-
-#### Execution — Python SDK (Fallback Path)
-
-```python
-#!/usr/bin/env python3
-from tencentcloud.common import credential
-from tencentcloud.vpc import vpc_client, models
-import os, json, time
-
-cred = credential.Credential(
-    os.environ.get("TENCENTCLOUD_SECRET_ID"),
-    os.environ.get("TENCENTCLOUD_SECRET_KEY")
-)
-client = vpc_client.VpcClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-req = models.CreateVpnGatewayRequest()
-req.VpcId = "{{user.vpc_id}}"
-req.VpnGatewayName = "{{user.vpn_gateway_name}}"
-req.Bandwidth = int("{{user.bandwidth}}")
-req.Zone = "{{user.zone}}"
-req.InstanceChargeType = "POSTPAID_BY_HOUR"
-req.ClientToken = str(int(time.time() * 1000000))
-
-resp = client.CreateVpnGateway(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
+> **CLI and SDK commands:** See [execution-flows.md: Create VPN Gateway](../references/execution-flows.md#1-create-vpn-gateway)
 
 #### Post-execution Validation
 
 1. Capture `{{output.vpn_gateway_id}}` from `$.Response.VpnGateway.VpnGatewayId`.
 2. Capture the public IP from `$.Response.VpnGateway.PublicIpAddress` — share with peer (Customer Gateway) operator.
-3. Poll `DescribeVpnGateways` until `State = AVAILABLE`:
-
-```bash
-for i in $(seq 1 18); do
-  STATE=$(tccli vpc DescribeVpnGateways --VpnGatewayIds "[\"{{output.vpn_gateway_id}}\"]" | \
-    jq -r '.Response.VpnGatewaySet[0].State')
-  [ "$STATE" = "AVAILABLE" ] && break
-  sleep 10
-done
-```
+3. Poll `DescribeVpnGateways` until `State = AVAILABLE` (see [execution-flows.md: Create VPN Gateway](../references/execution-flows.md#1-create-vpn-gateway) → Post-execution Validation).
 
 #### Failure Recovery
 
@@ -292,30 +248,9 @@ done
 
 ### Operation: Describe VPN Gateways
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli vpc DescribeVpnGateways \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --VpnGatewayIds "[\"{{output.vpn_gateway_id}}\"]"
-```
-
-Filter by VPC:
-
-```bash
-tccli vpc DescribeVpnGateways \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --Filters "Name=vpc-id,Values={{user.vpc_id}}"
-```
-
-#### Execution — Python SDK (Fallback Path)
-
-```python
-req = models.DescribeVpnGatewaysRequest()
-req.VpnGatewayIds = ["{{output.vpn_gateway_id}}"]
-resp = client.DescribeVpnGateways(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+> **CLI and SDK commands:** See [execution-flows.md: Describe VPN Gateways](../references/execution-flows.md#2-describe-vpn-gateways)
 
 #### Present to User
 
@@ -339,25 +274,9 @@ print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 | Peer IP format | Validate `{{user.peer_public_ip}}` is a valid IPv4 | Match | HALT; ask for a valid IP |
 | Name uniqueness | `DescribeCustomerGateways` | No duplicate name | Use different name |
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli vpc CreateCustomerGateway \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --CustomerGatewayName "{{user.customer_gateway_name}}" \
-  --IpAddress "{{user.peer_public_ip}}" \
-  --ClientToken "$(date +%s%N)"
-```
-
-#### Execution — Python SDK (Fallback Path)
-
-```python
-req = models.CreateCustomerGatewayRequest()
-req.CustomerGatewayName = "{{user.customer_gateway_name}}"
-req.IpAddress = "{{user.peer_public_ip}}"
-resp = client.CreateCustomerGateway(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
+> **CLI and SDK commands:** See [execution-flows.md: Create Customer Gateway](../references/execution-flows.md#3-create-customer-gateway)
 
 #### Post-execution Validation
 
@@ -383,67 +302,17 @@ Poll `DescribeCustomerGateways` until the new entry is visible (max 30s).
 | VPC CIDR not overlapping with peer | Compare `{{user.local_cidr}}` (VPC) vs peer `{{user.peer_cidr}}` (on-prem) | Disjoint | HALT — overlap causes blackhole routes |
 | Pre-shared key length | `{{user.pre_shared_key}}` is 16–32 chars | Match | HALT; ask user for a strong key |
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli vpc CreateVpnConnection \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --VpnGatewayId "{{output.vpn_gateway_id}}" \
-  --CustomerGatewayId "{{output.customer_gateway_id}}" \
-  --VpnConnectionName "{{user.vpn_connection_name}}" \
-  --PreShareKey "{{user.pre_shared_key}}" \
-  --VpnProto "IPsec" \
-  --IKESettings '{"IkeVersion":"IKEV2","Identity":"ADDRESS","PSK":"{{user.pre_shared_key}}","ExchangeMode":"AGGRESSIVE","LocalAddress":"{{output.vpn_gateway_public_ip}}","RemoteAddress":"{{user.peer_public_ip}}","LocalId":"{{output.vpn_gateway_public_ip}}","RemoteId":"{{user.peer_public_ip}}","IKESaLifetimeSeconds":86400,"IKEEncryptionAlgorithm":"AES-256","IKEIntegrityAlgorithm":"SHA1","DHGroupName":"GROUP2"}' \
-  --IPSECSettings '{"IpsecSaLifetimeTraffic":2560,"IpsecSaLifetimeSeconds":3600,'\''"'@type'"\'':'\''"system"'\'\''}' \
-  --LocalCidrBlocks '["{{user.local_cidr}}"]' \
-  --RemoteCidrBlocks '["{{user.peer_cidr}}"]' \
-  --ClientToken "$(date +%s%N)"
-```
-
+> **CLI and SDK commands:** See [execution-flows.md: Create VPN Connection](../references/execution-flows.md#4-create-vpn-connection-ipsec-tunnel)
+>
 > **PSK handling note:** The `--PreShareKey` flag and the PSK inside `IKESettings` are the same value. The agent should construct the CLI in a way that the value is **never echoed back** to the user. Use a heredoc, env var, or pass it programmatically; do not paste it into a chat echo.
-
-#### Execution — Python SDK (Fallback Path)
-
-```python
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.vpc import vpc_client, models
-
-cred = credential.Credential(
-    os.environ.get("TENCENTCLOUD_SECRET_ID"),
-    os.environ.get("TENCENTCLOUD_SECRET_KEY")
-)
-client = vpc_client.VpcClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-req = models.CreateVpnConnectionRequest()
-req.VpnGatewayId = "{{output.vpn_gateway_id}}"
-req.CustomerGatewayId = "{{output.customer_gateway_id}}"
-req.VpnConnectionName = "{{user.vpn_connection_name}}"
-req.PreShareKey = "{{user.pre_shared_key}}"
-req.VpnProto = "IPsec"
-req.LocalCidrBlocks = ["{{user.local_cidr}}"]
-req.RemoteCidrBlocks = ["{{user.peer_cidr}}"]
-# IKESettings / IPSECSettings: build per API spec
-resp = client.CreateVpnConnection(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
 
 #### Post-execution Validation
 
 1. Capture `{{output.vpn_connection_id}}` from `$.Response.VpnConnection.VpnConnectionId`.
 2. **Tell the user the public IP of the VPN Gateway** — the on-prem operator needs it to configure their side.
-3. Poll `DescribeVpnConnections` until `State = AVAILABLE`:
-
-```bash
-for i in $(seq 1 18); do
-  STATE=$(tccli vpc DescribeVpnConnections \
-    --VpnConnectionIds "[\"{{output.vpn_connection_id}}\"]" | \
-    jq -r '.Response.VpnConnectionSet[0].State')
-  [ "$STATE" = "AVAILABLE" ] && break
-  sleep 10
-done
-```
-
+3. Poll `DescribeVpnConnections` until `State = AVAILABLE` (see [execution-flows.md: Create VPN Connection](../references/execution-flows.md#4-create-vpn-connection-ipsec-tunnel) → Post-execution Validation).
 4. **Important:** The tunnel is `AVAILABLE` only when the **peer** is also configured. If state stays `PENDING`, the peer device is not configured or the crypto policy does not match — see [troubleshooting](references/troubleshooting.md).
 
 #### Failure Recovery
@@ -457,30 +326,9 @@ done
 
 ### Operation: Describe VPN Connections
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli vpc DescribeVpnConnections \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --VpnConnectionIds "[\"{{output.vpn_connection_id}}\"]"
-```
-
-Filter by gateway:
-
-```bash
-tccli vpc DescribeVpnConnections \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --Filters "Name=vpn-gateway-id,Values={{output.vpn_gateway_id}}"
-```
-
-#### Execution — Python SDK (Fallback Path)
-
-```python
-req = models.DescribeVpnConnectionsRequest()
-req.VpnConnectionIds = ["{{output.vpn_connection_id}}"]
-resp = client.DescribeVpnConnections(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+> **CLI and SDK commands:** See [execution-flows.md: Describe VPN Connections](../references/execution-flows.md#5-describe-vpn-connections)
 
 #### Present to User
 
@@ -501,13 +349,9 @@ print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 - **MUST** warn: this cuts hybrid cloud traffic for every workload that uses this tunnel.
 - **MUST** check: no production workload depends solely on this connection (no in-flight fail-over partner).
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli vpc DeleteVpnConnection \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --VpnConnectionId "{{output.vpn_connection_id}}"
-```
+> **CLI command:** See [execution-flows.md: Delete VPN Connection](../references/execution-flows.md#6-delete-vpn-connection)
 
 #### Post-execution Validation
 
@@ -520,13 +364,9 @@ Poll `DescribeVpnConnections`; expect absent within 60s.
 - **MUST** list all VPN Connections on the gateway (`DescribeVpnConnections` filtered by gateway) — none may remain.
 - **MUST** obtain explicit user confirmation with the gateway ID and a clear statement that **all** hybrid cloud tunnels on this gateway are torn down.
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli vpc DeleteVpnGateway \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --VpnGatewayId "{{output.vpn_gateway_id}}"
-```
+> **CLI command:** See [execution-flows.md: Delete VPN Gateway](../references/execution-flows.md#7-delete-vpn-gateway)
 
 #### Post-execution Validation
 
@@ -550,18 +390,9 @@ Poll `DescribeVpnGateways`; expect absent within 120s.
 | VPN Gateway AVAILABLE | `DescribeVpnGateways` | State `AVAILABLE` | HALT; wait |
 | Gateway supports SSL | `Type` field in gateway response | `SSL` or `CC` (combined) | HALT; create an SSL-capable gateway |
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli vpc CreateVpnGatewaySslServer \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --VpnGatewayId "{{output.vpn_gateway_id}}" \
-  --SslVpnServerName "{{user.ssl_vpn_server_name}}" \
-  --LocalAddress "{{user.ssl_local_cidr}}" \
-  --RemoteAddress "{{user.ssl_client_cidr}}" \
-  --SslVpnProtocol "UDP" \
-  --Port "{{user.ssl_port}}"
-```
+> **CLI command:** See [execution-flows.md: Create SSL VPN Server](../references/execution-flows.md#8-create-ssl-vpn-server)
 
 #### Post-execution Validation
 
@@ -571,14 +402,9 @@ Poll `DescribeVpnGatewaySslServers` until visible (max 30s).
 
 > **Cert handling note:** The response contains a one-time downloadable client cert. Surface it to the user **once** with a clear "save this now" warning; the cert cannot be re-fetched in plaintext.
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli vpc CreateVpnGatewaySslClient \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --SslVpnServerId "{{output.ssl_server_id}}" \
-  --SslVpnClientName "{{user.ssl_client_name}}"
-```
+> **CLI command:** See [execution-flows.md: Create SSL VPN Client](../references/execution-flows.md#9-create-ssl-vpn-client)
 
 #### Post-execution Validation
 
@@ -592,13 +418,9 @@ Capture the cert payload from the response; warn user it is shown only once.
 
 - **MUST** obtain explicit user confirmation with the client name; revocation is not reversible without re-issuing a new client.
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli vpc DeleteVpnGatewaySslClient \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --SslVpnClientId "{{output.ssl_client_id}}"
-```
+> **CLI command:** See [execution-flows.md: Delete SSL VPN Client](../references/execution-flows.md#10-delete-ssl-vpn-client)
 
 #### Post-execution Validation
 
@@ -611,13 +433,9 @@ Poll `DescribeVpnGatewaySslClients`; expect absent within 30s.
 - **MUST** confirm no VPN Connection references this customer gateway.
 - **MUST** obtain explicit user confirmation.
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli vpc DeleteCustomerGateway \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --CustomerGatewayId "{{output.customer_gateway_id}}"
-```
+> **CLI command:** See [execution-flows.md: Delete Customer Gateway](../references/execution-flows.md#11-delete-customer-gateway)
 
 #### Post-execution Validation
 
