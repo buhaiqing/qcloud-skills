@@ -249,59 +249,11 @@ tccli scf ListFunctions --Region {{env.TENCENTCLOUD_REGION}} --Namespace default
 
 #### Execution — CLI (`tccli`) (Primary Path)
 
+See [`references/execution-flows.md`](references/execution-flows.md) §1 for full CLI and SDK command blocks.
+
+**Quick command:**
 ```bash
-# Create function with zip package
-tccli scf CreateFunction \
-  --FunctionName "{{user.function_name}}" \
-  --Handler "{{user.handler}}" \
-  --Runtime "{{user.runtime}}" \
-  --Namespace "{{user.namespace}}" \
-  --MemorySize {{user.memory_size}} \
-  --Timeout {{user.timeout}} \
-  --Code.ZipFile "{{user.zip_file_path}}" \
-  --Description "Serverless function deployed via agent" \
-  --Region {{env.TENCENTCLOUD_REGION}}
-```
-
-#### Execution — Python SDK (Fallback Path)
-
-```python
-#!/usr/bin/env python3
-"""SDK fallback: SCF CreateFunction"""
-import os, json, base64
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.scf import scf_client, models
-
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = scf_client.ScfClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-        
-        req = models.CreateFunctionRequest()
-        req.FunctionName = os.environ.get("FUNCTION_NAME")
-        req.Handler = os.environ.get("HANDLER", "index.handler")
-        req.Runtime = os.environ.get("RUNTIME", "Python3.8")
-        req.MemorySize = int(os.environ.get("MEMORY_SIZE", "512"))
-        req.Timeout = int(os.environ.get("TIMEOUT", "30"))
-        req.Namespace = os.environ.get("NAMESPACE", "default")
-        
-        # Read zip file and encode
-        with open(os.environ.get("ZIP_FILE_PATH"), "rb") as f:
-            zip_content = f.read()
-        req.Code = models.Code()
-        req.Code.ZipFile = base64.b64encode(zip_content).decode("utf-8")
-        
-        resp = client.CreateFunction(req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+tccli scf CreateFunction --FunctionName "{{user.function_name}}" --Handler "{{user.handler}}" --Runtime "{{user.runtime}}" --Namespace "{{user.namespace}}" --MemorySize {{user.memory_size}} --Timeout {{user.timeout}} --Code.ZipFile "{{user.zip_file_path}}" --Region {{env.TENCENTCLOUD_REGION}}
 ```
 
 #### Post-execution Validation
@@ -309,19 +261,7 @@ if __name__ == "__main__":
 1. Read `{{output.function_name}}` from `$.Response.FunctionName`
 2. Poll GetFunction until Status = `Active` or timeout (60s):
 
-```bash
-for i in $(seq 1 30); do
-  STATUS=$(tccli scf GetFunction --Region {{env.TENCENTCLOUD_REGION}} --FunctionName "{{user.function_name}}" | jq -r '.Response.Status')
-  [ "$STATUS" = "Active" ] && break
-  sleep 2
-done
-
-# Check timeout
-if [ "$STATUS" != "Active" ]; then
-  echo "[ERROR] Timeout waiting for function Active status (current: $STATUS)"
-  exit 1
-fi
-```
+See [`references/execution-flows.md`](references/execution-flows.md) §1 for the full polling loop.
 
 3. Report function name and status to user
 4. On failure, go to **Failure Recovery**
@@ -343,26 +283,11 @@ fi
 
 #### Execution — CLI
 
+See [`references/execution-flows.md`](references/execution-flows.md) §2 for full CLI and SDK command blocks.
+
+**Quick command:**
 ```bash
-tccli scf UpdateFunctionCode \
-  --FunctionName "{{user.function_name}}" \
-  --Handler "{{user.handler}}" \
-  --Code.ZipFile "{{user.zip_file_path}}" \
-  --Namespace "{{user.namespace}}" \
-  --Region {{env.TENCENTCLOUD_REGION}}
-```
-
-#### Execution — Python SDK
-
-```python
-req = models.UpdateFunctionCodeRequest()
-req.FunctionName = os.environ.get("FUNCTION_NAME")
-req.Handler = os.environ.get("HANDLER", "index.handler")
-with open(os.environ.get("ZIP_FILE_PATH"), "rb") as f:
-    req.Code = models.Code()
-    req.Code.ZipFile = base64.b64encode(f.read()).decode("utf-8")
-resp = client.UpdateFunctionCode(req)
-print(json.dumps(resp.to_json_string(), indent=2))
+tccli scf UpdateFunctionCode --FunctionName "{{user.function_name}}" --Handler "{{user.handler}}" --Code.ZipFile "{{user.zip_file_path}}" --Namespace "{{user.namespace}}" --Region {{env.TENCENTCLOUD_REGION}}
 ```
 
 #### Post-execution Validation
@@ -390,21 +315,11 @@ print(json.dumps(resp.to_json_string(), indent=2))
 
 #### Execution — CLI
 
+See [`references/execution-flows.md`](references/execution-flows.md) §3 for full CLI and SDK command blocks.
+
+**Quick command:**
 ```bash
-tccli scf DeleteFunction \
-  --FunctionName "{{user.function_name}}" \
-  --Namespace "{{user.namespace}}" \
-  --Region {{env.TENCENTCLOUD_REGION}}
-```
-
-#### Execution — Python SDK
-
-```python
-req = models.DeleteFunctionRequest()
-req.FunctionName = os.environ.get("FUNCTION_NAME")
-req.Namespace = os.environ.get("NAMESPACE", "default")
-resp = client.DeleteFunction(req)
-print(json.dumps(resp.to_json_string(), indent=2))
+tccli scf DeleteFunction --FunctionName "{{user.function_name}}" --Namespace "{{user.namespace}}" --Region {{env.TENCENTCLOUD_REGION}}
 ```
 
 #### Post-execution Validation
@@ -424,26 +339,11 @@ print(json.dumps(resp.to_json_string(), indent=2))
 
 #### Execution — CLI
 
+See [`references/execution-flows.md`](references/execution-flows.md) §4 for full CLI and SDK command blocks.
+
+**Quick command:**
 ```bash
-# Publish $LATEST as a new version
-tccli scf PublishVersion \
-  --FunctionName "{{user.function_name}}" \
-  --Namespace "{{user.namespace}}" \
-  --Description "Version published {{date}}" \
-  --Region {{env.TENCENTCLOUD_REGION}}
-```
-
-#### Execution — Python SDK
-
-```python
-import datetime
-
-req = models.PublishVersionRequest()
-req.FunctionName = os.environ.get("FUNCTION_NAME")
-req.Namespace = os.environ.get("NAMESPACE", "default")
-req.Description = f"Published {datetime.now().isoformat()}"
-resp = client.PublishVersion(req)
-print(json.dumps(resp.to_json_string(), indent=2))
+tccli scf PublishVersion --FunctionName "{{user.function_name}}" --Namespace "{{user.namespace}}" --Description "Version published $(date -u +%Y-%m-%dT%H:%M:%SZ)" --Region {{env.TENCENTCLOUD_REGION}}
 ```
 
 #### Post-execution Validation
@@ -463,26 +363,11 @@ print(json.dumps(resp.to_json_string(), indent=2))
 
 #### Execution — CLI
 
+See [`references/execution-flows.md`](references/execution-flows.md) §5 for full CLI and SDK command blocks.
+
+**Quick command:**
 ```bash
-tccli scf CreateAlias \
-  --FunctionName "{{user.function_name}}" \
-  --Name "{{user.alias_name}}" \
-  --FunctionVersion "{{user.version}}" \
-  --Namespace "{{user.namespace}}" \
-  --Description "Alias for {{user.alias_name}} environment" \
-  --Region {{env.TENCENTCLOUD_REGION}}
-```
-
-#### Execution — Python SDK
-
-```python
-req = models.CreateAliasRequest()
-req.FunctionName = os.environ.get("FUNCTION_NAME")
-req.Name = os.environ.get("ALIAS_NAME")
-req.FunctionVersion = os.environ.get("FUNCTION_VERSION", "$LATEST")
-req.Namespace = os.environ.get("NAMESPACE", "default")
-resp = client.CreateAlias(req)
-print(json.dumps(resp.to_json_string(), indent=2))
+tccli scf CreateAlias --FunctionName "{{user.function_name}}" --Name "{{user.alias_name}}" --FunctionVersion "{{user.version}}" --Namespace "{{user.namespace}}" --Description "Alias for {{user.alias_name}} environment" --Region {{env.TENCENTCLOUD_REGION}}
 ```
 
 #### Post-execution Validation
@@ -507,54 +392,13 @@ print(json.dumps(resp.to_json_string(), indent=2))
 | Function exists | `tccli scf GetFunction --FunctionName {{user.function_name}}` | Status = Active | HALT |
 | Trigger config valid | Validate per trigger type | Valid config | Fix config |
 
-#### Execution — CLI (Timer Trigger)
+#### Execution — CLI
 
-```bash
-# Create timer trigger (cron expression)
-tccli scf CreateTrigger \
-  --FunctionName "{{user.function_name}}" \
-  --TriggerName "{{user.trigger_name}}" \
-  --Type "timer" \
-  --TriggerDesc '{"cron": "0 */2 * * * *"}' \
-  --Enable "OPEN" \
-  --Namespace "{{user.namespace}}" \
-  --Region {{env.TENCENTCLOUD_REGION}}
-```
+See [`references/execution-flows.md`](references/execution-flows.md) §6 for full CLI (Timer/COS) and SDK command blocks.
 
-#### Execution — CLI (COS Trigger)
-
-```bash
-# Create COS bucket trigger
-tccli scf CreateTrigger \
-  --FunctionName "{{user.function_name}}" \
-  --TriggerName "{{user.trigger_name}}" \
-  --Type "cos" \
-  --TriggerDesc '{"bucketUrl": "mybucket-{{appid}}.cos.{{region}}.myqcloud.com", "event": "cos:ObjectCreated:*", "filter": {"Prefix": "uploads/", "Suffix": ".jpg"}}' \
-  --Enable "OPEN" \
-  --Namespace "{{user.namespace}}" \
-  --Region {{env.TENCENTCLOUD_REGION}}
-```
-
-#### Execution — Python SDK
-
-```python
-req = models.CreateTriggerRequest()
-req.FunctionName = os.environ.get("FUNCTION_NAME")
-req.TriggerName = os.environ.get("TRIGGER_NAME")
-req.Type = os.environ.get("TRIGGER_TYPE")
-req.Namespace = os.environ.get("NAMESPACE", "default")
-req.Enable = "OPEN"
-
-# TriggerDesc varies by type
-trigger_type = os.environ.get("TRIGGER_TYPE")
-if trigger_type == "timer":
-    req.TriggerDesc = '{"cron": "0 */2 * * * *"}'
-elif trigger_type == "cos":
-    req.TriggerDesc = '{"bucketUrl": "...", "event": "cos:ObjectCreated:*"}'
-
-resp = client.CreateTrigger(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
+**Quick commands:**
+- Timer: `tccli scf CreateTrigger --FunctionName "{{user.function_name}}" --TriggerName "{{user.trigger_name}}" --Type timer --TriggerDesc '{"cron": "0 */2 * * * *"}' --Enable OPEN --Namespace "{{user.namespace}}" --Region {{env.TENCENTCLOUD_REGION}}`
+- COS: `tccli scf CreateTrigger --FunctionName "{{user.function_name}}" --TriggerName "{{user.trigger_name}}" --Type cos --TriggerDesc '{"bucketUrl": "...", "event": "cos:ObjectCreated:*"}' --Enable OPEN --Namespace "{{user.namespace}}" --Region {{env.TENCENTCLOUD_REGION}}`
 
 #### Post-execution Validation
 
@@ -575,40 +419,11 @@ print(json.dumps(resp.to_json_string(), indent=2))
 
 #### Execution — CLI
 
-```bash
-# Get recent function logs
-tccli scf GetFunctionLogs \
-  --FunctionName "{{user.function_name}}" \
-  --Namespace "{{user.namespace}}" \
-  --Limit 100 \
-  --Order "DESC" \
-  --Region {{env.TENCENTCLOUD_REGION}}
+See [`references/execution-flows.md`](references/execution-flows.md) §7 for full CLI and SDK command blocks.
 
-# Filter by request ID
-tccli scf GetFunctionLogs \
-  --FunctionName "{{user.function_name}}" \
-  --Namespace "{{user.namespace}}" \
-  --FunctionRequestId "{{user.request_id}}" \
-  --Region {{env.TENCENTCLOUD_REGION}}
-```
-
-#### Execution — Python SDK
-
-```python
-req = models.GetFunctionLogsRequest()
-req.FunctionName = os.environ.get("FUNCTION_NAME")
-req.Namespace = os.environ.get("NAMESPACE", "default")
-req.Limit = int(os.environ.get("LIMIT", "100"))
-req.Order = os.environ.get("ORDER", "DESC")
-
-request_id = os.environ.get("REQUEST_ID")
-if request_id:
-    req.FunctionRequestId = request_id
-
-resp = client.GetFunctionLogs(req)
-for log in resp.Data:
-    print(f"{log.StartTime} - {log.FunctionName} - {log.Log}")
-```
+**Quick commands:**
+- List logs: `tccli scf GetFunctionLogs --FunctionName "{{user.function_name}}" --Namespace "{{user.namespace}}" --Limit 100 --Order DESC --Region {{env.TENCENTCLOUD_REGION}}`
+- Filter by request ID: `tccli scf GetFunctionLogs --FunctionName "{{user.function_name}}" --Namespace "{{user.namespace}}" --FunctionRequestId "{{user.request_id}}" --Region {{env.TENCENTCLOUD_REGION}}`
 
 #### Present to User
 
