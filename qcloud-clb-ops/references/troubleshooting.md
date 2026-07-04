@@ -1,5 +1,29 @@
 # CLB Troubleshooting Guide
 
+> **Platform:** Date commands differ between macOS and Linux. Use the cross-platform helper below:
+> ```bash
+> # Cross-platform: compute timestamp N minutes ago
+> date_minus_minutes() {
+>   local mins=$1
+>   if date -v-"${mins}"M +%s >/dev/null 2>&1; then
+>     date -u -v-"${mins}"M +%Y-%m-%dT%H:%M:%S+00:00  # macOS
+>   else
+>     date -u -d "-${mins} minutes" +%Y-%m-%dT%H:%M:%S+00:00  # Linux
+>   fi
+> }
+> ```
+
+> **Tool dependency:** All `jq` commands below require `jq` installed. Verify before use:
+> ```bash
+> command -v jq >/dev/null 2>&1 || { echo "[ERROR] jq not installed — install via: brew install jq / apt install jq"; exit 1; }
+> ```
+
+> **Environment validation:** Ensure required environment variables are set:
+> ```bash
+> test -n "$TENCENTCLOUD_SECRET_ID" || { echo "[ERROR] TENCENTCLOUD_SECRET_ID not set"; exit 1; }
+> test -n "$TENCENTCLOUD_SECRET_KEY" || { echo "[ERROR] TENCENTCLOUD_SECRET_KEY not set"; exit 1; }
+> ```
+
 ## Quick Diagnosis: 5xx Errors (MTTR < 30 min)
 
 > **When `HttpCode5XX` alarm fires**, use the fast diagnosis path below instead of general troubleshooting.
@@ -10,19 +34,20 @@
 
 ```bash
 # 5xx trend (last 15 min)
-# Cross-platform: macOS uses date -v-15M, Linux uses date -d '-15 minutes'
-START_TIME=$(date -u -v-15M +%Y-%m-%dT%H:%M:%S+00:00 2>/dev/null || date -u -d '-15 minutes' +%Y-%m-%dT%H:%M:%S+00:00)
+START_TIME=$(date_minus_minutes 15)
 tccli monitor GetMonitorData \
   --Namespace "QCE/LB_PUBLIC" \
   --MetricName "HttpCode5XX" \
   --Dimensions "[{\"Name\":\"LoadBalancerId\",\"Value\":\"{{user.loadbalancer_id}}\"}]" \
   --Period 60 \
   --StartTime "$START_TIME" \
-  --EndTime "$(date -u +%Y-%m-%dT%H:%M:%S+00:00)"
+  --EndTime "$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" \
+  --Region "{{env.TENCENTCLOUD_REGION}}"
 
 # Backend health status
 tccli clb DescribeTargetHealth \
-  --LoadBalancerId "{{user.loadbalancer_id}}"
+  --LoadBalancerId "{{user.loadbalancer_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 2. **Route by condition:**
@@ -43,13 +68,27 @@ tccli clb DescribeTargetHealth \
 ```bash
 # Check current capacity
 tccli clb DescribeTargets --LoadBalancerId "{{user.loadbalancer_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   | jq '[.Response.Targets[] | {InstanceId, Weight, HealthStatus}]'
 
 # Scale: register additional backends
 tccli clb RegisterTargets \
   --LoadBalancerId "{{user.loadbalancer_id}}" \
   --ListenerId "{{user.listener_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --Targets "[{\"InstanceId\":\"{{user.new_instance_id}}\",\"Port\":{{user.target_port}},\"Weight\":10}]"
+
+# SDK fallback: Python equivalent
+# import json
+# from tencentcloud.common import credential
+# from tencentcloud.clb.v20180317 import clb_client, models
+# cred = credential.Credential("{{env.TENCENTCLOUD_SECRET_ID}}", "{{env.TENCENTCLOUD_SECRET_KEY}}")
+# client = clb_client.ClbClient(cred, "{{env.TENCENTCLOUD_REGION}}")
+# req = models.RegisterTargetsRequest()
+# req.LoadBalancerId = "{{user.loadbalancer_id}}"
+# req.ListenerId = "{{user.listener_id}}"
+# req.Targets = [models.TargetInfo(InstanceId="{{user.new_instance_id}}", Port={{user.target_port}}, Weight=10)]
+# resp = client.RegisterTargets(req)
 ```
 
 ### Backend Application Error
@@ -78,22 +117,49 @@ tccli clb RegisterTargets \
 **Diagnostic Steps:**
 1. Check health check configuration
 ```bash
-tccli clb DescribeListeners --LoadBalancerId "{{user.loadbalancer_id}}" | jq '.Response.ListenerSet[0].HealthCheck'
+tccli clb DescribeListeners --LoadBalancerId "{{user.loadbalancer_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  | jq '.Response.ListenerSet[0].HealthCheck'
+
+# SDK fallback: Python equivalent
+# import json
+# from tencentcloud.common import credential
+# from tencentcloud.clb.v20180317 import clb_client, models
+# cred = credential.Credential("{{env.TENCENTCLOUD_SECRET_ID}}", "{{env.TENCENTCLOUD_SECRET_KEY}}")
+# client = clb_client.ClbClient(cred, "{{env.TENCENTCLOUD_REGION}}")
+# req = models.DescribeListenersRequest()
+# req.LoadBalancerId = "{{user.loadbalancer_id}}"
+# resp = client.DescribeListeners(req)
+# health_check = resp.ListenerSet[0].HealthCheck
 ```
 2. Verify backend port is open
 ```bash
 # Check if backend port responds
-curl -v http://<backend-ip>:<port>/health-check-path
+# WARNING: Never log or expose backend IPs in agent output. Mask with <masked>.
+curl -v http://<masked>:<masked>/health-check-path
 ```
 3. Check security group rules
 ```bash
 # Extract SG IDs from LB, then check rules
 SG_IDS=$(tccli clb DescribeLoadBalancers \
   --LoadBalancerIds "[\"{{user.loadbalancer_id}}\"]" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   | jq -r '.Response.LoadBalancerSet[0].SecurityGroups[]')
 for SG_ID in $SG_IDS; do
-  tccli vpc DescribeSecurityGroups --SecurityGroupIds "[\"$SG_ID\"]"
+  tccli vpc DescribeSecurityGroups --SecurityGroupIds "[\"$SG_ID\"]" \
+    --Region "{{env.TENCENTCLOUD_REGION}}"
 done
+
+# SDK fallback: Python equivalent
+# import json
+# from tencentcloud.common import credential
+# from tencentcloud.clb.v20180317 import clb_client, models
+# cred = credential.Credential("{{env.TENCENTCLOUD_SECRET_ID}}", "{{env.TENCENTCLOUD_SECRET_KEY}}")
+# client = clb_client.ClbClient(cred, "{{env.TENCENTCLOUD_REGION}}")
+# req = models.DescribeLoadBalancersRequest()
+# req.LoadBalancerIds = ["{{user.loadbalancer_id}}"]
+# resp = client.DescribeLoadBalancers(req)
+# sg_ids = resp.LoadBalancerSet[0].SecurityGroups
 ```
 
 **Root Causes:**
@@ -111,15 +177,18 @@ done
 **Diagnostic Steps:**
 1. Verify CLB status
 ```bash
-tccli clb DescribeLoadBalancers --LoadBalancerIds "[\"{{user.loadbalancer_id}}\"]" | jq '.Response.LoadBalancerSet[0].Status'
+tccli clb DescribeLoadBalancers --LoadBalancerIds "[\"{{user.loadbalancer_id}}\"]" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" | jq '.Response.LoadBalancerSet[0].Status'
 ```
 2. Check listener configuration
 ```bash
-tccli clb DescribeListeners --LoadBalancerId "{{user.loadbalancer_id}}"
+tccli clb DescribeListeners --LoadBalancerId "{{user.loadbalancer_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 3. Verify backend binding
 ```bash
-tccli clb DescribeTargets --LoadBalancerId "{{user.loadbalancer_id}}"
+tccli clb DescribeTargets --LoadBalancerId "{{user.loadbalancer_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 **Root Causes:**
@@ -137,12 +206,27 @@ tccli clb DescribeTargets --LoadBalancerId "{{user.loadbalancer_id}}"
 **Diagnostic Steps:**
 1. Verify certificate ID
 ```bash
-tccli ssl DescribeCertificates --CertificateIds "[\"{{user.certificate_id}}\"]"
+tccli ssl DescribeCertificates --CertificateIds "[\"{{user.certificate_id}}\"]" \
+  --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 2. Check certificate expiration
 ```bash
 # Get certificate expiry date
+tccli ssl DescribeCertificates --CertificateIds "[\"{{user.certificate_id}}\"]" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  | jq '.Response.Certificates[0].CertExpireTime'
 ```
+
+# SDK fallback: Python equivalent
+# import json
+# from tencentcloud.common import credential
+# from tencentcloud.ssl.v20191205 import ssl_client, models
+# cred = credential.Credential("{{env.TENCENTCLOUD_SECRET_ID}}", "{{env.TENCENTCLOUD_SECRET_KEY}}")
+# client = ssl_client.SslClient(cred, "{{env.TENCENTCLOUD_REGION}}")
+# req = models.DescribeCertificatesRequest()
+# req.CertificateIds = ["{{user.certificate_id}}"]
+# resp = client.DescribeCertificates(req)
+# expire_time = resp.Certificates[0].CertExpireTime
 
 **Root Causes:**
 | Cause | Resolution |
@@ -158,12 +242,26 @@ tccli ssl DescribeCertificates --CertificateIds "[\"{{user.certificate_id}}\"]"
 **Diagnostic Steps:**
 1. Check backend weights
 ```bash
-tccli clb DescribeTargets --LoadBalancerId "{{user.loadbalancer_id}}" | jq '.Response.Targets[].Weight'
+tccli clb DescribeTargets --LoadBalancerId "{{user.loadbalancer_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  | jq '.Response.Targets[].Weight'
 ```
 2. Verify health status
 ```bash
-tccli clb DescribeTargetHealth --LoadBalancerId "{{user.loadbalancer_id}}"
+tccli clb DescribeTargetHealth --LoadBalancerId "{{user.loadbalancer_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
+
+# SDK fallback: Python equivalent
+# import json
+# from tencentcloud.common import credential
+# from tencentcloud.clb.v20180317 import clb_client, models
+# cred = credential.Credential("{{env.TENCENTCLOUD_SECRET_ID}}", "{{env.TENCENTCLOUD_SECRET_KEY}}")
+# client = clb_client.ClbClient(cred, "{{env.TENCENTCLOUD_REGION}}")
+# req = models.DescribeTargetsRequest()
+# req.LoadBalancerId = "{{user.loadbalancer_id}}"
+# resp = client.DescribeTargets(req)
+# weights = [t.Weight for t in resp.Targets]
 
 **Root Causes:**
 | Cause | Resolution |

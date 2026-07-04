@@ -56,7 +56,9 @@ tccli monitor GetMonitorData \
 ```bash
 # Check all backend health
 tccli clb DescribeTargetHealth \
-  --LoadBalancerId "{{user.loadbalancer_id}}"
+  --LoadBalancerId "{{user.loadbalancer_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ### Step 3: Quick LB Status Check (parallel)
@@ -65,6 +67,7 @@ tccli clb DescribeTargetHealth \
 # Verify LB is running
 tccli clb DescribeLoadBalancers \
   --LoadBalancerIds "[\"{{user.loadbalancer_id}}\"]" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
@@ -90,6 +93,8 @@ tccli clb DescribeLoadBalancers \
 # Filter unhealthy targets
 tccli clb DescribeTargetHealth \
   --LoadBalancerId "{{user.loadbalancer_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   | jq '[.Response.Targets[] | select(.HealthStatus != "alive")]'
 ```
 
@@ -99,6 +104,8 @@ tccli clb DescribeTargetHealth \
 # Get health check params
 tccli clb DescribeListeners \
   --LoadBalancerId "{{user.loadbalancer_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   | jq '.Response.ListenerSet[].HealthCheck'
 ```
 
@@ -117,6 +124,7 @@ curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 http://<backend-ip>:<
 SG_IDS=$(tccli clb DescribeLoadBalancers \
   --LoadBalancerIds "[\"{{user.loadbalancer_id}}\"]" \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   | jq -r '.Response.LoadBalancerSet[0].SecurityGroups[]')
 
 # Verify security group allows CLB health check source
@@ -126,6 +134,17 @@ for SG_ID in $SG_IDS; do
     --Region "{{env.TENCENTCLOUD_REGION}}" \
     | jq '.Response.SecurityGroupSet[0].SecurityGroupPolicySet'
 done
+
+# SDK fallback: Python equivalent
+# import json
+# from tencentcloud.common import credential
+# from tencentcloud.clb.v20180317 import clb_client, models
+# cred = credential.Credential("{{env.TENCENTCLOUD_SECRET_ID}}", "{{env.TENCENTCLOUD_SECRET_KEY}}")
+# client = clb_client.ClbClient(cred, "{{env.TENCENTCLOUD_REGION}}")
+# req = models.DescribeLoadBalancersRequest()
+# req.LoadBalancerIds = ["{{user.loadbalancer_id}}"]
+# resp = client.DescribeLoadBalancers(req)
+# sg_ids = resp.LoadBalancerSet[0].SecurityGroups
 ```
 
 ### Common Root Causes & Fixes
@@ -144,13 +163,17 @@ done
 # Quick remediation: deregister unhealthy → fix → re-register
 tccli clb DeregisterTargets \
   --LoadBalancerId "{{user.loadbalancer_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --ListenerId "{{user.listener_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --Targets "[{\"InstanceId\":\"{{user.instance_id}}\",\"Port\":{{user.target_port}}}]"
 
 # After backend fix, re-register
 tccli clb RegisterTargets \
   --LoadBalancerId "{{user.loadbalancer_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --ListenerId "{{user.listener_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --Targets "[{\"InstanceId\":\"{{user.instance_id}}\",\"Port\":{{user.target_port}},\"Weight\":10}]"
 ```
 
@@ -184,6 +207,8 @@ tccli clb RegisterTargets \
 # Get LB VIP
 tccli clb DescribeLoadBalancers \
   --LoadBalancerIds "[\"{{user.loadbalancer_id}}\"]" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   | jq '.Response.LoadBalancerSet[0].VipIps[0]'
 ```
 
@@ -230,6 +255,8 @@ tccli monitor GetMonitorData \
 # Get target weights and count
 tccli clb DescribeTargets \
   --LoadBalancerId "{{user.loadbalancer_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   | jq '[.Response.Targets[] | {InstanceId, Port, Weight, HealthStatus}]'
 ```
 
@@ -248,7 +275,9 @@ tccli clb DescribeTargets \
 # Quick scale: register additional backend servers
 tccli clb RegisterTargets \
   --LoadBalancerId "{{user.loadbalancer_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --ListenerId "{{user.listener_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --Targets "[{\"InstanceId\":\"{{user.instance_id}}\",\"Port\":{{user.target_port}},\"Weight\":10}]"
 ```
 
@@ -263,6 +292,7 @@ tccli clb RegisterTargets \
 ```bash
 tccli clb DescribeLoadBalancers \
   --LoadBalancerIds "[\"{{user.loadbalancer_id}}\"]" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
   | jq '.Response.LoadBalancerSet[0] | {LoadBalancerId, Status, LoadBalancerType, VpcId}'
 ```
@@ -303,6 +333,7 @@ done
 ```bash
 tccli clb DescribeTargetHealth \
   --LoadBalancerId "{{user.loadbalancer_id}}" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   | jq '[.Response.Targets[] | select(.HealthStatus != "alive")] | length'
 # Expected: 0 (all healthy)
 ```
