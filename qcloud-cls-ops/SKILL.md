@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.3.0"
-  last_updated: "2026-06-09"
+  version: "1.4.0"
+  last_updated: "2026-07-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/614"
@@ -192,105 +192,39 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 
 ## Quick Start
 
-### What This Skill Does
-
-This skill enables you to deploy, configure, troubleshoot, and monitor CLS (Cloud Log Service) log infrastructure using `tccli` CLI (primary) or `tencentcloud-sdk-python-cls` SDK (fallback).
-
-### Execution Environments
-
-| Environment | Setup Required | Use Case |
-|-------------|---------------|----------|
-| **Cloud Shell** | Zero setup | Quick operations, troubleshooting |
-| **Local CLI** | Install tccli + credentials | Development, automation |
-| **Local SDK** | Python 3.8+ + SDK package | Complex operations, batch processing |
-
-### Option 1: Cloud Shell (Recommended for Quick Start)
-
-**Zero-setup execution environment**:
-
-1. Login to [Tencent Cloud Console](https://console.cloud.tencent.com)
-2. Click **Cloud Shell** icon (top right toolbar)
-3. Terminal opens with pre-installed `tccli` and SDK
+| Env | Setup |
+|-----|-------|
+| **Cloud Shell** | [Console](https://console.cloud.tencent.com) → Cloud Shell icon. Pre-installed `tccli`/SDK, pre-authenticated, 10GB `/data/`. Limit: 30min idle, 10 sessions, no CI/CD. |
+| **Local CLI** | `pip install tccli` + `TENCENTCLOUD_SECRET_ID`/`_KEY`/`_REGION` |
+| **Local SDK** | `pip install tencentcloud-sdk-python-cls` + same credentials |
 
 ```bash
-# Cloud Shell is pre-authenticated - no credential setup needed
-tccli cls DescribeLogsets --Region ap-guangzhou
+# Verify (Cloud Shell or local)
+tccli cls DescribeLogsets --Region ap-guangzhou && python3 -c "from tencentcloud.cls import cls_client"
 
-# Save scripts to persistent storage
-mkdir -p /data/scripts
-# Files in /data/ persist across sessions
-```
-
-**Cloud Shell Features**:
-- Pre-installed: `tccli`, `tencentcloud-sdk-python`, common tools
-- Pre-authenticated: Uses console login credentials
-- Persistent: 10GB storage in `/data/`
-- Free: No additional cost
-
-### Option 2: Local CLI Setup
-
-**Prerequisites**:
-- [ ] `tccli` CLI installed (`pip install tccli`)
-- [ ] Credentials configured: `TENCENTCLOUD_SECRET_ID`, `TENCENTCLOUD_SECRET_KEY`
-- [ ] Region set: `TENCENTCLOUD_REGION`
-
-### Option 3: Python SDK Setup
-
-**Prerequisites**:
-- [ ] Python 3.8+ runtime
-- [ ] SDK installed: `pip install tencentcloud-sdk-python-cls`
-- [ ] Credentials configured
-
-### Verify Setup (All Environments)
-
-```bash
-# Check CLI version
-tccli version
-
-# Test API access
-tccli cls DescribeLogsets --Region ap-guangzhou
-
-# Expected output (JSON)
-# {"Response": {"Logsets": [...], "RequestId": "..."}}
-```
-
-### Your First Command
-
-```bash
-# List all logsets in current region
+# First command
 tccli cls DescribeLogsets --Region {{env.TENCENTCLOUD_REGION}}
-
-# Cloud Shell: Use explicit region
-tccli cls DescribeLogsets --Region ap-guangzhou
 ```
-
-### Next Steps
-
-- [Core Concepts](references/core-concepts.md) — Understand CLS architecture: Logset → Topic → Index → MachineGroup → Config
-- [Common Operations](#execution-flows) — Create logset, create topic, search logs, configure collection
-- [CLI Usage Guide](references/cli-usage.md) — Detailed CLI command reference
-- [Integration Guide](references/integration.md) — Cloud Shell, SDK setup, automation
-- [Troubleshooting](references/troubleshooting.md) — Fix common CLS issues
 
 ## Capabilities at a Glance
 
-| Operation | Description | Complexity | Risk Level |
-|-----------|-------------|------------|------------|
-| CreateLogset | Create new logset (log project container) | Low | Low |
-| DescribeLogsets | View logset details | Low | None |
-| DeleteLogset | Delete logset and all topics | Low | **High** — irreversible |
-| CreateTopic | Create log topic (storage/shard unit) | Low | Low |
-| DescribeTopics | View topic details and status | Low | None |
-| DeleteTopic | Delete topic and all logs | Low | **High** — irreversible |
-| CreateIndex | Configure index for log search | Medium | Low |
-| DeleteIndex | Remove index (search disabled) | Low | Medium |
-| SearchLog | Query logs with SQL syntax | Low | None |
-| CreateMachineGroup | Create log collection agent group | Medium | Low |
-| CreateConfig | Create log collection configuration | Medium | Low |
-| CreateShipper | Ship logs to COS/CKafka | Medium | Low |
-| CreateAlarm | Create log-based alarm rule | Medium | Low |
-| ImportCOSAccessLogs | Import COS access logs to CLS for analysis | Medium | Low |
-| COSAccessLogAnalysis | Analyze COS access logs — audit, troubleshooting, performance | Medium | None |
+| Operation | Risk Level |
+|-----------|------------|
+| CreateLogset | Low |
+| DescribeLogsets | None |
+| DeleteLogset | **High** — irreversible |
+| CreateTopic | Low |
+| DescribeTopics | None |
+| DeleteTopic | **High** — irreversible |
+| CreateIndex | Low |
+| DeleteIndex | Medium |
+| SearchLog | None |
+| CreateMachineGroup | Low |
+| CreateConfig | Low |
+| CreateShipper | Low |
+| CreateAlarm | Low |
+| ImportCOSAccessLogs | Low |
+| COSAccessLogAnalysis | None |
 
 ## Changelog
 
@@ -299,6 +233,7 @@ tccli cls DescribeLogsets --Region ap-guangzhou
 | 1.0.0 | 2026-05-28 | Initial skill with CreateLogset, CreateTopic, CreateIndex, SearchLog, CreateMachineGroup, CreateConfig, Delete operations |
 | 1.1.0 | 2026-05-31 | Add ImportCOSAccessLogs and COSAccessLogAnalysis operations; add cos-log-analysis.md reference |
 | 1.2.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CLS-specific safety rules incl. logset cascade delete, topic data loss, index removal unsearchable, machine group collection stop, config change gap), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
+| 1.4.0 | 2026-07-04 | Merged Quick Start into compact Env|Setup table; trimmed Capabilities to 2 columns (Operation + Risk Level); replaced inline SDK blocks with trimmed request-specific code + reference to references/sdk-templates.md; created references/sdk-templates.md with CLS init + polling + try-except. Bumped version. |
 
 ---
 
@@ -333,37 +268,16 @@ echo "Created Logset ID: $LOGSET_ID"
 
 #### Execution — Python SDK (Fallback Path)
 
+> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
+
 ```python
-#!/usr/bin/env python3
-"""
-SDK fallback for CreateLogset when CLI is unavailable
-"""
-import os, json, time
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cls import cls_client, models
-
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cls_client.ClsClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.CreateLogsetRequest()
-        req.LogsetName = os.environ.get("LOGSET_NAME", "default-logset")
-        req.ClientToken = str(int(time.time() * 1000000))
-
-        resp = client.CreateLogset(req)
-        result = json.loads(resp.to_json_string())
-        print(json.dumps(result, indent=2))
-        print(f"\nLogsetId: {result['Response']['LogsetId']}")
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+req = models.CreateLogsetRequest()
+req.LogsetName = os.environ.get("LOGSET_NAME", "default-logset")
+req.ClientToken = str(int(time.time() * 1000000))
+resp = client.CreateLogset(req)
+result = json.loads(resp.to_json_string())
+print(json.dumps(result, indent=2))
+print(f"\nLogsetId: {result['Response']['LogsetId']}")
 ```
 
 #### Post-execution Validation
@@ -382,13 +296,11 @@ tccli cls DescribeLogsets \
 
 #### Failure Recovery
 
+> Operation-specific errors only. See [Error Code Reference](#error-code-reference) for common codes.
+
 | Error pattern | Retry Strategy | Recovery |
 |--------------|----------------|----------|
 | `InvalidParameter.LogsetName` | 0 | Fix logset name format; retry |
-| `ResourceInUse.LogsetName` | 0 | Logset name already exists; use unique name |
-| `QuotaExceeded.Logset` | 0 | HALT; Request quota increase |
-| `RequestLimitExceeded` | 3, exp backoff | Back off and retry |
-| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
 
 ---
 
@@ -421,36 +333,19 @@ echo "Created Topic ID: $TOPIC_ID"
 
 #### Execution — Python SDK
 
+> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
+
 ```python
-#!/usr/bin/env python3
-from tencentcloud.common import credential
-from tencentcloud.cls import cls_client, models
-import os, json
-
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cls_client.ClsClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.CreateTopicRequest()
-        req.LogsetId = os.environ.get("LOGSET_ID")
-        req.TopicName = os.environ.get("TOPIC_NAME", "default-topic")
-        req.PartitionCount = int(os.environ.get("PARTITION_COUNT", "1"))
-        req.AutoSplit = True
-        req.MaxSplitPartitions = 50
-
-        resp = client.CreateTopic(req)
-        result = json.loads(resp.to_json_string())
-        print(json.dumps(result, indent=2))
-        print(f"\nTopicId: {result['Response']['TopicId']}")
-    except Exception as e:
-        print(f"[ERROR] {e}")
-
-if __name__ == "__main__":
-    main()
+req = models.CreateTopicRequest()
+req.LogsetId = os.environ.get("LOGSET_ID")
+req.TopicName = os.environ.get("TOPIC_NAME", "default-topic")
+req.PartitionCount = int(os.environ.get("PARTITION_COUNT", "1"))
+req.AutoSplit = True
+req.MaxSplitPartitions = 50
+resp = client.CreateTopic(req)
+result = json.loads(resp.to_json_string())
+print(json.dumps(result, indent=2))
+print(f"\nTopicId: {result['Response']['TopicId']}")
 ```
 
 #### Post-execution Validation
@@ -468,12 +363,11 @@ tccli cls DescribeTopics \
 
 #### Failure Recovery
 
+> Operation-specific errors only. See [Error Code Reference](#error-code-reference) for common codes.
+
 | Error pattern | Retry Strategy | Recovery |
 |--------------|----------------|----------|
-| `ResourceNotFound.LogsetNotExist` | 0 | HALT; create logset first |
 | `InvalidParameter.TopicName` | 0 | Fix topic name format; retry |
-| `ResourceInUse.TopicName` | 0 | Topic name exists in logset; use unique name |
-| `QuotaExceeded.Topic` | 0 | HALT; request quota increase |
 
 ---
 
@@ -516,49 +410,26 @@ tccli cls CreateIndex \
 
 #### Execution — Python SDK
 
+> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
+
 ```python
-#!/usr/bin/env python3
-from tencentcloud.common import credential
-from tencentcloud.cls import cls_client, models
-import os, json
-
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cls_client.ClsClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.CreateIndexRequest()
-        req.TopicId = os.environ.get("TOPIC_ID")
-        
-        # Configure index rule
-        rule = {
-            "FullText": {
-                "CaseSensitive": False,
-                "Tokenizer": "@&()='%$"
-            },
-            "KeyValue": {
-                "CaseSensitive": False,
-                "KeyValues": [
-                    {"Key": "level", "Value": {"Type": "text", "Tokenizer": " "}},
-                    {"Key": "timestamp", "Value": {"Type": "long"}},
-                    {"Key": "message", "Value": {"Type": "text", "Tokenizer": "@&()='%$"}}
-                ]
-            }
-        }
-        req.Rule = json.dumps(rule)
-        req.Status = True
-
-        resp = client.CreateIndex(req)
-        print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-        print("\n✅ Index created successfully")
-    except Exception as e:
-        print(f"[ERROR] {e}")
-
-if __name__ == "__main__":
-    main()
+req = models.CreateIndexRequest()
+req.TopicId = os.environ.get("TOPIC_ID")
+rule = {
+    "FullText": {"CaseSensitive": False, "Tokenizer": "@&()='%$"},
+    "KeyValue": {
+        "CaseSensitive": False,
+        "KeyValues": [
+            {"Key": "level", "Value": {"Type": "text", "Tokenizer": " "}},
+            {"Key": "timestamp", "Value": {"Type": "long"}},
+            {"Key": "message", "Value": {"Type": "text", "Tokenizer": "@&()='%$"}}
+        ]
+    }
+}
+req.Rule = json.dumps(rule)
+req.Status = True
+resp = client.CreateIndex(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 ```
 
 #### Post-execution Validation
@@ -575,10 +446,10 @@ tccli cls DescribeIndex \
 
 #### Failure Recovery
 
+> Operation-specific errors only. See [Error Code Reference](#error-code-reference) for common codes.
+
 | Error pattern | Retry Strategy | Recovery |
 |--------------|----------------|----------|
-| `ResourceNotFound.TopicNotExist` | 0 | HALT; verify topic ID |
-| `ResourceInUse.IndexAlreadyExist` | 0 | Index exists; use ModifyIndex or DeleteIndex first |
 | `InvalidParameter.IndexRule` | 0 | Fix index rule format; refer to API spec |
 
 ---
@@ -611,39 +482,20 @@ tccli cls SearchLog \
 
 #### Execution — Python SDK
 
+> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
+
 ```python
-#!/usr/bin/env python3
-from tencentcloud.common import credential
-from tencentcloud.cls import cls_client, models
-import os, json, time
-
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cls_client.ClsClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.SearchLogRequest()
-        req.TopicId = os.environ.get("TOPIC_ID")
-        req.From = int(time.time()) - 3600  # 1 hour ago
-        req.To = int(time.time())
-        req.Query = os.environ.get("SEARCH_QUERY", "*")
-        req.Limit = int(os.environ.get("LIMIT", "100"))
-
-        resp = client.SearchLog(req)
-        result = json.loads(resp.to_json_string())
-        
-        print(f"Total: {result['Response'].get('Count', 0)} logs")
-        print("\nResults:")
-        for log in result['Response'].get('Results', []):
-            print(f"  [{log.get('Timestamp')}] {log.get('Content', '')[:200]}")
-    except Exception as e:
-        print(f"[ERROR] {e}")
-
-if __name__ == "__main__":
-    main()
+req = models.SearchLogRequest()
+req.TopicId = os.environ.get("TOPIC_ID")
+req.From = int(time.time()) - 3600
+req.To = int(time.time())
+req.Query = os.environ.get("SEARCH_QUERY", "*")
+req.Limit = int(os.environ.get("LIMIT", "100"))
+resp = client.SearchLog(req)
+result = json.loads(resp.to_json_string())
+print(f"Total: {result['Response'].get('Count', 0)} logs")
+for log in result['Response'].get('Results', []):
+    print(f"  [{log.get('Timestamp')}] {log.get('Content', '')[:200]}")
 ```
 
 #### Present to User
@@ -658,12 +510,7 @@ if __name__ == "__main__":
 
 #### Failure Recovery
 
-| Error pattern | Retry Strategy | Recovery |
-|--------------|----------------|----------|
-| `ResourceNotFound.TopicNotExist` | 0 | HALT; verify topic ID |
-| `InvalidParameter.QuerySyntax` | 0 | Fix query syntax; refer to query language doc |
-| `LimitExceeded.SearchTimeRange` | 0 | Reduce time range; max 31 days per query |
-| `RequestLimitExceeded` | 3, exp backoff | Back off and retry |
+> See [Error Code Reference](#error-code-reference) for all applicable error codes.
 
 ---
 
@@ -695,39 +542,20 @@ tccli cls CreateMachineGroup \
 
 #### Execution — Python SDK
 
+> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
+
 ```python
-#!/usr/bin/env python3
-from tencentcloud.common import credential
-from tencentcloud.cls import cls_client, models
-import os, json
-
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cls_client.ClsClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.CreateMachineGroupRequest()
-        req.GroupName = os.environ.get("GROUP_NAME", "default-group")
-        
-        # Machine group type: IP-based
-        machine_group_type = {
-            "Type": "ip",
-            "Values": os.environ.get("CVM_IPS", "10.0.1.10").split(",")
-        }
-        req.MachineGroupType = json.dumps(machine_group_type)
-
-        resp = client.CreateMachineGroup(req)
-        result = json.loads(resp.to_json_string())
-        print(json.dumps(result, indent=2))
-        print(f"\nGroupId: {result['Response'].get('GroupId', 'N/A')}")
-    except Exception as e:
-        print(f"[ERROR] {e}")
-
-if __name__ == "__main__":
-    main()
+req = models.CreateMachineGroupRequest()
+req.GroupName = os.environ.get("GROUP_NAME", "default-group")
+machine_group_type = {
+    "Type": "ip",
+    "Values": os.environ.get("CVM_IPS", "10.0.1.10").split(",")
+}
+req.MachineGroupType = json.dumps(machine_group_type)
+resp = client.CreateMachineGroup(req)
+result = json.loads(resp.to_json_string())
+print(json.dumps(result, indent=2))
+print(f"\nGroupId: {result['Response'].get('GroupId', 'N/A')}")
 ```
 
 #### Post-execution Validation
@@ -743,11 +571,12 @@ tccli cls DescribeMachineGroups \
 
 #### Failure Recovery
 
+> Operation-specific errors only. See [Error Code Reference](#error-code-reference) for common codes.
+
 | Error pattern | Retry Strategy | Recovery |
 |--------------|----------------|----------|
 | `InvalidParameter.GroupName` | 0 | Fix group name format |
 | `ResourceInUse.GroupName` | 0 | Group name exists; use unique name |
-| `InvalidParameterValue` | 0 | Check MachineGroupType format |
 
 ---
 
@@ -787,51 +616,26 @@ tccli cls CreateConfig \
 
 #### Execution — Python SDK
 
+> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
+
 ```python
-#!/usr/bin/env python3
-from tencentcloud.common import credential
-from tencentcloud.cls import cls_client, models
-import os, json
-
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cls_client.ClsClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.CreateConfigRequest()
-        req.Name = os.environ.get("CONFIG_NAME", "default-config")
-        req.TopicId = os.environ.get("TOPIC_ID")
-        
-        # Output configuration
-        output = {"TopicId": os.environ.get("TOPIC_ID")}
-        req.Output = json.dumps(output)
-        
-        # Input configuration - container stdout
-        input_config = {
-            "Content": {
-                "Type": "container_stdout",
-                "ContainerStdout": {
-                    "Namespace": "default",
-                    "IncludeLabels": {"app": "myapp"}
-                }
-            }
+req = models.CreateConfigRequest()
+req.Name = os.environ.get("CONFIG_NAME", "default-config")
+req.TopicId = os.environ.get("TOPIC_ID")
+req.Output = json.dumps({"TopicId": os.environ.get("TOPIC_ID")})
+input_config = {
+    "Content": {
+        "Type": "container_stdout",
+        "ContainerStdout": {
+            "Namespace": "default",
+            "IncludeLabels": {"app": "myapp"}
         }
-        req.Input = json.dumps(input_config)
-        
-        # Associate with machine group
-        req.MachineGroupIds = [os.environ.get("MACHINE_GROUP_ID", "")]
-
-        resp = client.CreateConfig(req)
-        print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-        print("\n✅ Config created successfully")
-    except Exception as e:
-        print(f"[ERROR] {e}")
-
-if __name__ == "__main__":
-    main()
+    }
+}
+req.Input = json.dumps(input_config)
+req.MachineGroupIds = [os.environ.get("MACHINE_GROUP_ID", "")]
+resp = client.CreateConfig(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 ```
 
 #### Post-execution Validation
@@ -848,10 +652,10 @@ tccli cls DescribeConfigs \
 
 #### Failure Recovery
 
+> Operation-specific errors only. See [Error Code Reference](#error-code-reference) for common codes.
+
 | Error pattern | Retry Strategy | Recovery |
 |--------------|----------------|----------|
-| `ResourceNotFound.TopicNotExist` | 0 | HALT; verify topic ID |
-| `ResourceNotFound.MachineGroupNotExist` | 0 | HALT; verify machine group ID |
 | `InvalidParameter.ConfigName` | 0 | Fix config name format |
 | `InvalidParameter.InputConfig` | 0 | Check input configuration format |
 
@@ -902,43 +706,21 @@ echo "Created COS import task: $RECHARGE_ID"
 
 #### Execution — Python SDK (Fallback Path)
 
+> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
+
 ```python
-#!/usr/bin/env python3
-"""
-SDK fallback for CreateCosRecharge when CLI is unavailable
-"""
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cls import cls_client, models
-
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cls_client.ClsClient(cred, os.environ.get("TENCENTCLOUD_REGION", "ap-guangzhou"))
-
-        req = models.CreateCosRechargeRequest()
-        req.TopicId = os.environ.get("TOPIC_ID")
-        req.Bucket = os.environ.get("COS_BUCKET")
-        req.BucketRegion = os.environ.get("COS_REGION", os.environ.get("TENCENTCLOUD_REGION"))
-        req.LogType = os.environ.get("LOG_TYPE", "minimalist_log")
-        req.Prefix = os.environ.get("COS_PREFIX", "")
-        req.TaskName = os.environ.get("TASK_NAME", "cos-log-import")
-        req.Enable = 1
-
-        resp = client.CreateCosRecharge(req)
-        result = json.loads(resp.to_json_string())
-        print(json.dumps(result, indent=2))
-        recharge_id = result.get('Response', {}).get('TaskId') or result.get('Response', {}).get('RechargeId')
-        print(f"\n✅ COS import task created: {recharge_id}")
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+req = models.CreateCosRechargeRequest()
+req.TopicId = os.environ.get("TOPIC_ID")
+req.Bucket = os.environ.get("COS_BUCKET")
+req.BucketRegion = os.environ.get("COS_REGION", os.environ.get("TENCENTCLOUD_REGION"))
+req.LogType = os.environ.get("LOG_TYPE", "minimalist_log")
+req.Prefix = os.environ.get("COS_PREFIX", "")
+req.TaskName = os.environ.get("TASK_NAME", "cos-log-import")
+req.Enable = 1
+resp = client.CreateCosRecharge(req)
+result = json.loads(resp.to_json_string())
+recharge_id = result.get('Response', {}).get('TaskId') or result.get('Response', {}).get('RechargeId')
+print(f"\n✅ COS import task created: {recharge_id}")
 ```
 
 #### Post-execution Validation
@@ -967,16 +749,11 @@ tccli cls SearchLog \
 
 #### Failure Recovery
 
+> Operation-specific errors only. See [Error Code Reference](#error-code-reference) for common codes.
+
 | Error pattern | Retry Strategy | Recovery |
 |--------------|----------------|----------|
-| `InvalidParameter.Bucket` | 0 | Verify COS bucket name and region |
 | `InvalidParameter.TopicId` | 0 | HALT; verify CLS topic ID |
-| `ResourceNotFound.BucketNotExist` | 0 | HALT; COS bucket does not exist |
-| `ResourceNotFound.TopicNotExist` | 0 | HALT; CLS topic not found |
-| `ResourceInUse.CosRechargeAlreadyExist` | 0 | Import task exists; use ModifyCosRecharge or delete first |
-| `QuotaExceeded.CosRecharge` | 0 | HALT; too many import tasks per topic |
-| `RequestLimitExceeded` | 3, exp backoff | Back off and retry |
-| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
 
 ---
 
@@ -1126,8 +903,8 @@ Format results as structured Markdown tables:
 | No data in time range | 0 | Expand time range or wait for COS import to complete |
 | Index not found | 0 | HALT; create COS log index first (see cos-log-analysis.md) |
 | Import task not found | 0 | HALT; run ImportCOSAccessLogs first |
-| `InvalidParameter.QuerySyntax` | 0 | Fix query syntax; test with simple `*` first |
-| `LimitExceeded.SearchTimeRange` | 0 | Reduce time range (max 31 days) |
+
+> See [Error Code Reference](#error-code-reference) for CLS API error codes.
 
 #### Present to User
 
