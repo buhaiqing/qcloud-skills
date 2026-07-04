@@ -140,14 +140,14 @@ tccli vpc CreateVpnConnection \
   --VpnConnectionName "{{user.vpn_connection_name}}" \
   --PreShareKey "{{user.pre_shared_key}}" \
   --VpnProto "IPsec" \
-  --IKESettings '{"IkeVersion":"IKEV2","Identity":"ADDRESS","PSK":"{{user.pre_shared_key}}","ExchangeMode":"AGGRESSIVE","LocalAddress":"{{output.vpn_gateway_public_ip}}","RemoteAddress":"{{user.peer_public_ip}}","LocalId":"{{output.vpn_gateway_public_ip}}","RemoteId":"{{user.peer_public_ip}}","IKESaLifetimeSeconds":86400,"IKEEncryptionAlgorithm":"AES-256","IKEIntegrityAlgorithm":"SHA1","DHGroupName":"GROUP2"}' \
-  --IPSECSettings '{"IpsecSaLifetimeTraffic":2560,"IpsecSaLifetimeSeconds":3600,'\''"'@type'"\'':'\''"system"'\''}' \
+  --IKESettings '{"IkeVersion":"{{user.ike_version}}","Identity":"ADDRESS","ExchangeMode":"{{user.ike_exchange_mode}}","LocalAddress":"{{output.vpn_gateway_public_ip}}","RemoteAddress":"{{user.peer_public_ip}}","LocalId":"{{output.vpn_gateway_public_ip}}","RemoteId":"{{user.peer_public_ip}}","IKESaLifetimeSeconds":{{user.ike_sa_lifetime}},"IKEEncryptionAlgorithm":"{{user.ike_encryption}}","IKEIntegrityAlgorithm":"{{user.ike_integrity}}","DHGroupName":"{{user.ike_dh_group}}"}' \
+  --IPSECSettings '{"IpsecSaLifetimeTraffic": {{user.ipsec_sa_lifetime_traffic}}, "IpsecSaLifetimeSeconds": {{user.ipsec_sa_lifetime_seconds}}, "@type": "system"}' \
   --LocalCidrBlocks '["{{user.local_cidr}}"]' \
   --RemoteCidrBlocks '["{{user.peer_cidr}}"]' \
   --ClientToken "$(date +%s%N)"
 ```
 
-> **PSK handling:** The `--PreShareKey` flag and the PSK inside `IKESettings` must be the same value. Never echo the PSK back to the user.
+> **PSK handling:** The PSK is passed via `--PreShareKey` only. Never echo the PSK back to the user.
 
 ### SDK
 
