@@ -129,19 +129,7 @@ python3 -c "import tencentcloud.common.credential; print('SDK OK')"
 ```
 
 ### Your First Command
-```python
-#!/usr/bin/env python3
-from tencentcloud.common import credential
-from tencentcloud.common.profile.client_profile import ClientProfile
-from tencentcloud.common.profile.http_profile import HttpProfile
-import os
-
-cred = credential.Credential(
-    os.environ.get("TENCENTCLOUD_SECRET_ID"),
-    os.environ.get("TENCENTCLOUD_SECRET_KEY")
-)
-print("Credentials configured successfully")
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ### Next Steps
 - [Common Operations](#execution-flows) — Create, trigger, monitor pipelines
@@ -182,27 +170,7 @@ Every operation: **Pre-flight → Execute (SDK) → Validate → Recover**.
 
 #### Execution — Python SDK
 
-```python
-#!/usr/bin/env python3
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-import os, json
-
-cred = credential.Credential(
-    os.environ.get("TENCENTCLOUD_SECRET_ID"),
-    os.environ.get("TENCENTCLOUD_SECRET_KEY")
-)
-
-# Note: Actual client import depends on specific Tencent Cloud CI/CD service
-# Example structure (replace with actual service module):
-# from tencentcloud.[service] import [service]_client, models
-# client = [service]_client.[Service]Client(cred, os.environ.get("TENCENTCLOUD_REGION"))
-# req = models.CreatePipelineRequest()
-# req.PipelineName = "{{user.pipeline_name}}"
-# req.PipelineDesc = "{{user.pipeline_desc}}"
-# resp = client.CreatePipeline(req)
-# print(json.dumps(resp.to_json_string(), indent=2))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -228,28 +196,13 @@ cred = credential.Credential(
 
 #### Execution — Python SDK
 
-```python
-#!/usr/bin/env python3
-# req = models.StartPipelineRequest()
-# req.PipelineId = "{{user.pipeline_id}}"
-# req.Branch = "{{user.branch}}"
-# resp = client.StartPipeline(req)
-# print(json.dumps(resp.to_json_string(), indent=2))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
 Poll Describe API until build completes:
 
-```python
-import time
-for i in range(60):
-    # resp = client.DescribePipelineStatus(req)
-    # status = resp.PipelineStatus
-    # if status == "SUCCEEDED": break
-    # if status == "FAILED": raise Exception("Build failed")
-    time.sleep(10)
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Failure Recovery
 
@@ -263,12 +216,7 @@ for i in range(60):
 
 #### Execution — Python SDK
 
-```python
-#!/usr/bin/env python3
-# req = models.DescribePipelinesRequest()
-# resp = client.DescribePipelines(req)
-# print(json.dumps(resp.to_json_string(), indent=2))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ### Operation: Delete Pipeline
 
@@ -280,13 +228,7 @@ for i in range(60):
 
 #### Execution — Python SDK
 
-```python
-#!/usr/bin/env python3
-# req = models.DeletePipelineRequest()
-# req.PipelineId = "{{output.pipeline_id}}"
-# resp = client.DeletePipeline(req)
-# print(json.dumps(resp.to_json_string(), indent=2))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 

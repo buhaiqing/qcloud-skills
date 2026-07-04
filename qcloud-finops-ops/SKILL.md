@@ -122,20 +122,7 @@ tccli billing DescribeCostDetail --Month "2026-05" \
 
 **异常检测算法**（核心，ii + iii 双维度）：
 
-```python
-def is_anomaly(current, history_3m, budget):
-    avg_3m = mean(history_3m)
-    ii_ratio  = (current - avg_3m) / avg_3m      # 滚动对比
-    iii_ratio = current / budget.amount           # 预算对比
-    ii_violated  = ii_ratio  > 0.20               # ii 阈值 20%
-    iii_violated = iii_ratio > 0.80               # iii 阈值 80%
-    if ii_violated and iii_violated:   confidence = "HIGH"
-    elif ii_violated or iii_violated:  confidence = "MEDIUM"
-    else:                              confidence = "NORMAL"
-    return {"confidence": confidence,
-            "ii_violated": ii_violated,  "ii_ratio": ii_ratio,
-            "iii_violated": iii_violated, "iii_ratio": iii_ratio}
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 **告警通道**：委托 `qcloud-monitor-ops` 创建策略；支持短信/电话/邮件 + 企业微信/钉钉/飞书 Webhook。
 
