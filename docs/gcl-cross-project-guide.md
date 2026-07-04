@@ -106,7 +106,7 @@ python3 scripts/gcl_framework.py config
 
 #### 方式 2: 集成到 CI/CD
 
-在 `.github/workflows/ci.yml` 或类似文件中添加：
+在 `.github/workflows/validate-skills.yml` 或类似文件中添加：
 
 ```yaml
 - name: Check GCL Trigger

@@ -298,7 +298,7 @@ class GCLAutoFixer:
     def fix_violation(self, violation):
         """修复违规"""
         violation_type = self.classify_violation(violation)
-        
+
         if violation_type in self.fix_strategies:
             return self.fix_strategies[violation_type](violation)
         else:

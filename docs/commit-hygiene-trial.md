@@ -45,7 +45,7 @@ Trigger: every Monday 09:00 UTC+8 (cron: `0 1 * * 1`).
 |------|--------|--------|
 | 1. Collect | `scripts/commit_hygiene_trial.py collect` | Read `git log` past 7 days, parse trailers, append to `audit-results/commit-hygiene-trial.jsonl` |
 | 2. Score | `scripts/commit_hygiene_score.py` | Compute M1 / M2, append to `audit-results/commit-hygiene-trial-scores.jsonl` |
-| 3. Report | `scripts/commit_hygiene_trial.py report` | Generate `docs/commit-hygiene-trial-report-YYYYMMDD.md`, update `docs/commit-hygiene-trial-index.md` |
+| 3. Report | `scripts/commit_hygiene_trial.py report` | Generate `audit-results/commit-hygiene-trial-report-YYYYMMDD.md`, update `audit-results/commit-hygiene-trial-index.md` |
 | 4. Commit | Action's auto-commit | Commit jsonl + report back to repo under one `[trial] weekly snapshot YYYYMMDD` commit |
 
 If collect/score fails: action logs and exits silently (per P4).
