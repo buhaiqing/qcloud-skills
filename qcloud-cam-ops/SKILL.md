@@ -130,7 +130,7 @@ CAM (Cloud Access Management) is Tencent Cloud's identity and access management 
 This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
 is a **runtime** scoring layer that audits each CAM execution against an explicit
 rubric, in addition to the build-time **Safety Gates** above and the build-time
-**2-round self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
+**2-round self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
 
 > **CAM security posture is the most sensitive in the catalog.** Every destructive CAM op
 > (policy / user / group / role / API key / trust policy) is **immediately effective** and
@@ -142,11 +142,11 @@ rubric, in addition to the build-time **Safety Gates** above and the build-time
 
 | Property | Value | Source |
 |---|---|---|
-| GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| GCL applicability | **required** | [AGENTS.md §8](../AGENTS.md#8-per-skill-defaults-qcloud) |
 | `max_iterations` | **2** | per-skill override (matches AGENTS.md §8 default for `qcloud-cam-ops`) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CAM-specific safety rules, Correctness=1.0 for destructive ops |
 | Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
-| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../AGENTS.md#6-trace--audit-mandatory) |
 
 ### When the loop runs
 

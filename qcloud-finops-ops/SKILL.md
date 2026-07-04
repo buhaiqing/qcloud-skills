@@ -307,7 +307,7 @@ tccli voucher DescribeVoucherList --Status "unused" --Limit 100
 This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
 is a **runtime** scoring layer that audits each FinOps execution against an explicit rubric,
 in addition to the build-time **Safety Gates** above and the build-time **2-round
-self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
+self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
 
 > **Read-only / advisory skill.** This skill MUST NOT auto-execute billing changes or
 > resource mutations. GCL Safety dimension uses threshold **0.5** (not 1.0) for advisory
@@ -315,11 +315,11 @@ self-review** in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-
 
 | Property | Value | Source |
 |---|---|---|
-| GCL applicability | **optional** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| GCL applicability | **optional** | [AGENTS.md §8](../AGENTS.md#8-per-skill-defaults-qcloud) |
 | `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-finops-ops`) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 FinOps-specific safety rules |
 | Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
-| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../AGENTS.md#6-trace--audit-mandatory) |
 
 ### When the loop runs
 

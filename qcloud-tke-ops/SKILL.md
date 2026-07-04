@@ -379,11 +379,11 @@ This skill participates in the **Generator-Critic-Loop (GCL)** pilot.
 
 | Property | Value | Source |
 |---|---|---|
-| GCL applicability | **required** | [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud) |
+| GCL applicability | **required** | [AGENTS.md §8](../AGENTS.md#8-per-skill-defaults-qcloud) |
 | `max_iterations` | **2** | per-skill override |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 TKE-specific safety rules |
 | Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
-| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../../AGENTS.md#6-trace--audit-mandatory) |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../AGENTS.md#6-trace--audit-mandatory) |
 
 ### When the loop runs
 
