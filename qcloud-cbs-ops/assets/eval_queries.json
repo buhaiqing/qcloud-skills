@@ -1,0 +1,102 @@
+[
+  {
+    "query": "Create a 100GB cloud disk in ap-guangzhou-3",
+    "should_trigger": true,
+    "intent": "CreateDisks"
+  },
+  {
+    "query": "我要创建一块云硬盘",
+    "should_trigger": true,
+    "intent": "CreateDisks"
+  },
+  {
+    "query": "Attach disk disk-xxx to instance ins-xxx",
+    "should_trigger": true,
+    "intent": "AttachDisks"
+  },
+  {
+    "query": "把云硬盘挂载到服务器上",
+    "should_trigger": true,
+    "intent": "AttachDisks"
+  },
+  {
+    "query": "Detach the data disk from my CVM instance",
+    "should_trigger": true,
+    "intent": "DetachDisks"
+  },
+  {
+    "query": "Expand disk disk-xxx to 500GB",
+    "should_trigger": true,
+    "intent": "ResizeDisk"
+  },
+  {
+    "query": "Create a snapshot backup for my cloud disk",
+    "should_trigger": true,
+    "intent": "CreateSnapshot"
+  },
+  {
+    "query": "List all my CBS cloud disks",
+    "should_trigger": true,
+    "intent": "DescribeDisks"
+  },
+  {
+    "query": "Delete snapshot snap-xxx permanently",
+    "should_trigger": true,
+    "intent": "DeleteSnapshots"
+  },
+  {
+    "query": "Restore disk from snapshot snap-xxx",
+    "should_trigger": true,
+    "intent": "ApplySnapshot"
+  },
+  {
+    "query": "Change the instance type from S5.SMALL1 to S5.MEDIUM4",
+    "should_trigger": false,
+    "delegate_to": "qcloud-cvm-ops"
+  },
+  {
+    "query": "Deploy a load balancer for my backend",
+    "should_trigger": false,
+    "delegate_to": "qcloud-clb-ops"
+  },
+  {
+    "query": "Create a VPC network for my infrastructure",
+    "should_trigger": false,
+    "delegate_to": "qcloud-vpc-ops"
+  },
+  {
+    "query": "Create a MySQL database instance",
+    "should_trigger": false,
+    "delegate_to": "qcloud-cdb-ops"
+  },
+  {
+    "query": "Upload files to COS object storage",
+    "should_trigger": false,
+    "delegate_to": "qcloud-cos-ops"
+  },
+  {
+    "query": "Configure Cloud Monitor alarm for CPU",
+    "should_trigger": false,
+    "delegate_to": "qcloud-monitor-ops"
+  },
+  {
+    "query": "Grant CAM permissions for disk operations",
+    "should_trigger": false,
+    "delegate_to": "qcloud-cam-ops"
+  },
+  {
+    "query": "Deploy a serverless function with SCF",
+    "should_trigger": false,
+    "delegate_to": "qcloud-scf-ops"
+  },
+  {
+    "query": "My Alibaba Cloud ESS disk is slow",
+    "should_trigger": false,
+    "reason": "Not Tencent Cloud product"
+  },
+  {
+    "query": "AWS EBS volume creation",
+    "should_trigger": false,
+    "reason": "Not Tencent Cloud product"
+  }
+]

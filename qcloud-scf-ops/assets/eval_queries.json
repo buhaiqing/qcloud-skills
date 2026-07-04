@@ -1,0 +1,102 @@
+[
+  {
+    "query": "Create a new SCF function for data processing",
+    "should_trigger": true,
+    "intent": "CreateFunction"
+  },
+  {
+    "query": "创建一个云函数",
+    "should_trigger": true,
+    "intent": "CreateFunction"
+  },
+  {
+    "query": "Update function code for my serverless app",
+    "should_trigger": true,
+    "intent": "UpdateFunctionCode"
+  },
+  {
+    "query": "List all SCF functions in default namespace",
+    "should_trigger": true,
+    "intent": "ListFunctions"
+  },
+  {
+    "query": "Create a timer trigger for my function",
+    "should_trigger": true,
+    "intent": "CreateTrigger"
+  },
+  {
+    "query": "Publish a new version of my function",
+    "should_trigger": true,
+    "intent": "PublishVersion"
+  },
+  {
+    "query": "Delete function my-func permanently",
+    "should_trigger": true,
+    "intent": "DeleteFunction"
+  },
+  {
+    "query": "Create a COS trigger for object uploads",
+    "should_trigger": true,
+    "intent": "CreateTrigger"
+  },
+  {
+    "query": "查看云函数执行日志",
+    "should_trigger": true,
+    "intent": "GetFunctionLogs"
+  },
+  {
+    "query": "Invoke my function with test data",
+    "should_trigger": true,
+    "intent": "InvokeFunction"
+  },
+  {
+    "query": "Create a cloud disk for the function",
+    "should_trigger": false,
+    "delegate_to": "qcloud-cbs-ops"
+  },
+  {
+    "query": "Set up a Kafka message queue",
+    "should_trigger": false,
+    "delegate_to": "qcloud-ckafka-ops"
+  },
+  {
+    "query": "Configure Cloud Monitor alarms",
+    "should_trigger": false,
+    "delegate_to": "qcloud-monitor-ops"
+  },
+  {
+    "query": "Create a MySQL database for the app",
+    "should_trigger": false,
+    "delegate_to": "qcloud-cdb-ops"
+  },
+  {
+    "query": "Upload deployment package to COS",
+    "should_trigger": false,
+    "delegate_to": "qcloud-cos-ops"
+  },
+  {
+    "query": "Configure CAM role for function execution",
+    "should_trigger": false,
+    "delegate_to": "qcloud-cam-ops"
+  },
+  {
+    "query": "Set up API Gateway for HTTP triggers",
+    "should_trigger": false,
+    "delegate_to": "qcloud-apigw-ops"
+  },
+  {
+    "query": "My Alibaba Cloud Function Compute is slow",
+    "should_trigger": false,
+    "reason": "Not Tencent Cloud product"
+  },
+  {
+    "query": "AWS Lambda deployment",
+    "should_trigger": false,
+    "reason": "Not Tencent Cloud product"
+  },
+  {
+    "query": "Check my Tencent Cloud billing",
+    "should_trigger": false,
+    "delegate_to": "qcloud-billing-ops"
+  }
+]

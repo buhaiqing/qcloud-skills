@@ -1,0 +1,102 @@
+[
+  {
+    "query": "Create a logset for application logs",
+    "should_trigger": true,
+    "intent": "CreateLogset"
+  },
+  {
+    "query": "创建一个日志集",
+    "should_trigger": true,
+    "intent": "CreateLogset"
+  },
+  {
+    "query": "Create a log topic in my logset",
+    "should_trigger": true,
+    "intent": "CreateTopic"
+  },
+  {
+    "query": "Configure index for log search on my topic",
+    "should_trigger": true,
+    "intent": "CreateIndex"
+  },
+  {
+    "query": "Search logs with query level:ERROR",
+    "should_trigger": true,
+    "intent": "SearchLog"
+  },
+  {
+    "query": "List all logsets in my account",
+    "should_trigger": true,
+    "intent": "DescribeLogsets"
+  },
+  {
+    "query": "Create a machine group for log collection",
+    "should_trigger": true,
+    "intent": "CreateMachineGroup"
+  },
+  {
+    "query": "Set up log collection configuration",
+    "should_trigger": true,
+    "intent": "CreateConfig"
+  },
+  {
+    "query": "Import COS access logs into CLS",
+    "should_trigger": true,
+    "intent": "ImportCOSAccessLogs"
+  },
+  {
+    "query": "Analyze COS access logs for security threats",
+    "should_trigger": true,
+    "intent": "COSAccessLogAnalysis"
+  },
+  {
+    "query": "Deploy a serverless function",
+    "should_trigger": false,
+    "delegate_to": "qcloud-scf-ops"
+  },
+  {
+    "query": "Create a Kafka message queue",
+    "should_trigger": false,
+    "delegate_to": "qcloud-ckafka-ops"
+  },
+  {
+    "query": "Set up Cloud Monitor metrics",
+    "should_trigger": false,
+    "delegate_to": "qcloud-monitor-ops"
+  },
+  {
+    "query": "Create a MySQL database",
+    "should_trigger": false,
+    "delegate_to": "qcloud-cdb-ops"
+  },
+  {
+    "query": "Upload files to COS bucket",
+    "should_trigger": false,
+    "delegate_to": "qcloud-cos-ops"
+  },
+  {
+    "query": "Configure CAM permissions for log access",
+    "should_trigger": false,
+    "delegate_to": "qcloud-cam-ops"
+  },
+  {
+    "query": "Deploy an Elasticsearch cluster",
+    "should_trigger": false,
+    "delegate_to": "qcloud-es-ops"
+  },
+  {
+    "query": "My Alibaba Cloud SLS is not working",
+    "should_trigger": false,
+    "reason": "Not Tencent Cloud product"
+  },
+  {
+    "query": "AWS CloudWatch log setup",
+    "should_trigger": false,
+    "reason": "Not Tencent Cloud product"
+  },
+  {
+    "query": "Create a VPC for my network",
+    "should_trigger": false,
+    "delegate_to": "qcloud-vpc-ops"
+  }
+]

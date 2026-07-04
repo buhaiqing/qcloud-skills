@@ -1,0 +1,102 @@
+[
+  {
+    "query": "Create a CKafka instance with 3 partitions",
+    "should_trigger": true,
+    "intent": "CreateInstance"
+  },
+  {
+    "query": "创建一个CKafka实例",
+    "should_trigger": true,
+    "intent": "CreateInstance"
+  },
+  {
+    "query": "Create a new topic in my Kafka cluster",
+    "should_trigger": true,
+    "intent": "CreateTopic"
+  },
+  {
+    "query": "List all CKafka instances in my account",
+    "should_trigger": true,
+    "intent": "DescribeInstances"
+  },
+  {
+    "query": "Monitor consumer group lag on my CKafka topic",
+    "should_trigger": true,
+    "intent": "DescribeConsumerGroup"
+  },
+  {
+    "query": "Create an ACL rule to allow producer access",
+    "should_trigger": true,
+    "intent": "CreateAcl"
+  },
+  {
+    "query": "Send a message to my Kafka topic",
+    "should_trigger": true,
+    "intent": "SendMessages"
+  },
+  {
+    "query": "Delete CKafka instance ckafka-xxx",
+    "should_trigger": true,
+    "intent": "DeleteInstance"
+  },
+  {
+    "query": "Delete topic my-topic from the cluster",
+    "should_trigger": true,
+    "intent": "DeleteTopic"
+  },
+  {
+    "query": "Create a consumer group for my application",
+    "should_trigger": true,
+    "intent": "CreateConsumerGroup"
+  },
+  {
+    "query": "Deploy a serverless function",
+    "should_trigger": false,
+    "delegate_to": "qcloud-scf-ops"
+  },
+  {
+    "query": "Create a VPC for Kafka networking",
+    "should_trigger": false,
+    "delegate_to": "qcloud-vpc-ops"
+  },
+  {
+    "query": "Set up Cloud Monitor for Kafka metrics",
+    "should_trigger": false,
+    "delegate_to": "qcloud-monitor-ops"
+  },
+  {
+    "query": "Create a MySQL database",
+    "should_trigger": false,
+    "delegate_to": "qcloud-cdb-ops"
+  },
+  {
+    "query": "Upload files to object storage",
+    "should_trigger": false,
+    "delegate_to": "qcloud-cos-ops"
+  },
+  {
+    "query": "Configure CAM permissions for messaging",
+    "should_trigger": false,
+    "delegate_to": "qcloud-cam-ops"
+  },
+  {
+    "query": "Deploy a Redis cache cluster",
+    "should_trigger": false,
+    "delegate_to": "qcloud-redis-ops"
+  },
+  {
+    "query": "My Alibaba Cloud RocketMQ is slow",
+    "should_trigger": false,
+    "reason": "Not Tencent Cloud product"
+  },
+  {
+    "query": "AWS MSK cluster setup",
+    "should_trigger": false,
+    "reason": "Not Tencent Cloud product"
+  },
+  {
+    "query": "Check my Tencent Cloud billing",
+    "should_trigger": false,
+    "delegate_to": "qcloud-billing-ops"
+  }
+]
