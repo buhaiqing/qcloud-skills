@@ -187,30 +187,30 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 
 ## Quick Start
 
-### What This Skill Does
-This skill enables you to deploy, configure, troubleshoot, and monitor CBS cloud disks and snapshots using `tccli` CLI (primary) or `tencentcloud-sdk-python-cbs` SDK (fallback).
+| Env | Setup |
+|-----|-------|
+| **Cloud Shell** | [Console](https://console.cloud.tencent.com) → Cloud Shell icon. Pre-installed `tccli`/SDK, pre-authenticated, 10GB `/data/`. Limit: 30min idle, 10 sessions, no CI/CD. |
+| **Local CLI** | `pip install tccli` + `TENCENTCLOUD_SECRET_ID`/`_KEY`/`_REGION` |
+| **Local SDK** | `pip install tencentcloud-sdk-python-cbs` + same credentials |
 
-### Execution Environments
+```bash
+# Verify
+tccli cbs DescribeDisks --Region {{env.TENCENTCLOUD_REGION}} --Limit 1
+```
 
-| Environment | Setup Required | Use Case |
-|-------------|---------------|----------|
-| **Cloud Shell** | Zero setup | Quick operations, troubleshooting |
-| **Local CLI** | Install tccli + credentials | Development, automation |
-| **Local SDK** | Python 3.8+ + SDK package | Complex operations, batch processing |
-
-See [Integration](references/integration.md) for Cloud Shell, local CLI, and SDK setup instructions.
+**Next:** [Core Concepts](references/core-concepts.md) → [Operations](#execution-flows) → [Troubleshooting](references/troubleshooting.md)
 
 ## Capabilities at a Glance
 
-| Operation | Risk Level |
-|-----------|------------|
+| Operation | Description | Complexity | Risk Level |
+|-----------|-------------|------------|------------|
 | CreateDisks | Low |
 | AttachDisks | Low |
 | DetachDisks | Medium (data access interruption) |
 | ResizeDisk | Medium (requires unmount/remount) |
 | CreateSnapshot | Low |
-| DeleteSnapshots | High (irreversible) |
-| ApplySnapshot | High (data overwrite) |
+| DeleteSnapshots | **High** (irreversible) |
+| ApplySnapshot | **High** (data overwrite) |
 | DescribeDisks | None |
 | DescribeSnapshots | None |
 
@@ -219,8 +219,8 @@ See [Integration](references/integration.md) for Cloud Shell, local CLI, and SDK
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-28 | Initial skill with CreateDisks, AttachDisks, DetachDisks, ResizeDisk, CreateSnapshot, DeleteSnapshots, dual-path execution |
+| 1.3.0 | 2026-07-04 | Optimize: compress Quick Start, add SDK templates, compress Capabilities table, remove duplicate Prerequisites, replace inline SDK blocks with template references. Bump version. |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CBS-specific safety rules incl. disk-destroy irreversibility, detach-without-unmount guard, resize-shrink rejection, snapshot-chain warning, DeleteWithInstance toggle guard), `references/prompt-templates.md` (Generator + Critic + Orchestrator). `max_iter=2` per AGENTS.md §8 |
-| 1.3.0 | 2026-07-04 | Token Efficiency: compressed Quick Start (integration ref), Capabilities table (2 cols), 6 SDK blocks (sdk-templates.md ref); removed duplicate Prerequisites; added ApplySnapshot execution flow |
 
 ---
 
@@ -260,23 +260,21 @@ echo "Created disk: $DISK_ID"
 
 #### Execution — Python SDK (Fallback Path)
 
-> See [SDK Templates](references/sdk-templates.md) for Common Init / Polling / Try-Except boilerplate.
-
 ```python
+# See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
+
 req = models.CreateDisksRequest()
 req.Placement = models.Placement()
-req.Placement.Zone = os.environ.get("ZONE", "ap-guangzhou-3")
-req.DiskSize = int(os.environ.get("DISK_SIZE", "50"))
-req.DiskType = os.environ.get("DISK_TYPE", "CLOUD_PREMIUM")
-req.DiskName = os.environ.get("DISK_NAME", "data-disk")
+req.Placement.Zone = "{{user.zone}}"
+req.DiskSize = {{user.disk_size}}
+req.DiskType = "{{user.disk_type}}"
+req.DiskName = "{{user.disk_name}}"
 req.DiskChargeType = "POSTPAID_BY_HOUR"
 req.ClientToken = str(int(time.time() * 1000000))
 
 resp = client.CreateDisks(req)
 result = json.loads(resp.to_json_string())
-disk_id = result["Response"]["DiskIdSet"][0]
 print(json.dumps(result, indent=2))
-print(f"Created disk: {disk_id}")
 ```
 
 #### Post-execution Validation
@@ -335,12 +333,12 @@ echo "Attach request submitted: $(jq -r '.Response.RequestId' /tmp/response.json
 
 #### Execution — Python SDK (Fallback Path)
 
-> See [SDK Templates](references/sdk-templates.md) for Common Init / Polling / Try-Except boilerplate.
-
 ```python
+# See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
+
 req = models.AttachDisksRequest()
-req.DiskIds = [os.environ.get("DISK_ID")]
-req.InstanceId = os.environ.get("INSTANCE_ID")
+req.DiskIds = ["{{user.disk_id}}"]
+req.InstanceId = "{{user.instance_id}}"
 
 resp = client.AttachDisks(req)
 print(json.dumps(json.loads(resp.to_json_string()), indent=2))
@@ -401,11 +399,11 @@ echo "Detach request submitted: $(jq -r '.Response.RequestId' /tmp/response.json
 
 #### Execution — Python SDK (Fallback Path)
 
-> See [SDK Templates](references/sdk-templates.md) for Common Init / Polling / Try-Except boilerplate.
-
 ```python
+# See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
+
 req = models.DetachDisksRequest()
-req.DiskIds = [os.environ.get("DISK_ID")]
+req.DiskIds = ["{{user.disk_id}}"]
 
 resp = client.DetachDisks(req)
 print(json.dumps(json.loads(resp.to_json_string()), indent=2))
@@ -461,12 +459,12 @@ echo "Resize request submitted: $(jq -r '.Response.RequestId' /tmp/response.json
 
 #### Execution — Python SDK (Fallback Path)
 
-> See [SDK Templates](references/sdk-templates.md) for Common Init / Polling / Try-Except boilerplate.
-
 ```python
+# See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
+
 req = models.ResizeDiskRequest()
-req.DiskId = os.environ.get("DISK_ID")
-req.DiskSize = int(os.environ.get("NEW_DISK_SIZE"))
+req.DiskId = "{{user.disk_id}}"
+req.DiskSize = {{user.new_disk_size}}
 
 resp = client.ResizeDisk(req)
 print(json.dumps(json.loads(resp.to_json_string()), indent=2))
@@ -527,18 +525,16 @@ echo "Created snapshot: $SNAPSHOT_ID"
 
 #### Execution — Python SDK (Fallback Path)
 
-> See [SDK Templates](references/sdk-templates.md) for Common Init / Polling / Try-Except boilerplate.
-
 ```python
+# See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
+
 req = models.CreateSnapshotRequest()
-req.DiskId = os.environ.get("DISK_ID")
-req.SnapshotName = os.environ.get("SNAPSHOT_NAME", "backup-snapshot")
+req.DiskId = "{{user.disk_id}}"
+req.SnapshotName = "{{user.snapshot_name}}"
 
 resp = client.CreateSnapshot(req)
 result = json.loads(resp.to_json_string())
-snapshot_id = result["Response"]["SnapshotId"]
 print(json.dumps(result, indent=2))
-print(f"Created snapshot: {snapshot_id}")
 ```
 
 #### Post-execution Validation
@@ -593,11 +589,11 @@ echo "Delete request submitted: $(jq -r '.Response.RequestId' /tmp/response.json
 
 #### Execution — Python SDK (Fallback Path)
 
-> See [SDK Templates](references/sdk-templates.md) for Common Init / Polling / Try-Except boilerplate.
-
 ```python
+# See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
+
 req = models.DeleteSnapshotsRequest()
-req.SnapshotIds = [os.environ.get("SNAPSHOT_ID")]
+req.SnapshotIds = ["{{user.snapshot_id}}"]
 
 resp = client.DeleteSnapshots(req)
 print(json.dumps(json.loads(resp.to_json_string()), indent=2))
@@ -625,73 +621,7 @@ done
 | `OperationConflict.SnapshotOperationConflict` | 3, 30s | Retry; another operation in progress |
 | `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
 
----
 
-### Operation: ApplySnapshot (Restore Disk from Snapshot)
-
-> **Warning:** This operation overwrites disk data with snapshot contents. Data on the disk since the snapshot was taken will be lost.
-
-#### Pre-flight Checks
-
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| CLI install | `tccli version` | Exit 0 | Install: `pip install tccli` |
-| Credentials | Check `TENCENTCLOUD_SECRET_ID/KEY` env | Non-empty | HALT; configure env |
-| Region | `tccli cbs DescribeDisks --Region {{env.TENCENTCLOUD_REGION}} --Limit 1` | Valid response | HALT; set valid region |
-| Snapshot exists | `tccli cbs DescribeSnapshots --SnapshotIds "[\"{{user.snapshot_id}}\"]"` | Snapshot in `NORMAL` state | HALT; snapshot not found or not ready |
-| Target disk exists | `tccli cbs DescribeDisks --DiskIds "[\"{{user.disk_id}}\"]"` | Disk exists | HALT; invalid disk ID |
-| User confirmation | Prompt: "Restore disk {{user.disk_id}} from snapshot {{user.snapshot_id}}? This overwrites current data." | Explicit "yes" | HALT; user declined |
-
-#### Execution — CLI (`tccli`) (Primary Path)
-
-```bash
-tccli cbs ApplySnapshot \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --DiskId "{{user.disk_id}}" \
-  --SnapshotId "{{user.snapshot_id}}" > /tmp/response.json
-
-echo "Restore request submitted: $(jq -r '.Response.RequestId' /tmp/response.json)"
-```
-
-#### Execution — Python SDK (Fallback Path)
-
-> See [SDK Templates](references/sdk-templates.md) for Common Init / Polling / Try-Except boilerplate.
-
-```python
-req = models.ApplySnapshotRequest()
-req.DiskId = os.environ.get("DISK_ID")
-req.SnapshotId = os.environ.get("SNAPSHOT_ID")
-
-resp = client.ApplySnapshot(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
-
-#### Post-execution Validation
-
-1. Poll DescribeDisks until state is not `ROLLBACKING`:
-
-```bash
-for i in $(seq 1 60); do
-  STATE=$(tccli cbs DescribeDisks --Region {{env.TENCENTCLOUD_REGION}} --DiskIds "[\"{{user.disk_id}}\"]" | jq -r '.Response.DiskSet[0].DiskState')
-  [ "$STATE" != "ROLLBACKING" ] && [ "$STATE" != "ATTACHING" ] && echo "✅ Disk restored from snapshot (state: $STATE)" && break
-  echo "⏳ Applying snapshot... current state: $STATE"
-  sleep 5
-done
-```
-
-2. Report restored disk ID and snapshot ID to user
-
-#### Failure Recovery
-
-| Error pattern | Retry Strategy | Recovery |
-|--------------|----------------|----------|
-| `InvalidSnapshot.NotFound` | 0 | HALT. Snapshot already deleted or invalid ID |
-| `InvalidDisk.NotFound` | 0 | HALT. Disk ID invalid |
-| `InvalidSnapshot.NotCompleted` | 3, 30s | Retry; wait for snapshot to reach `NORMAL` state |
-| `OperationConflict.SnapshotOperationConflict` | 3, 30s | Retry; another operation in progress |
-| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
-
----
 
 ## Reference Directory
 
