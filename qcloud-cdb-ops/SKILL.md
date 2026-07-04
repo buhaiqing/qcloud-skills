@@ -17,8 +17,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.1.0"
-  last_updated: "2026-06-04"
+  version: "1.3.0"
+  last_updated: "2026-07-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "2017-03-20 - https://cloud.tencent.com/document/api/236"
@@ -151,45 +151,29 @@ TencentDB for MySQL (CDB) on Tencent Cloud provides a stable, reliable, and elas
 
 ## Quick Start
 
-### What This Skill Does
-This skill enables you to deploy, configure, troubleshoot, and monitor TencentDB for MySQL instances using the `tccli cdb` CLI (primary) or `tencentcloud-sdk-python-cdb` SDK (fallback).
+| Step | Action |
+|------|--------|
+| Env | `export TENCENTCLOUD_SECRET_ID=... TENCENTCLOUD_SECRET_KEY=... TENCENTCLOUD_REGION=...` |
+| Setup | `pip install tccli` (CLI) or `pip install tencentcloud-sdk-python-cdb` (SDK fallback) |
+| Verify | `tccli cdb DescribeDBInstances --Region {{env.TENCENTCLOUD_REGION}} --Limit 5` |
+| First | `tccli cdb DescribeDBInstances --Region {{env.TENCENTCLOUD_REGION}} --Limit 10` |
 
-### Prerequisites
-- [ ] `tccli` CLI installed (or Python 3.8+ runtime for SDK fallback)
-- [ ] Credentials configured: `TENCENTCLOUD_SECRET_ID`, `TENCENTCLOUD_SECRET_KEY`
-- [ ] Region set: `TENCENTCLOUD_REGION`
-
-### Verify Setup
-```bash
-tccli cdb DescribeDBInstances --Region {{env.TENCENTCLOUD_REGION}} --Limit 5
-```
-
-### Your First Command
-```bash
-# List MySQL instances in current region
-tccli cdb DescribeDBInstances --Region {{env.TENCENTCLOUD_REGION}} --Limit 10
-```
-
-### Next Steps
-- [Core Concepts](references/core-concepts.md) — Understand CDB architecture
-- [Common Operations](#execution-flows) — Create, manage, and monitor instances
-- [Troubleshooting](references/troubleshooting.md) — Fix common issues
+See [Core Concepts](references/core-concepts.md) → [Execution Flows](#execution-flows) → [Troubleshooting](references/troubleshooting.md).
 
 ## Capabilities at a Glance
 
-| Operation | Description | Complexity | Risk Level |
-|-----------|-------------|------------|------------|
-| CreateDBInstance | Create MySQL instance (prepaid) | Medium | Low |
-| CreateDBInstanceHour | Create MySQL instance (postpaid) | Medium | Low |
-| DescribeDBInstances | List MySQL instances | Low | None |
-| UpgradeDBInstance | Scale instance configuration | Medium | Medium |
-| RestartDBInstances | Restart instance | Low | Medium |
-| IsolateDBInstance | Isolate instance | Low | **High** |
-| CreateBackup | Create backup | Medium | None |
-| CreateCloneInstance | Restore from backup | High | **High** |
-| ModifyInstanceParam | Change parameters | Medium | Medium |
-| CreateAccounts | Create database account | Low | Low |
-| DescribeSlowLogData | Query slow query logs | Low | None |
+| Operation | Risk Level |
+|-----------|------------|
+| CreateDBInstance / CreateDBInstanceHour | Low |
+| DescribeDBInstances | None |
+| UpgradeDBInstance | Medium |
+| RestartDBInstances | Medium |
+| IsolateDBInstance | **High** |
+| CreateBackup | None |
+| CreateCloneInstance | **High** |
+| ModifyInstanceParam | Medium |
+| CreateAccounts | Low |
+| DescribeSlowLogData | None |
 
 ## Changelog
 
@@ -198,6 +182,7 @@ tccli cdb DescribeDBInstances --Region {{env.TENCENTCLOUD_REGION}} --Limit 10
 | 1.0.0 | 2026-05-21 | Initial API/SDK-oriented template with tccli CLI support |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CDB-specific safety rules incl. `ModifyAccountPrivileges` `Host=%` guard), `references/prompt-templates.md` (Generator + Critic + Orchestrator, isolated-context enforcement, password + Host='%' hygiene, SQL data-plane out-of-scope guard). `max_iter=2` per AGENTS.md §8 |
 | 1.2.0 | 2026-07-04 | Added slow query quick diagnosis decision tree: `references/cdb-slow-query-diagnosis-optimized.md` with automated recovery strategies, MTTD/MTTR metrics, and 4-type classification. Updated `references/troubleshooting.md` with quick diagnosis path. |
+| 1.3.0 | 2026-07-04 | Optimize: compress Quick Start to compact table, add SDK template reference, compress Capabilities table to 2 columns, remove duplicate Prerequisites, replace inline SDK boilerplate with template references. Bump version. |
 
 ---
 
@@ -280,33 +265,17 @@ tccli cdb CreateDBInstance \
 #### Execution — SDK
 
 ```python
-#!/usr/bin/env python3
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cdb.v20170320 import cdb_client, models
+# See references/sdk-templates.md for common init/poll/error boilerplate.
 
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-        req = models.CreateDBInstanceRequest()
-        req.Memory = 1000
-        req.Volume = 50
-        req.Period = 1
-        req.GoodsNum = 1
-        req.Zone = "ap-guangzhou-3"
-        req.EngineVersion = "8.0"
-        resp = client.CreateDBInstance(req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+req = models.CreateDBInstanceRequest()
+req.Memory = 1000
+req.Volume = 50
+req.Period = 1
+req.GoodsNum = 1
+req.Zone = "ap-guangzhou-3"
+req.EngineVersion = "8.0"
+resp = client.CreateDBInstance(req)
+print(json.dumps(resp.to_json_string(), indent=2))
 ```
 
 #### Post-execution Validation
@@ -346,35 +315,17 @@ tccli cdb DescribeDBInstances --ProjectId 0
 #### Execution — SDK
 
 ```python
-#!/usr/bin/env python3
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cdb.v20170320 import cdb_client, models
+# See references/sdk-templates.md for common init/poll/error boilerplate.
 
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+req = models.DescribeDBInstancesRequest()
+req.Offset = 0
+req.Limit = 20
+# Optional filters
+# req.InstanceIds = ["cdb-xxxxxx"]
+# req.Status = [1]  # 1=running
 
-        req = models.DescribeDBInstancesRequest()
-        req.Offset = 0
-        req.Limit = 20
-        # Optional filters
-        # req.InstanceIds = ["cdb-xxxxxx"]
-        # req.Status = [1]  # 1=running
-
-        resp = client.DescribeDBInstances(req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+resp = client.DescribeDBInstances(req)
+print(json.dumps(resp.to_json_string(), indent=2))
 ```
 
 #### Key Response Fields
@@ -416,34 +367,16 @@ tccli cdb UpgradeDBInstance \
 #### Execution — SDK
 
 ```python
-#!/usr/bin/env python3
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cdb.v20170320 import cdb_client, models
+# See references/sdk-templates.md for common init/poll/error boilerplate.
 
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+req = models.UpgradeDBInstanceRequest()
+req.InstanceId = "{{user.instance_id}}"
+req.Memory = 4000
+req.Volume = 200
+req.WaitSwitch = 1  # 0=immediate, 1=maintain window
 
-        req = models.UpgradeDBInstanceRequest()
-        req.InstanceId = "{{user.instance_id}}"
-        req.Memory = 4000
-        req.Volume = 200
-        req.WaitSwitch = 1  # 0=immediate, 1=maintain window
-
-        resp = client.UpgradeDBInstance(req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+resp = client.UpgradeDBInstance(req)
+print(json.dumps(resp.to_json_string(), indent=2))
 ```
 
 ### Operation: RestartDBInstances
@@ -461,31 +394,13 @@ tccli cdb RestartDBInstances --InstanceIds '["{{user.instance_id}}"]'
 #### Execution — SDK
 
 ```python
-#!/usr/bin/env python3
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cdb.v20170320 import cdb_client, models
+# See references/sdk-templates.md for common init/poll/error boilerplate.
 
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+req = models.RestartDBInstancesRequest()
+req.InstanceIds = ["{{user.instance_id}}"]
 
-        req = models.RestartDBInstancesRequest()
-        req.InstanceIds = ["{{user.instance_id}}"]
-
-        resp = client.RestartDBInstances(req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+resp = client.RestartDBInstances(req)
+print(json.dumps(resp.to_json_string(), indent=2))
 ```
 
 ### Operation: IsolateDBInstance — DESTRUCTIVE
@@ -527,38 +442,20 @@ tccli cdb CreateBackup \
 #### Execution — SDK
 
 ```python
-#!/usr/bin/env python3
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cdb.v20170320 import cdb_client, models
+# See references/sdk-templates.md for common init/poll/error boilerplate.
 
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+req = models.CreateBackupRequest()
+req.InstanceId = "{{user.instance_id}}"
+req.BackupMethod = "physical"  # or "logical"
 
-        req = models.CreateBackupRequest()
-        req.InstanceId = "{{user.instance_id}}"
-        req.BackupMethod = "physical"  # or "logical"
+# Optional: backup specific tables
+# table_item = models.BackupItem()
+# table_item.Db = "mysql"
+# table_item.Table = "user"
+# req.BackupDBTableList = [table_item]
 
-        # Optional: backup specific tables
-        # table_item = models.BackupItem()
-        # table_item.Db = "mysql"
-        # table_item.Table = "user"
-        # req.BackupDBTableList = [table_item]
-
-        resp = client.CreateBackup(req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+resp = client.CreateBackup(req)
+print(json.dumps(resp.to_json_string(), indent=2))
 ```
 
 #### Post-execution Validation
@@ -583,41 +480,23 @@ tccli cdb ModifyInstanceParam \
 #### Execution — SDK
 
 ```python
-#!/usr/bin/env python3
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cdb.v20170320 import cdb_client, models
+# See references/sdk-templates.md for common init/poll/error boilerplate.
 
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+req = models.ModifyInstanceParamRequest()
+req.InstanceIds = ["{{user.instance_id}}"]
 
-        req = models.ModifyInstanceParamRequest()
-        req.InstanceIds = ["{{user.instance_id}}"]
+param1 = models.Parameter()
+param1.Name = "auto_increment_increment"
+param1.CurrentValue = "2"
 
-        param1 = models.Parameter()
-        param1.Name = "auto_increment_increment"
-        param1.CurrentValue = "2"
+param2 = models.Parameter()
+param2.Name = "max_connections"
+param2.CurrentValue = "1000"
 
-        param2 = models.Parameter()
-        param2.Name = "max_connections"
-        param2.CurrentValue = "1000"
+req.ParamList = [param1, param2]
 
-        req.ParamList = [param1, param2]
-
-        resp = client.ModifyInstanceParam(req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+resp = client.ModifyInstanceParam(req)
+print(json.dumps(resp.to_json_string(), indent=2))
 ```
 
 #### Post-execution Validation
@@ -640,39 +519,21 @@ tccli cdb CreateAccounts \
 #### Create Account — SDK
 
 ```python
-#!/usr/bin/env python3
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cdb.v20170320 import cdb_client, models
+# See references/sdk-templates.md for common init/poll/error boilerplate.
 
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+req = models.CreateAccountsRequest()
+req.InstanceId = "{{user.instance_id}}"
 
-        req = models.CreateAccountsRequest()
-        req.InstanceId = "{{user.instance_id}}"
+account = models.Account()
+account.User = "dbuser"
+account.Host = "%"
 
-        account = models.Account()
-        account.User = "dbuser"
-        account.Host = "%"
+req.Accounts = [account]
+req.Password = "{{user.password}}"
+req.Description = "Application account"
 
-        req.Accounts = [account]
-        req.Password = "{{user.password}}"
-        req.Description = "Application account"
-
-        resp = client.CreateAccounts(req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+resp = client.CreateAccounts(req)
+print(json.dumps(resp.to_json_string(), indent=2))
 ```
 
 #### Describe Accounts — CLI
@@ -684,32 +545,14 @@ tccli cdb DescribeAccounts --InstanceId "{{user.instance_id}}" --Limit 20
 #### Describe Accounts — SDK
 
 ```python
-#!/usr/bin/env python3
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cdb.v20170320 import cdb_client, models
+# See references/sdk-templates.md for common init/poll/error boilerplate.
 
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+req = models.DescribeAccountsRequest()
+req.InstanceId = "{{user.instance_id}}"
+req.Limit = 20
 
-        req = models.DescribeAccountsRequest()
-        req.InstanceId = "{{user.instance_id}}"
-        req.Limit = 20
-
-        resp = client.DescribeAccounts(req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+resp = client.DescribeAccounts(req)
+print(json.dumps(resp.to_json_string(), indent=2))
 ```
 
 #### Modify Password — CLI
@@ -724,38 +567,20 @@ tccli cdb ModifyAccountPassword \
 #### Modify Password — SDK
 
 ```python
-#!/usr/bin/env python3
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cdb.v20170320 import cdb_client, models
+# See references/sdk-templates.md for common init/poll/error boilerplate.
 
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cdb_client.CdbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+req = models.ModifyAccountPasswordRequest()
+req.InstanceId = "{{user.instance_id}}"
 
-        req = models.ModifyAccountPasswordRequest()
-        req.InstanceId = "{{user.instance_id}}"
+account = models.Account()
+account.User = "dbuser"
+account.Host = "%"
 
-        account = models.Account()
-        account.User = "dbuser"
-        account.Host = "%"
+req.Accounts = [account]
+req.NewPassword = "{{user.new_password}}"
 
-        req.Accounts = [account]
-        req.NewPassword = "{{user.new_password}}"
-
-        resp = client.ModifyAccountPassword(req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+resp = client.ModifyAccountPassword(req)
+print(json.dumps(resp.to_json_string(), indent=2))
 ```
 
 ### Operation: Slow Query Log
@@ -770,33 +595,6 @@ tccli cdb DescribeSlowLogData \
   --Limit 20
 ```
 
----
-
-## Prerequisites
-
-1. **Install `tccli` CLI**:
-   ```bash
-   pip install tccli
-   ```
-
-2. **Bootstrap Python runtime** (for SDK fallback):
-   ```bash
-   pip install tencentcloud-sdk-python-cdb
-   ```
-
-3. **Configure Credentials**:
-   ```bash
-   export TENCENTCLOUD_SECRET_ID="{{env.TENCENTCLOUD_SECRET_ID}}"
-   export TENCENTCLOUD_SECRET_KEY="{{env.TENCENTCLOUD_SECRET_KEY}}"
-   export TENCENTCLOUD_REGION="{{env.TENCENTCLOUD_REGION}}"
-   ```
-
-4. **Verify Configuration**:
-   ```bash
-   tccli cdb DescribeDBInstances --Region ap-guangzhou --Limit 5
-   ```
-
----
 
 ## Error Code Reference (≥ 12 Product-Specific Codes)
 
