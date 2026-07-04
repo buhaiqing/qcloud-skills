@@ -88,15 +88,18 @@
 - `8ab576a feat(ccn-ops): 补充 SD-WAN 场景文档和操作流程`
 - `29940d8 fix(ccn-ops): 添加VPN网关创建命令的Type参数`
 
-### 6. vpn-ops — 多分支 VPN 拓扑模板
+### ~~6. vpn-ops — 多分支 VPN 拓扑模板~~ ✅ 已完成
 **综合评分:** 11 | **预计工作量:** 0.5 天
 **来源：** 2026-07-03-skill-gap-filling-plan.md Task 8
-**状态：** ⏳ 未开始
+**状态：** ✅ 已完成
 
-**任务清单：**
-- [ ] 创建多分支拓扑文档（references/multi-branch-topology.md）
-- [ ] 在 SKILL.md 中引用新文档
-- [ ] 提交
+**完成情况：**
+- [x] 多分支拓扑文档（references/multi-branch-topology.md）已存在，182行4场景
+- [x] SKILL.md Trigger & Scope 添加 multi-branch/hub-spoke/failover 关键词
+- [x] execution-flows.md 新增 §12 Multi-Branch Hub-Spoke 部署流程（CLI/SDK双路径）
+- [x] SKILL.md Execution Flows 入口更新关键词
+
+**提交记录：** `dd06849 feat(vpn): integrate multi-branch topology into SKILL.md and execution-flows.md`
 
 ---
 

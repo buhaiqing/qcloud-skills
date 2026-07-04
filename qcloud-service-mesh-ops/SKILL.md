@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-07-03"
+  version: "1.1.0"
+  last_updated: "2026-07-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/product/1261"
@@ -159,7 +159,7 @@ tccli tcm CreateMesh \
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0.0 | 2026-07-03 | Initial TCM skill, dual-path execution. Scope: mesh CRUD, cluster linking, Sidecar injection, traffic governance, mTLS. Delegates K8s ops to `qcloud-tke-ops`, monitoring to `qcloud-monitor-ops`. |
+| 1.1.0 | 2026-07-04 | GCL rubric/prompt-templates aligned to Tier A standard (rubric: 8 sections, prompt-templates: 7 sections with TE-6 backbone). |
 
 ---
 
