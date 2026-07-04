@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.4.0"
-  last_updated: "2026-07-04"
+  version: "1.5.0"
+  last_updated: "2026-07-05"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/614"
@@ -228,6 +228,7 @@ tccli cls DescribeLogsets --Region {{env.TENCENTCLOUD_REGION}}
 | 1.1.0 | 2026-05-31 | Add ImportCOSAccessLogs and COSAccessLogAnalysis operations; add cos-log-analysis.md reference |
 | 1.2.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CLS-specific safety rules incl. logset cascade delete, topic data loss, index removal unsearchable, machine group collection stop, config change gap), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
 | 1.4.0 | 2026-07-04 | Merged Quick Start into compact Env|Setup table; trimmed Capabilities to 2 columns (Operation + Risk Level); replaced inline SDK blocks with trimmed request-specific code + reference to references/sdk-templates.md; created references/sdk-templates.md with CLS init + polling + try-except. Bumped version. |
+| 1.5.0 | 2026-07-05 | TE refactor: extracted 7 repeated Failure Recovery sections → `references/failure-recovery-reference.md`; consolidated GCL safety rules table → single-sentence reference to rubric.md §4; rubric.md §3.5 added `<!-- Use API for latest -->` annotations to PartitionCount / Period / AlarmPeriod sets. |
 
 ---
 
@@ -281,11 +282,7 @@ tccli cls DescribeLogsets \
 
 #### Failure Recovery
 
-> Operation-specific errors only. See [Error Code Reference](#error-code-reference) for common codes.
-
-| Error pattern | Retry Strategy | Recovery |
-|--------------|----------------|----------|
-| `InvalidParameter.LogsetName` | 0 | Fix logset name format; retry |
+<!-- see references/failure-recovery-reference.md -->
 
 ---
 
@@ -334,11 +331,7 @@ tccli cls DescribeTopics \
 
 #### Failure Recovery
 
-> Operation-specific errors only. See [Error Code Reference](#error-code-reference) for common codes.
-
-| Error pattern | Retry Strategy | Recovery |
-|--------------|----------------|----------|
-| `InvalidParameter.TopicName` | 0 | Fix topic name format; retry |
+<!-- see references/failure-recovery-reference.md -->
 
 ---
 
@@ -396,11 +389,7 @@ tccli cls DescribeIndex \
 
 #### Failure Recovery
 
-> Operation-specific errors only. See [Error Code Reference](#error-code-reference) for common codes.
-
-| Error pattern | Retry Strategy | Recovery |
-|--------------|----------------|----------|
-| `InvalidParameter.IndexRule` | 0 | Fix index rule format; refer to API spec |
+<!-- see references/failure-recovery-reference.md -->
 
 ---
 
@@ -445,7 +434,7 @@ tccli cls SearchLog \
 
 #### Failure Recovery
 
-> See [Error Code Reference](#error-code-reference) for all applicable error codes.
+<!-- see references/failure-recovery-reference.md -->
 
 ---
 
@@ -491,12 +480,7 @@ tccli cls DescribeMachineGroups \
 
 #### Failure Recovery
 
-> Operation-specific errors only. See [Error Code Reference](#error-code-reference) for common codes.
-
-| Error pattern | Retry Strategy | Recovery |
-|--------------|----------------|----------|
-| `InvalidParameter.GroupName` | 0 | Fix group name format |
-| `ResourceInUse.GroupName` | 0 | Group name exists; use unique name |
+<!-- see references/failure-recovery-reference.md -->
 
 ---
 
@@ -551,12 +535,7 @@ tccli cls DescribeConfigs \
 
 #### Failure Recovery
 
-> Operation-specific errors only. See [Error Code Reference](#error-code-reference) for common codes.
-
-| Error pattern | Retry Strategy | Recovery |
-|--------------|----------------|----------|
-| `InvalidParameter.ConfigName` | 0 | Fix config name format |
-| `InvalidParameter.InputConfig` | 0 | Check input configuration format |
+<!-- see references/failure-recovery-reference.md -->
 
 ---
 
@@ -632,11 +611,7 @@ tccli cls SearchLog \
 
 #### Failure Recovery
 
-> Operation-specific errors only. See [Error Code Reference](#error-code-reference) for common codes.
-
-| Error pattern | Retry Strategy | Recovery |
-|--------------|----------------|----------|
-| `InvalidParameter.TopicId` | 0 | HALT; verify CLS topic ID |
+<!-- see references/failure-recovery-reference.md -->
 
 ---
 
@@ -792,15 +767,7 @@ self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-aft
 
 ### CLS-specific safety rules (rubric §4)
 
-Full rules: [`references/rubric.md`](references/rubric.md) §4.
-
-| # | Operation(s) | Gate (summary) |
-|---:|---|---|
-| 1 | `DeleteLogset` (any) | Logset ID + Name + topic count + total log data size echo; list all topics via `DescribeTopics`; ... |
-| 2 | `DeleteTopic` (any) | Topic ID + Name + partition count + storage size + active shipper count (via `DescribeShippers`) ... |
-| 3 | `ModifyTopic` (retention reduction: `Period > 0` AND new `Period < current Period`) | Show current `Period` × current storage size (via `DescribeTopics` `Storage` field) → target `Per... |
-| 4 | `CreateIndex` (full-text + key-value, especially `FullText` enabled) | Show current index (if any via `DescribeIndex`); if no existing index: surface projected cost = c... |
-| 5 | `ModifyConfig` (collection path / filter / `ExcludePaths` / `LogFormat` change) AND `ApplyConfigToMachineGroup` / `DeleteConfigAttachment` (machine-group ↔ config rebinding) | Show BEFORE / AFTER config diff; warn that the agent applies changes on its NEXT polling cycle (~... |
+Full rules: [`references/rubric.md`](references/rubric.md) §4 — 5 rules covering `DeleteLogset` cascade, `DeleteTopic` shipper orphan, `ModifyTopic` retention truncation, `CreateIndex` cost projection, and `ModifyConfig` async-apply gap.
 
 Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
@@ -826,6 +793,7 @@ See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PA
 |------|-------------|
 | [references/cli-usage.md](references/cli-usage.md) | Complete tccli command reference for CLS |
 | [references/core-concepts.md](references/core-concepts.md) | CLS architecture: Logset, Topic, Index, MachineGroup, Config |
+| [references/failure-recovery-reference.md](references/failure-recovery-reference.md) | Error taxonomy and per-operation recovery patterns; referenced by all execution flows |
 | [references/cos-log-analysis.md](references/cos-log-analysis.md) | COS access log analysis — fields, scenarios, query templates |
 | [references/troubleshooting.md](references/troubleshooting.md) | Common issues and solutions |
 | [references/integration.md](references/integration.md) | SDK setup, Cloud Shell, automation patterns |

@@ -226,6 +226,7 @@ __marimo__/
 
 # GCL / audit traces (runtime artifacts)
 audit-results/
+.pi-subagents/*
 
 # OS 系统文件（macOS Finder / Windows Explorer）
 .DS_Store

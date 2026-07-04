@@ -22,23 +22,21 @@
 
 ---
 
-## 2. Five rubric dimensions (mandatory)
+## 2. Five rubric dimensions
 
-Each dimension is scored `0`, `0.5`, or `1`. Thresholds are taken from
-[AGENTS.md §3](../../AGENTS.md#3-rubric-mandatory-per-skill) and are **not negotiable** in
-this skill — the only exception is `correctness = 1.0` **required** for the destructive
-operations listed in the per-operation table below.
+> **TE-6:** 5-dimension skeleton → [`gcl-prompt-backbone.md`](../../qcloud-skill-generator/references/gcl-prompt-backbone.md) — CBS overrides below.
 
-| # | Dimension | Threshold | Why this threshold for CBS |
+CBS overrides for the 5-dimension backbone:
+
+| # | Dimension | CBS Threshold | CBS Rationale |
 |---|---|---|---|
-| 1 | **Correctness** | ≥ 0.5 (1.0 required for `TerminateDisks` / `DeleteSnapshots` / `ApplySnapshot` / `ResizeDisk`) | Half-correct disk provisioning is still billable; half-correct destructive ops cause data loss; `ResizeDisk` shrink fails with a generic `InvalidParameter` instead of a clear "shrink not supported" — easy to mis-read as "API bug" |
-| 2 | **Safety** | **= 1** (strict) | CBS destructive ops are mostly irreversible: `TerminateDisks` and `DeleteSnapshots` have no undo; `ApplySnapshot` overwrites the current data; `DetachDisks` (force) on a running CVM can corrupt the filesystem; `ModifyDiskAttributes` toggling `DeleteWithInstance` from `FALSE` → `TRUE` arms a future footgun. Any missing safety step must abort |
-| 3 | **Idempotency** | ≥ 0.5 | CBS uses `ClientToken` for `CreateDisks` to prevent duplicate orders on retry; batch operations benefit from `--DryRun`; most state transitions are async (5s–600s) and require polling — a "double poll" is harmless, a "double commit" is not |
-| 4 | **Traceability** | ≥ 0.5 | Every CBS call has a `RequestId`; `CreateDisks` returns `DiskIdSet[]` async, `CreateSnapshot` returns `SnapshotId`, `ResizeDisk` only returns `RequestId` — the new size has to be confirmed by a follow-up `DescribeDisks`. Losing the polling tail breaks half the audit trail |
-| 5 | **Spec Compliance** | ≥ 0.5 | Refers to `references/core-concepts.md` / `references/cli-usage.md` constraints: DiskType × DiskSize matrix, zone match between disk and CVM (required for `AttachDisks`), **ExpandOnly invariant** for `ResizeDisk`, `LOCAL_BASIC` / `LOCAL_SSD` not resizable, disk count quota per CVM, snapshot quota per region |
+| 1 | **Correctness** | ≥ 0.5 (1.0 for `TerminateDisks`/`DeleteSnapshots`/`ApplySnapshot`/`ResizeDisk`) | Half-correct destructive ops cause data loss; `ResizeDisk` shrink fails with generic `InvalidParameter` — easy to mis-read as API bug |
+| 2 | **Safety** | **= 1** (strict) | CBS destructive ops are mostly irreversible; any missing safety step must abort |
+| 3 | **Idempotency** | ≥ 0.5 | `ClientToken` for `CreateDisks` prevents duplicate orders; async polling tails are safe to duplicate |
+| 4 | **Traceability** | ≥ 0.5 | `ResizeDisk` only returns `RequestId` — new size confirmed by follow-up `DescribeDisks`; polling tail is mandatory |
+| 5 | **Spec Compliance** | ≥ 0.5 | DiskType × DiskSize matrix, zone match, **ExpandOnly invariant**, `LOCAL_BASIC`/`LOCAL_SSD` not resizable, quota per CVM/region |
 
-**Safety = 0 → ABORT immediately**, regardless of total score. See
-[AGENTS.md §5](../../AGENTS.md#5-termination-first-match-wins) → `SAFETY_FAIL`.
+**Safety = 0 → ABORT immediately** per [AGENTS.md §5](../../AGENTS.md#5-termination-first-match-wins).
 
 ### 2.1 CBS-specific emphasis: the ExpandOnly invariant
 
@@ -233,12 +231,16 @@ User asked: "Create a 100GB `CLOUD_SSD` data disk in `ap-guangzhou-3`."
 
 | Version | Date | Change |
 |---|---|---|
-| 1.0.0 | 2026-06-04 | Phase 1 CBS rollout: rubric (5 dimensions, 5 CBS-specific safety rules incl. disk destroy irreversibility, detach-without-unmount data corruption, resize-shrink rejection, snapshot-chain deletion, DeleteWithInstance toggle) |
-| 1.1.0 | 2026-06-19 | Tier A conformance: flesh out §2 (5-dimension rubric with CBS-specific thresholds, §2.1 ExpandOnly invariant), §3 (per-dimension scoring checklist covering disk/snapshot state transitions, idempotency for ClientToken / no-op detection, Spec Compliance DiskType×DiskSize matrix and zone-match), §5 (Critic output schema with `rule_violations`), §6 (4 worked examples: PASS on CreateSnapshot with retention, SAFETY_FAIL on TerminateDisks without snapshot, RETRY on ResizeDisk shrink attempt, RETRY on CreateDisks missing ClientToken). No change to §1/§4/§8 |
+| 1.0.0 | 2026-06-04 | Phase 1 CBS rollout: rubric (5 dimensions, 5 CBS-specific safety rules) |
+| 1.1.0 | 2026-06-19 | Tier A conformance: §2–§6 fleshed out |
+| 1.4.0 | 2026-07-05 | TE-6: §2 5-dim skeleton → gcl-prompt-backbone.md; §3 scoring checklist unchanged (CBS-specific) |
+
+---
 
 ## 8. See also
 
-- [AGENTS.md §3](../../AGENTS.md#3-rubric-mandatory-per-skill), [AGENTS.md §8](../../AGENTS.md#8-per-skill-defaults-qcloud)
+- [AGENTS.md §3 Rubric](../../AGENTS.md#3-rubric-mandatory-per-skill)
+- [AGENTS.md §8 Per-Skill Defaults (`qcloud-cbs-ops`)](../../AGENTS.md#8-per-skill-defaults-qcloud)
 - [`prompt-templates.md`](prompt-templates.md)
 - [SKILL.md §Safety Gates](../SKILL.md#safety-gates-destructive-operations)
 - Sibling rubrics: [`cvm`](../cvm-ops/references/rubric.md), [`cdb`](../cdb-ops/references/rubric.md), [`cos`](../cos-ops/references/rubric.md), [`clb`](../clb-ops/references/rubric.md), [`tke`](../tke-ops/references/rubric.md)

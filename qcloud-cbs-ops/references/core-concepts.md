@@ -83,6 +83,8 @@ CVM Instance
 
 ## 2. Disk Types
 
+<!-- Use API for latest: `tccli cbs DescribeDiskConfigQuota --Region {{env.TENCENTCLOUD_REGION}} --InquiryType INQUIRY_CBS_CONFIG` -->
+
 ### Type Comparison
 
 | Type | Code | Performance | Use Case | Best For |
@@ -94,35 +96,16 @@ CVM Instance
 
 ### Performance Specifications
 
-#### Premium Cloud (`CLOUD_PREMIUM`)
+#### Performance Specifications
 
-| Metric | Specification |
-|--------|---------------|
-| Size Range | 10 - 32,000 GB |
-| Random IOPS | Up to 2,500 (base 1,800) |
-| Throughput | Up to 130 MB/s (base 100) |
-| Latency | < 10 ms |
-| IOPS/GB | ~0.5 |
+<!-- Use API for latest: `tccli cbs DescribeDiskConfigQuota ...` — specs below are representative as of 2026-05 -->
 
-#### SSD Cloud (`CLOUD_SSD`)
-
-| Metric | Specification |
-|--------|---------------|
-| Size Range | 20 - 32,000 GB |
-| Random IOPS | Up to 26,000 (base 2,600) |
-| Throughput | Up to 260 MB/s (base 100) |
-| Latency | < 3 ms |
-| IOPS/GB | ~50 |
-
-#### Enhanced SSD (`CLOUD_HSSD`)
-
-| Metric | Specification |
-|--------|---------------|
-| Size Range | 20 - 32,000 GB |
-| Random IOPS | Up to 100,000 (base 8,000) |
-| Throughput | Up to 1,000 MB/s (base 250) |
-| Latency | < 1 ms |
-| IOPS/GB | ~128 |
+| Disk Type | Size Range | Base IOPS | Max IOPS | Max Throughput | Latency |
+|-----------|-----------|-----------|----------|----------------|---------|
+| CLOUD_PREMIUM | 10–32,000 GB | 1,800 | 2,500 | 130 MB/s | <10ms |
+| CLOUD_SSD | 20–32,000 GB | 2,600 | 26,000 | 260 MB/s | <3ms |
+| CLOUD_HSSD | 20–32,000 GB | 8,000 | 100,000 | 1,000 MB/s | <1ms |
+| CLOUD_BASIC | 10–32,000 GB | — | — | — | — |
 
 #### Performance Calculation Formula
 
@@ -273,6 +256,8 @@ tccli monitor GetMonitorData \
 
 ### Default Quotas
 
+<!-- Use API for latest: `tccli cbs DescribeDiskConfigQuota ...` and `tccli cbs DescribeSnapshotQuota ...` — defaults below may vary by region/account -->
+
 | Resource | Default Quota | Scope |
 |----------|---------------|-------|
 | Max CBS disks per region | 100 | Per region |
@@ -309,6 +294,8 @@ tccli monitor GetMonitorData \
 ---
 
 ## 6. Billing Models
+
+<!-- Use API for latest pricing: `tccli cbs InquiryPriceCreateDisks --Region {{env.TENCENTCLOUD_REGION}} --DiskType CLOUD_SSD --DiskSize 500 --DiskChargeType POSTPAID_BY_HOUR` -->
 
 ### Charge Types
 

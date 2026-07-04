@@ -38,6 +38,13 @@ Run `ls qcloud-*-ops/` for the canonical list. The `README.md` skill list is als
 - **Cross-skill delegation**: CVM → VPC/CLB/COS; Monitor → CVM/CLB/VPC; CDB/ES → VPC/Monitor/COS; **Well-Architected** → `qcloud-well-architected-review` (orchestrator) dispatches read-only workers on each `qcloud-*-ops`; **proactive inspection** → `qcloud-proactive-inspection` delegates Discovery to product skills. Check the target skill's `## Trigger & Scope` for explicit `delegate-to` markers before inventing a flow.
 - **Five Core Standards** (P0 quality gates, all skills must satisfy): Clear Boundaries, Structured I/O (`{{env.*}}` / `{{user.*}}` / `{{output.*}}` placeholders), Explicit Actionable Steps, Complete Failure Strategies (≥ 10 product-specific error codes with HALT vs retry), Absolute Single Responsibility.
 - **Token Efficiency** (P0 — 强制): 在保持 Agent 可执行性的前提下最小化 Token 消耗。规则包括 TE-1（API 查替代硬编码表）、TE-3（紧凑错误表 ≤3 列）、TE-4（JSON paths 集中声明）、TE-5（YAML anchors）、TE-6（消除跨文件重复）。详见下方 Round 1 检查清单。
+
+  **TE 巡检强制触发规则：** 每次 `SKILL.md` / `references/*.md` / `references/rubric.md` / `references/prompt-templates.md` 变更完成后，**必须**运行一轮 TE 巡检，判断是否需要将内联内容外迁至 `references/` 子文档并建立关联：
+
+  1. 扫描变更后 SKILL.md 中是否存在 **>10 行的重复性内容块**（错误表、JSON paths、代码片段），如有 → 提取至 `references/<topic>.md`，原位置保留 `<!-- see references/<topic>.md -->` 引用占位。
+  2. 扫描 `references/rubric.md` 和 `references/prompt-templates.md` 是否存在 **GCL Quality Gate / Prompt 文本重复**（多个技能共享相同结构），如有 → 提取至 `qcloud-skill-generator/references/gcl-prompt-backbone.md`，各技能引用而非复制（TE-6）。
+  3. 扫描 `references/` 子文档是否包含 **>5 处内联硬编码值**（实例规格列表、Region 列表等），如有 → 标注 `<!-- Use API for latest -->` 并附查询命令（TE-1）。
+  4. 巡检结果写入变更 commit message 的 footer：`TE-Audit: moved N blocks to references/; N inline tables annotated`；若无需迁移，也需记录 `TE-Audit: no refactor needed`。
 - **Subagent 并发上限 (P0 — 强制，不可打破):** 同时运行的 subagent 数量 **不得超过 3 个**。此限制适用于所有场景：并行编码、并行评审、并行研究。超过 3 个并发 subagent 会导致 429 限流和资源争用，历史教训表明并发越高失败率越高。调度原则：先启动 3 个，等待完成后再启动下一批。
 - **No web console as agent execution path.** The console may be referenced for product docs but never for state changes.
 - **Minimal-change principle.** Prefer owner-scoped, minimal diffs. Do not reformat, rename, or restructure unrelated skill files while updating one skill; defer broad cleanups to an explicit follow-up task.
@@ -442,3 +449,25 @@ python3 scripts/verify_gcl_execution.py "<task_description>" <commit_hash>
 ```
 
 **不得跳过任何检查步骤！**
+
+---
+
+## 🚨 **!!! IMPORTANT — 定期反思与复盘，沉淀可复用资产 !!!**
+
+**⚠️ 此为 P0 级强制规范，优先级高于其他所有编码任务。每次会话结束时必须自我检查。**
+
+### 核心理念
+
+每一次任务——无论大小——如果只修了一个 bug、加了一个功能就走了，没有留下任何可复用的东西，**这次工作的价值就损失了一半**。反思和复盘的目的是：
+
+1. **不让同样的错误发生两次** — 踩过的坑需要变成规则、检查清单、或者自动化脚本
+2. **不让做过的努力白费** — 解决的复杂问题应该沉淀为模板、文档、或者通用工具函数
+3. **不让团队重复造轮子** — 你踩过的坑、找到的最佳实践、摸索出的套路，应该让下一个 AI 和人直接复用
+
+### 沉淀物资产出的形式
+
+每次反思复盘后，必须产出至少一项以下形式的**可复用资产**：
+
+| 资产类型 | 适用场景 | 举例 |
+|---------|---------|------|
+| 📝 **failure-patterns.md 条目** | 踩坑/错误/异常行为-|------|\n| 📝 **failure-patterns.md 条目** | 踩坑/错误/异常行为 | \`pattern: CVM ModifyInstanceSpec 参数不全 → InstanceType 缺失 → HALT\` |\n| 📋 **检查清单/规则** | 容易被遗忘的步骤 | \`升级 SKILL.md 版本时必须同时更新 changelog\` |\n| 🛠️ **脚本/工具函数** | 重复出现的操作 | \`check_markdown_python.py\` 捕获 Python 片段中的常见错误 |\n| 🏗️ **模板** | 重复出现的任务结构 | SDK 初始化样板、API 调用模式 |\n| 📄 **决策记录** | 复杂权衡的决策 | 为什么选 SDK 而不是 CLI、为什么不用某个 API 参数 |\n| 🔍 **排查流程** | 常见问题排查 | 慢查询排查决策树、磁盘挂载失败排查步骤 |\n\n### 执行时机（必须触发）\n\n| 时机 | 原因 | 最少产出 |\n|------|------|---------|\n| **每完成一个 SKILL.md 变更** | 编码过程中一定有取舍和踩坑 | 1 条 failure-patterns.md 或 1 个模板提取 |\n| **每次 GCL Critic 发现新问题** | Critic 发现的缺陷是系统性改进信号 | 1 条检查清单规则 或 1 条 failure-pattern |\n| **每完成 3 个技能的优化**（如本次 cvm→cdb→cls→cbs 批量优化） | 批量改造后应提炼通用模式 | docs/failure-patterns.md 新条目 + 跨技能改进建议 |\n| **每次修复了 1 个以上的反复出现的同类 bug** | 重复 bug = 缺少系统化防护 | 检查清单或自动化校验工具 |\n| **每次决策遇到 2 个以上可行方案需要权衡时** | 复杂决策不做记录下次还会纠结 | 决策记录（ADR） |\n\n### 执行流程\n\n```\n任务完成 ✅\n  ↓\n问自己三个问题：\n  1. 这次任务中踩了什么坑？下次如何避免？→ failure-patterns.md\n  2. 有什么代码/模式是其他技能也能用的？→ 提取为通用模板/脚本\n  3. 有什么经验应该写成文档让后来的 AI 知道？→ 更新 references/ 或 AGENTS.md\n  ↓\n至少产出 1 项可复用资产（failure-pattern、检查清单、脚本、模板、决策记录）\n  ↓\n如果资产在 docs/failure-patterns.md 中 → 更新并去重\n如果资产是新的脚本/模板 → 按 Asset placement 规则放置（qcloud-*-ops/ 下）\n如果资产是 AGENTS.md 规则 → 直接更新本文件\n  ↓\n完成并记录\n```\n\n### 与其他质量门的关系\n\n| 门禁 | 关系 |\n|------|------|\n| **GCL Generator-Critic Loop** | GCL 的 Critic 发现的问题 → 必须纳入 failure-patterns.md |\n| **2-round self-review** | Round 2 评审中发现的可复用模式 → 沉淀为模板/规则 |\n| **Reflexion memory** | \`docs/failure-patterns.md\` 既是 Reflexion 的数据源，也是反思复盘的输出目标 |\n| **Token Efficiency (TE)** | 提取通用模板（TE-6）本身就是一次高效的复盘产出 |\n\n### 禁止行为 ❌\n\n- ❌ 任务完成后直接走，不留下任何文档或记录\n- ❌ 踩了坑修复了，但不记录到 failure-patterns.md 中\n- ❌ 多次遇到同类问题却始终不建立系统化的防护（检查清单/脚本）\n- ❌ 只在脑子里想"下次注意"，而不形成可被其他 AI 读取的正式记录\n\n> **记住：一次反思都不做 = 白干。做了反思但不沉淀 = 只做了一半。沉淀了但不复用 = 浪费。复用却不改进 = 停滞。闭环是：反思 → 沉淀 → 复用 → 改进 → 再反思。**\n"}]

@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.3.0"
-  last_updated: "2026-07-04"
+  version: "1.4.0"
+  last_updated: "2026-07-05"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/362"
@@ -112,6 +112,20 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 
 **Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: cbs`).
 
+## JSON Path Conventions (TE-4)
+
+<!-- Centralized response paths — do NOT repeat inline per operation -->
+
+| Operation | Key Response Path | Notes |
+|-----------|-------------------|-------|
+| CreateDisks | `$.Response.DiskIdSet[0]` | New disk ID |
+| DescribeDisks | `$.Response.DiskSet[].DiskId/State/Size/Type` | Disk list |
+| Attach/Detach/Resize | `$.Response.RequestId` | Tracking ID |
+| CreateSnapshot | `$.Response.SnapshotId` | Snapshot ID |
+| DescribeSnapshots | `$.Response.SnapshotSet[].SnapshotId/State` | Snapshot list |
+
+See [`references/execution-flows.md`](references/execution-flows.md) §Index for CLI vs SDK field names per operation.
+
 ## Variable Convention (Agent-Readable)
 
 | Placeholder | Meaning | Agent Action |
@@ -144,36 +158,13 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 
 ### Disk State Definitions
 
-| State | Description | Allowed Operations |
-|-------|-------------|-------------------|
-| `UNATTACHED` | Disk not attached to any instance | Attach, Delete, Create Snapshot |
-| `ATTACHING` | Disk is being attached | Poll only |
-| `ATTACHED` | Disk attached to instance | Detach, Resize, Create Snapshot |
-| `DETACHING` | Disk is being detached | Poll only |
-| `EXPANDING` | Disk is being expanded | Poll only |
-| `ROLLBACKING` | Disk is being rolled back | Poll only |
-| `TORECYCLE` | Disk pending recycling | Recover or Delete |
-| `DUMPING` | Disk data is being exported | Poll only |
-
-### Response Field Summary
-
-| Operation | Key Field | Description |
-|-----------|-----------|-------------|
-| CreateDisks | `$.Response.DiskIdSet[0]` | New disk ID |
-| DescribeDisks | `$.Response.DiskSet[].DiskId/State/Size/Type` | Disk list |
-| Attach/Detach/Resize | `$.Response.RequestId` | Tracking ID |
-| CreateSnapshot | `$.Response.SnapshotId` | Snapshot ID |
-| DescribeSnapshots | `$.Response.SnapshotSet[].SnapshotId/State` | Snapshot list |
+See [`references/core-concepts.md`](references/core-concepts.md) §3 — full state machine diagram and transition table.
 
 ### State Transitions
 
 | Operation | Initial → Target | Poll/Max |
 |-----------|------------------|----------|
-| CreateDisks | — → `UNATTACHED` | 5s/120s |
-| Attach/Detach | `UNATTACHED` ↔ `ATTACHED` | 5s/120s |
-| ResizeDisk | Same state | 5s/300s |
-| CreateSnapshot | — → `NORMAL` | 5s/600s |
-| DeleteSnapshots | any → absent | 5s/120s |
+See [`references/core-concepts.md`](references/core-concepts.md) §3 for full state transition table with max-wait times.
 
 ## Quick Start
 
@@ -209,8 +200,9 @@ tccli cbs DescribeDisks --Region {{env.TENCENTCLOUD_REGION}} --Limit 1
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-28 | Initial skill with CreateDisks, AttachDisks, DetachDisks, ResizeDisk, CreateSnapshot, DeleteSnapshots, dual-path execution |
-| 1.3.0 | 2026-07-04 | Optimize: compress Quick Start, add SDK templates, compress Capabilities table, remove duplicate Prerequisites, replace inline SDK blocks with template references. Bump version. |
-| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CBS-specific safety rules incl. disk-destroy irreversibility, detach-without-unmount guard, resize-shrink rejection, snapshot-chain warning, DeleteWithInstance toggle guard), `references/prompt-templates.md` (Generator + Critic + Orchestrator). `max_iter=2` per AGENTS.md §8 |
+| 1.4.0 | 2026-07-05 | TE-6: Error Code Reference table → `references/error-reference.md`; per-op Failure Recovery tables → compact inline refs; rubric.md §2 5-dim skeleton → gcl-prompt-backbone.md; core-concepts.md & troubleshooting.md annotated `<!-- Use API for latest -->`; JSON paths consolidated at SKILL.md top (TE-4); Disk State/Response Field → cross-refs (TE-6). |
+| 1.3.0 | 2026-07-04 | Optimize: compress Quick Start, add SDK templates, compress Capabilities table, remove duplicate Prerequisites, replace inline SDK blocks with template references. |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CBS-specific safety rules), `references/prompt-templates.md` (Generator + Critic + Orchestrator). `max_iter=2` |
 
 ---
 
@@ -248,13 +240,7 @@ See [execution-flows.md](references/execution-flows.md) §1 SDK.
 
 | Error pattern | Retry Strategy | Recovery |
 |--------------|----------------|----------|
-| `InvalidParameter.DiskTypeNotSupported` | 0 | Fix disk type to valid value (CLOUD_PREMIUM, CLOUD_SSD, CLOUD_HSSD) |
-| `InvalidParameterValue.DiskSizeNotSupported` | 0 | Check disk size limits (min 20GB, max 32000GB) |
-| `ResourceInsufficient.ZoneResourceInsufficient` | 3, 30s | Retry with exponential backoff; HALT if persists |
-| `QuotaExceeded.DiskQuota` | 0 | HALT. Request quota increase or delete unused disks |
-| `InvalidZone.NotFound` | 0 | HALT. Use valid availability zone |
-| `RequestLimitExceeded` | 3, exp backoff | Back off and retry |
-| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
+See [`references/error-reference.md`](references/error-reference.md) §2 for full taxonomy. Common: `DiskTypeNotSupported`, `DiskSizeNotSupported`, `ZoneResourceInsufficient`, `DiskQuota` → HALT.
 
 ---
 
@@ -286,13 +272,7 @@ See [execution-flows.md](references/execution-flows.md) §2 SDK.
 
 | Error pattern | Retry Strategy | Recovery |
 |--------------|----------------|----------|
-| `InvalidDisk.Attached` | 0 | HALT. Disk already attached to another instance |
-| `InvalidDisk.NotFound` | 0 | HALT. Verify disk ID via DescribeDisks |
-| `InvalidInstance.NotFound` | 0 | HALT. Verify instance ID via DescribeInstances |
-| `InvalidDisk.ZoneMismatch` | 0 | HALT. Disk and instance must be in same zone |
-| `LimitExceeded.AttachedDiskQuota` | 0 | HALT. Instance disk quota exceeded |
-| `OperationConflict.DiskOperationConflict` | 3, 30s | Retry; another operation in progress |
-| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
+See [`references/error-reference.md`](references/error-reference.md) §2. Common: `Attached`, `NotFound`, `ZoneMismatch`, `AttachedDiskQuota` → HALT; `OperationConflict` → retry 3×.
 
 ---
 
@@ -326,10 +306,7 @@ See [execution-flows.md](references/execution-flows.md) §3 SDK.
 
 | Error pattern | Retry Strategy | Recovery |
 |--------------|----------------|----------|
-| `InvalidDisk.NotAttached` | 0 | HALT. Disk is not attached to any instance |
-| `InvalidDisk.NotFound` | 0 | HALT. Verify disk ID |
-| `OperationConflict.DiskOperationConflict` | 3, 30s | Retry; another operation in progress |
-| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
+See [`references/error-reference.md`](references/error-reference.md) §2. Common: `NotAttached`, `NotFound` → HALT; `OperationConflict` → retry 3×.
 
 ---
 
@@ -362,12 +339,7 @@ See [execution-flows.md](references/execution-flows.md) §4 SDK.
 
 | Error pattern | Retry Strategy | Recovery |
 |--------------|----------------|----------|
-| `InvalidParameter.DiskSizeNotSupported` | 0 | HALT. Verify disk size limits |
-| `InvalidDisk.NotFound` | 0 | HALT. Verify disk ID |
-| `InvalidDisk.ResizeNotSupported` | 0 | HALT. Disk type does not support resizing |
-| `InvalidParameterValue.DiskSizeTooSmall` | 0 | HALT. New size must be larger than current |
-| `OperationConflict.DiskOperationConflict` | 3, 30s | Retry; another operation in progress |
-| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
+See [`references/error-reference.md`](references/error-reference.md) §2. Common: `ResizeNotSupported`, `DiskSizeTooSmall`, `DiskSizeNotSupported` → HALT (ExpandOnly invariant); `OperationConflict` → retry 3×.
 
 ---
 
@@ -398,10 +370,7 @@ See [execution-flows.md](references/execution-flows.md) §5 SDK.
 
 | Error pattern | Retry Strategy | Recovery |
 |--------------|----------------|----------|
-| `InvalidDisk.NotFound` | 0 | HALT. Verify disk ID |
-| `QuotaExceeded.SnapshotQuota` | 0 | HALT. Delete old snapshots or request quota increase |
-| `OperationConflict.DiskOperationConflict` | 3, 30s | Retry; disk operation in progress |
-| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
+See [`references/error-reference.md`](references/error-reference.md) §2. Common: `NotFound`, `SnapshotQuota` → HALT; `OperationConflict` → retry 3×.
 
 ---
 
@@ -435,10 +404,7 @@ See [execution-flows.md](references/execution-flows.md) §6 SDK.
 
 | Error pattern | Retry Strategy | Recovery |
 |--------------|----------------|----------|
-| `InvalidSnapshot.NotFound` | 0 | HALT. Snapshot already deleted or invalid ID |
-| `InvalidSnapshot.InUse` | 0 | HALT. Snapshot is being used for image creation or other operations |
-| `OperationConflict.SnapshotOperationConflict` | 3, 30s | Retry; another operation in progress |
-| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
+See [`references/error-reference.md`](references/error-reference.md) §2. Common: `NotFound`, `InUse` → HALT; `SnapshotOperationConflict` → retry 3×.
 
 
 
@@ -481,29 +447,7 @@ See [execution-flows.md](references/execution-flows.md) §6 SDK.
 
 ---
 
-## Error Code Reference (CBS-Specific)
-
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `InvalidParameter` | Generic parameter error | Fix per API spec |
-| `InvalidDisk.NotFound` | Disk ID invalid | Verify via DescribeDisks |
-| `InvalidDisk.Attached` | Disk already attached | Detach first or use another disk |
-| `InvalidDisk.NotAttached` | Disk not attached | Attach before operation |
-| `InvalidDisk.ZoneMismatch` | Disk and instance in different zones | Use resources in same zone |
-| `InvalidDisk.ResizeNotSupported` | Disk type cannot be resized | Use CLOUD_PREMIUM/SSD/HSSD |
-| `InvalidSnapshot.NotFound` | Snapshot ID invalid | Verify via DescribeSnapshots |
-| `InvalidSnapshot.InUse` | Snapshot being used for image creation | Wait for completion |
-| `InvalidInstance.NotFound` | Instance ID invalid | Verify via DescribeInstances |
-| `QuotaExceeded.DiskQuota` | Disk quota exceeded | Request quota increase |
-| `QuotaExceeded.SnapshotQuota` | Snapshot quota exceeded | Delete old snapshots |
-| `LimitExceeded.AttachedDiskQuota` | Instance disk quota exceeded | Detach unused disks |
-| `ResourceInsufficient.ZoneResourceInsufficient` | Zone resource insufficient | Retry or use different zone |
-| `OperationConflict.DiskOperationConflict` | Another disk operation in progress | Retry (3x, 30s) |
-| `OperationConflict.SnapshotOperationConflict` | Another snapshot operation in progress | Retry (3x, 30s) |
-| `RequestLimitExceeded` | API rate limit | Retry (3x, exp backoff) |
-| `InternalError` | Server error | Retry (3x); escalate |
-
----
+See [`references/error-reference.md`](references/error-reference.md) for the full CBS error taxonomy.
 
 ## Safety Gates (Destructive Operations)
 

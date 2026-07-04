@@ -2,9 +2,13 @@
 
 CBS-specific error codes, diagnostic steps, and recovery patterns.
 
+<!-- Use API for latest: error codes at https://cloud.tencent.com/document/api/362/; quotas via `tccli cbs DescribeDiskConfigQuota` / `DescribeSnapshotQuota` -->
+
 ---
 
 ## 1. Error Code Reference (CBS-Specific)
+
+> Full taxonomy: [`references/error-reference.md`](references/error-reference.md) — this section highlights the most common patterns.
 
 | Code | Description | Recovery |
 |------|-------------|----------|

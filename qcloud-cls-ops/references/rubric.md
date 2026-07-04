@@ -112,14 +112,14 @@ This dimension audits the **Safety Gates** chapter of `SKILL.md` and the per-ope
 | Check | Score 1 | Score 0.5 | Score 0 |
 |---|---|---|---|
 | Region in request matches `{{env.TENCENTCLOUD_REGION}}` (or region was explicitly overridden with rationale — CLS is regional; a logset in `ap-guangzhou` cannot be queried from `ap-shanghai`) | ✓ | region mismatched but override documented | silently wrong region |
-| For `CreateTopic`: `PartitionCount` ∈ {1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 30, 40, 50, 60, 70, 80, 90, 100} AND (`AutoSplit = false` OR (`MaxSplitPartitions` ≥ `PartitionCount` AND `MaxSplitPartitions` ≤ 50)); cross-checked with `core-concepts.md` | ✓ | — | invalid `PartitionCount` / `MaxSplitPartitions` combination submitted |
-| For `ModifyTopic` retention: `Period` ∈ {1, 3, 5, 7, 15, 30, 90, 180, 365, 730, 1825} days (CLS-supported retention values); for **reduction**: warn that the change is hard-truncate, no soft-delete | ✓ | — | unsupported `Period` value, or reduction without truncation warning |
+| For `CreateTopic`: `PartitionCount` ∈ {1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 30, 40, 50, 60, 70, 80, 90, 100} <!-- Use API for latest; verify via `tccli cls CreateTopic --help` --> AND (`AutoSplit = false` OR (`MaxSplitPartitions` ≥ `PartitionCount` AND `MaxSplitPartitions` ≤ 50)); cross-checked with `core-concepts.md` | ✓ | — | invalid `PartitionCount` / `MaxSplitPartitions` combination submitted |
+| For `ModifyTopic` retention: `Period` ∈ {1, 3, 5, 7, 15, 30, 90, 180, 365, 730, 1825} days (CLS-supported retention values; <!-- Use API for latest; verify via `tccli cls ModifyTopic --help` -->); for **reduction**: warn that the change is hard-truncate, no soft-delete | ✓ | — | unsupported `Period` value, or reduction without truncation warning |
 | For `CreateIndex`: `Rule.FullText.Tokenizer` is one of the documented tokenizers (`@&()='%$`, or empty for whitespace); `Rule.KeyValue.KeyValues[].Value.Type` ∈ {`text`, `long`, `double`, `json`}; field names are valid JSON paths | ✓ | — | invalid tokenizer or field type submitted |
 | For `CreateConfig` (`host_file` type): `LogPath` is a valid absolute path matching the OS pattern (`/var/log/**/*.log` style); `FilePattern` is a valid glob; `ExtractRule` is valid (time-key, regex-key, JSON-key, multi-key) | ✓ | path captured but pattern not validated | invalid path or pattern submitted |
 | For `CreateShipper` to COS: target `Bucket` exists (`qcloud-cos-ops` `HeadBucket`); target `Region` matches; `Prefix` is a valid COS key prefix (no leading `/`) | ✓ | — | non-existent bucket submitted; shipper will silently fail on first delivery |
 | For `CreateShipper` to CKafka: target `TopicId` exists (`qcloud-ckafka-ops` `DescribeTopics`); `TopicName` matches | ✓ | — | non-existent CKafka topic submitted |
 | For `CreateCosRecharge`: source `Bucket` has access logging enabled (`qcloud-cos-ops` `GetBucketLogging`); target CLS `TopicId` exists; `LogType` ∈ {`minimalist_log`, `standard_log`} | ✓ | access logging not enabled (import will succeed but be empty) | invalid `LogType` or non-existent bucket/topic |
-| For `CreateAlarm`: query syntax parses (CLS uses SQL-like; test with simple `*` first); `TriggerCount` ∈ [1, 10]; `AlarmPeriod` ∈ {60, 300, 900, 1800, 3600} seconds | ✓ | — | invalid query syntax, or trigger/period out of range |
+| For `CreateAlarm`: query syntax parses (CLS uses SQL-like; test with simple `*` first); `TriggerCount` ∈ [1, 10]; `AlarmPeriod` ∈ {60, 300, 900, 1800, 3600} seconds <!-- Use API for latest; verify via `tccli cls CreateAlarm --help` --> | ✓ | — | invalid query syntax, or trigger/period out of range |
 
 ---
 
@@ -230,6 +230,7 @@ because both result in **immediate, irreversible data loss** with no soft-delete
 |---|---|---|
 | 1.0.0 | 2026-06-04 | Phase 1 CLS rollout: rubric (5 rules: logset cascade delete, topic data loss, index removal unsearchable, machine group collection stop, config change silent gap) |
 | 1.1.0 | 2026-06-19 | Tier A flesh-out: added §1 Scope, §2 Five dimensions, §3 Per-dimension checklist (5 sub-sections, 30+ rows), §5 Output schema with `rule_violations` CLS-specific extension, §6 Worked examples (PASS / SAFETY_FAIL / RETRY × 1), §8 See also. Source-of-truth cross-references moved to AGENTS.md §3/§5/§7/§8. Customised to CLS-specific safety surface: cascade deletion (DeleteLogset kills entire tree), silent data loss on retention reduction (ModifyTopic hard-truncate), full-text index cost accumulation (CreateIndex projection), async config-apply gaps (ModifyConfig ~60s silent window), shipping-pipeline breakage on topic deletion (CreateShipper target gone) |
+| 1.2.0 | 2026-07-05 | TE-1 §3.5: added `<!-- Use API for latest -->` annotations to PartitionCount / Period / AlarmPeriod hardcoded sets; no structural changes to rubric logic |
 
 ## 8. See also
 
