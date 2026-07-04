@@ -242,6 +242,8 @@ tccli ckafka DescribeInstances --Region {{env.TENCENTCLOUD_REGION}} --Limit 10
 
 Every operation: **Pre-flight → Execute (SDK/API and tccli) → Validate → Recover**. Do not skip phases.
 
+Detailed CLI/SDK command blocks for each operation are in [execution-flows.md](references/execution-flows.md).
+
 ### Operation: CreateInstance (Create CKafka Instance)
 
 #### Pre-flight Checks
@@ -255,78 +257,11 @@ Every operation: **Pre-flight → Execute (SDK/API and tccli) → Validate → R
 | VPC/Subnet | Verify via qcloud-vpc-ops | VPC and subnet exist | HALT; create VPC first |
 | Quota | Check `ResourceInsufficient` patterns | Sufficient quota | HALT; raise quota |
 
-#### Execution — CLI (`tccli`) (Primary Path)
+#### Execution
 
-```bash
-# Basic create (required params)
-tccli ckafka CreateInstance \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --ZoneId "{{user.zone_id}}" \
-  --InstanceName "{{user.instance_name}}" \
-  --VpcId "{{user.vpc_id}}" \
-  --SubnetId "{{user.subnet_id}}" \
-  --SpecType "standard" \
-  --DiskType "CLOUD_SSD" \
-  --DiskSize 1000 \
-  --MsgRetentionTime 1440
+**CLI** (`tccli ckafka CreateInstance`): See [execution-flows.md §1](references/execution-flows.md#1-createinstance)
 
-# Professional tier with multi-AZ
-tccli ckafka CreateInstance \
-  --Region "ap-guangzhou" \
-  --ZoneId "ap-guangzhou-3" \
-  --InstanceName "my-ckafka-cluster" \
-  --VpcId "vpc-xxxxxx" \
-  --SubnetId "subnet-xxxxxx" \
-  --SpecType "professional" \
-  --DiskType "CLOUD_SSD" \
-  --DiskSize 3000 \
-  --MsgRetentionTime 10080 \
-  --InstanceVersion "2.4.1"
-```
-
-#### Execution — Python SDK (Fallback Path)
-
-```python
-#!/usr/bin/env python3
-import os
-import json
-import time
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.ckafka.v20190819 import ckafka_client, models
-
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = ckafka_client.CkafkaClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.CreateInstanceRequest()
-        req.ZoneId = "ap-guangzhou-3"
-        req.InstanceName = "my-ckafka-cluster"
-        req.VpcId = "vpc-xxxxxx"
-        req.SubnetId = "subnet-xxxxxx"
-        req.SpecType = "standard"
-        req.DiskType = "CLOUD_SSD"
-        req.DiskSize = 1000
-        req.MsgRetentionTime = 1440
-        req.InstanceVersion = "2.4.1"
-
-        resp = client.CreateInstance(req)
-        result = json.loads(resp.to_json_string())
-        print(json.dumps(result, indent=2))
-
-        instance_id = result["Response"]["InstanceId"]
-        print(f"Instance created: {instance_id}")
-
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
-```
+**SDK** (Python): See [execution-flows.md §1](references/execution-flows.md#1-createinstance)
 
 #### Post-execution Validation
 
@@ -405,39 +340,11 @@ if status != 1:
 | Topic name valid | Regex check | Valid Kafka topic name | Fix naming |
 | Partition/replica valid | Check limits | Within instance limits | Adjust values |
 
-#### Execution — CLI
+#### Execution
 
-```bash
-# Create topic with basic config
-tccli ckafka CreateTopic \
-  --InstanceId "{{user.instance_id}}" \
-  --TopicName "{{user.topic_name}}" \
-  --PartitionNum {{user.partition_num}} \
-  --ReplicaNum {{user.replica_num}}
+**CLI** (`tccli ckafka CreateTopic`): See [execution-flows.md §2](references/execution-flows.md#2-createtopic)
 
-# Create topic with advanced config
-tccli ckafka CreateTopic \
-  --InstanceId "ckafka-xxxxxx" \
-  --TopicName "order-events" \
-  --PartitionNum 6 \
-  --ReplicaNum 3 \
-  --EnableWhiteList 0 \
-  --RetentionMs 604800000 \
-  --Note "Order processing events topic"
-```
-
-#### Execution — SDK
-
-```python
-req = models.CreateTopicRequest()
-req.InstanceId = "{{user.instance_id}}"
-req.TopicName = "{{user.topic_name}}"
-req.PartitionNum = {{user.partition_num}}
-req.ReplicaNum = {{user.replica_num}}
-req.Note = "Created via API"
-resp = client.CreateTopic(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+**SDK** (Python): See [execution-flows.md §2](references/execution-flows.md#2-createtopic)
 
 #### Post-execution Validation
 
@@ -473,35 +380,11 @@ tccli ckafka DescribeTopic \
 |-------|--------|----------|------------|
 | Instance exists | DescribeInstances | Status = 1 | HALT |
 
-#### Execution — CLI
+#### Execution
 
-```bash
-# List all consumer groups
-tccli ckafka DescribeConsumerGroup \
-  --InstanceId "{{user.instance_id}}" \
-  --Offset 0 \
-  --Limit 20
+**CLI** (`tccli ckafka DescribeConsumerGroup`): See [execution-flows.md §3](references/execution-flows.md#3-describecomposergroup)
 
-# List with filter
-tccli ckafka DescribeConsumerGroup \
-  --InstanceId "ckafka-xxxxxx" \
-  --SearchWord "order-consumer"
-```
-
-#### Execution — SDK
-
-```python
-req = models.DescribeConsumerGroupRequest()
-req.InstanceId = "{{user.instance_id}}"
-req.Offset = 0
-req.Limit = 20
-resp = client.DescribeConsumerGroup(req)
-result = json.loads(resp.to_json_string())
-
-# Parse consumer group info
-for group in result["Response"]["Result"]["ConsumerGroupList"]:
-    print(f"Group: {group['ConsumerGroupName']}, Lag: {group.get('ConsumeLag', 'N/A')}")
-```
+**SDK** (Python): See [execution-flows.md §3](references/execution-flows.md#3-describecomposergroup)
 
 #### Key Response Fields
 
@@ -532,54 +415,11 @@ tccli ckafka DescribeGroupInfo \
 | Instance exists | DescribeInstances | Status = 1 | HALT |
 | Resource exists | DescribeTopic | Topic exists | Create topic first |
 
-#### Execution — CLI
+#### Execution
 
-```bash
-# Create ACL for producer
-tccli ckafka CreateAcl \
-  --InstanceId "{{user.instance_id}}" \
-  --ResourceType "TOPIC" \
-  --ResourceName "{{user.topic_name}}" \
-  --Principal "User:*" \
-  --Host "*" \
-  --Operation "Write" \
-  --PermissionType "Allow"
+**CLI** (`tccli ckafka CreateAcl`): See [execution-flows.md §4](references/execution-flows.md#4-createacl)
 
-# Create ACL for consumer (Read)
-tccli ckafka CreateAcl \
-  --InstanceId "ckafka-xxxxxx" \
-  --ResourceType "TOPIC" \
-  --ResourceName "order-events" \
-  --Principal "User:consumer-app" \
-  --Host "10.0.0.0/8" \
-  --Operation "Read" \
-  --PermissionType "Allow"
-
-# Create consumer group ACL
-tccli ckafka CreateAcl \
-  --InstanceId "ckafka-xxxxxx" \
-  --ResourceType "GROUP" \
-  --ResourceName "order-consumer-group" \
-  --Principal "User:consumer-app" \
-  --Host "*" \
-  --Operation "Read" \
-  --PermissionType "Allow"
-```
-
-#### Execution — SDK
-
-```python
-req = models.CreateAclRequest()
-req.InstanceId = "{{user.instance_id}}"
-req.ResourceType = "TOPIC"
-req.ResourceName = "{{user.topic_name}}"
-req.Principal = "User:*"
-req.Host = "*"
-req.Operation = "Write"
-req.PermissionType = "Allow"
-resp = client.CreateAcl(req)
-print(f"ACL created: {resp.to_json_string()}")
-```
+**SDK** (Python): See [execution-flows.md §4](references/execution-flows.md#4-createacl)
 
 #### Post-execution Validation
 
@@ -610,41 +450,11 @@ tccli ckafka DescribeACL \
 | Topic exists | DescribeTopic | Topic exists | Create topic |
 | ACL allows write | DescribeACL | Write permission | Create ACL |
 
-#### Execution — CLI
+#### Execution
 
-```bash
-# Send a single message
-tccli ckafka SendMessages \
-  --InstanceId "{{user.instance_id}}" \
-  --Topic "{{user.topic_name}}" \
-  --Partition 0 \
-  --Message 'Hello Kafka!'
+**CLI** (`tccli ckafka SendMessages`): See [execution-flows.md §5](references/execution-flows.md#5-sendmessage)
 
-# Send JSON message (escape properly)
-tccli ckafka SendMessages \
-  --InstanceId "ckafka-xxxxxx" \
-  --Topic "order-events" \
-  --Message '{"orderId":"12345","status":"created","timestamp":"2026-05-28T10:00:00Z"}'
-```
-
-#### Execution — SDK
-
-```python
-import base64
-
-req = models.SendMessageRequest()
-req.InstanceId = "{{user.instance_id}}"
-req.Topic = "{{user.topic_name}}"
-req.Partition = 0
-
-# Encode message (if required by SDK version)
-message = '{"event":"test","data":"hello"}'
-req.Message = base64.b64encode(message.encode()).decode()
-
-resp = client.SendMessage(req)
-result = json.loads(resp.to_json_string())
-print(f"Message sent, offset: {result['Response'].get('Offset', 'N/A')}")
-```
+**SDK** (Python): See [execution-flows.md §5](references/execution-flows.md#5-sendmessage)
 
 #### Post-execution Validation
 
