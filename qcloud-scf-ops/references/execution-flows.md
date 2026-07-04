@@ -14,6 +14,8 @@ SKILL.md describes **what to do** (high-level steps); this file shows **how to d
 | §5 | CreateAlias | `tccli scf CreateAlias --FunctionName ...` | `client.CreateAlias(req)` |
 | §6 | CreateTrigger | `tccli scf CreateTrigger --TriggerName ...` | `client.CreateTrigger(req)` |
 | §7 | GetFunctionLogs | `tccli scf GetFunctionLogs --FunctionName ...` | `client.GetFunctionLogs(req)` |
+| §8 | CreateLayer | `tccli scf CreateLayer --LayerName ...` | `client.CreateLayer(req)` |
+| §9 | DeleteLayerVersion | `tccli scf DeleteLayerVersion --LayerName ... --LayerVersion ...` | `client.DeleteLayerVersion(req)` |
 
 ---
 
@@ -326,7 +328,7 @@ tccli scf CreateTrigger \
   --FunctionName "{{user.function_name}}" \
   --TriggerName "{{user.trigger_name}}" \
   --Type "cos" \
-  --TriggerDesc '{"bucketUrl": "mybucket-{{env.TENCENTCLOUD_APPID}}.cos.{{env.TENCENTCLOUD_REGION}}.myqcloud.com", "event": "cos:ObjectCreated:*", "filter": {"Prefix": "uploads/", "Suffix": ".jpg"}}' \
+  --TriggerDesc '{"bucketUrl": "mybucket-example.cos.{{env.TENCENTCLOUD_REGION}}.myqcloud.com", "event": "cos:ObjectCreated:*", "filter": {"Prefix": "uploads/", "Suffix": ".jpg"}}' \
   --Enable "OPEN" \
   --Namespace "{{user.namespace}}" \
   --Region {{env.TENCENTCLOUD_REGION}}
@@ -433,6 +435,113 @@ def main():
 if __name__ == "__main__":
     main()
 ```
+
+---
+
+## §8 Operation: CreateLayer
+
+### CLI (Primary Path)
+
+```bash
+# Create a new layer version
+tccli scf CreateLayer \
+  --LayerName "{{user.layer_name}}" \
+  --LayerZipUri "{{user.zip_file_path}}" \
+  --Description "Layer version $(date -u +%Y-%m-%d)" \
+  --Region {{env.TENCENTCLOUD_REGION}}
+```
+
+### Python SDK (Fallback Path)
+
+```python
+#!/usr/bin/env python3
+"""SDK fallback: SCF CreateLayer"""
+import os, json, base64
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.scf import scf_client, models
+
+def main():
+    try:
+        cred = credential.Credential(
+            os.environ.get("TENCENTCLOUD_SECRET_ID"),
+            os.environ.get("TENCENTCLOUD_SECRET_KEY")
+        )
+        client = scf_client.ScfClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+        req = models.CreateLayerRequest()
+        req.LayerName = os.environ.get("LAYER_NAME")
+        req.LayerZipUri = os.environ.get("ZIP_FILE_PATH")
+        req.Description = f"Layer version"
+
+        resp = client.CreateLayer(req)
+        print(resp.to_json_string())
+    except TencentCloudSDKException as err:
+        print(f"[ERROR] {err}")
+
+if __name__ == "__main__":
+    main()
+```
+
+### Post-execution Validation
+
+1. Read new layer version from `$.Response.LayerVersion`
+2. Verify layer exists via ListLayers
+
+---
+
+## §9 Operation: DeleteLayerVersion
+
+### Pre-flight (Safety Gate)
+
+- **MUST** enumerate functions using this layer version via `ListLayerVersions` and `GetFunction`
+- **MUST** warn: deleting a layer version will cause functions using it to fail on next cold start
+- **MUST** obtain explicit confirmation
+
+### CLI (Primary Path)
+
+```bash
+# Delete a specific layer version
+tccli scf DeleteLayerVersion \
+  --LayerName "{{user.layer_name}}" \
+  --LayerVersion "{{user.version}}" \
+  --Region {{env.TENCENTCLOUD_REGION}}
+```
+
+### Python SDK (Fallback Path)
+
+```python
+#!/usr/bin/env python3
+"""SDK fallback: SCF DeleteLayerVersion"""
+import os, json
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.scf import scf_client, models
+
+def main():
+    try:
+        cred = credential.Credential(
+            os.environ.get("TENCENTCLOUD_SECRET_ID"),
+            os.environ.get("TENCENTCLOUD_SECRET_KEY")
+        )
+        client = scf_client.ScfClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+        req = models.DeleteLayerVersionRequest()
+        req.LayerName = os.environ.get("LAYER_NAME")
+        req.LayerVersion = int(os.environ.get("LAYER_VERSION"))
+
+        resp = client.DeleteLayerVersion(req)
+        print(resp.to_json_string())
+    except TencentCloudSDKException as err:
+        print(f"[ERROR] {err}")
+
+if __name__ == "__main__":
+    main()
+```
+
+### Post-execution Validation
+
+1. Verify layer version no longer appears in ListLayerVersions
 
 ---
 
