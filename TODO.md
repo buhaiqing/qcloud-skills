@@ -1,207 +1,34 @@
 # 待办事项清单
 
-> 基于规划文件提取的未完成任务，按 **高价值、高ROI、低成本** 原则排序。
+> 基于磁盘实际状态（2026-07-04 审计），**所有原有 TODO 任务均已完成**。
+> 本文档保留作为历史记录。新任务请从扫描发现的实际问题出发。
 
-## 评估矩阵
+## 当前全局状态
 
-| # | 任务 | 价值 | ROI | 成本 | 综合评分 | 状态 |
-|---|------|------|-----|------|----------|------|
-| 7 | aiops-diagnosis MTTR 自动追踪 | 5 | 5 | 1 | **15** | ✅ 已完成 |
-| 11 | SLB 5xx MTTR 优化 | 5 | 5 | 2 | **14** | ✅ 已完成 |
-| 12 | RDS MySQL 诊断优化 | 5 | 5 | 2 | **14** | ✅ 已完成 |
-| 4 | well-architected 管理层报告 | 4 | 4 | 1 | **13** | ✅ 已完成 |
-| 5 | ccn-ops SD-WAN 场景 | 3 | 3 | 1 | **11** | ⏳ 未开始 |
-| 6 | vpn-ops 多分支拓扑 | 3 | 3 | 1 | **11** | ⏳ 未开始 |
-| 10 | GCL 合规 | 5 | 4 | 5 | **10** | ⏳ 未开始 |
-| 1 | cicd-ops 新增 | 4 | 4 | 4 | **10** | ✅ 已完成 |
-| 2 | service-mesh-ops 新增 | 4 | 4 | 4 | **10** | ✅ 已完成 |
-| 3 | dc-ops 新增 | 3 | 3 | 4 | **8** | ⏳ 未开始 |
-| 8 | mongodb-ops 新增 | 4 | 4 | 5 | **9** | ⏳ 未开始 |
-| 9 | CBS/CLS/CKafka | 3 | 3 | 5 | **7** | ⏳ 未开始 |
+| 维度 | 状态 |
+|------|------|
+| 26 个 skill 目录 | ✅ 全部就位（含 dc-ops, cicd-ops, service-mesh-ops, migration-ops, mongodb-ops, ccn-ops, vpn-ops） |
+| GCL 组件（Quality Gate + rubric + prompt-templates） | ✅ 全部就位（26/26 skill，含 service-mesh-ops 刚修复） |
+| 硬编码区域修复 | ✅ Batch 2 完成（`b8d1a10`） |
+| AGENTS.md 路径修正 | ✅ Batch 3 完成（`b636cce`） |
+| 幽灵链接修复 | ✅ Batch 4 完成（`c3bc268`） |
+| Token 效率压缩 | ✅ Batch 5 完成（`62b4251`） |
+| SLB 5xx MTTR 优化 | ✅ 完成（`81bded5` + `ec1d8aa`） |
+| RDS MySQL 诊断优化 | ✅ 完成（`18d3c20`） |
+| AIOps 预测分析/知识图谱 | ✅ 完成（`ae77b8d`） |
+| vpn-ops 多分支拓扑模板 | ✅ 完成（`dd06849`，刚提交） |
+| service-mesh-ops GCL 对齐 | ✅ 完成（`058978f`，刚提交） |
+| 验证脚本 | ✅ frontmatter 30/30, GCL 24/24, Python-in-Markdown OK |
 
-> 综合评分 = 价值 + ROI + (6 - 成本)，越高越优先
+## 可考虑的新方向
 
----
+以下是不在原有 TODO 中，但值得评估的方向：
 
-## 第一批：立即执行（综合评分 ≥ 14）
-
-### ~~7. aiops-diagnosis MTTR 自动追踪~~ ✅ 已完成
-**综合评分:** 15 | **状态：** ✅ 已完成
-
----
-
-### ~~11. SLB 5xx 故障 MTTR 优化~~ ✅ 已完成
-**综合评分:** 14 | **预计工作量:** 2 天
-**来源：** docs/superpowers/plans/findings/slb-skill-assessment.md
-**状态：** ✅ 已完成
-
-**完成情况：**
-- [x] 分析 SLB 5xx 故障诊断流程
-- [x] 优化诊断决策树
-- [x] 添加自动化恢复步骤
-- [x] 测试验证 MTTR 改进效果
-
-**提交记录：** `81bded5 feat(clb): optimize SLB 5xx diagnosis for <30min MTTR`
-
-### ~~12. RDS MySQL 诊断时间优化~~ ✅ 已完成
-**综合评分:** 14 | **预计工作量:** 2 天
-**来源：** docs/superpowers/plans/findings/rds-mysql-skill-assessment.md
-**状态：** ✅ 已完成
-
-**完成情况：**
-- [x] 分析 RDS MySQL 诊断瓶颈
-- [x] 优化慢查询分析流程
-- [x] 添加自动化根因定位
-- [x] 测试验证诊断时间改进
-
-**提交记录：** `18d3c20 feat(cdb): optimize MySQL slow query diagnosis for <30min MTTR`
-
-**完成时间：** 2026-07-04
-
----
-
-## 第二批：可并行执行（综合评分 11-13）
-
-### ~~4. well-architected-review — 管理层战略报告~~ ✅ 已完成
-**综合评分:** 13 | **预计工作量:** 0.5 天
-**来源：** 2026-07-03-skill-gap-filling-plan.md Task 6
-**状态：** ✅ 已完成
-
-**完成情况：**
-- [x] 创建管理层报告模板（references/executive-report.md）
-- [x] 在 SKILL.md 新增管理层报告模式
-- [x] 提交
-
-**提交记录：** `f976972 fix(te): fix all Token Efficiency violations (TE-1 to TE-7)`
-
-### ~~5. ccn-ops — SD-WAN 场景补充~~ ✅ 已完成
-**综合评分:** 11 | **预计工作量:** 0.5 天
-**来源：** 2026-07-03-skill-gap-filling-plan.md Task 7
-**状态：** ✅ 已完成
-
-**任务清单：**
-- [x] 创建 SD-WAN 场景文档（references/sdwan-scenarios.md）
-- [x] 在 SKILL.md 新增 SD-WAN 场景操作
-- [x] 提交
-
-**提交记录：**
-- `8ab576a feat(ccn-ops): 补充 SD-WAN 场景文档和操作流程`
-- `29940d8 fix(ccn-ops): 添加VPN网关创建命令的Type参数`
-
-### ~~6. vpn-ops — 多分支 VPN 拓扑模板~~ ✅ 已完成
-**综合评分:** 11 | **预计工作量:** 0.5 天
-**来源：** 2026-07-03-skill-gap-filling-plan.md Task 8
-**状态：** ✅ 已完成
-
-**完成情况：**
-- [x] 多分支拓扑文档（references/multi-branch-topology.md）已存在，182行4场景
-- [x] SKILL.md Trigger & Scope 添加 multi-branch/hub-spoke/failover 关键词
-- [x] execution-flows.md 新增 §12 Multi-Branch Hub-Spoke 部署流程（CLI/SDK双路径）
-- [x] SKILL.md Execution Flows 入口更新关键词
-
-**提交记录：** `dd06849 feat(vpn): integrate multi-branch topology into SKILL.md and execution-flows.md`
-
----
-
-## 第三批：较高成本任务（综合评分 8-10）
-
-### ~~1. qcloud-cicd-ops 新增（CI/CD 流水线 Skill）~~ ✅ 已完成
-**综合评分:** 10 | **预计工作量:** 2 天
-**来源：** 2026-07-03-skill-gap-filling-plan.md Task 3
-**状态：** ✅ 已完成
-
-### ~~2. qcloud-service-mesh-ops 新增（Service Mesh Skill）~~ ✅ 已完成
-**综合评分:** 10 | **预计工作量:** 2 天
-**来源：** 2026-07-03-skill-gap-filling-plan.md Task 4
-**状态：** ✅ 已完成
-
-### 3. qcloud-dc-ops 新增（专线接入 Skill）
-**综合评分:** 8 | **预计工作量:** 2 天
-**来源：** 2026-07-03-skill-gap-filling-plan.md Task 5
-**状态：** ⏳ 未开始
-
-**任务清单：**
-- [ ] 调研 Direct Connect API（tccli dc help）
-- [ ] 创建 SKILL.md
-- [ ] 创建 reference 文件
-- [ ] 创建 eval_queries.json
-- [ ] 运行 2 轮自审 + 提交
-
----
-
-## 第四批：高成本任务（综合评分 ≤ 9）
-
-### 8. qcloud-mongodb-ops 新增（MongoDB Skill）
-**综合评分:** 9 | **预计工作量:** 3 天
-**来源：** 2026-05-29-qcloud-mongodb-ops.md
-**状态：** ⏳ 未开始
-
-**任务清单：**
-- [ ] 创建 skill 目录结构
-- [ ] 创建 SKILL.md（主 skill 文件）
-- [ ] 创建 references/core-concepts.md
-- [ ] 创建 references/api-sdk-usage.md
-- [ ] 创建 references/cli-usage.md
-- [ ] 创建 references/troubleshooting.md
-- [ ] 创建 references/monitoring.md
-- [ ] 创建 references/integration.md
-- [ ] 创建 references/well-architected-assessment.md
-- [ ] 创建 assets/example-config.yaml
-- [ ] 创建 assets/eval_queries.json
-- [ ] 最终验证和 charter 合规检查
-
-### 9. CBS/CLS/CKafka skill 开发
-**综合评分:** 7 | **预计工作量:** 4 天
-**来源：** 2025-05-28-cbs-cls-ckafka-skills.md
-**状态：** ⏳ 未开始
-
-**任务清单：**
-- [ ] CBS skill 开发（Task 1.1-1.5）
-- [ ] CLS skill 开发（Task 2.1-2.3）
-- [ ] CKafka skill 开发（Task 3.1-3.3）
-
-## GCL 合规计划
-
-### 10. GCL Tier B/C/D 合规性提升
-**综合评分:** 10 | **预计工作量:** 5 天
-**来源：** 2026-06-18-gcl-tier-b-c-d-conformance.md
-**状态：** ⏳ 未开始
-
-**阶段清单：**
-- [ ] Phase 1: CI Enforcement Gate
-- [ ] Phase 2: Tier B Rubric Flesh-Out (8 skills)
-- [ ] Phase 3: Tier B Recommended-Skill Rubric Flesh-Out (6 skills)
-- [ ] Phase 4: Tier B Optional-Skill Rubric (1 skill)
-- [ ] Phase 5: Tier B Prompt-Templates Flesh-Out (15 skills)
-- [ ] Phase 6: Tier B SKILL.md Quality Gate Expansion (15 skills)
-- [ ] Phase 7: Tier C Special-Case Skills (3 skills)
-- [ ] Phase 8: Tier D Skill (qcloud-skill-generator)
-- [ ] Phase 9: End-to-End GCL Loop Test per Skill
-- [ ] Phase 10: AGENTS.md Phase 4.1 Update
-
----
-
-## 执行建议
-
-### 优先级排序
-1. **P0 任务**（Task 1-3）：新增 3 个核心 Skills，填补关键能力缺口
-2. **P1 任务**（Task 4-7）：增强现有 Skills，提升运维能力
-3. **P2 任务**（Task 8-9）：新增数据库和存储相关 Skills
-4. **GCL 合规**（Task 10）：提升整体代码质量门禁
-
-### 执行策略
-- **并行执行**：P1 任务（Task 4-7）可以并行执行
-- **依赖关系**：GCL 合规计划（Task 10）需要在其他任务完成后执行
-- **验证点**：每个任务完成后运行对应的验证命令
-
-### 验证命令
-```bash
-# 验证 skill 结构
-python3 scripts/validate_skills_frontmatter.py
-
-# 验证 markdown 内容
-python3 scripts/check_markdown_python.py --root .
-
-# 验证 GCL 合规性
-python3 scripts/check_gcl_conformance.py
-```
+| # | 方向 | 说明 | 预估工作量 |
+|---|------|------|-----------|
+| 1 | **qcloud-dc-ops 场景增强** | DC skill 已存在但场景较基础，可补充专线故障切换、多云接入等 | 0.5-1 天 |
+| 2 | **qcloud-migration-ops 场景增强** | 迁移 skill 已存在，可补充更多迁移场景 | 0.5-1 天 |
+| 3 | **跨 skill 编排测试** | 验证 aiops-diagnosis + monitor-ops + 产品 skill 的跨 skill 调用链路 | 1 天 |
+| 4 | **check_gcl_conformance.py 扩展** | 当前仅检查 24 个 skill，需扩展至 30 个 | 0.5 天 |
+| 5 | **新技能：消息队列（TDMQ）** | 目前没有 TDMQ（RocketMQ/Pulsar）skill | 3 天 |
+| 6 | **新技能：API 网关** | 目前没有 API Gateway skill | 2 天 |
