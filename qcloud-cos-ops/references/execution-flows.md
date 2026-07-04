@@ -33,7 +33,9 @@ tccli cos PutBucket \
 
 ```python
 from tencentcloud.common import credential
-from tencentcloud.cos import cos_client, models
+from qcloud_cos import CosClient
+from qcloud_cos import CosConfig, CosRequestError
+from qcloud_cos.utils import UtilAuto
 
 cred = credential.Credential(
     "{{env.TENCENTCLOUD_SECRET_ID}}",
@@ -65,7 +67,9 @@ coscmd upload --multipart "{{user.local_file}}" "/{{user.bucket_name}}/{{user.ob
 
 ```python
 from tencentcloud.common import credential
-from tencentcloud.cos import cos_client, models
+from qcloud_cos import CosClient
+from qcloud_cos import CosConfig, CosRequestError
+from qcloud_cos.utils import UtilAuto
 
 cred = credential.Credential(
     "{{env.TENCENTCLOUD_SECRET_ID}}",
@@ -96,7 +100,9 @@ coscmd download "/{{user.bucket_name}}/{{user.object_key}}" "{{user.local_file}}
 
 ```python
 from tencentcloud.common import credential
-from tencentcloud.cos import cos_client, models
+from qcloud_cos import CosClient
+from qcloud_cos import CosConfig, CosRequestError
+from qcloud_cos.utils import UtilAuto
 
 cred = credential.Credential(
     "{{env.TENCENTCLOUD_SECRET_ID}}",
@@ -129,7 +135,9 @@ coscmd delete "/{{user.bucket_name}}/{{user.object_key}}"
 
 ```python
 from tencentcloud.common import credential
-from tencentcloud.cos import cos_client, models
+from qcloud_cos import CosClient
+from qcloud_cos import CosConfig, CosRequestError
+from qcloud_cos.utils import UtilAuto
 
 cred = credential.Credential(
     "{{env.TENCENTCLOUD_SECRET_ID}}",
@@ -158,7 +166,9 @@ coscmd list "{{user.bucket_name}}"
 
 ```python
 from tencentcloud.common import credential
-from tencentcloud.cos import cos_client, models
+from qcloud_cos import CosClient
+from qcloud_cos import CosConfig, CosRequestError
+from qcloud_cos.utils import UtilAuto
 
 cred = credential.Credential(
     "{{env.TENCENTCLOUD_SECRET_ID}}",
@@ -202,7 +212,9 @@ tccli cos DeleteBucket \
 
 ```python
 from tencentcloud.common import credential
-from tencentcloud.cos import cos_client, models
+from qcloud_cos import CosClient
+from qcloud_cos import CosConfig, CosRequestError
+from qcloud_cos.utils import UtilAuto
 
 cred = credential.Credential(
     "{{env.TENCENTCLOUD_SECRET_ID}}",
@@ -244,7 +256,9 @@ tccli cos PutBucketLifecycle \
 
 ```python
 from tencentcloud.common import credential
-from tencentcloud.cos import cos_client, models
+from qcloud_cos import CosClient
+from qcloud_cos import CosConfig, CosRequestError
+from qcloud_cos.utils import UtilAuto
 
 cred = credential.Credential(
     "{{env.TENCENTCLOUD_SECRET_ID}}",
@@ -359,7 +373,7 @@ echo "Phase 3 complete."
 echo "=== Phase 4: Idle Resource Detection ==="
 echo "--- 4a. Empty Bucket Detection ---"
 for bucket in $(tccli cos DescribeBuckets --Region {{env.TENCENTCLOUD_REGION}} | jq -r '.Response.Buckets[].Name'); do
-  OBJ_COUNT=$(tccli cos GetBucket --Bucket "$bucket" --Region {{env.TENCENTCLOUD_REGION}} --MaxKeys 1 2>/dev/null | jq '.Response.Contents | length // 0')
+  OBJ_COUNT=$(tccli cos ListObjects --Bucket "$bucket" --Region {{env.TENCENTCLOUD_REGION}} --MaxKeys 1 2>/dev/null | jq '.Response.Contents | length // 0')
   if [ "$OBJ_COUNT" -eq 0 ]; then
     echo "  🔴 Empty bucket: $bucket"
   fi
@@ -423,7 +437,9 @@ COS FinOps: Full automated cost analysis
 """
 import os, json, subprocess, datetime
 from tencentcloud.common import credential
-from tencentcloud.cos import cos_client, models
+from qcloud_cos import CosClient
+from qcloud_cos import CosConfig, CosRequestError
+from qcloud_cos.utils import UtilAuto
 from tencentcloud.cls import cls_client as cls_sdk, models as cls_models
 
 REGION = os.environ.get("TENCENTCLOUD_REGION", "ap-guangzhou")
@@ -440,7 +456,7 @@ cls_client_inst = cls_sdk.ClsClient(cred, REGION)
 # Phase 1: Collect COS metadata
 print("=== Phase 1: COS Metadata ===")
 req = models.DescribeBucketsRequest()
-resp = json.loads(cos_client_inst.DescribeBuckets(req).to_json_string())
+resp = json.loads(cos_client_inst.DescribeBuckets(req))
 buckets = resp.get('Response', {}).get('Buckets', [])
 print(f"Buckets: {len(buckets)}")
 
@@ -448,7 +464,7 @@ print(f"Buckets: {len(buckets)}")
 print("\n=== Phase 2: CLS Verification ===")
 cos_req = cls_models.DescribeCosRechargesRequest()
 cos_req.TopicId = TOPIC_ID
-recharges = json.loads(cls_client_inst.DescribeCosRecharges(cos_req).to_json_string())
+recharges = json.loads(cls_client_inst.DescribeCosRecharges(cos_req))
 recharge_count = len(recharges.get('Response', {}).get('CosRecharges', []))
 print(f"COS import tasks: {recharge_count}")
 
@@ -462,7 +478,7 @@ search_req.To = int(datetime.datetime.now().timestamp())
 try:
     search_req.Query = 'eventName:PutObject | select storageClass, count(*) as c, round(sum(objectSize)/1073741824, 2) as tGB group by storageClass'
     search_req.Limit = 100
-    resp = json.loads(cls_client_inst.SearchLog(search_req).to_json_string())
+    resp = json.loads(cls_client_inst.SearchLog(search_req))
     results = resp.get('Response', {}).get('Results', [])
     print(f"Storage class distribution: {len(results)} entries")
 except Exception as e:
