@@ -82,7 +82,7 @@ This skill is an **operational runbook** for agents: explicit scope, credential 
 ### SHOULD Use This Skill When
 
 - User mentions "Tencent Cloud VPN" OR "IPSec VPN" OR "SSL VPN" OR "虚拟专用网络" OR "VPN 网关" OR "客户网关" OR "hybrid cloud" OR "on-prem connectivity"
-- Task keywords: VPN gateway, VPN tunnel, VPN connection, customer gateway, IKE, pre-shared key, SSL VPN server, SSL VPN client, hybrid cloud, site-to-site, remote access
+- Task keywords: VPN gateway, VPN tunnel, VPN connection, customer gateway, IKE, pre-shared key, SSL VPN server, SSL VPN client, hybrid cloud, site-to-site, remote access, multi-branch topology, branch office, hub-and-spoke, active-standby failover
 - User describes a scenario requiring **encrypted tunnels between a Tencent VPC and on-prem / remote networks** (IPSec) or **remote user access** to a VPC (SSL)
 - User asks to design, deploy, configure, monitor, or troubleshoot a VPN connection end-to-end
 
@@ -210,7 +210,7 @@ tccli vpc CreateVpnGateway \
 
 ## Execution Flows (Agent-Readable)
 
-Every operation: **Pre-flight → Execute (CLI and SDK) → Validate → Recover**.
+Every operation: **Pre-flight → Execute (CLI and SDK) → Validate → Recover**. For multi-branch topology deployment, see Operation 12 below.
 
 ### Operation: Create VPN Gateway
 

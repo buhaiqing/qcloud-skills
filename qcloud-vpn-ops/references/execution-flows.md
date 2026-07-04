@@ -18,6 +18,7 @@
 | 9 | Create SSL VPN Client | `tccli vpc CreateVpnGatewaySslClient` | — |
 | 10 | Delete SSL VPN Client | `tccli vpc DeleteVpnGatewaySslClient` | — |
 | 11 | Delete Customer Gateway | `tccli vpc DeleteCustomerGateway` | — |
+| 12 | Multi-Branch Hub-Spoke Deployment | See §12 | See §12 |
 
 ---
 
@@ -317,3 +318,132 @@ tccli vpc DeleteCustomerGateway \
 ### Post-execution Validation
 
 Poll `DescribeCustomerGateways`; expect absent within 30s.
+
+---
+
+## 12. Multi-Branch Hub-Spoke Topology Deployment
+
+Deploy a Hub-Spoke topology with a single VPN Gateway in the VPC (Hub) and multiple branch offices (Spokes), each connected via an IPSec tunnel.
+
+### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| VPC exists | `tccli vpc DescribeVpcs --VpcIds "[\"{{user.vpc_id}}\"]"` | State `AVAILABLE` | HALT; create or recover VPC first |
+| VPN Gateway exists | `tccli vpc DescribeVpnGateways --VpnGatewayIds "[\"{{output.vpn_gateway_id}}\"]"` | State `AVAILABLE` | HALT; create VPN gateway first |
+| Branch CIDRs non-overlapping | Validate each `{{user.branch_n_cidr}}` against VPC CIDR and other branch CIDRs | No overlap | HALT; ask user to re-plan CIDR allocation |
+| Bandwidth adequate | Sum of branch bandwidth expectations ≤ gateway bandwidth | Sum ≤ gateway spec | HALT; upgrade gateway or reduce branches |
+
+### CLI — Create Customer Gateways for Each Branch
+
+```bash
+# Branch 1
+tccli vpc CreateCustomerGateway \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --CustomerGatewayName "branch1-cgw" \
+  --IpAddress "{{user.branch1_public_ip}}" \
+  --ClientToken "$(date +%s%N)1"
+
+# Branch 2
+tccli vpc CreateCustomerGateway \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --CustomerGatewayName "branch2-cgw" \
+  --IpAddress "{{user.branch2_public_ip}}" \
+  --ClientToken "$(date +%s%N)2"
+
+# Repeat for N branches...
+```
+
+### CLI — Create VPN Connections (One per Branch)
+
+```bash
+# Tunnel to Branch 1
+tccli vpc CreateVpnConnection \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --VpnGatewayId "{{output.vpn_gateway_id}}" \
+  --CustomerGatewayId "{{output.branch1_cgw_id}}" \
+  --VpnConnectionName "tunnel-to-branch1" \
+  --PreShareKey "{{user.pre_shared_key}}" \
+  --VpnProto "IPsec" \
+  --LocalCidrBlocks '["{{user.vpc_cidr}}"]' \
+  --RemoteCidrBlocks '["{{user.branch1_cidr}}"]' \
+  --ClientToken "$(date +%s%N)b1"
+
+# Tunnel to Branch 2
+tccli vpc CreateVpnConnection \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --VpnGatewayId "{{output.vpn_gateway_id}}" \
+  --CustomerGatewayId "{{output.branch2_cgw_id}}" \
+  --VpnConnectionName "tunnel-to-branch2" \
+  --PreShareKey "{{user.pre_shared_key}}" \
+  --VpnProto "IPsec" \
+  --LocalCidrBlocks '["{{user.vpc_cidr}}"]' \
+  --RemoteCidrBlocks '["{{user.branch2_cidr}}"]' \
+  --ClientToken "$(date +%s%N)b2"
+```
+
+### SDK
+
+```python
+#!/usr/bin/env python3
+from tencentcloud.common import credential
+from tencentcloud.vpc import vpc_client, models
+import os, json, time
+
+cred = credential.Credential(
+    os.environ.get("TENCENTCLOUD_SECRET_ID"),
+    os.environ.get("TENCENTCLOUD_SECRET_KEY")
+)
+client = vpc_client.VpcClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
+
+branches = [
+    {"name": "branch1", "ip": "{{user.branch1_public_ip}}", "cidr": "{{user.branch1_cidr}}"},
+    {"name": "branch2", "ip": "{{user.branch2_public_ip}}", "cidr": "{{user.branch2_cidr}}"},
+]
+
+# Create Customer Gateways
+cgw_ids = {}
+for b in branches:
+    req = models.CreateCustomerGatewayRequest()
+    req.CustomerGatewayName = f"{b['name']}-cgw"
+    req.IpAddress = b["ip"]
+    resp = client.CreateCustomerGateway(req)
+    parsed = json.loads(resp.to_json_string())
+    cgw_ids[b["name"]] = parsed["Response"]["CustomerGateway"]["CustomerGatewayId"]
+
+# Create VPN Connections
+for b in branches:
+    req = models.CreateVpnConnectionRequest()
+    req.VpnGatewayId = "{{output.vpn_gateway_id}}"
+    req.CustomerGatewayId = cgw_ids[b["name"]]
+    req.VpnConnectionName = f"tunnel-to-{b['name']}"
+    req.PreShareKey = "{{user.pre_shared_key}}"
+    req.VpnProto = "IPsec"
+    req.LocalCidrBlocks = ["{{user.vpc_cidr}}"]
+    req.RemoteCidrBlocks = [b["cidr"]]
+    resp = client.CreateVpnConnection(req)
+    print(resp.to_json_string())
+```
+
+### Post-execution Validation
+
+```bash
+# Verify all tunnels are AVAILABLE
+tccli vpc DescribeVpnConnections \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Filters "Name=vpn-gateway-id,Values={{output.vpn_gateway_id}}" | \
+  jq -r '.Response.VpnConnectionSet[] | "\(.VpnConnectionName): \(.State)"'
+
+# Expected output (example):
+# tunnel-to-branch1: AVAILABLE
+# tunnel-to-branch2: AVAILABLE
+```
+
+### Recover
+
+| Error Code | Meaning | Recovery |
+|------------|---------|----------|
+| `InvalidParameterValue.Malformed` | Parameter format error | Check JSON/string format; verify CIDR notation |
+| `LimitExceeded` | Quota exceeded (too many connections per gateway) | HALT; raise quota or use multiple gateways |
+| `ResourceInUse` | Customer Gateway already referenced | Use existing CGW or delete conflicting references |
+| `InvalidParameterValue.Duplicate` | Duplicate tunnel name | Use unique connection names per branch |
