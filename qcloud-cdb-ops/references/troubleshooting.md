@@ -2,6 +2,37 @@
 
 CDB-specific error codes, diagnostic steps, and recovery patterns for Tencent Cloud TencentDB for MySQL.
 
+## Quick Diagnosis: Slow Query Issues (MTTR < 30 min)
+
+> **When slow query alarms fire**, use the fast diagnosis path below instead of general troubleshooting.
+
+### Fast Triage (2 min)
+
+1. **Check instance status and connection count:**
+
+```bash
+# Check instance status
+tccli cdb DescribeDBInstances \
+  --InstanceIds '["{{user.instance_id}}"]' \
+  --Fields "InstanceId,Status,Memory,Volume,EngineVersion"
+
+# Check current connection count
+tccli cdb DescribeDBInstanceAttribute \
+  --InstanceId "{{user.instance_id}}" \
+  --Fields "MaxConnections,CurrentConnections"
+```
+
+2. **Route by condition:**
+
+| Condition | Diagnosis | Next Phase |
+|-----------|-----------|------------|
+| SlowQueries > 10/hour | **Slow query issue** | Phase 2: Slow Query Analysis |
+| CurrentConnections > MaxConnections*0.8 | **Connection limit issue** | Phase 3: Connection Optimization |
+| MemoryUsage > 80% | **Memory issue** | Phase 4: Memory Optimization |
+| VolumeUsage > 80% | **Disk space issue** | Phase 5: Disk Optimization |
+
+3. **Detailed runbook:** See [CDB Slow Query Fast Diagnosis](cdb-slow-query-diagnosis-optimized.md) for the full Phase 1–4 runbook.
+
 ---
 
 ## 1. Error Code Reference (CDB-Specific)
