@@ -232,59 +232,17 @@ tccli cdb DescribeInstanceParams \
 
 Every operation: **Pre-flight → Execute (SDK/API and tccli) → Validate → Recover**. Do not skip phases.
 
+> **CLI/SDK commands are now in [`references/execution-flows.md`](references/execution-flows.md)** — this section describes **what** each operation does; the reference file contains **how** to execute it (CLI and SDK code blocks with full imports and initialization).
+
 ### Operation: CreateDBInstance (Create MySQL Instance — Prepaid)
 
-#### Pre-flight Checks
+**What:** Create a prepaid MySQL instance. Captures `{{output.deal_id}}` for async polling.
 
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| Python SDK | `pip show tencentcloud-sdk-python-cdb` | Version installed | Document install |
-| CLI / deps | `tccli version` | Exit code 0 | Document CLI install |
-| Credentials | Check env vars | Non-empty | HALT |
-| VPC/Subnet | Verify via qcloud-vpc-ops | VPC and subnet exist | HALT |
-| Price | `tccli cdb DescribeDBPrice` | Price available | Check spec validity |
+**Pre-flight Checks:** Python SDK installed? CLI version OK? Credentials set? VPC/Subnet exist via qcloud-vpc-ops? Price available via `DescribeDBPrice`?
 
-#### Execution — CLI
+**Validate:** Poll `DescribeTasks` / `DescribeAsyncRequestInfo` until instance status = 1 (running).
 
-```bash
-# Create prepaid MySQL 8.0 instance
-tccli cdb CreateDBInstance \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --Memory 1000 \
-  --Volume 50 \
-  --Period 1 \
-  --GoodsNum 1 \
-  --Zone "{{user.zone}}" \
-  --UniqVpcId "{{user.vpc_id}}" \
-  --UniqSubnetId "{{user.subnet_id}}" \
-  --EngineVersion "8.0" \
-  --InstanceRole "master" \
-  --ProjectId 0
-```
-
-#### Execution — SDK
-
-```python
-# See references/sdk-templates.md for common init/poll/error boilerplate.
-
-req = models.CreateDBInstanceRequest()
-req.Memory = 1000
-req.Volume = 50
-req.Period = 1
-req.GoodsNum = 1
-req.Zone = "ap-guangzhou-3"
-req.EngineVersion = "8.0"
-resp = client.CreateDBInstance(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
-
-#### Post-execution Validation
-
-1. Capture `{{output.deal_id}}` from CreateDBInstance response
-2. Poll `DescribeTasks` or use `DescribeAsyncRequestInfo` until instance status is 1 (running)
-3. On success, report instance ID and connection info
-
-#### Failure Recovery
+**Failure Recovery:**
 
 | Error pattern | Max retries | Agent Action |
 |--------------|-------------|--------------|
@@ -294,307 +252,91 @@ print(json.dumps(resp.to_json_string(), indent=2))
 | `InternalError.DBError` | 3 | Retry; escalate if persists |
 | `LimitExceeded.ExceedMaxInstanceCount` | 0 | HALT; raise quota |
 
+**Commands:** [`references/execution-flows.md#1-createdbinstance`](references/execution-flows.md#1-createdbinstance)
+
+---
+
 ### Operation: DescribeDBInstances (List Instances)
 
-#### Execution — CLI
+**What:** List CDB instances with optional filters (instance ID, status, project). Returns instance metadata including status, resource specs, and network info.
 
-```bash
-# List all instances
-tccli cdb DescribeDBInstances --Region {{env.TENCENTCLOUD_REGION}} --Offset 0 --Limit 20
+**Commands:** [`references/execution-flows.md#2-describedbinstances`](references/execution-flows.md#2-describedbinstances)
 
-# Filter by instance ID
-tccli cdb DescribeDBInstances --InstanceIds '["cdb-xxxxxx"]'
-
-# Filter by status (1=running)
-tccli cdb DescribeDBInstances --Status "[1]"
-
-# Filter by project
-tccli cdb DescribeDBInstances --ProjectId 0
-```
-
-#### Execution — SDK
-
-```python
-# See references/sdk-templates.md for common init/poll/error boilerplate.
-
-req = models.DescribeDBInstancesRequest()
-req.Offset = 0
-req.Limit = 20
-# Optional filters
-# req.InstanceIds = ["cdb-xxxxxx"]
-# req.Status = [1]  # 1=running
-
-resp = client.DescribeDBInstances(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
-
-#### Key Response Fields
+**Key Response Fields:**
 
 | Field | JSON Path | Notes |
 |-------|-----------|-------|
 | InstanceId | `$.Response.Items[].InstanceId` | Instance unique ID |
-| InstanceName | `$.Response.Items[].InstanceName` | — |
 | Status | `$.Response.Items[].Status` | 0=creating, 1=running, 4=isolating, 5=isolated |
-| Memory | `$.Response.Items[].Memory` | Memory in MB |
-| Volume | `$.Response.Items[].Volume` | Disk in GB |
-| EngineVersion | `$.Response.Items[].EngineVersion` | — |
-| Vip | `$.Response.Items[].Vip` | — |
-| Vport | `$.Response.Items[].Vport` | Port (default 3306) |
-| Zone | `$.Response.Items[].Zone` | — |
-| InstanceType | `$.Response.Items[].InstanceType` | 1=master, 2=DR, 3=read-only |
-| AutoRenew | `$.Response.Items[].AutoRenew` | Auto-renewal flag |
+| Memory/Volume | `$.Response.Items[].Memory/Volume` | MB / GB |
+| Vip:Vport | `$.Response.Items[].Vip:$.Response.Items[].Vport` | Default port 3306 |
+
+---
 
 ### Operation: UpgradeDBInstance (Scale Instance)
 
-#### Pre-flight Checks
+**What:** Scale instance memory and disk. `WaitSwitch=1` maintains maintenance window.
 
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| Instance exists | DescribeDBInstances | Status=1 (running) | HALT |
-| New spec valid | DescribeDBPrice | Price available | Recommend valid specs |
+**Pre-flight:** Instance exists (status=1)? New spec price available?
 
-#### Execution — CLI
+**Commands:** [`references/execution-flows.md#3-upgradedbinstance`](references/execution-flows.md#3-upgradedbinstance)
 
-```bash
-# Upgrade instance configuration
-tccli cdb UpgradeDBInstance \
-  --InstanceId "{{user.instance_id}}" \
-  --Memory 4000 \
-  --Volume 200 \
-  --WaitSwitch 1
-```
-
-#### Execution — SDK
-
-```python
-# See references/sdk-templates.md for common init/poll/error boilerplate.
-
-req = models.UpgradeDBInstanceRequest()
-req.InstanceId = "{{user.instance_id}}"
-req.Memory = 4000
-req.Volume = 200
-req.WaitSwitch = 1  # 0=immediate, 1=maintain window
-
-resp = client.UpgradeDBInstance(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
+---
 
 ### Operation: RestartDBInstances
 
-#### Pre-flight
+**What:** Restart instance. **Pre-flight:** warn user — instance unavailable 30–120s.
 
-- Warn user: instance will be unavailable during restart (typically 30–120s)
+**Commands:** [`references/execution-flows.md#4-restartdbinstances`](references/execution-flows.md#4-restartdbinstances)
 
-#### Execution — CLI
-
-```bash
-tccli cdb RestartDBInstances --InstanceIds '["{{user.instance_id}}"]'
-```
-
-#### Execution — SDK
-
-```python
-# See references/sdk-templates.md for common init/poll/error boilerplate.
-
-req = models.RestartDBInstancesRequest()
-req.InstanceIds = ["{{user.instance_id}}"]
-
-resp = client.RestartDBInstances(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
+---
 
 ### Operation: IsolateDBInstance — DESTRUCTIVE
 
-#### Pre-flight (Safety Gate)
+**What:** Isolate instance (makes it inaccessible). **Safety Gates apply — MUST have explicit user confirmation + pre-backup reminder + retention warning.**
 
-- **MUST** obtain explicit confirmation: isolating `{{user.instance_id}}` will make it inaccessible
-- **MUST** suggest creating a final backup before isolation
-- **MUST** warn: isolated instances can be de-isolated via `ReleaseIsolatedDBInstances` if within retention period
-- **MUST NOT** proceed without clear user assent
+**Commands:** [`references/execution-flows.md#5-isolatedbinstance`](references/execution-flows.md#5-isolatedbinstance)
 
-#### Execution — CLI
-
-```bash
-tccli cdb IsolateDBInstance --InstanceId "{{user.instance_id}}"
-```
+---
 
 ### Operation: CreateBackup (Backup)
 
-> **Reliability Pillar:** Following Tencent Cloud Well-Architected Framework, every writable skill MUST document backup operations.
+**What:** Create manual backup (logical or physical). Reliability Pillar requirement.
 
-#### Pre-flight Checks
+**Pre-flight:** Instance exists (status=1)? Backup config valid?
 
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| Instance exists | DescribeDBInstances | Status=1 | HALT |
-| Backup config | DescribeBackupConfig | Config valid | Configure backup first |
+**Validate:** Poll `DescribeBackups` until `Status=SUCCESS`.
 
-#### Execution — CLI
+**Commands:** [`references/execution-flows.md#6-createbackup`](references/execution-flows.md#6-createbackup)
 
-```bash
-# Create manual backup
-tccli cdb CreateBackup \
-  --InstanceId "{{user.instance_id}}" \
-  --BackupMethod "logical" \
-  --BackupDBTableList '[{"Db":"mysql","Table":"user"}]'
-```
-
-#### Execution — SDK
-
-```python
-# See references/sdk-templates.md for common init/poll/error boilerplate.
-
-req = models.CreateBackupRequest()
-req.InstanceId = "{{user.instance_id}}"
-req.BackupMethod = "physical"  # or "logical"
-
-# Optional: backup specific tables
-# table_item = models.BackupItem()
-# table_item.Db = "mysql"
-# table_item.Table = "user"
-# req.BackupDBTableList = [table_item]
-
-resp = client.CreateBackup(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
-
-#### Post-execution Validation
-
-Poll `DescribeBackups` until `Status` is `SUCCESS`:
-
-```bash
-tccli cdb DescribeBackups --InstanceId "{{user.instance_id}}" --Offset 0 --Limit 1
-```
+---
 
 ### Operation: ModifyInstanceParam (Parameter Change)
 
-#### Execution — CLI
+**What:** Modify instance parameters (e.g., `auto_increment_increment`, `max_connections`).
 
-```bash
-# Modify parameters
-tccli cdb ModifyInstanceParam \
-  --InstanceIds '["{{user.instance_id}}"]' \
-  --ParamList '[{"Name":"auto_increment_increment","CurrentValue":"2"},{"Name":"max_connections","CurrentValue":"1000"}]'
-```
+**Validate:** `DescribeInstanceParams` confirms values applied. Some params require restart (`WaitSwitch=0`).
 
-#### Execution — SDK
+**Commands:** [`references/execution-flows.md#7-modifyinstanceparam`](references/execution-flows.md#7-modifyinstanceparam)
 
-```python
-# See references/sdk-templates.md for common init/poll/error boilerplate.
+---
 
-req = models.ModifyInstanceParamRequest()
-req.InstanceIds = ["{{user.instance_id}}"]
+### Operation: Account Management (Create / Describe / ModifyPassword)
 
-param1 = models.Parameter()
-param1.Name = "auto_increment_increment"
-param1.CurrentValue = "2"
+**What:** CRUD operations on MySQL accounts. `Host='%'` requires extra scrutiny (see Safety Gates).
 
-param2 = models.Parameter()
-param2.Name = "max_connections"
-param2.CurrentValue = "1000"
+**Commands:**
+- Create: [`references/execution-flows.md#8-createaccount`](references/execution-flows.md#8-createaccount)
+- Describe: [`references/execution-flows.md#9-describeaccounts`](references/execution-flows.md#9-describeaccounts)
+- ModifyPassword: [`references/execution-flows.md#10-modifyaccountpassword`](references/execution-flows.md#10-modifyaccountpassword)
 
-req.ParamList = [param1, param2]
-
-resp = client.ModifyInstanceParam(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
-
-#### Post-execution Validation
-
-1. Verify via `DescribeInstanceParams` that values were applied
-2. If `WaitSwitch=0` (immediate), some params may require restart
-
-### Operation: Account Management
-
-#### Create Account — CLI
-
-```bash
-tccli cdb CreateAccounts \
-  --InstanceId "{{user.instance_id}}" \
-  --Accounts '[{"User":"dbuser","Host":"%"}]' \
-  --Password "{{user.password}}" \
-  --Description "Application account"
-```
-
-#### Create Account — SDK
-
-```python
-# See references/sdk-templates.md for common init/poll/error boilerplate.
-
-req = models.CreateAccountsRequest()
-req.InstanceId = "{{user.instance_id}}"
-
-account = models.Account()
-account.User = "dbuser"
-account.Host = "%"
-
-req.Accounts = [account]
-req.Password = "{{user.password}}"
-req.Description = "Application account"
-
-resp = client.CreateAccounts(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
-
-#### Describe Accounts — CLI
-
-```bash
-tccli cdb DescribeAccounts --InstanceId "{{user.instance_id}}" --Limit 20
-```
-
-#### Describe Accounts — SDK
-
-```python
-# See references/sdk-templates.md for common init/poll/error boilerplate.
-
-req = models.DescribeAccountsRequest()
-req.InstanceId = "{{user.instance_id}}"
-req.Limit = 20
-
-resp = client.DescribeAccounts(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
-
-#### Modify Password — CLI
-
-```bash
-tccli cdb ModifyAccountPassword \
-  --InstanceId "{{user.instance_id}}" \
-  --Accounts '[{"User":"dbuser","Host":"%"}]' \
-  --NewPassword "{{user.new_password}}"
-```
-
-#### Modify Password — SDK
-
-```python
-# See references/sdk-templates.md for common init/poll/error boilerplate.
-
-req = models.ModifyAccountPasswordRequest()
-req.InstanceId = "{{user.instance_id}}"
-
-account = models.Account()
-account.User = "dbuser"
-account.Host = "%"
-
-req.Accounts = [account]
-req.NewPassword = "{{user.new_password}}"
-
-resp = client.ModifyAccountPassword(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
+---
 
 ### Operation: Slow Query Log
 
-#### Execution — CLI
+**What:** Query slow log data for diagnosis. See also § Slow Query Quick Diagnosis for automated triage.
 
-```bash
-tccli cdb DescribeSlowLogData \
-  --InstanceId "{{user.instance_id}}" \
-  --StartTime "2026-05-20 00:00:00" \
-  --EndTime "2026-05-21 00:00:00" \
-  --Limit 20
-```
-
+**Commands:** [`references/execution-flows.md#11-describeslowlogdata`](references/execution-flows.md#11-describeslowlogdata)
 
 ## Error Code Reference (≥ 12 Product-Specific Codes)
 
