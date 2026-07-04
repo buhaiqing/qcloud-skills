@@ -294,7 +294,7 @@ Instance creation requires:
 |---------|------------|-------|
 | VPC | Network isolation | `qcloud-vpc-ops` |
 | CLB | Load distribution | `qcloud-clb-ops` |
-| MySQL | Database backend | `qcloud-mysql-ops` |
+| MySQL | Database backend | `qcloud-cdb-ops` |
 | COS | Object storage | `qcloud-cos-ops` |
 | CAM | Permission control | `qcloud-cam-ops` |
 

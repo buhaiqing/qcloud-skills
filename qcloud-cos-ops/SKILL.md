@@ -77,7 +77,7 @@ COS (Cloud Object Storage) on Tencent Cloud provides scalable, secure, and highl
 ### SHOULD NOT Use
 
 - CDN operations → `qcloud-cdn-ops`
-- MySQL/PostgreSQL → `qcloud-mysql-ops` / `qcloud-pg-ops`
+- MySQL/PostgreSQL → `qcloud-cdb-ops` / `qcloud-postgres-ops`
 - Billing/account → `qcloud-billing-ops`
 - COS access log analysis (audit, troubleshooting, security) → delegate to `qcloud-cls-ops`
 - Console-only → State limitation

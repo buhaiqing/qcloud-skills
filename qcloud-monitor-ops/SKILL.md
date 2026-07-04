@@ -97,7 +97,7 @@ Every generated skill MUST satisfy these five standards:
 - Task is **product-specific operations** → delegate to product ops skill:
   - CVM → `qcloud-cvm-ops`
   - CLB → `qcloud-clb-ops`
-  - MySQL → `qcloud-mysql-ops`
+  - MySQL → `qcloud-cdb-ops`
   - VPC → `qcloud-vpc-ops`
 - Task is purely billing/FinOps/cost analysis → `qcloud-finops-ops` (when present)
 - Task is CAM only → `qcloud-cam-ops` (when present)
@@ -110,7 +110,7 @@ Every generated skill MUST satisfy these five standards:
 |------------------|---------------|-------------------|
 | `QCE/CVM` | `qcloud-cvm-ops` | CPU/Memory/Disk metrics → CVM operations |
 | `QCE/LB_PUBLIC` | `qcloud-clb-ops` | CLB connection/traffic → CLB operations |
-| `QCE/CDB` | `qcloud-mysql-ops` | MySQL slow query → MySQL operations |
+| `QCE/CDB` | `qcloud-cdb-ops` | MySQL slow query → MySQL operations |
 | `QCE/REDIS` | `qcloud-redis-ops` | Redis metrics → Redis operations |
 | `QCE/VPC` | `qcloud-vpc-ops` | VPC flow metrics → VPC operations |
 
@@ -178,7 +178,7 @@ Configure alarms, query metrics, manage dashboards, and troubleshoot monitoring 
 
 ### Verify Setup
 ```bash
-tccli monitor DescribeAllNamespaces --Region ap-guangzhou
+tccli monitor DescribeAllNamespaces --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ### Your First Command

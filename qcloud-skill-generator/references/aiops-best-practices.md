@@ -175,7 +175,7 @@ class DiagnosisDecisionTree:
         # Load appropriate skill for resource type
         skill_map = {
             'CVM': 'qcloud-cvm-ops',
-            'MySQL': 'qcloud-mysql-ops',
+            'MySQL': 'qcloud-cdb-ops',
             'CBS': 'qcloud-cbs-ops',
             'CLB': 'qcloud-clb-ops',
             'Redis': 'qcloud-redis-ops',
@@ -194,8 +194,8 @@ class DiagnosisDecisionTree:
 | qcloud-cvm-ops | qcloud-cbs-ops | Disk-related issue detected |
 | qcloud-cvm-ops | qcloud-vpc-ops | Network/VPC issue detected |
 | qcloud-cvm-ops | qcloud-clb-ops | Load balancer issue detected |
-| qcloud-mysql-ops | qcloud-cvm-ops | Host-level issue detected |
-| qcloud-mysql-ops | qcloud-cbs-ops | Storage issue detected |
+| qcloud-cdb-ops | qcloud-cvm-ops | Host-level issue detected |
+| qcloud-cdb-ops | qcloud-cbs-ops | Storage issue detected |
 | qcloud-redis-ops | qcloud-cvm-ops | Host-level issue detected |
 | qcloud-clb-ops | qcloud-cvm-ops | Backend server issue |
 

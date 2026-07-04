@@ -30,7 +30,7 @@
     "reason": "Explicit update/regenerate request for existing skill"
   },
   {
-    "query": "Fix the gaps found in qcloud-mysql-ops during review",
+    "query": "Fix the gaps found in qcloud-cdb-ops during review",
     "should_trigger": true,
     "reason": "Maintenance request for existing generated skill"
   },
@@ -57,7 +57,7 @@
   {
     "query": "Describe my TencentDB MySQL instances",
     "should_trigger": false,
-    "reason": "Operational query, not skill generation - use qcloud-mysql-ops"
+    "reason": "Operational query, not skill generation - use qcloud-cdb-ops"
   },
   {
     "query": "Delete a CBS disk from Tencent Cloud",

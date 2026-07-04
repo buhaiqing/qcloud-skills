@@ -248,7 +248,7 @@ TENCENTCLOUD_REGION=ap-guangzhou
 | Subnet creation | `qcloud-vpc-ops` | Verify Subnet exists |
 | Security Group | `qcloud-vpc-ops` | Verify SG exists, add rules |
 | CLB attach | `qcloud-clb-ops` | CVM instance as backend target |
-| MySQL deployment | `qcloud-mysql-ops` | Separate skill for DB |
+| MySQL deployment | `qcloud-cdb-ops` | Separate skill for DB |
 | Redis deployment | `qcloud-redis-ops` | Separate skill for cache |
 | CAM permissions | `qcloud-cam-ops` | Grant CVM API permissions |
 | Billing queries | `qcloud-billing-ops` | Cost analysis, price inquiry |

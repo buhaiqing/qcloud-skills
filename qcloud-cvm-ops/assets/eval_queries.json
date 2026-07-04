@@ -157,7 +157,7 @@
   {
     "query": "Create a MySQL database instance",
     "should_trigger": false,
-    "delegate_to": "qcloud-mysql-ops"
+    "delegate_to": "qcloud-cdb-ops"
   },
   {
     "query": "Deploy Redis cluster",

@@ -200,7 +200,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 
 ```bash
 # Verify (Cloud Shell or local)
-tccli cls DescribeLogsets --Region ap-guangzhou && python3 -c "from tencentcloud.cls import cls_client"
+tccli cls DescribeLogsets --Region "{{env.TENCENTCLOUD_REGION}}" && python3 -c "from tencentcloud.cls import cls_client"
 
 # First command
 tccli cls DescribeLogsets --Region {{env.TENCENTCLOUD_REGION}}
@@ -761,6 +761,8 @@ tccli cls SearchLog \
 
 Multi-step analysis of COS access logs imported into CLS. Covers troubleshooting, audit, security, and performance scenarios.
 
+→ 完整场景分类、查询模板、结果展示格式：见 [`references/cos-access-log-analysis.md`](references/cos-access-log-analysis.md)
+
 #### Pre-flight Checks
 
 | Check | Method | Expected | On Failure |
@@ -772,139 +774,9 @@ Multi-step analysis of COS access logs imported into CLS. Covers troubleshooting
 
 #### Execution Flow
 
-**Step 1: Determine analysis scenario from user intent**
-
-Classify the user's request into one of these scenarios:
-
-| Scenario | User Keywords | Primary Fields |
-|----------|--------------|----------------|
-| Troubleshooting | "can't access", "object not found", "404 error" | `reqPath`, `resHttpCode`, `resErrorCode` |
-| Audit | "who deleted", "who modified", "audit trail" | `eventName`, `requester`, `eventTime` |
-| Security | "anomalous IP", "brute force", "suspicious" | `remoteIp`, `resHttpCode`, `requester` |
-| Performance | "slow requests", "high latency", "timeout" | `resTotalTime`, `eventName` |
-| Cost | "infrequent access", "cost optimization" | `reqPath`, `storageClass`, access count |
-| General | No specific intent | Show overview dashboard |
-
-**Step 2: Execute scenario-specific analysis**
-
-> Full query templates and field definitions are in [references/cos-log-analysis.md](references/cos-log-analysis.md).
-
-##### Scenario A: Troubleshooting
-
-```bash
-# Search by object path
-tccli cls SearchLog \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --TopicId "{{user.topic_id}}" \
-  --From $(date -d '{{user.time_range}}' +%s) \
-  --To $(date +%s) \
-  --Query 'reqPath:"{{user.req_path}}"' \
-  --Limit 100
-
-# Aggregate by HTTP status code
-# resHttpCode aggregation requires SQL analysis in console
-# CLI alternative: SearchLog with query='reqPath:"/path" AND resHttpCode:*'
-```
-
-##### Scenario B: Audit Trail
-
-```bash
-# Search for delete events on a specific path
-tccli cls SearchLog \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --TopicId "{{user.topic_id}}" \
-  --From $(date -d '{{user.time_range}}' +%s) \
-  --To $(date +%s) \
-  --Query 'eventName:DeleteObject AND reqPath:"{{user.req_path}}"' \
-  --Limit 50
-
-# Search all delete events in a bucket
-tccli cls SearchLog \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --TopicId "{{user.topic_id}}" \
-  --From $(date -d '{{user.time_range}}' +%s) \
-  --To $(date +%s) \
-  --Query 'eventName:DeleteObject AND bucketName:{{user.cos_bucket}}' \
-  --Limit 200
-```
-
-##### Scenario C: Security Analysis
-
-```bash
-# Top requesting IPs
-tccli cls SearchLog \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --TopicId "{{user.topic_id}}" \
-  --From $(date -d '{{user.time_range}}' +%s) \
-  --To $(date +%s) \
-  --Query 'resHttpCode:403 OR resHttpCode:404' \
-  --Limit 200
-
-# Anonymous access attempts
-tccli cls SearchLog \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --TopicId "{{user.topic_id}}" \
-  --From $(date -d '{{user.time_range}}' +%s) \
-  --To $(date +%s) \
-  --Query 'requester:- AND resHttpCode:403' \
-  --Limit 100
-```
-
-##### Scenario D: Performance Analysis
-
-```bash
-# Slow requests (resTotalTime > 1000ms)
-tccli cls SearchLog \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --TopicId "{{user.topic_id}}" \
-  --From $(date -d '{{user.time_range}}' +%s) \
-  --To $(date +%s) \
-  --Query 'resTotalTime:>1000' \
-  --Limit 100 \
-  --Sort desc
-```
-
-**Step 3: Present results to user**
-
-| Scenario | Key Insights to Present |
-|----------|------------------------|
-| Troubleshooting | Show matching log count by resHttpCode; highlight 4xx/5xx; show latest error events |
-| Audit | Show who (requester), when (eventTime), what eventName, source IP |
-| Security | Show top IPs by error count; flag IPs with >100 errors; identify scan patterns |
-| Performance | Show top 10 slowest requests; average latency by eventName |
-| Cost | Show least-accessed objects; recommend storage class transitions |
-
-Format results as structured Markdown tables:
-
-```
-### COS Access Log Analysis Results
-
-**Scenario**: Troubleshooting — Object `/folder/text.txt` access failure
-
-**Time Range**: Last 7 days
-**Total Requests**: 142 | **Errors**: 8 (5.6%)
-
-| resHttpCode | Count | Interpretation |
-|-------------|-------|----------------|
-| 200 | 134 | Success |
-| 403 | 5 | Access Denied — check bucket policy |
-| 404 | 3 | NoSuchKey — object may have been deleted |
-
-**Latest Errors**:
-| Time | Event | IP | Error Code | Requester |
-|------|-------|----|------------|-----------|
-| 2026-05-30T10:00Z | GetObject | 192.168.1.1 | AccessDenied | 100012345678:subuser |
-```
-
-#### Failure Recovery
-
-| Error pattern | Retry Strategy | Recovery |
-|--------------|----------------|----------|
-| No data in time range | 0 | Expand time range or wait for COS import to complete |
-| Index not found | 0 | HALT; create COS log index first (see cos-log-analysis.md) |
-| Import task not found | 0 | HALT; run ImportCOSAccessLogs first |
-
-> See [Error Code Reference](#error-code-reference) for CLS API error codes.
+1. **Classify scenario** — map user intent to Troubleshooting / Audit / Security / Performance / Cost / General
+2. **Execute** — run scenario-specific `SearchLog` query (see reference)
+3. **Present** — structured Markdown table with key insights
 
 #### Present to User
 

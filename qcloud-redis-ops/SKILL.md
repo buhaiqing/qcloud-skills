@@ -40,7 +40,7 @@ metadata:
 
 TencentDB for Redis is Tencent Cloud's managed in-memory database service supporting standalone, master-replica, and cluster architectures. This skill is an **operational runbook** for agents: explicit scope, credential rules, pre-flight checks, **dual-path execution** (official **`tccli` CLI** and **Python SDK fallback**), response validation, and failure recovery. **Do not use the web console as the primary agent execution path**.
 
-> **UX Compliance:** This skill follows the [User Experience Specification](../references/user-experience-spec.md). All operations include onboarding guidance, minimal prompts, smart defaults, clear feedback, and user-friendly error handling.
+> **UX Compliance:** This skill follows the [User Experience Specification](../qcloud-skill-generator/references/user-experience-spec.md). All operations include onboarding guidance, minimal prompts, smart defaults, clear feedback, and user-friendly error handling.
 
 ### CLI applicability (repository policy)
 
@@ -86,7 +86,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - Task is CAM / permission model only → delegate to: `qcloud-cam-ops` (when present)
 - Task is **VPC network only** → delegate to: `qcloud-vpc-ops`
 - Task is **application-level Redis client debugging** (connection strings, serialization) → application debugging, not this skill
-- Task is **TencentDB for MySQL/PostgreSQL** → delegate to: `qcloud-cdb-ops` / `qcloud-postgresql-ops`
+- Task is **TencentDB for MySQL/PostgreSQL** → delegate to: `qcloud-cdb-ops` / `qcloud-postgres-ops`
 - Task is cloud **Memcached** → delegate to appropriate Memcached skill (when present)
 - Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 

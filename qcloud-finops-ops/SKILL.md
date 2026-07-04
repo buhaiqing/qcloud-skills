@@ -226,7 +226,7 @@ for ACCOUNT in "${ACCOUNTS[@]}"; do
   export TENCENTCLOUD_SECRET_KEY="${ACCOUNT}_SECRET_KEY"
   tccli billing DescribeBillSummaryByMonth \
     --Month "$(date +%Y-%m)" \
-    --Region ap-guangzhou
+    --Region "{{env.TENCENTCLOUD_REGION}}"
 done
 ```
 

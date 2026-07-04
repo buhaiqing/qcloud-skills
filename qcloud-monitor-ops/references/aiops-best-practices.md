@@ -102,7 +102,7 @@ diagnosis_decision_tree:
 | CVM CPUUsage > 90% | `qcloud-cvm-ops` | Instance-level issue |
 | CVM DiskUsage > 90% | `qcloud-cvm-ops` + `qcloud-cbs-ops` | Storage issue |
 | CLB HealthStatus unhealthy | `qcloud-clb-ops` | Backend health |
-| MySQL SlowQuery high | `qcloud-mysql-ops` | Database performance |
+| MySQL SlowQuery high | `qcloud-cdb-ops` | Database performance |
 | Redis CmdExecuteCount anomaly | `qcloud-redis-ops` | Cache performance |
 | VPC VpcFlowMetric anomaly | `qcloud-vpc-ops` | Network issue |
 

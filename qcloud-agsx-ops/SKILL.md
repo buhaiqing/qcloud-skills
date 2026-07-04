@@ -172,18 +172,7 @@ test -n "$TENCENTCLOUD_SECRET_KEY" && echo "SecretKey: set"
 ```
 
 ### Your First Command
-```python
-from tencentcloud.common import credential
-from tencentcloud.ags.v20250920 import ags_client, models
-
-cred = credential.Credential(
-    os.environ["TENCENTCLOUD_SECRET_ID"],
-    os.environ["TENCENTCLOUD_SECRET_KEY"]
-)
-client = ags_client.AgsClient(cred, "ap-guangzhou")
-resp = client.DescribeSandboxToolList(models.DescribeSandboxToolListRequest())
-print(resp.to_json_string())
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ## Capabilities at a Glance
 
@@ -220,20 +209,7 @@ Since `cli_applicability: sdk-only`, only SDK paths are documented. See `referen
 | Quota | Call DescribeSandboxToolList | Tool count < quota | HALT; user raises quota |
 
 #### Execution - Python SDK
-
-```python
-from tencentcloud.ags.v20250920 import ags_client, models
-
-req = models.CreateSandboxToolRequest()
-req.from_json_string(json.dumps({
-    "ToolName": "{{user.tool_name}}",
-    "ToolType": "CodeSandbox",       # CodeSandbox | BrowserSandbox | CustomSandbox
-    "DefaultTimeout": 3600,
-    "Description": "Created by AGSX skill"
-}))
-resp = client.CreateSandboxTool(req)
-# resp.ToolId -> stool-xxxxxxxx (capture as {{output.resource_id}})
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -256,14 +232,7 @@ resp = client.CreateSandboxTool(req)
 ### Operation: DescribeSandboxToolList
 
 #### Execution - Python SDK
-
-```python
-req = models.DescribeSandboxToolListRequest()
-req.from_json_string('{"Limit": 20, "Offset": 0}')
-resp = client.DescribeSandboxToolList(req)
-for tool in resp.ToolSet:
-    print(tool.ToolId, tool.ToolName, tool.Status)
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Present to User
 
@@ -285,15 +254,7 @@ for tool in resp.ToolSet:
 | Tool exists | DescribeSandboxToolList by `{{user.tool_id}}` | Status = AVAILABLE | HALT; tool not found or not stable |
 
 #### Execution - Python SDK
-
-```python
-req = models.UpdateSandboxToolRequest()
-req.from_json_string(json.dumps({
-    "ToolId": "{{user.tool_id}}",
-    "Description": "Updated description"
-}))
-resp = client.UpdateSandboxTool(req)
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -319,21 +280,7 @@ resp = client.UpdateSandboxTool(req)
 3. **MUST NOT** proceed without clear user assent.
 
 #### Execution - Python SDK
-
-```python
-# Pre-check: confirm no active instances
-desc_req = models.DescribeSandboxInstanceListRequest()
-desc_req.from_json_string(json.dumps({"ToolId": "{{user.tool_id}}"}))
-desc_resp = client.DescribeSandboxInstanceList(desc_req)
-if len(desc_resp.InstanceSet) > 0:
-    print(f"[WARN] {len(desc_resp.InstanceSet)} active instances. Stop first.")
-    # HALT until instances cleared
-
-# User confirmed; proceed
-req = models.DeleteSandboxToolRequest()
-req.from_json_string(json.dumps({"ToolId": "{{user.tool_id}}"}))
-resp = client.DeleteSandboxTool(req)
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -358,19 +305,7 @@ Poll DescribeSandboxToolList until `ResourceNotFound` or absent (interval: 5s, m
 | API key | `test -n "$E2B_API_KEY"` | Non-empty | CreateAPIKey first |
 
 #### Execution - Python SDK
-
-```python
-req = models.StartSandboxInstanceRequest()
-req.from_json_string(json.dumps({
-    "ToolId": "{{user.tool_id}}",
-    "ToolName": "{{user.tool_name}}",
-    "Timeout": 3600,
-    "Metadata": [{"Key": "agent_id", "Value": "agent-001"}]
-}))
-resp = client.StartSandboxInstance(req)
-# resp.InstanceId -> si-xxxxxxxx
-# resp.Endpoint -> wss://si-xxx.ap-guangzhou.tencentags.com
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -390,14 +325,7 @@ resp = client.StartSandboxInstance(req)
 ### Operation: DescribeSandboxInstanceList
 
 #### Execution - Python SDK
-
-```python
-req = models.DescribeSandboxInstanceListRequest()
-req.from_json_string(json.dumps({"InstanceIds": ["{{user.instance_id}}"]}))
-resp = client.DescribeSandboxInstanceList(req)
-for inst in resp.InstanceSet:
-    print(inst.InstanceId, inst.Status, inst.CreatedAt, inst.ExpireAt)
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Present to User
 
@@ -419,12 +347,7 @@ for inst in resp.InstanceSet:
 3. **MUST NOT** proceed without clear user assent.
 
 #### Execution - Python SDK
-
-```python
-req = models.StopSandboxInstanceRequest()
-req.from_json_string(json.dumps({"InstanceId": "{{user.instance_id}}"}))
-resp = client.StopSandboxInstance(req)
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -442,14 +365,7 @@ Poll DescribeSandboxInstanceList until Status = `STOPPED` or absent (interval: 5
 ### Operation: CreateAPIKey
 
 #### Execution - Python SDK
-
-```python
-req = models.CreateAPIKeyRequest()
-req.from_json_string(json.dumps({"Name": "prod-key-01"}))
-resp = client.CreateAPIKey(req)
-# resp.ApiKey -> store securely, shown only once
-# MASK in logs: ak-****resp.ApiKey[-4:]
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 > **Security:** The API key value is returned ONLY on creation. Store immediately. Mask in all subsequent logs.
 
@@ -477,12 +393,7 @@ resp = client.CreateAPIKey(req)
 3. Suggest creating replacement key first if still in use.
 
 #### Execution - Python SDK
-
-```python
-req = models.DeleteAPIKeyRequest()
-req.from_json_string(json.dumps({"KeyId": "{{user.key_id}}"}))
-resp = client.DeleteAPIKey(req)
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -508,16 +419,7 @@ resp = client.DeleteAPIKey(req)
 | Region support | Check region | ap-guangzhou | Switch to supported region |
 
 #### Execution - Python SDK
-
-```python
-req = models.CreatePreCacheImageTaskRequest()
-req.from_json_string(json.dumps({
-    "Image": "{{user.image_id}}",
-    "ImageRegistryType": "DockerHub"
-}))
-resp = client.CreatePreCacheImageTask(req)
-# Reduces cold-start from ~500ms to ~100ms
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 

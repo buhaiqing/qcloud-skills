@@ -31,7 +31,7 @@ resp = client.PutBucket(req)
 | From COS | To Skill | Context |
 |----------|----------|---------|
 | Static website | qcloud-cdn-ops | CDN acceleration |
-| Backup storage | qcloud-mysql-ops | Database backup |
+| Backup storage | qcloud-cdb-ops | Database backup |
 
 ## References
 

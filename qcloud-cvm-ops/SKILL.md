@@ -51,7 +51,7 @@ CVM operational runbook: dual-path (`tccli` + Python SDK), explicit pre-flight/v
 
 **SHOULD:** CVM instance lifecycle (CRUD/start/stop/reboot/terminate), CBS disks (attach/detach/resize), snapshots/images, SSH/migration/performance issues.
 
-**SHOULD NOT:** billing → `qcloud-billing-ops`, CAM → `qcloud-cam-ops`, VPC-only → `qcloud-vpc-ops`, CLB → `qcloud-clb-ops`, DB → `qcloud-mysql-ops`/`qcloud-redis-ops`, WA review → `qcloud-well-architected-review`.
+**SHOULD NOT:** billing → `qcloud-billing-ops`, CAM → `qcloud-cam-ops`, VPC-only → `qcloud-vpc-ops`, CLB → `qcloud-clb-ops`, DB → `qcloud-cdb-ops`/`qcloud-redis-ops`, WA review → `qcloud-well-architected-review`.
 
 **Delegate:** VPC/SG pre-check via VPC skill before RunInstances; CLB → CLB skill; CBS within CVM scope; snapshots/images within CVM scope; multi-product → per-skill. Read-only WA assessment → see below.
 
@@ -184,28 +184,7 @@ INSTANCE_ID=$(jq -r '.Response.InstanceIdSet[0]' /tmp/response.json)
 
 > See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
 
-```python
-req = models.RunInstancesRequest()
-req.Placement = models.Placement()
-req.Placement.Zone = os.environ.get("ZONE", "ap-guangzhou-3")
-req.InstanceType = os.environ.get("INSTANCE_TYPE", "S5.SMALL1")
-req.ImageId = os.environ.get("IMAGE_ID", "img-xxx")
-req.InstanceName = os.environ.get("INSTANCE_NAME", "test-instance")
-req.SystemDisk = models.SystemDisk()
-req.SystemDisk.DiskType = "CLOUD_PREMIUM"
-req.SystemDisk.DiskSize = 50
-req.InstanceChargeType = "POSTPAID_BY_HOUR"
-req.ClientToken = str(int(time.time() * 1000000))
-req.VpcId = os.environ.get("VPC_ID", "")
-req.SubnetId = os.environ.get("SUBNET_ID", "")
-req.SecurityGroupIds = os.environ.get("SECURITY_GROUP_IDS", "").split(",")
-req.InternetAccessible = models.InternetAccessible()
-req.InternetAccessible.InternetChargeType = "TRAFFIC_POSTPAID_BY_HOUR"
-req.InternetAccessible.InternetMaxBandwidthOut = 1
-
-resp = client.RunInstances(req)
-print(json.loads(resp.to_json_string()))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -254,15 +233,7 @@ tccli cvm DescribeInstances \
 
 > See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
 
-```python
-req = models.DescribeInstancesRequest()
-req.InstanceIds = [os.environ.get("INSTANCE_ID", "ins-xxx")]
-req.Offset = 0
-req.Limit = 100
-
-resp = client.DescribeInstances(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Present to User
 
@@ -297,12 +268,7 @@ tccli cvm StartInstances \
 
 #### Execution — Python SDK (Fallback Path)
 
-```python
-req = models.StartInstancesRequest()
-req.InstanceIds = ["{{user.instance_id}}"]
-resp = client.StartInstances(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 
@@ -328,13 +294,7 @@ tccli cvm StopInstances \
 
 #### Execution — Python SDK (Fallback Path)
 
-```python
-req = models.StopInstancesRequest()
-req.InstanceIds = ["{{user.instance_id}}"]
-req.StopType = "SOFT"  # or "HARD"
-resp = client.StopInstances(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 
@@ -353,13 +313,7 @@ tccli cvm RebootInstances \
 
 #### Execution — Python SDK (Fallback Path)
 
-```python
-req = models.RebootInstancesRequest()
-req.InstanceIds = ["{{user.instance_id}}"]
-req.RebootType = "SOFT"  # or "HARD"
-resp = client.RebootInstances(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ### Operation: ResetInstance (Re-image)
 
@@ -391,13 +345,7 @@ tccli cvm ResetInstance \
 
 #### Execution — Python SDK (Fallback Path)
 
-```python
-req = models.ResetInstanceRequest()
-req.InstanceId = "{{user.instance_id}}"
-req.ImageId = "{{user.image_id}}"
-resp = client.ResetInstance(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 
@@ -431,12 +379,7 @@ tccli cvm TerminateInstances \
 
 #### Execution — Python SDK (Fallback Path)
 
-```python
-req = models.TerminateInstancesRequest()
-req.InstanceIds = ["{{user.instance_id}}"]
-resp = client.TerminateInstances(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 
@@ -487,16 +430,7 @@ tccli cvm ModifyInstanceSpec \
 
 #### Execution — Python SDK (Fallback Path)
 
-> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
-
-```python
-req = models.ModifyInstanceSpecRequest()
-req.InstanceId = "{{user.instance_id}}"
-req.InstanceType = "{{user.new_instance_type}}"
-
-resp = client.ModifyInstanceSpec(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 
@@ -533,18 +467,7 @@ tccli cvm ResizeInstanceDisks \
 
 #### Execution — Python SDK (Fallback Path)
 
-```python
-req = models.ResizeInstanceDisksRequest()
-req.InstanceId = "{{user.instance_id}}"
-req.DataDisks = [
-    models.DataDisk(
-        DiskId="{{user.disk_id}}",
-        DiskSize={{user.new_disk_size}}
-    )
-]
-resp = client.ResizeInstanceDisks(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ### Operation: CreateSnapshot (Backup)
 
@@ -572,17 +495,7 @@ Poll DescribeSnapshots until `SUCCESS` status.
 
 #### Execution — Python SDK (Fallback Path)
 
-> See [SDK Templates](references/sdk-templates.md) — Common Initialization (CBS Client).
-
-```python
-import time
-
-req = cbs_models.CreateSnapshotRequest()
-req.DiskId = "{{user.disk_id}}"
-req.SnapshotName = "backup-" + "{{user.instance_id}}" + "-" + time.strftime("%Y%m%d-%H%M%S")
-resp = client.CreateSnapshot(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ### Operation: CreateImage (Custom Image)
 
@@ -606,18 +519,7 @@ tccli cvm CreateImage \
 
 #### Execution — Python SDK (Fallback Path)
 
-> See [SDK Templates](references/sdk-templates.md) — Common Initialization.
-
-```python
-import time
-
-req = models.CreateImageRequest()
-req.InstanceId = "{{user.instance_id}}"
-req.ImageName = "{{user.image_name}}"
-req.ImageDescription = "Custom image created at " + time.strftime("%Y%m%d-%H%M%S")
-resp = client.CreateImage(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ### Operation: AttachDisks (Attach CBS Disks)
 
@@ -643,16 +545,7 @@ tccli cbs AttachDisks \
 
 #### Execution — Python SDK (Fallback Path)
 
-> See [SDK Templates](references/sdk-templates.md) — Common Initialization (CBS Client).
-
-```python
-req = cbs_models.AttachDisksRequest()
-req.InstanceId = "{{user.instance_id}}"
-req.DiskIds = ["{{user.disk_id}}"]
-
-resp = client.AttachDisks(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 
@@ -692,16 +585,7 @@ tccli cbs DetachDisk \
 
 #### Execution — Python SDK (Fallback Path)
 
-> See [SDK Templates](references/sdk-templates.md) — Common Initialization (CBS Client).
-
-```python
-req = cbs_models.DetachDiskRequest()
-req.InstanceId = "{{user.instance_id}}"
-req.DiskId = "{{user.disk_id}}"
-
-resp = client.DetachDisk(req)
-print(json.dumps(json.loads(resp.to_json_string()), indent=2))
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 

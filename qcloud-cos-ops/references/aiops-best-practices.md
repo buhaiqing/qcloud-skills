@@ -80,7 +80,7 @@ cos_diagnosis_tree:
 |------------|-------------|---------|
 | CDN performance | qcloud-cdn-ops | Bucket endpoint, CDN domain |
 | Network issue | qcloud-vpc-ops | VPC ID, region |
-| MySQL backup | qcloud-mysql-ops | Backup bucket, DB instance |
+| MySQL backup | qcloud-cdb-ops | Backup bucket, DB instance |
 
 ## 4. Proactive Inspection
 

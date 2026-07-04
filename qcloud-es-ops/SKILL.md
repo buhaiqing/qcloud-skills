@@ -92,7 +92,7 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - Task is **VPC network only** (subnet, route table, NAT gateway) → delegate to: `qcloud-vpc-ops`
 - Task is **COS standalone** (object upload/download without ES context) → delegate to: `qcloud-cos-ops`
 - Task is **CVM / compute instance** → delegate to: `qcloud-cvm-ops`
-- Task is **MySQL/Redis/PostgreSQL database** → delegate to: `qcloud-cdb-ops` / `qcloud-redis-ops` / `qcloud-pg-ops`
+- Task is **MySQL/Redis/PostgreSQL database** → delegate to: `qcloud-cdb-ops` / `qcloud-redis-ops` / `qcloud-postgres-ops`
 - Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 
 ### Delegation Rules
@@ -337,7 +337,7 @@ See [execution-flows.md](references/execution-flows.md) §9 for CLI and SDK comm
 
 4. **Verify Configuration**:
    ```bash
-   tccli es DescribeInstances --Region ap-guangzhou --Limit 5
+   tccli es DescribeInstances --Region "{{env.TENCENTCLOUD_REGION}}" --Limit 5
    ```
 
 ---

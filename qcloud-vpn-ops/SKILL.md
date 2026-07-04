@@ -166,14 +166,14 @@ Enables you to plan, deploy, and operate VPN Gateway + IPSec VPN Connection / SS
 
 ### Verify Setup
 ```bash
-tccli vpc DescribeVpnGateways --Region ap-guangzhou
+tccli vpc DescribeVpnGateways --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ### Your First Command
 ```bash
 # Create a VPN Gateway (IPSec)
 tccli vpc CreateVpnGateway \
-  --Region "ap-guangzhou" \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --VpcId "vpc-xxx" \
   --VpnGatewayName "to-dc-1" \
   --Bandwidth 10 \
@@ -463,7 +463,7 @@ export TENCENTCLOUD_REGION="ap-guangzhou"
 3. **Verify:**
 
 ```bash
-tccli vpc DescribeVpnGateways --Region ap-guangzhou
+tccli vpc DescribeVpnGateways --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ## Reference Directory

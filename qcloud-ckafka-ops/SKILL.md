@@ -42,7 +42,7 @@ metadata:
 
 CKafka (Cloud Kafka) is Tencent Cloud's fully managed, distributed message queue service built on Apache Kafka, providing high-throughput, low-latency messaging capabilities. This skill is an **operational runbook** for agents: explicit scope, credential rules, pre-flight checks, **dual-path execution** (official **`tccli` CLI** and **Python SDK fallback**), response validation, and failure recovery. **Do not use the web console as the primary agent execution path**.
 
-> **UX Compliance:** This skill follows the [User Experience Specification](../references/user-experience-spec.md). All operations include onboarding guidance, minimal prompts, smart defaults, clear feedback, and user-friendly error handling.
+> **UX Compliance:** This skill follows the [User Experience Specification](../qcloud-skill-generator/references/user-experience-spec.md). All operations include onboarding guidance, minimal prompts, smart defaults, clear feedback, and user-friendly error handling.
 
 ### CLI applicability (repository policy)
 
@@ -291,28 +291,7 @@ if [ "$STATUS" != "1" ]; then
 fi
 ```
 
-```python
-# SDK polling with adaptive backoff
-# Phase 1: Fast polling (first 5 min) - check every 10s
-# Phase 2: Slow polling (after 5 min) - check every 30s
-# Total timeout: 20 minutes
-import time
-
-for i in range(50):
-    desc_req = models.DescribeInstancesRequest()
-    desc_req.InstanceIds = ["{{output.instance_id}}"]
-    resp = client.DescribeInstances(desc_req)
-    status = json.loads(resp.to_json_string())["Response"]["Result"][0]["Status"]
-    if status == 1:
-        break
-    # Adaptive sleep: 10s for first 30 checks (5 min), then 30s
-    sleep_time = 10 if i < 30 else 30
-    time.sleep(sleep_time)
-
-# Check timeout
-if status != 1:
-    raise TimeoutError(f"CKafka instance not ready after 20 min (status: {status})")
-```
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 3. On success, report `{{output.instance_id}}` and instance details to the user
 4. On terminal failure, go to **Failure Recovery**
@@ -641,5 +620,5 @@ See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PA
 
 4. **Verify Configuration**:
    ```bash
-   tccli ckafka DescribeInstances --Region ap-guangzhou --Limit 5
+   tccli ckafka DescribeInstances --Region "{{env.TENCENTCLOUD_REGION}}" --Limit 5
    ```

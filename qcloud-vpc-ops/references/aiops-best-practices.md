@@ -106,7 +106,7 @@ class VPCDiagnosisTree:
 |------------|-------------|---------|
 | CVM connectivity | qcloud-cvm-ops | Subnet ID, Instance ID |
 | CLB backend issue | qcloud-clb-ops | VPC ID, Subnet IDs |
-| MySQL network issue | qcloud-mysql-ops | VPC ID, Subnet ID |
+| MySQL network issue | qcloud-cdb-ops | VPC ID, Subnet ID |
 | CBS attachment | qcloud-cbs-ops | Instance ID, Disk ID |
 
 ### Delegation Protocol

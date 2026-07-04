@@ -59,7 +59,7 @@ TencentDB for MySQL (CDB) on Tencent Cloud provides a stable, reliable, and elas
 
 | # | Standard | How This Skill Fulfills It |
 |---|----------|---------------------------|
-| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT Use conditions with precise triggers (MySQL, CDB, 云数据库) and delegation rules (ES → qcloud-es-ops, Redis → qcloud-redis-ops, PostgreSQL → qcloud-pg-ops) |
+| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT Use conditions with precise triggers (MySQL, CDB, 云数据库) and delegation rules (ES → qcloud-es-ops, Redis → qcloud-redis-ops, PostgreSQL → qcloud-postgres-ops) |
 | 2 | **Structured I/O** | Placeholder conventions (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`) with type and source documented per operation |
 | 3 | **Explicit Actionable Steps** | Every operation: Pre-flight → Execute → Validate → Recover, with numbered imperative steps for CLI and SDK paths |
 | 4 | **Complete Failure Strategies** | Error taxonomy table with ≥ 12 CDB-specific codes; HALT vs retry per error type |
@@ -97,7 +97,7 @@ TencentDB for MySQL (CDB) on Tencent Cloud provides a stable, reliable, and elas
 - Task is **VPC network only** (subnet, route table, NAT gateway) → delegate to: `qcloud-vpc-ops`
 - Task is **Elasticsearch Service** → delegate to: `qcloud-es-ops`
 - Task is **Redis / memcached** → delegate to: `qcloud-redis-ops` (when present)
-- Task is **PostgreSQL** → delegate to: `qcloud-pg-ops` (when present)
+- Task is **PostgreSQL** → delegate to: `qcloud-postgres-ops` (when present)
 - Task is **SQL Server** → delegate to: `qcloud-sqlserver-ops` (when present)
 - Task is **MongoDB** → delegate to: `qcloud-mongodb-ops` (when present)
 - Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`

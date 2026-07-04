@@ -51,7 +51,7 @@ monitor_integration_hub:
 |---------------|-------------|---------|
 | QCE/CVM CPUUsage alarm | `qcloud-cvm-ops` | InstanceId, CPU metrics |
 | QCE/LB_PUBLIC HealthStatus | `qcloud-clb-ops` | LoadBalancerId, backend status |
-| QCE/CDB SlowQuery | `qcloud-mysql-ops` | DB instance ID, slow query log |
+| QCE/CDB SlowQuery | `qcloud-cdb-ops` | DB instance ID, slow query log |
 | QCE/REDIS memory | `qcloud-redis-ops` | Redis instance ID |
 | QCE/VPC network | `qcloud-vpc-ops` | VPC ID, flow metrics |
 
@@ -93,7 +93,7 @@ alarm_triggered_flow:
 |-----------|---------------|------------------------|
 | `QCE/CVM` | `qcloud-cvm-ops` | CPUUsage, MemUsage, DiskUsage alarms |
 | `QCE/LB_PUBLIC` | `qcloud-clb-ops` | HealthStatus, HttpCode5XX alarms |
-| `QCE/CDB` | `qcloud-mysql-ops` | SlowQuery, Connection alarms |
+| `QCE/CDB` | `qcloud-cdb-ops` | SlowQuery, Connection alarms |
 | `QCE/REDIS` | `qcloud-redis-ops` | CmdExecuteCount, CacheHitRate alarms |
 | `QCE/VPC` | `qcloud-vpc-ops` | Flow metrics, EIP alarms |
 | `QCE/CBS` | `qcloud-cvm-ops` | DiskUsage alarms (CBS attached to CVM) |

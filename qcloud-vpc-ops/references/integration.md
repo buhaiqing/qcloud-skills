@@ -198,7 +198,7 @@ print(f"Delegate to qcloud-clb-ops with subnet_ids={subnets}")
 |----------|----------|-----------------|
 | Create VPC/Subnet | qcloud-cvm-ops | `vpc_id`, `subnet_id` |
 | Create VPC/Subnet | qcloud-clb-ops | `vpc_id`, `subnet_ids` |
-| Create VPC/Subnet | qcloud-mysql-ops | `vpc_id`, `subnet_ids` |
+| Create VPC/Subnet | qcloud-cdb-ops | `vpc_id`, `subnet_ids` |
 | Create VPC/Subnet | qcloud-redis-ops | `vpc_id`, `subnet_ids` |
 
 ## Async Operations

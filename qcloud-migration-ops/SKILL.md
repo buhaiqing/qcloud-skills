@@ -126,13 +126,13 @@ Enables you to plan and execute migration projects — assess readiness, migrate
 
 ### Verify Setup
 ```bash
-tccli msp ListMigrationTask --Region ap-guangzhou
+tccli msp ListMigrationTask --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ### Your First Command
 ```bash
 # List migration projects
-tccli msp ListMigrationProject --Region ap-guangzhou
+tccli msp ListMigrationProject --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
 ### Next Steps
