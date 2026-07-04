@@ -78,7 +78,7 @@ def main():
 
         resp = client.CreateInstance(req)
         result = json.loads(resp.to_json_string())
-        print(json.dumps(result, indent=2))
+        print(resp.to_json_string())
 
         instance_id = result["Response"]["InstanceId"]
         print(f"Instance created: {instance_id}")
@@ -186,8 +186,9 @@ def main():
     req.Offset = 0
     req.Limit = 20
     resp = client.DescribeConsumerGroup(req)
-    result = json.loads(resp.to_json_string())
+    print(resp.to_json_string())
 
+    result = json.loads(resp.to_json_string())
     # Parse consumer group info
     for group in result["Response"]["Result"]["ConsumerGroupList"]:
         print(f"Group: {group['ConsumerGroupName']}, Lag: {group.get('ConsumeLag', 'N/A')}")
@@ -315,6 +316,7 @@ def main():
     req.Message = base64.b64encode(message.encode()).decode()
 
     resp = client.SendMessage(req)
+    print(resp.to_json_string())
     result = json.loads(resp.to_json_string())
     print(f"Message sent, offset: {result['Response'].get('Offset', 'N/A')}")
 
