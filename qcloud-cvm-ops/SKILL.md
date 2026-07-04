@@ -16,8 +16,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.2.0"
-  last_updated: "2026-06-27"
+  version: "1.3.0"
+  last_updated: "2026-07-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/213"
@@ -39,79 +39,25 @@ metadata:
 
 ## Overview
 
-CVM (Cloud Virtual Machine) is Tencent Cloud's primary compute service providing scalable, high-performance virtual servers. This skill is an **operational runbook** for agents: explicit scope, credential rules, pre-flight checks, **dual-path execution** (official **`tccli` CLI** and **Python SDK fallback**), response validation, and failure recovery. **Do not use the web console as the primary agent execution path**.
-
-> **UX Compliance:** This skill follows the [User Experience Specification](../qcloud-skill-generator/references/user-experience-spec.md). All operations include onboarding guidance, minimal prompts, smart defaults, clear feedback, and user-friendly error handling.
-
-### CLI applicability (repository policy)
-
-- **`cli_applicability: dual-path`**: Official `tccli` fully supports CVM. You **MUST** ship **`references/cli-usage.md`** and, in **each** execution flow below, document **both** the SDK step **and** the `tccli` step. CLI is the **primary** execution path for simplicity; Python SDK is used for edge-case operations CLI doesn't expose or for complex parameter handling.
+CVM operational runbook: dual-path (`tccli` + Python SDK), explicit pre-flight/validate/recover, web console not an agent path.
 
 ## Five Core Standards (Quality Gates)
 
-| # | Standard | How This Skill Fulfills It |
-|---|----------|---------------------------|
-| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT with precise triggers and delegation rules |
-| 2 | **Structured I/O** | Placeholder conventions (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`) per operation |
-| 3 | **Explicit Actionable Steps** | Every operation: Pre-flight → Execute → Validate → Recover |
-| 4 | **Complete Failure Strategies** | Error taxonomy with ≥ 12 CVM-specific codes; HALT vs retry per error type |
-| 5 | **Absolute Single Responsibility** | One product (CVM), primary resource model (Instance) |
+1-5: Clear Boundaries, Structured I/O (`{{env.*}}`/`{{user.*}}`/`{{output.*}}`), Explicit Steps (Pre-flight→Execute→Validate→Recover), Complete Failure Strategies (≥12 CVM codes), Single Responsibility (CVM instances+CBS disks).
 
-Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates) for detailed descriptions.
+[WA integration](references/well-architected-assessment.md): Reliability (multi-AZ/backup/DR), Security (CAM/SSH/SG), Cost (type comparison/RI/idle), Efficiency (batch/auto-scaling/schedule).
 
-### Well-Architected Framework Integration (卓越架构)
+## Trigger & Scope
 
-| Pillar | Skill Integration | Reference |
-|--------|-------------------|-----------|
-| **可靠性 (Reliability)** | Multi-AZ deployment, instance backup/snapshot, DR via image migration, auto-recovery configs | `references/well-architected-assessment.md` |
-| **安全性 (Security)** | CAM permissions, SSH key management, security group rules, encryption-at-rest | `references/well-architected-assessment.md` |
-| **成本 (Cost)** | Instance type comparison, pay-as-you-go vs prepaid, reserved instances, idle resource detection | `references/well-architected-assessment.md` |
-| **效率 (Efficiency)** | Batch instance operations, auto-scaling integration, scheduled shutdown/start | `references/well-architected-assessment.md` |
+**SHOULD:** CVM instance lifecycle (CRUD/start/stop/reboot/terminate), CBS disks (attach/detach/resize), snapshots/images, SSH/migration/performance issues.
 
-## Trigger & Scope (Agent-Readable)
+**SHOULD NOT:** billing → `qcloud-billing-ops`, CAM → `qcloud-cam-ops`, VPC-only → `qcloud-vpc-ops`, CLB → `qcloud-clb-ops`, DB → `qcloud-mysql-ops`/`qcloud-redis-ops`, WA review → `qcloud-well-architected-review`.
 
-### SHOULD Use This Skill When
+**Delegate:** VPC/SG pre-check via VPC skill before RunInstances; CLB → CLB skill; CBS within CVM scope; snapshots/images within CVM scope; multi-product → per-skill. Read-only WA assessment → see below.
 
-- User mentions "CVM" OR "云服务器" OR "Tencent Cloud instance" OR "virtual machine" OR "腾讯云服务器"
-- Task involves CRUD or lifecycle operations on **CVM Instances** (RunInstances, DescribeInstances, StartInstances, StopInstances, RebootInstances, TerminateInstances, ModifyInstanceAttribute)
-- Task involves **CBS (Cloud Block Storage)** disks attached to CVM (CreateDisks, AttachDisk, DetachDisk, ResizeDisk)
-- Task involves **Snapshots** and **Images** for CVM backup/restore (CreateSnapshot, DescribeSnapshots, CreateImage, DescribeImages)
-- Task keywords: create instance, deploy server, launch VM, start/stop/reboot instance, resize disk, backup, snapshot, image, SSH, migrate instance, instance type, CPU/memory
-- User asks to deploy, configure, troubleshoot, or monitor CVM **via API, SDK, CLI, or automation**
-- User describes performance issues (CPU high, memory pressure, disk I/O) without naming product
+## Read-Only Assessment (WA delegate)
 
-### SHOULD NOT Use This Skill When
-
-- Task is purely billing / account management → delegate to: `qcloud-billing-ops` (when present)
-- Task is CAM / permission model only → delegate to: `qcloud-cam-ops` (when present)
-- Task is **VPC network only** (subnet, route table, NAT gateway) → delegate to: `qcloud-vpc-ops`
-- Task is **CLB load balancing** → delegate to: `qcloud-clb-ops`
-- Task is **MySQL/Redis database** → delegate to: `qcloud-mysql-ops` / `qcloud-redis-ops`
-- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
-
-### Delegation Rules
-
-- CVM depends on VPC: verify VPC/Subnet/SecurityGroup exist via `qcloud-vpc-ops` before RunInstances
-- CVM uses CLB: delegate load balancer operations to `qcloud-clb-ops`
-- CBS disk operations are within CVM scope (attached storage), but standalone CBS management uses this skill
-- Snapshot/Image operations are within CVM scope for instance backup/restore
-- Multi-product requests: handle each product with its skill; do not merge unrelated APIs
-- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review` orchestrator; see **Read-Only Assessment Mode** below
-- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
-
-## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
-
-> **delegate-to marker:** When `qcloud-well-architected-review` invokes this skill with `{{user.mode}}=well-architected-readonly`, assess **CVM/CBS/snapshot/image** architecture read-only and return `{{output.product_assessment}}`.
-
-| Input from orchestrator | Value |
-|---|---|
-| `{{user.mode}}` | `well-architected-readonly` |
-| `{{user.pillars}}` | `all` or subset: reliability / security / cost / efficiency |
-| `{{user.scope}}` | `single-resource` or `account-wide` |
-
-**Allowed:** `Describe*` and `GetMonitorData` only — **no** Run/Start/Stop/Terminate/Create/Modify/Delete.
-
-**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract**; paginate Describe* → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: cvm`).
+When `{{user.mode}}=well-architected-readonly`: read-only Describe*/GetMonitorData only. Execute [well-architected-assessment.md](references/well-architected-assessment.md) Worker Output Contract; paginate → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: cvm`).
 
 ## Variable Convention (Agent-Readable)
 
@@ -133,112 +79,37 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 
 > **Security Warning (Credential Masking — MANDATORY):** **NEVER** log, print, or expose `TENCENTCLOUD_SECRET_KEY` in any output. Mask all credentials with `***` or `<masked>`. Check existence only: `test -n "$TENCENTCLOUD_SECRET_KEY"` ✅ | `echo $TENCENTCLOUD_SECRET_KEY` ❌
 
-## API and Response Conventions (Agent-Readable)
+## API Conventions
 
-- **API spec is canonical**: https://cloud.tencent.com/document/api/213
-- **Errors**: Tencent Cloud uses `Response.Error.Code` / `Response.Error.Message` pattern
-- **Timestamps**: ISO 8601 format (e.g., `2026-05-21T10:00:00+08:00`)
-- **Idempotency**: Use `ClientToken` for RunInstances to avoid duplicate creation on retry
-
-### Example Response Field Table
-
-| Operation | JSON Path | Type | Description |
-|-----------|----------|------|-------------|
-| RunInstances | `$.Response.InstanceIdSet[0]` | string | New instance ID |
-| DescribeInstances | `$.Response.InstanceSet[0].InstanceId` | string | Instance ID |
-| DescribeInstances | `$.Response.InstanceSet[0].Status` | string | Instance state |
-| DescribeInstances | `$.Response.InstanceSet[0].CPU` | int | CPU cores |
-| DescribeInstances | `$.Response.InstanceSet[0].Memory` | int | Memory in GB |
-| StopInstances | `$.Response.RequestId` | string | Request tracking ID |
-| CreateSnapshot | `$.Response.SnapshotId` | string | Snapshot ID |
+**API:** https://cloud.tencent.com/document/api/213. **Errors:** `Response.Error.Code`/`Message`. **Timestamps:** ISO 8601. **Idempotency:** `ClientToken` for RunInstances.
 
 ### Expected State Transitions
 
-| Operation | Initial State | Target State | Poll Interval | Max Wait |
-|-----------|---------------|--------------|---------------|----------|
-| RunInstances | — | `RUNNING` | 5s | 300s |
-| StartInstances | `STOPPED` | `RUNNING` | 5s | 120s |
-| StopInstances | `RUNNING` | `STOPPED` | 5s | 120s |
-| RebootInstances | any stable | `RUNNING` | 5s | 120s |
-| TerminateInstances | any | absent (404/empty) | 5s | 300s |
+| Operation | Initial → Target | Wait |
+|-----------|-----------------|------|
+| RunInstances | → `RUNNING` | 5s×60 |
+| StartInstances | `STOPPED`→`RUNNING` | 5s×24 |
+| StopInstances | `RUNNING`→`STOPPED` | 5s×24 |
+| RebootInstances | any→`RUNNING` | 5s×24 |
+| TerminateInstances | any→404 | 5s×60 |
 
 ## Quick Start
 
-### What This Skill Does
-This skill enables you to deploy, configure, troubleshoot, and monitor CVM instances using `tccli` CLI (primary) or `tencentcloud-sdk-python-cvm` SDK (fallback).
-
-### Execution Environments
-
-| Environment | Setup Required | Use Case |
-|-------------|---------------|----------|
-| **Cloud Shell** | Zero setup | Quick operations, troubleshooting |
-| **Local CLI** | Install tccli + credentials | Development, automation |
-| **Local SDK** | Python 3.8+ + SDK package | Complex operations, batch processing |
-
-### Option 1: Cloud Shell (Recommended for Quick Start)
-
-**Zero-setup execution environment**:
-
-1. Login to [Tencent Cloud Console](https://console.cloud.tencent.com)
-2. Click **Cloud Shell** icon (top right toolbar)
-3. Terminal opens with pre-installed `tccli` and SDK
+| Env | Setup |
+|-----|-------|
+| **Cloud Shell** | [Console](https://console.cloud.tencent.com) → Cloud Shell icon. Pre-installed `tccli`/SDK, pre-authenticated, 10GB `/data/`. Limit: 30min idle, 10 sessions, no CI/CD. |
+| **Local CLI** | `pip install tccli` + `TENCENTCLOUD_SECRET_ID`/`_KEY`/`_REGION` |
+| **Local SDK** | `pip install tencentcloud-sdk-python-cvm` + same credentials |
 
 ```bash
-# Cloud Shell is pre-authenticated - no credential setup needed
-tccli cvm DescribeZones --Region ap-guangzhou
+# Verify (Cloud Shell or local)
+tccli cvm DescribeZones --Region ap-guangzhou && python3 -c "from tencentcloud.cvm import cvm_client"
 
-# Save scripts to persistent storage
-mkdir -p /data/scripts
-# Files in /data/ persist across sessions
-```
-
-**Cloud Shell Features**:
-- Pre-installed: `tccli`, `tencentcloud-sdk-python`, common tools
-- Pre-authenticated: Uses console login credentials
-- Persistent: 10GB storage in `/data/`
-- Free: No additional cost
-
-### Option 2: Local CLI Setup
-
-**Prerequisites**:
-- [ ] `tccli` CLI installed (`pip install tccli`)
-- [ ] Credentials configured: `TENCENTCLOUD_SECRET_ID`, `TENCENTCLOUD_SECRET_KEY`
-- [ ] Region set: `TENCENTCLOUD_REGION`
-
-### Option 3: Python SDK Setup
-
-**Prerequisites**:
-- [ ] Python 3.8+ runtime
-- [ ] SDK installed: `pip install tencentcloud-sdk-python-cvm`
-- [ ] Credentials configured
-
-### Verify Setup (All Environments)
-```bash
-# Check CLI version
-tccli version
-
-# Test API access
-tccli cvm DescribeZones --Region ap-guangzhou
-
-# Expected output (JSON)
-# {"Response": {"ZoneSet": [...], "RequestId": "..."}}
-```
-
-### Your First Command
-```bash
-# List all instances in current region
+# First command
 tccli cvm DescribeInstances --Region {{env.TENCENTCLOUD_REGION}}
-
-# Cloud Shell: Use explicit region
-tccli cvm DescribeInstances --Region ap-guangzhou
 ```
 
-### Next Steps
-- [Core Concepts](references/core-concepts.md) — Understand CVM architecture and limits
-- [Common Operations](#execution-flows) — Create, manage, and delete instances
-- [CLI Usage Guide](references/cli-usage.md) — Detailed CLI command reference
-- [Integration Guide](references/integration.md) — Cloud Shell, SDK setup, automation
-- [Troubleshooting](references/troubleshooting.md) — Fix common CVM issues
+**Next:** [Execution Flows](#execution-flows), [CLI Usage](references/cli-usage.md), [Integration](references/integration.md), [Troubleshooting](references/troubleshooting.md).
 
 ## Capabilities at a Glance
 
@@ -254,6 +125,9 @@ tccli cvm DescribeInstances --Region ap-guangzhou
 | AllocateHosts | Create dedicated hosts | Medium | Low |
 | CreateSnapshot | Create disk backup | Low | Low |
 | CreateImage | Create custom image | Medium | Low |
+| ModifyInstanceSpec | Change instance type (CPU/memory) | Medium | Medium (requires STOPPED) |
+| AttachDisks | Attach CBS disks to instance | Low | None |
+| DetachDisk | Detach CBS disk from instance | Low | Medium (service interruption) |
 
 ## Changelog
 
@@ -262,6 +136,7 @@ tccli cvm DescribeInstances --Region ap-guangzhou
 | 1.0.0 | 2026-05-21 | Initial skill with RunInstances, DescribeInstances, Start/Stop/Reboot/Terminate, CBS disk operations, Snapshot/Image management |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL pilot: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CVM-specific safety rules), `references/prompt-templates.md` (Generator + Critic + Orchestrator, isolated-context enforcement). `max_iter=2` per AGENTS.md §8 |
 | 1.2.0 | 2026-06-27 | Round 1 self-review fixes: added ResetInstances execution flow (G1), TerminateInstances DryRun pre-flight (G2), SDK fallback for ResizeInstanceDisks/CreateSnapshot/CreateImage (G3-G5), StopInstances HARD gate (G6). Bumped version. |
+| 1.3.0 | 2026-07-04 | Added ModifyInstanceSpec, AttachDisks, DetachDisk operations; created references/sdk-templates.md; replaced inline SDK blocks with references; merged Prerequisites into Quick Start; removed duplicate Variables section. Bumped version. |
 
 ---
 
@@ -307,50 +182,29 @@ INSTANCE_ID=$(jq -r '.Response.InstanceIdSet[0]' /tmp/response.json)
 
 #### Execution — Python SDK (Fallback Path)
 
+> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
+
 ```python
-#!/usr/bin/env python3
-"""
-SDK fallback for RunInstances when CLI parameter handling is complex
-"""
-import os, json, time
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.cvm import cvm_client, models
+req = models.RunInstancesRequest()
+req.Placement = models.Placement()
+req.Placement.Zone = os.environ.get("ZONE", "ap-guangzhou-3")
+req.InstanceType = os.environ.get("INSTANCE_TYPE", "S5.SMALL1")
+req.ImageId = os.environ.get("IMAGE_ID", "img-xxx")
+req.InstanceName = os.environ.get("INSTANCE_NAME", "test-instance")
+req.SystemDisk = models.SystemDisk()
+req.SystemDisk.DiskType = "CLOUD_PREMIUM"
+req.SystemDisk.DiskSize = 50
+req.InstanceChargeType = "POSTPAID_BY_HOUR"
+req.ClientToken = str(int(time.time() * 1000000))
+req.VpcId = os.environ.get("VPC_ID", "")
+req.SubnetId = os.environ.get("SUBNET_ID", "")
+req.SecurityGroupIds = os.environ.get("SECURITY_GROUP_IDS", "").split(",")
+req.InternetAccessible = models.InternetAccessible()
+req.InternetAccessible.InternetChargeType = "TRAFFIC_POSTPAID_BY_HOUR"
+req.InternetAccessible.InternetMaxBandwidthOut = 1
 
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = cvm_client.CvmClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.RunInstancesRequest()
-        req.Placement = models.Placement()
-        req.Placement.Zone = os.environ.get("ZONE", "ap-guangzhou-3")
-        req.InstanceType = os.environ.get("INSTANCE_TYPE", "S5.SMALL1")
-        req.ImageId = os.environ.get("IMAGE_ID", "img-xxx")
-        req.InstanceName = os.environ.get("INSTANCE_NAME", "test-instance")
-        req.SystemDisk = models.SystemDisk()
-        req.SystemDisk.DiskType = "CLOUD_PREMIUM"
-        req.SystemDisk.DiskSize = 50
-        req.InstanceChargeType = "POSTPAID_BY_HOUR"
-        req.ClientToken = str(int(time.time() * 1000000))
-        # VPC and network configuration
-        req.VpcId = os.environ.get("VPC_ID", "")
-        req.SubnetId = os.environ.get("SUBNET_ID", "")
-        req.SecurityGroupIds = os.environ.get("SECURITY_GROUP_IDS", "").split(",")
-        req.InternetAccessible = models.InternetAccessible()
-        req.InternetAccessible.InternetChargeType = "TRAFFIC_POSTPAID_BY_HOUR"
-        req.InternetAccessible.InternetMaxBandwidthOut = 1
-
-        resp = client.RunInstances(req)
-        print(json.loads(resp.to_json_string()))
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
+resp = client.RunInstances(req)
+print(json.loads(resp.to_json_string()))
 ```
 
 #### Post-execution Validation
@@ -398,18 +252,9 @@ tccli cvm DescribeInstances \
 
 #### Execution — Python SDK (Fallback Path)
 
+> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
+
 ```python
-#!/usr/bin/env python3
-from tencentcloud.common import credential
-from tencentcloud.cvm import cvm_client, models
-import os, json, time
-
-cred = credential.Credential(
-    os.environ.get("TENCENTCLOUD_SECRET_ID"),
-    os.environ.get("TENCENTCLOUD_SECRET_KEY")
-)
-client = cvm_client.CvmClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
 req = models.DescribeInstancesRequest()
 req.InstanceIds = [os.environ.get("INSTANCE_ID", "ins-xxx")]
 req.Offset = 0
@@ -618,6 +463,55 @@ tccli cvm ModifyInstanceAttribute \
   --SecurityGroupIds "[\"sg-new1\",\"sg-new2\"]"
 ```
 
+### Operation: ModifyInstanceSpec (Change Instance Type)
+
+> **⚠️ Requires instance in `STOPPED` state.** Changing instance type (CPU/memory) is a cold migration — the instance must be stopped before modification.
+
+#### Pre-flight
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| Instance exists | DescribeInstances | Instance found | HALT |
+| Instance state | DescribeInstances | `STOPPED` | HALT; stop instance first |
+| Current spec | DescribeInstances → `$.InstanceType` | Known | Continue |
+| Target differs | User-provided value | Different from current | HALT; target same as current |
+
+#### Execution — CLI
+
+```bash
+tccli cvm ModifyInstanceSpec \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --InstanceId "{{user.instance_id}}" \
+  --InstanceType "{{user.new_instance_type}}"
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
+
+```python
+req = models.ModifyInstanceSpecRequest()
+req.InstanceId = "{{user.instance_id}}"
+req.InstanceType = "{{user.new_instance_type}}"
+
+resp = client.ModifyInstanceSpec(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
+#### Validation
+
+Poll DescribeInstances until `STOPPED` (spec change completes while stopped), then confirm `$.InstanceType` matches `{{user.new_instance_type}}`.
+
+#### Failure Recovery
+
+| Error pattern | Max retries | Recovery |
+|--------------|-------------|----------|
+| `InvalidParameterValue.InstanceTypeNotSupported` | 0 | Check zone-instance type matrix via DescribeZoneInstanceConfigInfos |
+| `InvalidInstanceState.InstanceIsRunning` | 0 | HALT; instance must be STOPPED |
+| `TradeError.PriceError` | 0 | HALT; check billing eligibility for target type |
+| `RequestLimitExceeded` | 3, exp backoff | Back off and retry |
+| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
+
 ### Operation: ResizeInstanceDisk (CBS Disk Expansion)
 
 #### Pre-flight
@@ -678,10 +572,12 @@ Poll DescribeSnapshots until `SUCCESS` status.
 
 #### Execution — Python SDK (Fallback Path)
 
-```python
-import os, json, time
+> See [SDK Templates](references/sdk-templates.md) — Common Initialization (CBS Client).
 
-req = models.CreateSnapshotRequest()
+```python
+import time
+
+req = cbs_models.CreateSnapshotRequest()
 req.DiskId = "{{user.disk_id}}"
 req.SnapshotName = "backup-" + "{{user.instance_id}}" + "-" + time.strftime("%Y%m%d-%H%M%S")
 resp = client.CreateSnapshot(req)
@@ -710,8 +606,10 @@ tccli cvm CreateImage \
 
 #### Execution — Python SDK (Fallback Path)
 
+> See [SDK Templates](references/sdk-templates.md) — Common Initialization.
+
 ```python
-import os, json, time
+import time
 
 req = models.CreateImageRequest()
 req.InstanceId = "{{user.instance_id}}"
@@ -721,81 +619,105 @@ resp = client.CreateImage(req)
 print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 ```
 
----
+### Operation: AttachDisks (Attach CBS Disks)
 
-## Prerequisites
+> **Note:** Uses CBS API namespace (`tccli cbs`). Attaches existing CBS disks to a running CVM instance.
 
-### Option A: Cloud Shell (Zero Setup)
+#### Pre-flight
 
-**Browser-based execution environment with pre-installed tools**:
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| Instance exists | DescribeInstances | Instance found | HALT |
+| Instance state | DescribeInstances | `RUNNING` | HALT; start instance first |
+| Disks exist | DescribeDisks | All found | HALT; verify disk IDs |
+| Disk state | DescribeDisks | `NOT_ATTACHED` | HALT; disk already attached |
 
-1. **Access Cloud Shell**:
-   - Login to [Tencent Cloud Console](https://console.cloud.tencent.com)
-   - Click **Cloud Shell** icon (top right toolbar)
-   - Terminal opens automatically
-
-2. **Pre-installed Components**:
-   - `tccli` CLI (latest version)
-   - `tencentcloud-sdk-python` (full SDK)
-   - Python 3.8+
-   - Common tools: jq, vim, curl
-
-3. **Pre-authenticated**: Uses console login credentials automatically
-
-4. **Persistent Storage**: Save scripts in `/data/` (10GB)
+#### Execution — CLI
 
 ```bash
-# In Cloud Shell - no setup required
-tccli cvm DescribeZones --Region ap-guangzhou
-
-# Save scripts for reuse
-mkdir -p /data/scripts
-vim /data/scripts/create_instance.sh
+tccli cbs AttachDisks \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --InstanceId "{{user.instance_id}}" \
+  --DiskIds "[\"{{user.disk_id}}\"]"
 ```
 
-**Cloud Shell Limitations**:
-- 30 min idle timeout (reconnect after)
-- Max 10 concurrent sessions
-- Browser-based (not for CI/CD)
+#### Execution — Python SDK (Fallback Path)
 
-### Option B: Local CLI Installation
+> See [SDK Templates](references/sdk-templates.md) — Common Initialization (CBS Client).
 
-1. **Install `tccli` CLI**:
+```python
+req = cbs_models.AttachDisksRequest()
+req.InstanceId = "{{user.instance_id}}"
+req.DiskIds = ["{{user.disk_id}}"]
+
+resp = client.AttachDisks(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
+```
+
+#### Validation
+
+Poll DescribeDisks until disk `Attached` status and `InstanceId` matches `{{user.instance_id}}`.
+
+#### Failure Recovery
+
+| Error pattern | Max retries | Recovery |
+|--------------|-------------|----------|
+| `InvalidDisk.NotSupported` | 0 | HALT; disk type not attachable to this instance |
+| `InvalidDisk.DiskAttached` | 0 | HALT; disk already attached to an instance |
+| `InvalidInstance.NotSupported` | 0 | HALT; instance does not accept more disks |
+| `RequestLimitExceeded` | 3, exp backoff | Back off and retry |
+| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
+
+### Operation: DetachDisk (Detach CBS Disk)
+
+> **⚠️ Service interruption:** Detaching a data disk may cause I/O errors if the disk is in use. Unmount the filesystem before detaching.
+
+#### Pre-flight
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| Instance exists | DescribeInstances | Instance found | HALT |
+| Disk exists | DescribeDisks | Disk found | HALT |
+| Disk attached to instance | DescribeDisks | `InstanceId` matches `{{user.instance_id}}` | HALT; disk not attached to this instance |
+| Warn unmount | Prompt user | User confirms filesystem unmounted | HALT; unmount first |
+
+#### Execution — CLI
 
 ```bash
-pip install tccli
-
-# Or via Homebrew (macOS)
-brew install tccli
+tccli cbs DetachDisk \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --InstanceId "{{user.instance_id}}" \
+  --DiskId "{{user.disk_id}}"
 ```
 
-2. **Bootstrap Python runtime** (SDK fallback):
+#### Execution — Python SDK (Fallback Path)
 
-```bash
-python3 --version  # ≥ 3.8
-pip install tencentcloud-sdk-python-cvm
+> See [SDK Templates](references/sdk-templates.md) — Common Initialization (CBS Client).
+
+```python
+req = cbs_models.DetachDiskRequest()
+req.InstanceId = "{{user.instance_id}}"
+req.DiskId = "{{user.disk_id}}"
+
+resp = client.DetachDisk(req)
+print(json.dumps(json.loads(resp.to_json_string()), indent=2))
 ```
 
-3. **Configure Credentials**:
+#### Validation
 
-```bash
-export TENCENTCLOUD_SECRET_ID="AKIDxxxx"
-export TENCENTCLOUD_SECRET_KEY="xxxxx"
-export TENCENTCLOUD_REGION="ap-guangzhou"
-```
+Poll DescribeDisks until disk `NOT_ATTACHED` state and `InstanceId` is absent.
 
-4. **Verify Configuration**:
+#### Failure Recovery
 
-```bash
-tccli cvm DescribeZones --Region ap-guangzhou
-```
+| Error pattern | Max retries | Recovery |
+|--------------|-------------|----------|
+| `InvalidDisk.NotSupported` | 0 | HALT; disk type does not support detach |
+| `InvalidDisk.DiskBusy` | 0 | HALT; unmount filesystem, wait for I/O to drain |
+| `InvalidDisk.NotAttached` | 0 | HALT; disk not attached to specified instance |
+| `RequestLimitExceeded` | 3, exp backoff | Back off and retry |
+| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
 
-### Quick Environment Check
 
-```bash
-# One-line verification (works in Cloud Shell and Local)
-python3 -c "from tencentcloud.cvm import cvm_client; print('✅ SDK OK')" && tccli version
-```
 
 ## Reference Directory
 
@@ -952,20 +874,3 @@ Error response:
     }
   }
 }
-```
-
-## Variables
-
-| Variable | Source | Example |
-|----------|--------|---------|
-| `{{env.TENCENTCLOUD_SECRET_ID}}` | Environment | `AKID...` |
-| `{{env.TENCENTCLOUD_SECRET_KEY}}` | Environment | `***` (masked) |
-| `{{env.TENCENTCLOUD_REGION}}` | Environment | `ap-guangzhou` |
-| `{{user.zone}}` | User | `ap-guangzhou-3` |
-| `{{user.instance_type}}` | User | `S5.SMALL1` |
-| `{{user.image_id}}` | User | `img-xxx` |
-| `{{user.instance_name}}` | User | `my-cvm` |
-| `{{user.instance_id}}` | User | `ins-xxx` |
-| `{{user.disk_size}}` | User | `50` |
-| `{{output.instance_id}}` | API Response | `ins-xxx` |
-| `{{output.request_id}}` | API Response | Request tracking ID | `abc123` |

@@ -85,6 +85,41 @@
     "intent": "CreateImage"
   },
   {
+    "query": "Change the instance type from S5.SMALL1 to S5.MEDIUM4",
+    "should_trigger": true,
+    "intent": "ModifyInstanceSpec"
+  },
+  {
+    "query": "Upgrade my instance CPU and memory",
+    "should_trigger": true,
+    "intent": "ModifyInstanceSpec"
+  },
+  {
+    "query": "把这台机器的配置升级一下",
+    "should_trigger": true,
+    "intent": "ModifyInstanceSpec"
+  },
+  {
+    "query": "Attach a 100GB SSD disk to my instance",
+    "should_trigger": true,
+    "intent": "AttachDisks"
+  },
+  {
+    "query": "挂载一块云硬盘到服务器",
+    "should_trigger": true,
+    "intent": "AttachDisks"
+  },
+  {
+    "query": "Detach disk-x from my CVM instance",
+    "should_trigger": true,
+    "intent": "DetachDisk"
+  },
+  {
+    "query": "卸载服务器上的数据盘",
+    "should_trigger": true,
+    "intent": "DetachDisk"
+  },
+  {
     "query": "我的服务器CPU使用率很高怎么办",
     "should_trigger": true,
     "intent": "Troubleshooting"
