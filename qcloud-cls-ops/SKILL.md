@@ -166,29 +166,23 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 - **Timestamps**: Unix timestamp (seconds) or ISO 8601 format depending on API
 - **Idempotency**: Use `ClientToken` for Create operations to avoid duplicates on retry
 
-### Example Response Field Table
+### Response Field Summary
 
-| Operation | JSON Path | Type | Description |
-|-----------|-----------|------|-------------|
-| CreateLogset | `$.Response.LogsetId` | string | New logset ID (UUID format) |
-| DescribeLogsets | `$.Response.Logsets[0].LogsetId` | string | Logset ID |
-| DescribeLogsets | `$.Response.Logsets[0].LogsetName` | string | Logset name |
-| CreateTopic | `$.Response.TopicId` | string | New topic ID (UUID format) |
-| DescribeTopics | `$.Response.Topics[0].TopicId` | string | Topic ID |
-| DescribeTopics | `$.Response.Topics[0].TopicName` | string | Topic name |
-| DescribeTopics | `$.Response.Topics[0].PartitionCount` | int | Number of partitions |
-| SearchLog | `$.Response.Results[0].Timestamp` | int | Log timestamp (Unix) |
-| SearchLog | `$.Response.Results[0].Content` | string | Log content |
+| Operation | Key Field Path | Description |
+|-----------|----------------|-------------|
+| CreateLogset | `$.Response.LogsetId` | New logset ID |
+| DescribeLogsets | `$.Response.Logsets[].LogsetId/Name` | Logset list |
+| CreateTopic | `$.Response.TopicId` | New topic ID |
+| DescribeTopics | `$.Response.Topics[].TopicId/Name/PartitionCount` | Topic list |
+| SearchLog | `$.Response.Results[].Timestamp/Content` | Log entries |
 
-### Expected State Transitions
+### State Transitions
 
-| Operation | Initial State | Target State | Poll Interval | Max Wait |
-|-----------|---------------|--------------|---------------|----------|
-| CreateLogset | — | `ACTIVE` | 2s | 30s |
-| CreateTopic | — | `ACTIVE` | 2s | 30s |
-| CreateIndex | — | `ACTIVE` | 5s | 60s |
-| DeleteLogset | `ACTIVE` | absent (404) | 5s | 60s |
-| DeleteTopic | `ACTIVE` | absent (404) | 5s | 60s |
+| Operation | Initial → Target | Poll/Max |
+|-----------|------------------|----------|
+| CreateLogset/Topic | — → `ACTIVE` | 2s/30s |
+| CreateIndex | — → `ACTIVE` | 5s/60s |
+| DeleteLogset/Topic | `ACTIVE` → absent | 5s/60s |
 
 ## Quick Start
 
@@ -241,6 +235,8 @@ tccli cls DescribeLogsets --Region {{env.TENCENTCLOUD_REGION}}
 
 Every operation: **Pre-flight → Execute (CLI and SDK) → Validate → Recover**. Do not skip phases.
 
+> **SDK Templates:** Init/poll/error boilerplate → [references/sdk-templates.md](references/sdk-templates.md); Code examples → [references/sdk-code-examples.md](references/sdk-code-examples.md)
+
 ### Operation: CreateLogset (Create Log Project)
 
 #### Pre-flight Checks
@@ -268,9 +264,6 @@ echo "Created Logset ID: $LOGSET_ID"
 
 #### Execution — Python SDK (Fallback Path)
 
-> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
-
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -325,9 +318,6 @@ echo "Created Topic ID: $TOPIC_ID"
 
 #### Execution — Python SDK
 
-> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
-
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -391,9 +381,6 @@ tccli cls CreateIndex \
 
 #### Execution — Python SDK
 
-> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
-
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -445,9 +432,6 @@ tccli cls SearchLog \
 
 #### Execution — Python SDK
 
-> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
-
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Present to User
 
@@ -493,9 +477,6 @@ tccli cls CreateMachineGroup \
 
 #### Execution — Python SDK
 
-> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
-
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -555,9 +536,6 @@ tccli cls CreateConfig \
 
 #### Execution — Python SDK
 
-> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
-
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -627,9 +605,6 @@ echo "Created COS import task: $RECHARGE_ID"
 
 #### Execution — Python SDK (Fallback Path)
 
-> See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
-
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 

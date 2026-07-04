@@ -166,22 +166,15 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 | `2` | Creating (创建中) | Wait for completion |
 | `3` | Failed (创建失败) | Retry or escalate |
 
-### Response Field Table
+### Response Field Summary
 
-| Operation | JSON Path | Type | Description |
-|-----------|-----------|------|-------------|
-| CreateInstance | `$.Response.InstanceId` | string | New instance ID (ckafka-xxx) |
-| CreateInstance | `$.Response.RequestId` | string | Request tracking ID |
-| DescribeInstances | `$.Response.Result[].InstanceId` | array | Instance IDs |
-| DescribeInstances | `$.Response.Result[].Status` | number | 0=创建中, 1=运行中, 2=删除中, 5=已隔离, 7=隔离中 |
-| DescribeInstances | `$.Response.Result[].InstanceName` | string | Instance name |
-| DescribeInstances | `$.Response.Result[].KafkaVersion` | string | Kafka version (e.g., "2.4.1") |
-| CreateTopic | `$.Response.Result.TopicId` | string | Topic ID |
-| CreateTopic | `$.Response.Result.TopicName` | string | Topic name |
-| DescribeTopic | `$.Response.Result.TopicList[].TopicName` | string | Topic name |
-| DescribeTopic | `$.Response.Result.TopicList[].PartitionNum` | number | Number of partitions |
-| DescribeConsumerGroup | `$.Response.Result.ConsumerGroupList[].ConsumerGroupName` | string | Consumer group name |
-| DescribeConsumerGroup | `$.Response.Result.ConsumerGroupList[].ConsumeLag` | number | Consumer lag (messages) |
+| Operation | Key Field | Description |
+|-----------|-----------|-------------|
+| CreateInstance | `$.Response.InstanceId` | New instance ID |
+| DescribeInstances | `$.Response.Result[].InstanceId/Name/Status` | Instance list |
+| CreateTopic | `$.Response.Result.TopicId/TopicName` | Topic info |
+| DescribeTopic | `$.Response.Result.TopicList[].TopicName/PartitionNum` | Topic list |
+| DescribeConsumerGroup | `$.Response.Result.ConsumerGroupList[].ConsumerGroupName/ConsumeLag` | Consumer group list |
 
 ## Quick Start
 

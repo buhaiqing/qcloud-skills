@@ -160,14 +160,12 @@ Every generated skill MUST satisfy these five standards. Use them as a design ch
 | `rtable.name` | `$.Response.RouteTableSet[].RouteTableName` |
 | `rtable.routes` | `$.Response.RouteTableSet[].RouteSet` |
 
-### Expected State Transitions
+### State Transitions
 
-| Operation | Initial State | Target State | Poll Interval | Max Wait |
-|-----------|---------------|--------------|---------------|----------|
-| CreateVpc | — | `AVAILABLE` | 5s | 120s |
-| CreateSubnet | — | `AVAILABLE` | 5s | 120s |
-| DeleteVpc | `AVAILABLE` | absent/404 | 5s | 60s |
-| DeleteSubnet | `AVAILABLE` | absent/404 | 5s | 60s |
+| Operation | Initial → Target | Poll/Max |
+|-----------|------------------|----------|
+| CreateVpc/Subnet | — → `AVAILABLE` | 5s/120s |
+| DeleteVpc/Subnet | `AVAILABLE` → absent | 5s/60s |
 
 ## Quick Start
 
@@ -197,16 +195,16 @@ tccli vpc CreateVpc --Region "{{env.TENCENTCLOUD_REGION}}" --VpcName "my-vpc" --
 
 ## Capabilities at a Glance
 
-| Operation | Description | Complexity | Risk Level |
-|-----------|-------------|------------|------------|
-| CreateVpc | Create a new VPC | Medium | Low |
-| DescribeVpcs | View VPC details | Low | None |
-| DeleteVpc | Remove a VPC | Low | **High** — irreversible |
-| CreateSubnet | Create subnet in VPC | Medium | Low |
-| DescribeSubnets | View subnet details | Low | None |
-| DeleteSubnet | Remove a subnet | Low | **High** — disconnect instances |
-| CreateRouteTable | Create route table | Medium | Low |
-| DeleteRouteTable | Remove route table | Low | Medium |
+| Operation | Risk Level | Notes |
+|-----------|------------|-------|
+| CreateVpc | Low | Medium complexity |
+| DescribeVpcs | None | Read-only |
+| DeleteVpc | **High** | Irreversible |
+| CreateSubnet | Low | In VPC |
+| DescribeSubnets | None | Read-only |
+| DeleteSubnet | **High** | Disconnects instances |
+| CreateRouteTable | Low | — |
+| DeleteRouteTable | Medium | — |
 
 ## Changelog
 
@@ -221,6 +219,8 @@ tccli vpc CreateVpc --Region "{{env.TENCENTCLOUD_REGION}}" --VpcName "my-vpc" --
 ## Execution Flows (Agent-Readable)
 
 Every operation: **Pre-flight → Execute (CLI and SDK) → Validate → Recover**.
+
+> **SDK Templates:** Init/poll/error boilerplate → [references/sdk-templates.md](references/sdk-templates.md); Code examples → [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ### Operation: Create VPC
 
@@ -252,7 +252,6 @@ tccli vpc CreateVpc \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -289,7 +288,6 @@ tccli vpc DescribeVpcs \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Present to User
 
@@ -337,7 +335,6 @@ tccli vpc DeleteVpc \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -367,7 +364,6 @@ tccli vpc CreateSubnet \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 
@@ -391,7 +387,6 @@ tccli vpc DeleteSubnet \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 
@@ -415,7 +410,6 @@ tccli vpc DescribeSubnets \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Present to User
 
@@ -448,7 +442,6 @@ tccli vpc CreateRouteTable \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 
@@ -466,7 +459,6 @@ tccli vpc DescribeRouteTables \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Present to User
 
@@ -494,7 +486,6 @@ tccli vpc DeleteRouteTable \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 
@@ -531,7 +522,6 @@ tccli vpc CreateVpcPeeringConnection \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -586,7 +576,6 @@ tccli vpc AcceptVpcPeeringConnection \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -621,7 +610,6 @@ tccli vpc DescribeVpcPeeringConnections \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Present to User
 
@@ -658,7 +646,6 @@ tccli vpc DeleteVpcPeeringConnection \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -673,29 +660,6 @@ Poll `DescribeVpcPeeringConnections` for the ID; expect empty / 404 within 60s.
 | `InvalidStatus.NotActive` | Peering is `PENDING_ACCEPTANCE`; either accept first or have the initiator cancel |
 
 ---
-
-## Prerequisites
-
-1. **Install `tccli` CLI:**
-
-```bash
-pip install tccli
-tccli version
-```
-
-2. **Configure Credentials:**
-
-```bash
-export TENCENTCLOUD_SECRET_ID="AKID..."
-export TENCENTCLOUD_SECRET_KEY="..."
-export TENCENTCLOUD_REGION="ap-guangzhou"
-```
-
-3. **Verify:**
-
-```bash
-tccli vpc DescribeVpcs --Region "{{env.TENCENTCLOUD_REGION}}"
-```
 
 ## Reference Directory
 

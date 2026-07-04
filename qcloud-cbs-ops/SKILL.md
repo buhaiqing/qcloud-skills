@@ -155,35 +155,25 @@ Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards
 | `TORECYCLE` | Disk pending recycling | Recover or Delete |
 | `DUMPING` | Disk data is being exported | Poll only |
 
-### Response Field Table
+### Response Field Summary
 
-| Operation | JSON Path | Type | Description |
-|-----------|-----------|------|-------------|
-| CreateDisks | `$.Response.DiskIdSet[0]` | string | New disk ID (e.g., `disk-xxxxxxxx`) |
-| DescribeDisks | `$.Response.DiskSet[0].DiskId` | string | Disk ID |
-| DescribeDisks | `$.Response.DiskSet[0].DiskState` | string | Disk state (UNATTACHED/ATTACHED) |
-| DescribeDisks | `$.Response.DiskSet[0].DiskSize` | int | Disk size in GB |
-| DescribeDisks | `$.Response.DiskSet[0].DiskType` | string | Disk type (CLOUD_PREMIUM/CLOUD_SSD) |
-| DescribeDisks | `$.Response.DiskSet[0].InstanceId` | string | Attached instance ID (if any) |
-| AttachDisks | `$.Response.RequestId` | string | Request tracking ID |
-| DetachDisks | `$.Response.RequestId` | string | Request tracking ID |
-| ResizeDisk | `$.Response.RequestId` | string | Request tracking ID |
-| CreateSnapshot | `$.Response.SnapshotId` | string | Snapshot ID (e.g., `snap-xxxxxxxx`) |
-| DescribeSnapshots | `$.Response.SnapshotSet[0].SnapshotId` | string | Snapshot ID |
-| DescribeSnapshots | `$.Response.SnapshotSet[0].SnapshotState` | string | Snapshot state (NORMAL/CREATING) |
-| DeleteSnapshots | `$.Response.RequestId` | string | Request tracking ID |
+| Operation | Key Field | Description |
+|-----------|-----------|-------------|
+| CreateDisks | `$.Response.DiskIdSet[0]` | New disk ID |
+| DescribeDisks | `$.Response.DiskSet[].DiskId/State/Size/Type` | Disk list |
+| Attach/Detach/Resize | `$.Response.RequestId` | Tracking ID |
+| CreateSnapshot | `$.Response.SnapshotId` | Snapshot ID |
+| DescribeSnapshots | `$.Response.SnapshotSet[].SnapshotId/State` | Snapshot list |
 
-### Expected State Transitions
+### State Transitions
 
-| Operation | Initial State | Target State | Poll Interval | Max Wait |
-|-----------|---------------|--------------|---------------|----------|
-| CreateDisks | — | `UNATTACHED` | 5s | 120s |
-| AttachDisks | `UNATTACHED` | `ATTACHED` | 5s | 120s |
-| DetachDisks | `ATTACHED` | `UNATTACHED` | 5s | 120s |
-| ResizeDisk | `ATTACHED`/`UNATTACHED` | Same state (size changed) | 5s | 300s |
-| CreateSnapshot | — | `NORMAL` | 5s | 600s |
-| DeleteSnapshots | any | absent (404/empty) | 5s | 120s |
-| ApplySnapshot | any | `ATTACHED`/`UNATTACHED` | 5s | 300s |
+| Operation | Initial → Target | Poll/Max |
+|-----------|------------------|----------|
+| CreateDisks | — → `UNATTACHED` | 5s/120s |
+| Attach/Detach | `UNATTACHED` ↔ `ATTACHED` | 5s/120s |
+| ResizeDisk | Same state | 5s/300s |
+| CreateSnapshot | — → `NORMAL` | 5s/600s |
+| DeleteSnapshots | any → absent | 5s/120s |
 
 ## Quick Start
 
@@ -202,17 +192,17 @@ tccli cbs DescribeDisks --Region {{env.TENCENTCLOUD_REGION}} --Limit 1
 
 ## Capabilities at a Glance
 
-| Operation | Description | Complexity | Risk Level |
-|-----------|-------------|------------|------------|
-| CreateDisks | Low |
-| AttachDisks | Low |
-| DetachDisks | Medium (data access interruption) |
-| ResizeDisk | Medium (requires unmount/remount) |
-| CreateSnapshot | Low |
-| DeleteSnapshots | **High** (irreversible) |
-| ApplySnapshot | **High** (data overwrite) |
-| DescribeDisks | None |
-| DescribeSnapshots | None |
+| Operation | Risk Level | Notes |
+|-----------|------------|-------|
+| CreateDisks | Low | — |
+| AttachDisks | Low | — |
+| DetachDisks | Medium | Data access interruption |
+| ResizeDisk | Medium | Requires unmount/remount |
+| CreateSnapshot | Low | — |
+| DeleteSnapshots | **High** | Irreversible |
+| ApplySnapshot | **High** | Data overwrite |
+| DescribeDisks | None | Read-only |
+| DescribeSnapshots | None | Read-only |
 
 ## Changelog
 
@@ -614,22 +604,3 @@ Error response:
   }
 }
 ```
-
-## Variables
-
-| Variable | Source | Example |
-|----------|--------|---------|
-| `{{env.TENCENTCLOUD_SECRET_ID}}` | Environment | `AKID...` |
-| `{{env.TENCENTCLOUD_SECRET_KEY}}` | Environment | `***` (masked) |
-| `{{env.TENCENTCLOUD_REGION}}` | Environment | `ap-guangzhou` |
-| `{{user.zone}}` | User | `ap-guangzhou-3` |
-| `{{user.disk_name}}` | User | `data-disk-01` |
-| `{{user.disk_id}}` | User | `disk-xxx` |
-| `{{user.disk_size}}` | User | `100` |
-| `{{user.disk_type}}` | User | `CLOUD_SSD` |
-| `{{user.instance_id}}` | User | `ins-xxx` |
-| `{{user.snapshot_name}}` | User | `backup-20260528` |
-| `{{user.snapshot_id}}` | User | `snap-xxx` |
-| `{{output.disk_id}}` | API Response | `disk-xxx` |
-| `{{output.snapshot_id}}` | API Response | `snap-xxx` |
-| `{{output.request_id}}` | API Response | `abc123` |

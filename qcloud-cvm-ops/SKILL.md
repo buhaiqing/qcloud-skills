@@ -113,21 +113,21 @@ tccli cvm DescribeInstances --Region {{env.TENCENTCLOUD_REGION}}
 
 ## Capabilities at a Glance
 
-| Operation | Description | Complexity | Risk Level |
-|-----------|-------------|------------|------------|
-| RunInstances | Create new CVM instance(s) | Medium | Low |
-| DescribeInstances | View instance details | Low | None |
-| StartInstances | Start stopped instances | Low | None |
-| StopInstances | Stop running instances | Low | Medium (service interruption) |
-| RebootInstances | Reboot instances | Low | Medium |
-| ModifyInstanceAttribute | Change instance config | Medium | Medium |
-| TerminateInstances | Delete instances (irreversible) | Low | **High** |
-| AllocateHosts | Create dedicated hosts | Medium | Low |
-| CreateSnapshot | Create disk backup | Low | Low |
-| CreateImage | Create custom image | Medium | Low |
-| ModifyInstanceSpec | Change instance type (CPU/memory) | Medium | Medium (requires STOPPED) |
-| AttachDisks | Attach CBS disks to instance | Low | None |
-| DetachDisk | Detach CBS disk from instance | Low | Medium (service interruption) |
+| Operation | Risk Level | Notes |
+|-----------|------------|-------|
+| RunInstances | Low | Create new instance |
+| DescribeInstances | None | Read-only |
+| StartInstances | None | — |
+| StopInstances | Medium | Service interruption |
+| RebootInstances | Medium | — |
+| ModifyInstanceAttribute | Medium | Name/SG changes |
+| TerminateInstances | **High** | Irreversible |
+| AllocateHosts | Low | Dedicated host |
+| CreateSnapshot | Low | CBS backup |
+| CreateImage | Low | Custom image |
+| ModifyInstanceSpec | Medium | Requires STOPPED |
+| AttachDisks | None | CBS to instance |
+| DetachDisk | Medium | I/O warning |
 
 ## Changelog
 
@@ -143,6 +143,8 @@ tccli cvm DescribeInstances --Region {{env.TENCENTCLOUD_REGION}}
 ## Execution Flows (Agent-Readable)
 
 Every operation: **Pre-flight → Execute (CLI and SDK) → Validate → Recover**. Do not skip phases.
+
+> **SDK Templates:** Init/poll/error boilerplate → [references/sdk-templates.md](references/sdk-templates.md); Code examples → [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ### Operation: RunInstances (Create CVM)
 
@@ -184,7 +186,6 @@ INSTANCE_ID=$(jq -r '.Response.InstanceIdSet[0]' /tmp/response.json)
 
 > See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -233,7 +234,6 @@ tccli cvm DescribeInstances \
 
 > See [SDK Templates](references/sdk-templates.md) for common init/poll/error boilerplate.
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Present to User
 
@@ -268,7 +268,6 @@ tccli cvm StartInstances \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 
@@ -294,7 +293,6 @@ tccli cvm StopInstances \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 
@@ -313,7 +311,6 @@ tccli cvm RebootInstances \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ### Operation: ResetInstance (Re-image)
 
@@ -345,7 +342,6 @@ tccli cvm ResetInstance \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 
@@ -379,7 +375,6 @@ tccli cvm TerminateInstances \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 
@@ -430,7 +425,6 @@ tccli cvm ModifyInstanceSpec \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 
@@ -467,7 +461,6 @@ tccli cvm ResizeInstanceDisks \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ### Operation: CreateSnapshot (Backup)
 
@@ -495,7 +488,6 @@ Poll DescribeSnapshots until `SUCCESS` status.
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ### Operation: CreateImage (Custom Image)
 
@@ -519,7 +511,6 @@ tccli cvm CreateImage \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ### Operation: AttachDisks (Attach CBS Disks)
 
@@ -545,7 +536,6 @@ tccli cbs AttachDisks \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 
@@ -585,7 +575,6 @@ tccli cbs DetachDisk \
 
 #### Execution — Python SDK (Fallback Path)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Validation
 

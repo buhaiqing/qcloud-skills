@@ -136,13 +136,11 @@ SSL Certificate Service (SSL 证书服务) on Tencent Cloud provides certificate
 
 ### Response Fields
 
-| Operation | JSON Path | Type | Description |
-|-----------|-----------|------|-------------|
-| Upload | `$.Response.CertificateId` | string | New certificate ID |
-| Describe | `$.Response.Certificates[0].CertificateId` | string | Certificate ID |
-| List | `$.Response.Certificates[].CertificateId` | array | Certificate IDs |
-| Delete | `$.Response.RequestId` | string | Request tracking ID |
-| Deploy | `$.Response.RequestId` | string | Request tracking ID |
+| Operation | Key Field | Description |
+|-----------|-----------|-------------|
+| Upload | `$.Response.CertificateId` | New certificate ID |
+| Describe/List | `$.Response.Certificates[].CertificateId` | Certificate list |
+| Delete/Deploy | `$.Response.RequestId` | Tracking ID |
 
 ### Certificate Status
 
@@ -180,24 +178,24 @@ tccli ssl DescribeCertificates --Limit 20
 
 ## Capabilities at a Glance
 
-| Operation | Description | Complexity | Risk Level |
-|-----------|-------------|------------|------------|
-| Upload Certificate | Upload existing certificate | Low | Medium |
-| Apply Certificate | Apply for free/paid certificate | High | Low |
-| Describe Certificate | View certificate details | Low | None |
-| List Certificates | List all certificates | Low | None |
-| Delete Certificate | Delete a certificate | Low | **High** — irreversible |
-| Deploy Certificate | Deploy to cloud resources | Medium | Medium |
-| Download Certificate | Download certificate files | Low | **High** — exposes private key |
-| Complete Domain Verify | Complete domain verification | Medium | Low |
-| Modify Certificate | Update certificate name/project | Low | Low |
-| Check Certificate Expiry | Monitor expiration dates | Low | None |
-| Submit Certificate Info | Submit info for paid cert | Medium | Low |
-| Certificate Renewal | Renew expiring certificates | Medium | Medium |
+| Operation | Risk Level | Notes |
+|-----------|------------|-------|
+| Upload Certificate | Medium | Upload existing PEM cert |
+| Apply Certificate | Low | DV/OV/EV via CA |
+| Describe/List Certificate | None | Read-only |
+| Delete Certificate | **High** | Irreversible |
+| Deploy Certificate | Medium | To CDN/CLB/WAF/etc |
+| Download Certificate | **High** | Exposes private key |
+| Complete Domain Verify | Low | DNS or HTTP |
+| Modify Certificate | Low | Name/project only |
+| Check Certificate Expiry | None | Monitoring |
+| Certificate Renewal | Medium | Before expiry |
 
 ## Execution Flows
 
 Every operation: **Pre-flight → Execute (CLI primary, SDK fallback) → Validate → Recover**. Do not skip phases.
+
+> **SDK Templates:** Init/poll/error boilerplate → [references/sdk-templates.md](references/sdk-templates.md); Code examples → [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ### Operation: Upload Certificate
 
@@ -230,7 +228,6 @@ Parameters:
 
 #### Execution — Python SDK (Fallback)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -265,8 +262,7 @@ tccli ssl DescribeCertificates \
   --Limit 20
 ```
 
-SDK fallback: → SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
-
+SDK fallback: 
 #### Present to User
 
 | Field | JSON Path | Description |
@@ -287,8 +283,7 @@ tccli ssl DescribeCertificateDetail \
   --CertificateId "{{user.certificate_id}}"
 ```
 
-SDK fallback: → SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
-
+SDK fallback: 
 ### Operation: Delete Certificate (Safety Gate — High Risk)
 
 > **Destructive operation — irreversible.**

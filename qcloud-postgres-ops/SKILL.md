@@ -140,25 +140,21 @@ TencentDB for PostgreSQL on Tencent Cloud provides fully managed PostgreSQL data
 
 ### Response Fields
 
-| Operation | JSON Path | Type | Description |
-|-----------|-----------|------|-------------|
-| Create | `$.Response.DealNames[0]` | string | Order/deal ID for async tracking |
-| Describe | `$.Response.DBInstance.Status` | string | Instance status (running, creating, etc.) |
-| List | `$.Response.DBInstanceSet[].DBInstanceId` | array | Instance IDs |
-| Modify/Delete | `$.Response.RequestId` | string | Request tracking ID |
+| Operation | Key Field | Description |
+|-----------|-----------|-------------|
+| Create | `$.Response.DealNames[0]` | Order ID for async tracking |
+| Describe/List | `$.Response.DBInstanceSet[].DBInstanceId` | Instance IDs |
+| Modify/Delete | `$.Response.RequestId` | Request tracking ID |
 
 ### State Transitions
 
-| Operation | Initial State | Target State | Poll Interval | Max Wait |
-|-----------|---------------|--------------|---------------|----------|
-| Create | — | running | 5s | 600s |
-| Modify spec | running | running | 5s | 600s |
-| Isolate | running | isolated | 5s | 120s |
-| Delete | isolated | deleted | 5s | 120s |
-| Backup | running | running | 10s | 600s |
-| Restore | running | running | 10s | 1800s |
-
-Instance status: creating, running, isolated, deleting, deleted
+| Operation | Initial → Target | Poll/Max |
+|-----------|------------------|----------|
+| Create | — → running | 5s/600s |
+| Modify spec | running → running | 5s/600s |
+| Isolate | running → isolated | 5s/120s |
+| Delete | isolated → deleted | 5s/120s |
+| Backup/Restore | running → running | 10s/600s |
 
 ## Quick Start
 
@@ -185,26 +181,28 @@ tccli postgres DescribeDBInstances --Limit 20
 
 ## Capabilities at a Glance
 
-| Operation | Description | Complexity | Risk Level |
-|-----------|-------------|------------|------------|
-| Create Instance | Create a new PostgreSQL instance (monthly/hourly) | High | Low |
-| Describe Instance | View instance details | Low | None |
-| Modify Spec | Scale memory/disk up or down | Medium | Medium |
-| Delete Instance | Isolate + delete | Low | **High** — irreversible |
-| Backup Instance | Manual or auto backup | Medium | None |
-| Restore Instance | Restore from backup | High | **High** — data overwrite |
-| Manage Accounts | Create, list, reset password | Low | Medium |
-| Manage Parameters | Describe/modify instance parameters | Low | Medium |
-| Slow Log Diagnosis | View slow queries | Low | None |
-| SSL/TLS | Enable/disable SSL, update cert | Low | Medium |
-| Read-only Replicas | Create/describe/delete read-only replicas | Medium | Medium |
-| Security Groups | Describe/modify bound security groups | Low | Medium |
-| Data Migration | Create/modify/describe migration jobs | High | **High** — data loss |
-| Backup Download | Download backup files | Low | None |
+| Operation | Risk Level | Notes |
+|-----------|------------|-------|
+| Create Instance | Low | Monthly/hourly |
+| Describe Instance | None | Read-only |
+| Modify Spec | Medium | Scale up/down |
+| Delete Instance | **High** | Irreversible |
+| Backup Instance | None | Manual/auto |
+| Restore Instance | **High** | Data overwrite |
+| Manage Accounts | Medium | Create/reset |
+| Manage Parameters | Medium | Describe/modify |
+| Slow Log Diagnosis | None | Read-only |
+| SSL/TLS | Medium | Enable/disable |
+| Read-only Replicas | Medium | Create/delete |
+| Security Groups | Medium | Bind/modify |
+| Data Migration | **High** | Data loss risk |
+| Backup Download | None | — |
 
 ## Execution Flows
 
 Every operation: **Pre-flight → Execute (CLI primary, SDK fallback) → Validate → Recover**. Do not skip phases.
+
+> **SDK Templates:** Init/poll/error boilerplate → [references/sdk-templates.md](references/sdk-templates.md); Code examples → [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ### Operation: Create Instance
 
@@ -258,7 +256,6 @@ Parameters:
 
 #### Execution — Python SDK (Fallback)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -298,7 +295,6 @@ tccli postgres DescribeDBInstances \
 ```
 
 SDK fallback:
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Present to User
 
@@ -337,7 +333,6 @@ tccli postgres UpgradeDBInstance \
 ```
 
 SDK fallback:
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
@@ -414,7 +409,6 @@ tccli postgres DescribeDBBackups \
 
 #### Execution — Manual Backup (SDK Fallback)
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Post-execution Validation
 
