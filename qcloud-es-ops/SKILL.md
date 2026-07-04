@@ -211,108 +211,14 @@ Every operation: **Pre-flight → Execute (SDK/API and tccli) → Validate → R
 | VPC/Subnet | Verify via qcloud-vpc-ops | VPC and subnet exist | HALT; create VPC first |
 | Quota | Check `ResourceInsufficient` patterns | Sufficient quota | HALT; raise quota |
 
-#### Execution — CLI (`tccli`) (Primary Path)
+#### Execution
 
-```bash
-# Basic create (required params)
-tccli es CreateInstance \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --Zone "{{user.zone}}" \
-  --NodeType "ES.S1.MEDIUM4" \
-  --NodeNum 3 \
-  --DiskSize 200 \
-  --DiskType "CLOUD_SSD" \
-  --EsVersion "7.14.2" \
-  --VpcId "{{user.vpc_id}}" \
-  --SubnetId "{{user.subnet_id}}" \
-  --Password "{{user.password}}" \
-  --InstanceName "{{user.cluster_name}}"
-
-# With dedicated master node and Kibana
-tccli es CreateInstance \
-  --Region "ap-guangzhou" \
-  --Zone "ap-guangzhou-3" \
-  --NodeType "ES.S1.MEDIUM4" \
-  --NodeNum 3 \
-  --DiskSize 200 \
-  --DiskType "CLOUD_SSD" \
-  --EsVersion "7.14.2" \
-  --VpcId "vpc-xxxx" \
-  --SubnetId "subnet-xxxx" \
-  --Password "{{user.password}}" \
-  --InstanceName "my-es-cluster" \
-  --EnableDedicatedMaster true \
-  --MasterNodeNum 3 \
-  --MasterNodeType "ES.S1.MEDIUM4" \
-  --MasterNodeDiskSize 50
-```
-
-#### Execution — Python SDK (Fallback Path)
-
-```python
-#!/usr/bin/env python3
-import os
-import json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.es.v20180416 import es_client, models
-
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = es_client.EsClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.CreateInstanceRequest()
-        req.Zone = "ap-guangzhou-3"
-        req.NodeType = "ES.S1.MEDIUM4"
-        req.NodeNum = 3
-        req.DiskSize = 200
-        req.DiskType = "CLOUD_SSD"
-        req.EsVersion = "7.14.2"
-        req.VpcId = "vpc-xxxx"
-        req.SubnetId = "subnet-xxxx"
-        req.Password = os.environ.get("ES_PASSWORD")
-        req.InstanceName = "my-es-cluster"
-
-        resp = client.CreateInstance(req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
-```
+See [execution-flows.md](references/execution-flows.md) §1 for CLI and SDK command blocks.
 
 #### Post-execution Validation
 
 1. Capture `{{output.instance_id}}` from response: `$.Response.InstanceId`
-2. Poll `DescribeInstances` until `HealthStatus` is stable (0=green, 1=yellow) or timeout:
-
-```bash
-# CLI polling
-for i in $(seq 1 60); do
-  STATUS=$(tccli es DescribeInstances --InstanceIds '["{{output.instance_id}}"]' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['Response']['InstanceList'][0]['HealthStatus'])")
-  [ "$STATUS" = "0" ] || [ "$STATUS" = "1" ] && break
-  sleep 10
-done
-```
-
-```python
-# SDK polling
-import time
-for i in range(60):
-    desc_req = models.DescribeInstancesRequest()
-    desc_req.InstanceIds = [instance_id]
-    resp = client.DescribeInstances(desc_req)
-    if resp.InstanceList[0].HealthStatus in [0, 1]:
-        break
-    time.sleep(10)
-```
-
+2. Poll `DescribeInstances` until `HealthStatus` is stable (0=green, 1=yellow) or timeout — see [execution-flows.md](references/execution-flows.md) §1 polling examples
 3. On success, report `{{output.instance_id}}` and cluster endpoint details to the user
 4. On terminal failure, go to **Failure Recovery**
 
@@ -336,44 +242,9 @@ for i in range(60):
 |-------|--------|----------|------------|
 | Credentials | Check env vars | Non-empty | HALT |
 
-#### Execution — CLI
+#### Execution
 
-```bash
-# List all clusters (paginated)
-tccli es DescribeInstances --Region {{env.TENCENTCLOUD_REGION}} --Offset 0 --Limit 20
-
-# Filter by specific instance IDs
-tccli es DescribeInstances --InstanceIds '["es-xxxxxx"]'
-
-# Filter by health status (0=green, 1=yellow, 2=red)
-tccli es DescribeInstances --HealthStatus "[0]"
-```
-
-#### Execution — SDK
-
-```python
-req = models.DescribeInstancesRequest()
-req.Offset = 0
-req.Limit = 20
-resp = client.DescribeInstances(req)
-print(json.dumps(resp.to_json_string(), indent=2))
-```
-
-#### Key Response Fields
-
-| Field | JSON Path | Notes |
-|-------|-----------|-------|
-| InstanceId | `$.Response.InstanceList[].InstanceId` | Cluster unique ID |
-| InstanceName | `$.Response.InstanceList[].InstanceName` | Cluster name |
-| HealthStatus | `$.Response.InstanceList[].HealthStatus` | 0=green, 1=yellow, 2=red, -1=unknown |
-| EsVersion | `$.Response.InstanceList[].EsVersion` | Elasticsearch version |
-| NodeType | `$.Response.InstanceList[].NodeType` | Node specification |
-| NodeNum | `$.Response.InstanceList[].NodeNum` | Number of nodes |
-| DiskSize | `$.Response.InstanceList[].DiskSize` | Disk size in GB |
-| EsDomain | `$.Response.InstanceList[].EsDomain` | ES cluster access domain |
-| KibanaUrl | `$.Response.InstanceList[].KibanaUrl` | Kibana dashboard URL |
-| Status | `$.Response.InstanceList[].Status` | 0=processing, 1=normal, -1=stopped |
-| CreateTime | `$.Response.InstanceList[].CreateTime` | Creation time (ISO 8601) |
+See [execution-flows.md](references/execution-flows.md) §2 for CLI and SDK command blocks.
 
 ### Operation: DeleteInstance (Terminate ES Cluster) — DESTRUCTIVE
 
@@ -384,27 +255,9 @@ print(json.dumps(resp.to_json_string(), indent=2))
 - **MUST** warn: all indices, data, and Kibana configurations will be permanently lost
 - **MUST NOT** proceed without clear user assent (type "CONFIRM" to proceed)
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli es DeleteInstance --InstanceId "{{user.instance_id}}" --Region {{env.TENCENTCLOUD_REGION}}
-```
-
-#### Execution — SDK
-
-```python
-req = models.DeleteInstanceRequest()
-req.InstanceId = "{{user.instance_id}}"
-resp = client.DeleteInstance(req)
-```
-
-#### Post-execution Validation
-
-```bash
-# Verify deletion
-tccli es DescribeInstances --InstanceIds '["{{user.instance_id}}"]'
-# Expected: ResourceNotFound or empty result
-```
+See [execution-flows.md](references/execution-flows.md) §3 for CLI and SDK command blocks.
 
 ### Operation: UpdateInstance (Scale Cluster)
 
@@ -415,16 +268,9 @@ tccli es DescribeInstances --InstanceIds '["{{user.instance_id}}"]'
 | Resource exists | DescribeInstances | Status=1 (normal) | HALT |
 | Cluster healthy | HealthStatus | 0 or 1 (green/yellow) | Warn user; proceed with caution |
 
-#### Execution — CLI
+#### Execution
 
-```bash
-# Scale node type and count
-tccli es UpdateInstance \
-  --InstanceId "{{user.instance_id}}" \
-  --NodeType "ES.S1.LARGE8" \
-  --NodeNum 5 \
-  --DiskSize 500
-```
+See [execution-flows.md](references/execution-flows.md) §4 for CLI and SDK command blocks.
 
 ### Operation: RestartInstance (Restart ES Cluster)
 
@@ -432,16 +278,9 @@ tccli es UpdateInstance \
 
 - Warn user: cluster will be unavailable during restart (typically 30s–5min)
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli es RestartInstance --InstanceId "{{user.instance_id}}"
-```
-
-```bash
-# Restart specific nodes
-tccli es RestartNodes --InstanceId "{{user.instance_id}}" --NodeNames '["node1","node2"]'
-```
+See [execution-flows.md](references/execution-flows.md) §5 and §6 for CLI and SDK command blocks for RestartInstance and RestartNodes.
 
 ### Operation: CreateClusterSnapshot (Backup)
 
@@ -454,13 +293,9 @@ tccli es RestartNodes --InstanceId "{{user.instance_id}}" --NodeNames '["node1",
 | Cluster exists | DescribeInstances | Instance exists | HALT |
 | COS backup configured | DescribeClusterSnapshot | Backup repository accessible | Configure COS backup first |
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli es CreateClusterSnapshot \
-  --InstanceId "{{user.instance_id}}" \
-  --SnapshotName "auto-snapshot-$(date +%Y%m%d-%H%M%S)"
-```
+See [execution-flows.md](references/execution-flows.md) §7 for CLI and SDK command blocks.
 
 ### Operation: RestoreClusterSnapshot (Restore)
 
@@ -469,25 +304,15 @@ tccli es CreateClusterSnapshot \
 - **MUST** warn: restore overwrites current data
 - **MUST** confirm target cluster and snapshot source
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli es RestoreClusterSnapshot \
-  --InstanceId "{{user.instance_id}}" \
-  --SnapshotId "{{user.snapshot_id}}"
-```
+See [execution-flows.md](references/execution-flows.md) §8 for CLI and SDK command blocks.
 
 ### Operation: DiagnoseInstance (Health Diagnosis)
 
-#### Execution — CLI
+#### Execution
 
-```bash
-# Run diagnostics
-tccli es DiagnoseInstance --InstanceId "{{user.instance_id}}"
-
-# Get diagnosis settings
-tccli es DescribeDiagnose --InstanceId "{{user.instance_id}}"
-```
+See [execution-flows.md](references/execution-flows.md) §9 for CLI and SDK command blocks.
 
 ---
 
