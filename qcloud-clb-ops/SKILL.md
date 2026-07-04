@@ -251,65 +251,15 @@ Every operation: **Pre-flight → Execute (CLI and SDK) → Validate → Recover
 | Region | Valid region code | `{{env.TENCENTCLOUD_REGION}}` valid | Suggest valid region |
 | VPC exists | `tccli vpc DescribeVpcs` | Target VPC exists | HALT; delegate to qcloud-vpc-ops |
 
-#### Execution — CLI (`tccli`) (Primary Path)
+#### Execution
 
-```bash
-# CLI call (JSON output by default)
-tccli clb CreateLoadBalancer \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --LoadBalancerType "OPEN" \
-  --VpcId "{{user.vpc_id}}" \
-  --LoadBalancerName "{{user.loadbalancer_name}}"
-```
-
-#### Execution — Python SDK (Fallback Path)
-
-```python
-#!/usr/bin/env python3
-"""
-SDK fallback script for CLB CreateLoadBalancer
-"""
-import os
-import json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.clb.v20180317 import clb_client, models
-
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = clb_client.ClbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-        
-        req = models.CreateLoadBalancerRequest()
-        req.LoadBalancerType = "OPEN"
-        req.VpcId = "{{user.vpc_id}}"
-        req.LoadBalancerName = "{{user.loadbalancer_name}}"
-        
-        resp = client.CreateLoadBalancer(req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-        
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
-```
+- **CLI**: See [execution-flows.md](references/execution-flows.md#1-create-loadbalancer)
+- **SDK**: See [execution-flows.md](references/execution-flows.md#1-create-loadbalancer)
 
 #### Post-execution Validation
 
 1. Read `{{output.loadbalancer_id}}` from `$.Response.LoadBalancerIds[0]`
-2. Poll DescribeLoadBalancers until `Status=2`:
-
-```bash
-for i in $(seq 1 60); do
-  STATUS=$(tccli clb DescribeLoadBalancers --LoadBalancerIds "[\"{{output.loadbalancer_id}}\"]" | jq -r '.Response.LoadBalancerSet[0].Status')
-  [ "$STATUS" = "2" ] && break
-  sleep 5
-done
-```
+2. Poll DescribeLoadBalancers until `Status=2`: See [execution-flows.md](references/execution-flows.md#1-create-loadbalancer)
 
 #### Failure Recovery
 
@@ -326,10 +276,7 @@ done
 
 #### Execution
 
-```bash
-# CLI — JSON output (default)
-tccli clb DescribeLoadBalancers --Region {{env.TENCENTCLOUD_REGION}} --LoadBalancerIds "[\"{{user.loadbalancer_id}}\"]"
-```
+- **CLI**: See [execution-flows.md](references/execution-flows.md#2-describe-loadbalancers)
 
 #### Present to User
 
@@ -350,49 +297,10 @@ tccli clb DescribeLoadBalancers --Region {{env.TENCENTCLOUD_REGION}} --LoadBalan
 | LoadBalancer exists | DescribeLoadBalancers | LB in running state | HALT |
 | Port not conflict | Check existing listeners | Port available | HALT; suggest different port |
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli clb CreateListener \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --LoadBalancerId "{{user.loadbalancer_id}}" \
-  --Protocol "{{user.listener_protocol}}" \
-  --Port "{{user.listener_port}}" \
-  --ListenerName "{{user.listener_name}}"
-```
-
-#### Execution — Python SDK (Fallback Path)
-
-```python
-#!/usr/bin/env python3
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.clb.v20180317 import clb_client, models
-
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = clb_client.ClbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.CreateListenerRequest()
-        req.LoadBalancerId = "{{user.loadbalancer_id}}"
-        req.Protocol = "{{user.listener_protocol}}"
-        req.Port = {{user.listener_port}}
-        req.ListenerName = "{{user.listener_name}}"
-
-        resp = client.CreateListener(req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
-```
+- **CLI**: See [execution-flows.md](references/execution-flows.md#3-create-listener)
+- **SDK**: See [execution-flows.md](references/execution-flows.md#3-create-listener)
 
 #### Post-execution Validation
 
@@ -409,52 +317,10 @@ if __name__ == "__main__":
 | CVM instance exists | Delegate to qcloud-cvm-ops | Instance RUNNING | HALT |
 | CVM in same VPC | DescribeInstances | Same VPC as LB | HALT; VPC mismatch |
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli clb RegisterTargets \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --LoadBalancerId "{{user.loadbalancer_id}}" \
-  --ListenerId "{{user.listener_id}}" \
-  --Targets "[\"InstanceId\":\"{{user.instance_id}}\",\"Port\":{{user.target_port}},\"Weight\":{{user.target_weight}}}]"
-```
-
-#### Execution — Python SDK (Fallback Path)
-
-```python
-#!/usr/bin/env python3
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.clb.v20180317 import clb_client, models
-
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = clb_client.ClbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.RegisterTargetsRequest()
-        req.LoadBalancerId = "{{user.loadbalancer_id}}"
-        req.ListenerId = "{{user.listener_id}}"
-
-        target = models.Target()
-        target.InstanceId = "{{user.instance_id}}"
-        target.Port = {{user.target_port}}
-        target.Weight = {{user.target_weight}}
-        req.Targets = [target]
-
-        resp = client.RegisterTargets(req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
-```
+- **CLI**: See [execution-flows.md](references/execution-flows.md#4-register-targets)
+- **SDK**: See [execution-flows.md](references/execution-flows.md#4-register-targets)
 
 #### Post-execution Validation
 
@@ -463,43 +329,10 @@ if __name__ == "__main__":
 
 ### Operation: Describe Target Health
 
-#### Execution — CLI
+#### Execution
 
-```bash
-tccli clb DescribeTargetHealth \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --LoadBalancerId "{{user.loadbalancer_id}}"
-```
-
-#### Execution — Python SDK (Fallback Path)
-
-```python
-#!/usr/bin/env python3
-import os, json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.clb.v20180317 import clb_client, models
-
-def main():
-    try:
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        client = clb_client.ClbClient(cred, os.environ.get("TENCENTCLOUD_REGION"))
-
-        req = models.DescribeTargetHealthRequest()
-        req.LoadBalancerId = "{{user.loadbalancer_id}}"
-
-        resp = client.DescribeTargetHealth(req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
-```
+- **CLI**: See [execution-flows.md](references/execution-flows.md#5-describe-target-health)
+- **SDK**: See [execution-flows.md](references/execution-flows.md#5-describe-target-health)
 
 #### Present to User
 
@@ -519,12 +352,7 @@ if __name__ == "__main__":
 
 #### Execution
 
-```bash
-# Delete with confirmation
-tccli clb DeleteLoadBalancer \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --LoadBalancerId "{{user.loadbalancer_id}}"
-```
+- **CLI**: See [execution-flows.md](references/execution-flows.md#6-delete-loadbalancer)
 
 #### Post-execution Validation
 
