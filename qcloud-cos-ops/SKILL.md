@@ -84,6 +84,10 @@ COS (Cloud Object Storage) on Tencent Cloud provides scalable, secure, and highl
 
 - Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 
+### delegate-from: qcloud-proactive-inspection
+
+> **Passively triggered when `{{user.scope}}` includes `cos`.** Read-only COS inspection: ListBuckets → storage analytics → idle detection → cost anomaly flags. See [references/proactive-inspection.md](references/proactive-inspection.md) for delegation contract.
+
 ### Delegation Rules
 
 - COS access log analysis → delegate to `qcloud-cls-ops` with bucket name, region, and CLS topic

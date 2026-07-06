@@ -1,0 +1,196 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "COS Access Log Schema (CLS)",
+  "description": "Field mapping for Tencent Cloud COS access logs exported to CLS via cos-internal delivery. Used by FinOpsAnalysis and cls-analysis-guide.md for LogQL queries.",
+  "owner": "qcloud-cos-ops",
+  "version": "1.0.0",
+  "log_source": "COS access logging (COS → CLS via cos-internal delivery)",
+  "fields": {
+    "bucketName": {
+      "type": "string",
+      "description": "Target bucket name",
+      "example": "my-bucket-12345"
+    },
+    "objectName": {
+      "type": "string",
+      "description": "Object key (URL-encoded)",
+      "example": "logs%2F2026%2F01.json"
+    },
+    "objectSize": {
+      "type": "integer",
+      "description": "Object size in bytes",
+      "example": 1048576
+    },
+    "storageClass": {
+      "type": "string",
+      "enum": ["STANDARD", "STANDARD_IA", "ARCHIVE", "DEEP_ARCHIVE", "INTELLIGENT_TIERING", "MAZ_STANDARD", "MAZ_STANDARD_IA"],
+      "description": "Storage class at time of operation",
+      "example": "STANDARD"
+    },
+    "eventName": {
+      "type": "string",
+      "description": "COS operation type",
+      "enum": ["PutObject", "GetObject", "DeleteObject", "HeadObject", "ListObject", "UploadPart", "CompleteMultipartUpload", "AbortMultipartUpload", "CreateBucket", "DeleteBucket", "GetBucket", "PutBucketAcl", "GetBucketAcl", "PutBucketLifecycle", "GetBucketLifecycle", "PutBucketLogging", "GetBucketLogging"],
+      "example": "GetObject"
+    },
+    "remoteIp": {
+      "type": "string",
+      "description": "Client IP address",
+      "example": "192.168.1.1"
+    },
+    "reqBytesSent": {
+      "type": "integer",
+      "description": "Upload bytes sent by client",
+      "example": 524288
+    },
+    "resBytesSent": {
+      "type": "integer",
+      "description": "Download bytes sent to client",
+      "example": 1073741824
+    },
+    "reqMethod": {
+      "type": "string",
+      "description": "HTTP request method",
+      "example": "GET"
+    },
+    "reqPath": {
+      "type": "string",
+      "description": "HTTP request path",
+      "example": "/logs/2026/01.json"
+    },
+    "reqUri": {
+      "type": "string",
+      "description": "Full request URI with query string",
+      "example": "/logs/2026/01.json?response-content-type=application%2Fjson"
+    },
+    "httpProtocol": {
+      "type": "string",
+      "description": "HTTP protocol version",
+      "example": "HTTP/1.1"
+    },
+    "httpStatus": {
+      "type": "integer",
+      "description": "HTTP response status code",
+      "example": 200
+    },
+    "errorCode": {
+      "type": "string",
+      "description": "COS error code if request failed",
+      "example": "NoSuchKey"
+    },
+    "requestId": {
+      "type": "string",
+      "description": "Unique request identifier (UUID)",
+      "example": "NWRmOTQ4MmYtYzQ2YS0xMWVnLWIyOTctZTEyMzQ1Njc4OTFh"
+    },
+    "operationTime": {
+      "type": "string",
+      "description": "Operation timestamp in RFC3339 format",
+      "example": "2026-06-01T10:23:45+08:00"
+    },
+    "eventTime": {
+      "type": "string",
+      "description": "Event timestamp in RFC3339 format (alias for operationTime, preferred in CLS queries)",
+      "example": "2026-06-01T10:23:45+08:00"
+    },
+    "userSecretId": {
+      "type": "string",
+      "description": "CAM secret ID used for request (masked: first 8 chars visible, rest redacted)",
+      "example": "AKIDxxxx",
+      "sensitivity": "high"
+    },
+    "versionId": {
+      "type": "string",
+      "description": "Object version ID (present when bucket versioning is enabled)",
+      "example": "MTg0NDY3ODUwODE2NTk3ODY4MDI"
+    },
+    "targetStorageClass": {
+      "type": "string",
+      "description": "Target storage class for CopyObject or CompleteMultipartUpload with storage class change",
+      "example": "STANDARD_IA"
+    },
+    "uploadId": {
+      "type": "string",
+      "description": "Multipart upload ID",
+      "example": "NzM0MjkxMjM2XzEyMzQ1Nzg5MGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6"
+    },
+    "referer": {
+      "type": "string",
+      "description": "HTTP Referer header value",
+      "example": "https://example.com/page"
+    },
+    "userAgent": {
+      "type": "string",
+      "description": "Client User-Agent string",
+      "example": "cos-python-sdk-v5.4.0"
+    },
+    "deltaDataSize": {
+      "type": "integer",
+      "description": "Storage delta in bytes (positive=increase, negative=decrease). Available only on PutObject/DeleteObject events when bucket has versioning disabled.",
+      "example": -1073741824
+    }
+  },
+  "derived_fields": {
+    "downloadGB": {
+      "type": "number",
+      "formula": "resBytesSent / 1073741824",
+      "unit": "GB",
+      "usage": "FinOps traffic cost analysis"
+    },
+    "uploadGB": {
+      "type": "number",
+      "formula": "reqBytesSent / 1073741824",
+      "unit": "GB",
+      "usage": "FinOps traffic cost analysis"
+    },
+    "sizeMB": {
+      "type": "number",
+      "formula": "objectSize / 1048576",
+      "unit": "MB",
+      "usage": "Object size normalization"
+    },
+    "sizeGB": {
+      "type": "number",
+      "formula": "objectSize / 1073741824",
+      "unit": "GB",
+      "usage": "FinOps storage aggregation"
+    },
+    "totalGB": {
+      "type": "number",
+      "formula": "sum(objectSize) / 1073741824",
+      "unit": "GB",
+      "usage": "Storage tier distribution (requires GROUP BY)"
+    }
+  },
+  "query_examples": {
+    "storage_class_distribution": {
+      "query": "eventName:PutObject | select storageClass, count(*) as count, round(sum(objectSize)/1073741824, 2) as totalGB group by storageClass order by totalGB desc",
+      "purpose": "FinOps Phase 3a — identify storage tier mix for cost estimation"
+    },
+    "traffic_top_consumers": {
+      "query": "| select remoteIp, round(sum(resBytesSent)/1073741824, 2) as downloadGB, count(*) as accessCount group by remoteIp order by downloadGB desc limit 10",
+      "purpose": "FinOps Phase 3c — identify top bandwidth consumers for traffic cost attribution"
+    },
+    "daily_storage_delta": {
+      "query": "| select date_trunc('day', eventTime) as day, round(sum(deltaDataSize)/1073741824, 2) as deltaGB group by day order by day",
+      "purpose": "FinOps Phase 3e — detect storage spikes vs baseline"
+    },
+    "ia_access_frequency": {
+      "query": "storageClass:STANDARD_IA | select eventName, count(*) as count group by eventName order by count desc",
+      "purpose": "FinOps Phase 3d — detect unnecessary STANDARD_IA access (should be rare)"
+    },
+    "idle_large_objects": {
+      "query": "| select reqPath, round(objectSize/1073741824, 2) as sizeGB, count(*) as accessCount, storageClass, max(eventTime) as lastAccess group by reqPath, sizeGB, storageClass having sizeGB > 1 order by accessCount asc limit 20",
+      "purpose": "FinOps Phase 4c — objects >1GB with low access, candidates for tiering"
+    },
+    "empty_bucket_detection": {
+      "query": "NOT eventName:PutObject | stats count(*) as eventCount by bucketName",
+      "purpose": "FinOps Phase 4a — buckets with no writes (requires manual ListObjects to confirm empty)"
+    }
+  },
+  "known_gaps": {
+    "deltaDataSize": "Only available when bucket versioning is DISABLED. With versioning enabled, net delta must be calculated from PutObject (+objectSize) minus DeleteObject (-objectSize per non-current version) per VersionId.",
+    "versionId": "Present only for buckets with versioning enabled. Always null for unversioned buckets.",
+    "userSecretId": "Always partially masked by COS. Do not use for audit trails that require full ID traceability."
+  }
+}

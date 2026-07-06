@@ -400,6 +400,43 @@ echo "Phase 4 complete."
 # Phase 5: Generate FinOps Report
 echo "=== Phase 5: Generating FinOps Report ==="
 REPORT_FILE="/tmp/cos-finops-report-$(date +%Y%m%d).md"
+
+# Baseline comparison: query same window 30 days prior
+BASELINE_FROM=$(date -d '60 days ago' +%s)000
+BASELINE_TO=$(date -d '30 days ago' +%s)000
+BASELINE_TOTAL=$(tccli cls SearchLog \
+  --Region {{env.TENCENTCLOUD_REGION}} \
+  --TopicId "{{user.topic_id}}" \
+  --From $BASELINE_FROM --To $BASELINE_TO \
+  --QueryString '| stats count(*) as baseline_count, round(sum(objectSize)/1073741824, 2) as baseline_GB' \
+  --Limit 1 2>/dev/null | jq -r '.Response.AnalysisResults[0].baseline_GB // "0"')
+CURRENT_TOTAL=$(tccli cls SearchLog \
+  --Region {{env.TENCENTCLOUD_REGION}} \
+  --TopicId "{{user.topic_id}}" \
+  --From $(date -d '{{user.cost_time_range}}' +%s)000 \
+  --To $(date +%s)000 \
+  --QueryString '| stats count(*) as current_count, round(sum(objectSize)/1073741824, 2) as current_GB' \
+  --Limit 1 2>/dev/null | jq -r '.Response.AnalysisResults[0].current_GB // "0"')
+
+# Calculate delta percentage (avoid division by zero)
+BASELINE_FROM_HUMAN=$(date -d @${BASELINE_FROM%%000} '+%Y-%m-%d')
+BASELINE_TO_HUMAN=$(date -d @${BASELINE_TO%%000} '+%Y-%m-%d')
+
+if [ "$BASELINE_TOTAL" != "0" ] && [ "$BASELINE_TOTAL" != "null" ]; then
+  DELTA_PCT=$(echo "scale=1; (($CURRENT_TOTAL - $BASELINE_TOTAL) / $BASELINE_TOTAL) * 100" | bc)
+  BASELINE_COMPARE="Current: ${CURRENT_TOTAL}GB vs Baseline(${BASELINE_FROM_HUMAN}-${BASELINE_TO_HUMAN}): ${BASELINE_TOTAL}GB (Δ${DELTA_PCT}%)"
+else
+  DELTA_PCT="N/A"
+  BASELINE_COMPARE="Baseline data unavailable (CLS logs may not cover 60-day window)"
+fi
+
+# Flag anomaly if delta > 30%
+if [[ "$DELTA_PCT" != "N/A" ]] && [[ $(echo "$DELTA_PCT > 30" | bc) -eq 1 ]]; then
+  ANOMALY_FLAG="**[ANOMALY DETECTED]** Storage delta ${DELTA_PCT}% vs baseline (>30% threshold)"
+else
+  ANOMALY_FLAG="✅ Storage delta within normal range"
+fi
+
 cat > "$REPORT_FILE" << REPORT_EOF
 # COS FinOps Analysis Report
 **Generated**: $(date '+%Y-%m-%d %H:%M:%S')
@@ -412,6 +449,12 @@ cat > "$REPORT_FILE" << REPORT_EOF
 - **Request Cost**: Refer to finops-cost-optimization.md Section 3 for calculation
 - **Traffic Cost**: Refer to finops-cost-optimization.md Section 4 for calculation
 
+## Baseline Comparison
+$BASELINE_COMPARE
+$ANOMALY_FLAG
+
+> **Baseline Source**: Same-duration window 30 days prior to analysis period. See [references/cls-cos-log-schema.json](references/cls-cos-log-schema.json) for log field definitions.
+
 ## Key Findings
 1. **Idle Resources**: Check Phase 4 output for empty buckets and unused objects
 2. **Storage Optimization**: Check Phase 3d for IA storage access frequency
@@ -422,6 +465,7 @@ cat > "$REPORT_FILE" << REPORT_EOF
 - Run \`tccli cos PutBucketLifecycle\` to set lifecycle rules for unconfigured buckets
 - Run \`tccli cls SearchLog\` with cost analysis queries (see finops-cost-optimization.md)
 - Review idle buckets and consider deletion or data migration
+- If anomaly detected: investigate spike source via Phase 3e daily trend
 REPORT_EOF
 
 echo "✅ Report generated: $REPORT_FILE"
