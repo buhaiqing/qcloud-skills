@@ -54,6 +54,9 @@ Tencent Cloud ES provides a fully managed, elastically scalable cloud-native sea
 
 ### ES Node Specification Families
 
+> **TE-1:** Family codes (ES.S1, ES.C1, ES.M1) launch with new ES versions.
+> Query: `tccli es DescribeInstanceTypeConfig --Region ap-guangzhou | jq '.Response.TypeConfigSet[].NodeType' | sort -u`
+
 | Family | Code | Use Case | Examples |
 |--------|------|----------|----------|
 | **Standard** | ES.S1 | General-purpose search and analytics | ES.S1.MEDIUM4, ES.S1.LARGE8 |

@@ -51,6 +51,9 @@ CVM (Cloud Virtual Machine) provides scalable virtual servers on Tencent Cloud i
 
 ### Instance Type Families
 
+> **TE-1:** Family codes (S5, C5, M6, etc.) are stable but new generations launch quarterly.
+> Query for latest: `tccli cvm DescribeZoneInstanceConfigInfos --Region ap-guangzhou --Zone ap-guangzhou-3 | jq '.Response.InstanceTypeQuotaSet[].InstanceFamily' | sort -u`
+
 | Family | Code | Use Case | Examples |
 |--------|------|----------|----------|
 | **Standard S** | S5, SA2, SA3 | General-purpose web/apps | S5.SMALL1, SA2.MEDIUM4 |
@@ -104,6 +107,9 @@ tccli cvm DescribeZoneInstanceConfigInfos --Region ap-guangzhou --Zone ap-guangz
 | **Local SSD** | `LOCAL_SSD` | Ultra-fast ephemeral | Temp high-IO |
 
 ### CBS Limits
+
+> **TE-1:** Max values come from the `DescribeDiskConfigQuota` / `InquiryPriceCreateDisks` API — query per zone for confirmation:
+> `tccli cbs InquiryPriceCreateDisks --Region ap-guangzhou --Zone ap-guangzhou-3 --DiskType CLOUD_SSD --DiskCount 1 --DiskSize 100`
 
 | Limit | Value |
 |-------|-------|

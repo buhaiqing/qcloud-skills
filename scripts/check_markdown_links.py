@@ -120,7 +120,15 @@ def target_exists(root: Path, source: Path, target: str) -> bool:
 
 def check_file(root: Path, path: Path) -> list[Finding]:
     findings: list[Finding] = []
+    in_code_block = False
     for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        # Track code block boundaries to avoid flagging links inside ```python/``` blocks
+        if line.strip().startswith("```"):
+            in_code_block = not in_code_block
+            continue
+        if in_code_block:
+            continue
+
         for match in LINK_RE.finditer(line):
             target = normalize_target(match.group(1))
             if target and not target_exists(root, path, target):
