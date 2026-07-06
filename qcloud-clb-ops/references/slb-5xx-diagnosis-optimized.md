@@ -57,7 +57,6 @@ tccli monitor GetMonitorData \
 # Check all backend health
 tccli clb DescribeTargetHealth \
   --LoadBalancerId "{{user.loadbalancer_id}}" \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
@@ -67,7 +66,6 @@ tccli clb DescribeTargetHealth \
 # Verify LB is running
 tccli clb DescribeLoadBalancers \
   --LoadBalancerIds "[\"{{user.loadbalancer_id}}\"]" \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --Region "{{env.TENCENTCLOUD_REGION}}"
 ```
 
@@ -94,7 +92,6 @@ tccli clb DescribeLoadBalancers \
 tccli clb DescribeTargetHealth \
   --LoadBalancerId "{{user.loadbalancer_id}}" \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
   | jq '[.Response.Targets[] | select(.HealthStatus != "alive")]'
 ```
 
@@ -104,7 +101,6 @@ tccli clb DescribeTargetHealth \
 # Get health check params
 tccli clb DescribeListeners \
   --LoadBalancerId "{{user.loadbalancer_id}}" \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
   | jq '.Response.ListenerSet[].HealthCheck'
 ```
@@ -123,7 +119,6 @@ curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 http://<backend-ip>:<
 # Get security group IDs dynamically from LB configuration
 SG_IDS=$(tccli clb DescribeLoadBalancers \
   --LoadBalancerIds "[\"{{user.loadbalancer_id}}\"]" \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
   | jq -r '.Response.LoadBalancerSet[0].SecurityGroups[]')
 
@@ -208,7 +203,6 @@ tccli clb RegisterTargets \
 tccli clb DescribeLoadBalancers \
   --LoadBalancerIds "[\"{{user.loadbalancer_id}}\"]" \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
   | jq '.Response.LoadBalancerSet[0].VipIps[0]'
 ```
 
@@ -256,7 +250,6 @@ tccli monitor GetMonitorData \
 tccli clb DescribeTargets \
   --LoadBalancerId "{{user.loadbalancer_id}}" \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
   | jq '[.Response.Targets[] | {InstanceId, Port, Weight, HealthStatus}]'
 ```
 
@@ -277,7 +270,6 @@ tccli clb RegisterTargets \
   --LoadBalancerId "{{user.loadbalancer_id}}" \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
   --ListenerId "{{user.listener_id}}" \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --Targets "[{\"InstanceId\":\"{{user.instance_id}}\",\"Port\":{{user.target_port}},\"Weight\":10}]"
 ```
 
@@ -292,7 +284,6 @@ tccli clb RegisterTargets \
 ```bash
 tccli clb DescribeLoadBalancers \
   --LoadBalancerIds "[\"{{user.loadbalancer_id}}\"]" \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
   | jq '.Response.LoadBalancerSet[0] | {LoadBalancerId, Status, LoadBalancerType, VpcId}'
 ```

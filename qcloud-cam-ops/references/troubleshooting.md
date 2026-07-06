@@ -16,6 +16,7 @@
 | `LimitExceeded.PolicyNumberExceed` | Too many policies per user/group/role | 1. `ListAttachedUserPolicies`<br>2. Count policies Detach unused policies (max 10 per entity) |
 | `FailedOperation.PolicyHasUser` | Policy has attached users | 1. `ListAttachedPolicyUsers`<br>2. Review attachments Detach from users first, then delete |
 | `OperationDenied.AccountIsFrozen` | Account is frozen | 1. Check account status<br>2. Contact Tencent Cloud support Unfreeze account before operations |
+| `RequestLimitExceeded` | CAM API rate limit hit | 1. Capture RequestId and timestamp<br>2. Implement exponential backoff: retry at 1s → 2s → 4s → 8s → 16s<br>3. If sustained (> 10 retries), queue for async processing<br>4. Check `X-RateLimit-*` response headers if present |
 
 ## Common Diagnostic Patterns
 

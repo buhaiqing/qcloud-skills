@@ -172,16 +172,6 @@ clb_security_group:
 
 > Hourly rates vary by region. Check current pricing at `https://buy.cloud.tencent.com/price/clb`.
 
-**Monthly Cost Estimation:**
-
-| Type | Best For |
-|------|----------|
-| Shared OPEN | Small traffic, cost-sensitive |
-| Dedicated OPEN | High traffic, stable performance |
-| Internal | Internal microservices |
-
-> Current pricing available at `https://buy.cloud.tencent.com/price/clb`.
-
 ### 3.2 Idle Resource Detection
 
 | Pattern | Detection | Threshold | Recommendation |

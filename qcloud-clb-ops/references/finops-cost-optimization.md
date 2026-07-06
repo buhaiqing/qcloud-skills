@@ -34,23 +34,29 @@ Cost optimization patterns specifically for CLB (Load Balancer) resources.
 ```python
 def calculate_clb_monthly_cost(lb_type: str, bandwidth_mbps: int, hours: int = 720) -> float:
     # Calculate CLB monthly cost
+    # <!-- Use API for latest: tccli billing DescribeProductPrice --ProductType=clb --Bandwidth=<Mbps> --...] -->
     base_rates = {
-        'shared': 0.02,
-        'dedicated': 0.8,
-        'internal': 0.01,
-        'anycast': 1.2
+        # <!-- Use API: tccli billing DescribeProductPrice --ProductType=clb --InstanceType=shared -->
+        'shared': 0.02,       # $/hr — verify via DescribeProductPrice
+        # <!-- Use API: tccli billing DescribeProductPrice --ProductType=clb --InstanceType=dedicated -->
+        'dedicated': 0.8,     # $/hr — verify via DescribeProductPrice
+        # <!-- Use API: tccli billing DescribeProductPrice --ProductType=clb --InstanceType=internal -->
+        'internal': 0.01,     # $/hr — verify via DescribeProductPrice
+        # <!-- Use API: tccli billing DescribeProductPrice --ProductType=clb --InstanceType=anycast -->
+        'anycast': 1.2       # $/hr — verify via DescribeProductPrice
     }
-    
+
     hourly_cost = base_rates.get(lb_type, 0.02)
     base_cost = hourly_cost * hours
-    
+
     # Add bandwidth if public LB
     if lb_type in ['shared', 'dedicated', 'anycast']:
-        bandwidth_cost = bandwidth_mbps * 50  # ¥50/Mbps/month
+        # <!-- Use API: tccli billing DescribeBandwidthPrice --BandwidthType=PostpaidByHour --TrafficPerMegabytes=... -->
+        bandwidth_cost = bandwidth_mbps * 50  # ¥50/Mbps/month — verify via DescribeBandwidthPrice
         total_cost = base_cost + bandwidth_cost
     else:
         total_cost = base_cost
-    
+
     return total_cost
 ```
 

@@ -18,5 +18,18 @@
   {"query": "设置VPC和子网", "should_trigger": false},
   {"query": "做一次资源巡检", "should_trigger": false},
   {"query": "配置负载均衡", "should_trigger": false},
-  {"query": "刷新CDN缓存", "should_trigger": false}
+  {"query": "刷新CDN缓存", "should_trigger": false},
+  {"query": "检查哪些用户没有开启MFA", "should_trigger": true},
+  {"query": "enable MFA for all users", "should_trigger": true},
+  {"query": "谁有QcloudCamFullAccess权限", "should_trigger": true},
+  {"query": "who has admin access", "should_trigger": true},
+  {"query": "设置SAML SSO", "should_trigger": true},
+  {"query": "configure OIDC provider", "should_trigger": true},
+  {"query": "rotate all old API keys", "should_trigger": true},
+  {"query": "清理超过90天的access key", "should_trigger": true},
+  {"query": "查看trust policy是否安全", "should_trigger": true},
+  {"query": "check if Principal=* in any role", "should_trigger": true},
+  {"query": "查一下哪个用户在用CVM", "should_trigger": false},
+  {"query": "关闭一个端口", "should_trigger": false},
+  {"query": "check CLS log retention", "should_trigger": false}
 ]

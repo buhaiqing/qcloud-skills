@@ -225,14 +225,53 @@ NOT passing — the threshold here is `1.0`, not the generic `≥ 0.5`.
 
 ---
 
-## 7. Changelog
+## 7. GCL → Cloud Monitor Alerting
+
+> AIOps闭环：Safety=0 / high-severity rule violation → 告警上 Cloud Monitor。
+
+### 触发条件
+
+| 条件 | 级别 | 原因 |
+|---|---|---|
+| `decision: ABORT` (任何 rule violation) | **高** | 不可逆操作被阻止，需人工复盘 |
+| `decision: RETRY` (第 1 次迭代通过) | **中** | 潜在风险操作经人工介入后通过 |
+| `decision: PASS` (destructive op) | **低** | 破坏性操作正常完成，建议审计 |
+
+### 字段映射 → [gcl-quality-summary.schema.json](../../qcloud-monitor-ops/assets/gcl-quality-summary.schema.json)
+
+```json
+{
+  "skill_id": "qcloud-cam-ops",
+  "event_type": "gcl_abort | gcl_retry | gcl_pass",
+  "operation": "DeleteUser | DeletePolicy | ...",
+  "severity": "high | medium | low",
+  "rule_violations": [{"rule": 1, "operation": "DeleteUser", "rationale": "..."}],
+  "request_id": "<first tccli RequestId>",
+  "timestamp": "<ISO8601>"
+}
+```
+
+### 配置（依赖 `qcloud-monitor-ops`）
+
+```bash
+# 告警阈值（示例）
+# gcl_abort_count{skill="qcloud-cam-ops"} > 0 → 触发高优告警
+# gcl_retry_count{skill="qcloud-cam-ops"} > 3/hour → 触发中优告警
+```
+
+> **Owner:** `qcloud-monitor-ops`; `qcloud-cam-ops` 仅负责在 trace JSON 中填入正确字段。
+
+---
+
+## 8. Changelog
 
 | Version | Date | Change |
 |---|---|---|
 | 1.0.0 | 2026-06-04 | Phase 1 CAM rollout: rubric (5 rules: user-delete with active keys, policy-delete with attached principals, in-use API key deletion, trust policy amplification, over-permissive policy grant) |
 | 1.1.0 | 2026-06-19 | Tier A conformance: flesh out to 8 sections (Scope, Dimensions, Per-dim checklist, Output schema, Worked examples, See also). Elevated Correctness threshold to **1.0 required for ALL destructive CAM ops** (CAM has no soft-delete / recycle-bin grace period, unlike CDB or CVM). Per-dim checklist now covers `AddUser` / `Attach*` / `Detach*` / `CreateApiKey` / `RotateAccessKey` / trust-policy diffs. Three worked examples: PASS on `AddUser` (least-privilege starting point), SAFETY_FAIL on `DeleteUser` with orphaned API keys, RETRY on `RotateAccessKey` pivot around the 2-key limit |
+| 1.2.0 | 2026-07-06 | AIOps闭环: add §7 GCL→Monitor alerting (trigger conditions, field mapping to gcl-quality-summary.schema.json); add RequestLimitExceeded to troubleshooting.md; add UpdateAssumeRolePolicy+OIDC to cli-usage.md; add MFA/SSO test cases to eval_queries.json |
 
-## 8. See also
+## 9. See also
 
 - [AGENTS.md §3 Rubric](../../AGENTS.md#3-rubric-mandatory-per-skill) — generic rubric spec
 - [AGENTS.md §8 Per-Skill Defaults](../../AGENTS.md#8-per-skill-defaults-qcloud) — `qcloud-cam-ops` is `required`, `max_iter=2`

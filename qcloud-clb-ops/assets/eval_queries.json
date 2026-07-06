@@ -78,5 +78,33 @@
   {
     "query": "Configure security group rules",
     "should_trigger": false
+  },
+  {
+    "query": "CLB后端返回502怎么排查",
+    "should_trigger": true
+  },
+  {
+    "query": "load balancer 5xx errors",
+    "should_trigger": true
+  },
+  {
+    "query": "backend health check failing",
+    "should_trigger": true
+  },
+  {
+    "query": "slow response from CLB",
+    "should_trigger": true
+  },
+  {
+    "query": "TCP listener backend connection refused",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我创建一个COS bucket",
+    "should_trigger": false
+  },
+  {
+    "query": "设置VPN网关",
+    "should_trigger": false
   }
 ]

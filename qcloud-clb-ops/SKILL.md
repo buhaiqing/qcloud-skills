@@ -16,8 +16,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.2.0"
-  last_updated: "2026-07-04"
+  version: "1.2.1"
+  last_updated: "2026-07-06"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/214"
@@ -232,6 +232,7 @@ tccli clb DescribeLoadBalancers --Region {{env.TENCENTCLOUD_REGION}}
 | 1.0.0 | 2026-05-21 | Initial CLB skill with dual-path CLI/SDK support |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CLB-specific safety rules incl. listener-delete traffic cut, mass-deregister drain, Internet↔Internal flip guard), `references/prompt-templates.md` (Generator + Critic + Orchestrator, isolated-context enforcement). `max_iter=2` per AGENTS.md §8 |
 | 1.2.0 | 2026-07-04 | SLB 5xx fast diagnosis optimization: added `references/slb-5xx-diagnosis-optimized.md` (4-phase runbook, MTTR < 30 min target), updated `references/troubleshooting.md` with quick 5xx triage path, added Quick Diagnosis Scenarios table to SKILL.md |
+| 1.2.1 | 2026-07-06 | AIOps: fix duplicate --Region flags in slb-5xx-diagnosis-optimized.md (9 occurrences), hardcoded pricing TE-1 in finops-cost-optimization.md, add Backend 5xx Retry Guidance to troubleshooting.md, add Idempotency Guidance to SKILL.md, clarify DryRun scope in rubric.md, delete duplicate billing table in well-architected-assessment.md, add AIOps eval cases |
 
 ---
 
@@ -357,6 +358,14 @@ Every operation: **Pre-flight → Execute (CLI and SDK) → Validate → Recover
 #### Post-execution Validation
 
 Poll DescribeLoadBalancers until LB returns empty or 404.
+
+### Idempotency Guidance
+
+**CreateLoadBalancer:** `tccli clb CreateLoadBalancer` supports `ClientToken` (UUID). Always pass a stable UUID per logical operation. If the call times out, re-run with the same ClientToken — CLB returns the existing instance rather than creating a duplicate.
+
+**RegisterTargets:** Partial success is possible when registering multiple targets. After the call, always run `DescribeTargetHealth` and diff the result against the requested set. Flag any TargetIds not in `RUNNING` state.
+
+**DeregisterTargets:** The call is idempotent — re-deregistering an already-deregistered target returns success. No pre-check needed for retries.
 
 ---
 

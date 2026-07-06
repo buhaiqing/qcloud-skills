@@ -15,8 +15,8 @@ compatibility: >-
   Tencent Cloud CAM endpoints.
 metadata:
   author: qcloud
-  version: "1.1.0"
-  last_updated: "2026-06-04"
+  version: "1.2.0"
+  last_updated: "2026-07-06"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/598"
@@ -222,11 +222,43 @@ tccli cam CreatePolicy \
 - If `PolicyNameAlreadyExists`: Use CreatePolicyVersion instead
 - If `InvalidParameter.PolicyDocument`: Validate JSON, fix syntax
 
+### Policy Version Rotation
+
+> Triggered when: `LimitExceeded.PolicyVersionLimit` (max 5 per policy).
+> **Do NOT delete the policy to fix a version limit** — delete old versions, not the policy.
+
+**Pre-flight:**
+1. List all versions: `tccli cam GetPolicyVersionList --PolicyName {{user.policy_name}}`
+2. Identify versions with 0 attached count — prioritize oldest for deletion
+
+**Execute (rotate, oldest-first):**
+```bash
+# 1. Delete the oldest unused version
+tccli cam DeletePolicyVersion \
+  --PolicyName {{user.policy_name}} \
+  --PolicyVersionId <oldest_version_id>
+
+# 2. Create new version
+tccli cam CreatePolicyVersion \
+  --PolicyName {{user.policy_name}} \
+  --PolicyDocument '{{user.policy_document}}'
+
+# 3. Set new version as default (atomic switch)
+tccli cam SetDefaultPolicyVersion \
+  --PolicyName {{user.policy_name}} \
+  --PolicyVersionId <new_version_id>
+```
+
+**Validate:** Re-list versions (count ≤ 5, new version is default), then `GetPolicy` confirms effective policy.
+
+**Recover:** If `LimitExceeded.PolicyVersionLimit` recurs: delete 2 oldest versions manually — CAM does not auto-prune.
+
 ### Attach Policy to User
 
 **Pre-flight:**
 1. Verify user exists: `tccli cam GetUser --Name {{user.user_name}}`
 2. Verify policy exists: `tccli cam GetPolicy --PolicyName {{user.policy_name}}`
+3. **DryRun (batch):** If attaching >1 policy or >1 user, enumerate pre-flight first and confirm impact before committing
 
 **Execute (tccli):**
 ```bash
@@ -262,6 +294,42 @@ tccli cam AttachRolePolicy \
 1. Verify role created: `tccli cam GetRole --RoleName {{user.role_name}}`
 2. Verify policy attached: `tccli cam ListAttachedRolePolicies --RoleName {{user.role_name}}`
 
+### MFA Status Check
+
+> **Read-only AIOps flow** — invoked by `qcloud-proactive-inspection`.
+> Output: `{{output.mfa_status}}` — list of `{"user": <name>, "mfa_enabled": bool}`.
+> Flag any human account with `mfa_enabled: false` as **cam-sec-MFA-001** finding.
+
+### Configure SAML/OIDC SSO
+
+> **delegate-to marker:** `qcloud-cam-ops` owns SAML/OIDC provider CRUD only.
+> Deep IdP tenant config (Okta/Azure AD group-to-role mapping) → delegate to `qcloud-aiops-diagnosis`.
+
+**Pre-flight:**
+1. Verify IdP metadata XML valid and not expired
+2. Check provider name uniqueness: `tccli cam ListSAMLProviders` / `tccli cam ListOIDCProviders`
+
+**Execute (SAML):**
+```bash
+tccli cam CreateSAMLProvider \
+  --Name {{user.provider_name}} \
+  --SAMLMetadata "$(cat idp_metadata.xml)"
+```
+
+**Execute (OIDC):**
+```bash
+tccli cam CreateOIDCProvider \
+  --Name {{user.oidc_name}} \
+  --OIDCConfig "{\"IssuerUrl\":\"https://...\",\"ClientId\":\"...\"}"
+```
+
+**Validate:**
+1. `tccli cam GetSAMLProvider --Name {{user.provider_name}}`
+2. `tccli cam GetOIDCProvider --OIDCProviderId <id>`
+3. Confirm trust relationship in target role's trust policy (never `Principal=*`)
+
+**Safety gate:** Trust policy must use **specific service/account** in `Principal`; `Principal=*` ⇒ Safety = 0 ⇒ ABORT.
+
 ## Troubleshooting
 
 | Error Code | Meaning | Recovery |
@@ -276,6 +344,7 @@ tccli cam AttachRolePolicy \
 | `FailedOperation.UserAlreadyInGroup` | User already in group | Skip or use different group |
 | `AuthFailure.MFAFailure` | MFA required | User must complete MFA verification |
 | `LimitExceeded.PolicyNumberExceed` | Too many policies | Delete unused policies first |
+| `RequestLimitExceeded` | API rate limit hit | Retry with exponential backoff: 1s → 2s → 4s → 8s → 16s; if sustained, queue async |
 
 ---
 
@@ -283,5 +352,6 @@ For detailed content, see:
 - [Core Concepts](references/core-concepts.md) — CAM architecture, policy syntax
 - [API & SDK Usage](references/api-sdk-usage.md) — Operation mapping, SDK examples
 - [CLI Usage](references/cli-usage.md) — tccli cam command reference
-- [Troubleshooting](references/troubleshooting.md) — Error code diagnostics
+- [Troubleshooting](references/troubleshooting.md) — Error code diagnostics (incl. RequestLimitExceeded backoff)
 - [Well-Architected Assessment](references/well-architected-assessment.md) — Security best practices
+- [Core Concepts](references/core-concepts.md) — Trust policy validation, Principal=`*` detection script

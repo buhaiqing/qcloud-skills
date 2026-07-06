@@ -100,6 +100,15 @@ tccli clb RegisterTargets \
 - Backend OOM? → Scale instance memory
 - Upstream dependency failure? → Fix upstream; add circuit breaker
 
+### Backend 5xx Retry Guidance
+
+> When a backend returns 5xx (502/503/504) and the LB health check is passing:
+
+1. Do NOT immediately remove the backend from the LB
+2. Run `tccli clb DescribeTargetHealth --LoadBalancerId <id> --ListenerId <id>` to confirm backend is still registered and healthy
+3. Retry with backoff: 5s → 15s → 30s → 60s (4 attempts max)
+4. If backend remains unhealthy after retries, invoke Phase 2A recovery (unbind → wait → verify → re-bind)
+
 ### LB Not Running
 
 **Symptom:** `DescribeLoadBalancers` returns `Status` ≠ 2

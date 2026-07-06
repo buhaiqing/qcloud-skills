@@ -23,9 +23,14 @@
 | Delete role | `tccli cam DeleteRole --RoleName <name>` | Detach policies first |
 | List roles | `tccli cam ListRole` | All roles in account |
 | Attach role policy | `tccli cam AttachRolePolicy --RoleName <name> --PolicyName <policy>` | Links policy to role |
+| Update assume-role trust policy | `tccli cam UpdateAssumeRolePolicy --RoleName <name> --PolicyDocument '<json>'` | ⚠️ Trust widening risk; see rubric §4 rule 4 |
 | List API keys | `tccli cam ListApiKey --SecretId <sid>` | Returns all keys for SecretId |
 | Delete API key | `tccli cam DeleteApiKey --AccessKeyId <key>` | Irreversible |
 | Create SAML provider | `tccli cam CreateSAMLProvider --Name <name> --SAMLMetadata '<xml>'` | SSO setup |
+| Create OIDC provider | `tccli cam CreateOIDCProvider --Name <name> --OIDCConfig '<json>'` | OIDC SSO setup |
+| Get OIDC provider | `tccli cam GetOIDCProvider --OIDCProviderId <id>` | OIDC config check |
+| List OIDC providers | `tccli cam ListOIDCProviders` | OIDC provider audit |
+| Delete OIDC provider | `tccli cam DeleteOIDCProvider --OIDCProviderId <id>` | OIDC cleanup |
 
 ## Coverage Gap Table
 
