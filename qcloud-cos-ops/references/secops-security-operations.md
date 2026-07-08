@@ -52,10 +52,14 @@ def query_cos_audit_logs(start_time: str, end_time: str) -> list:
 
 ### Public Access Audit
 
-```bash
-tccli cos GetBucketACL --Bucket bucket-name | jq '.Response.ACL'
+```python
+# SDK-only — no `tccli cos` service. Alert if ACL == public-read / public-read-write.
+from qcloud_cos import CosConfig, CosS3Client
 
-# Alert if ACL == public-read or public-read-write
+config = CosConfig(Region=region, SecretId=secret_id, SecretKey=secret_key)
+client = CosS3Client(config)
+resp = client.get_bucket_acl(Bucket="bucket-name")
+print(resp.get("ACL"))
 ```
 
 ## 3. Bucket Policy Security
@@ -94,9 +98,16 @@ tccli cos GetBucketACL --Bucket bucket-name | jq '.Response.ACL'
 
 ### Enable Encryption
 
-```bash
-tccli cos PutBucketEncryption --Bucket bucket-name \
-  --EncryptionConfiguration '{"ServerSideEncryption":{"Algorithm":"AES256"}}'
+```python
+# SDK-only — no `tccli cos` service.
+from qcloud_cos import CosConfig, CosS3Client
+
+config = CosConfig(Region=region, SecretId=secret_id, SecretKey=secret_key)
+client = CosS3Client(config)
+client.put_bucket_encryption(
+    Bucket="bucket-name",
+    ServerSideEncryptionConfiguration={"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]}
+)
 ```
 
 ## 5. Compliance Checklist

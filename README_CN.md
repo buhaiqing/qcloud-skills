@@ -53,6 +53,12 @@ Canonical 技能清单以仓库中的 `qcloud-*` 目录和 `AGENTS.md` 为准。
 | `qcloud-ssl-ops` | SSL 证书 | 证书查询、部署、续期、删除保护与证书关联检查 |
 | `qcloud-agsx-ops` | Agent Runtime / AGSX | SDK-only 能力，Agent pool 和运行时资源运维 |
 | `qcloud-finops-ops` | FinOps | 成本分析、账单查询、异常检测、优化建议；不自动执行计费变更 |
+| `qcloud-ccn-ops` | 云联网 CCN | CCN 实例、VPC/专线/VPN 关联、路由学习/传播、带宽限制、跨地域/跨账号组网 |
+| `qcloud-cicd-ops` | CI/CD & DevOps | 流水线、代码仓库、制品仓库、自动化部署；SDK-only 能力 |
+| `qcloud-dc-ops` | 专线接入 DC | 物理专线、专用通道、专线网关、BGP 路由 |
+| `qcloud-migration-ops` | 云迁移 | 主机迁移（CVM 在线/离线）、数据库迁移（DTS）、存储迁移、迁移评估 |
+| `qcloud-service-mesh-ops` | 服务网格 TCM | Istio 服务网格、Sidecar 注入、流量治理、灰度发布、mTLS、链路追踪 |
+| `qcloud-tcop-ops` | 优化平台 TCOP | 成本优化、资源优化（规格调整/闲置）、架构审查、预留实例/ Savings Plan 覆盖率、优化报告 |
 
 ### 跨产品与元技能
 

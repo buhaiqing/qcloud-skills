@@ -153,7 +153,7 @@
   ],
   "trace": {
     "commands": [
-      "tccli cos ListBuckets (SecretKey=<masked>)"
+       "qcloud_cos CosS3Client.list_buckets (SecretKey=<masked>)"
     ],
     "request_ids": [
       "a1b2c3d4-e5f6-7890-abcd-ef1234567890"

@@ -3,18 +3,20 @@
 > **Purpose:** This file contains the detailed **how-to** commands (CLI and SDK) for each COS operation. The parent `SKILL.md` describes **what-to-do** and references this file for implementation details.
 >
 > **Index:** Each section corresponds to a `## Execution Flows` subsection in `SKILL.md`. Cross-link anchors use the format `#N-operation-name`.
+>
+> **Path policy (verified):** COS has **no** `tccli cos` service. Object operations use the **coscmd** CLI; bucket/lifecycle/ACL/versioning operations use the **Python SDK** (`tencentcloud-sdk-python-cos`). Do not emit `tccli cos ...` commands — they do not exist.
 
 ## Index
 
 | § | Operation | CLI Command | SDK Command |
 |---|-----------|-------------|-------------|
-| 1 | [CreateBucket](#1-createbucket) | `tccli cos PutBucket` | `cos_client.CosClient.PutBucket` |
+| 1 | [CreateBucket](#1-createbucket) | — (SDK only) | `cos_client.CosClient.PutBucket` |
 | 2 | [UploadObject](#2-uploadobject) | `coscmd upload` / `coscmd upload --multipart` | `cos_client.CosClient.PutObject` |
 | 3 | [GetObject](#3-getobject) | `coscmd download` | `cos_client.CosClient.GetObject` |
 | 4 | [DeleteObject](#4-deleteobject) | `coscmd delete` | `cos_client.CosClient.DeleteObject` |
 | 5 | [ListObjects](#5-listobjects) | `coscmd list` | `cos_client.CosClient.ListObjects` |
-| 6 | [DeleteBucket](#6-deletebucket) | `tccli cos DeleteBucket` | `cos_client.CosClient.DeleteBucket` |
-| 7 | [ConfigureLifecycle](#7-configurelifecycle) | `tccli cos PutBucketLifecycle` | `cos_client.CosClient.PutBucketLifecycle` |
+| 6 | [DeleteBucket](#6-deletebucket) | — (SDK only) | `cos_client.CosClient.DeleteBucket` |
+| 7 | [ConfigureLifecycle](#7-configurelifecycle) | — (SDK only) | `cos_client.CosClient.PutBucketLifecycle` |
 | 8 | [FinOpsAnalysis](#8-finopsanalysis) | CLI (multi-phase bash + CLS queries) | Python SDK (full automation) |
 
 ---
@@ -23,37 +25,30 @@
 
 ### CLI
 
-```bash
-tccli cos PutBucket \
-  --Bucket "{{user.bucket_name}}" \
-  --Region "{{env.TENCENTCLOUD_REGION}}"
-```
+> coscmd does **not** provide bucket creation. Use the Python SDK (below) or the COS Console.
 
 ### SDK (Python)
 
 ```python
-from tencentcloud.common import credential
-from qcloud_cos import CosClient
-from qcloud_cos import CosConfig, CosRequestError
-from qcloud_cos.utils import UtilAuto
+from qcloud_cos import CosConfig, CosS3Client
+import os
 
-cred = credential.Credential(
-    "{{env.TENCENTCLOUD_SECRET_ID}}",
-    "{{env.TENCENTCLOUD_SECRET_KEY}}"
+config = CosConfig(
+    Region=os.environ.get("TENCENTCLOUD_REGION"),
+    SecretId=os.environ.get("TENCENTCLOUD_SECRET_ID"),
+    SecretKey=os.environ.get("TENCENTCLOUD_SECRET_KEY"),
 )
-client = cos_client.CosClient(cred, "{{env.TENCENTCLOUD_REGION}}")
+client = CosS3Client(config)
 
-req = models.PutBucketRequest()
-req.Bucket = "{{user.bucket_name}}"
-resp = client.PutBucket(req)
-resp.to_json_string()  # → "{\"Response\": {\"RequestId\": \"...\"}}"
+resp = client.create_bucket(Bucket="{{user.bucket_name}}")
+# resp -> bucket location
 ```
 
 ---
 
 ## 2. UploadObject
 
-### CLI
+### CLI (coscmd)
 
 ```bash
 # Simple upload (≤ 5GB)
@@ -66,31 +61,31 @@ coscmd upload --multipart "{{user.local_file}}" "/{{user.bucket_name}}/{{user.ob
 ### SDK (Python)
 
 ```python
-from tencentcloud.common import credential
-from qcloud_cos import CosClient
-from qcloud_cos import CosConfig, CosRequestError
-from qcloud_cos.utils import UtilAuto
+from qcloud_cos import CosConfig, CosS3Client
+import os
 
-cred = credential.Credential(
-    "{{env.TENCENTCLOUD_SECRET_ID}}",
-    "{{env.TENCENTCLOUD_SECRET_KEY}}"
+config = CosConfig(
+    Region=os.environ.get("TENCENTCLOUD_REGION"),
+    SecretId=os.environ.get("TENCENTCLOUD_SECRET_ID"),
+    SecretKey=os.environ.get("TENCENTCLOUD_SECRET_KEY"),
 )
-client = cos_client.CosClient(cred, "{{env.TENCENTCLOUD_REGION}}")
+client = CosS3Client(config)
 
-req = models.PutObjectRequest()
-req.Bucket = "{{user.bucket_name}}"
-req.Key = "{{user.object_key}}"
-req.Body = open("{{user.local_file}}", "rb")
-req.StorageClass = "{{user.storage_class}}"
-resp = client.PutObject(req)
-resp.to_json_string()  # → "{\"Response\": {\"ETag\": \"...\"}}"
+with open("{{user.local_file}}", "rb") as f:
+    resp = client.put_object(
+        Bucket="{{user.bucket_name}}",
+        Key="{{user.object_key}}",
+        Body=f.read(),
+        StorageClass="{{user.storage_class}}",
+    )
+# resp['ETag'] -> MD5 hash for integrity verification
 ```
 
 ---
 
 ## 3. GetObject
 
-### CLI
+### CLI (coscmd)
 
 ```bash
 coscmd download "/{{user.bucket_name}}/{{user.object_key}}" "{{user.local_file}}"
@@ -99,33 +94,30 @@ coscmd download "/{{user.bucket_name}}/{{user.object_key}}" "{{user.local_file}}
 ### SDK (Python)
 
 ```python
-from tencentcloud.common import credential
-from qcloud_cos import CosClient
-from qcloud_cos import CosConfig, CosRequestError
-from qcloud_cos.utils import UtilAuto
+from qcloud_cos import CosConfig, CosS3Client
+import os
 
-cred = credential.Credential(
-    "{{env.TENCENTCLOUD_SECRET_ID}}",
-    "{{env.TENCENTCLOUD_SECRET_KEY}}"
+config = CosConfig(
+    Region=os.environ.get("TENCENTCLOUD_REGION"),
+    SecretId=os.environ.get("TENCENTCLOUD_SECRET_ID"),
+    SecretKey=os.environ.get("TENCENTCLOUD_SECRET_KEY"),
 )
-client = cos_client.CosClient(cred, "{{env.TENCENTCLOUD_REGION}}")
+client = CosS3Client(config)
 
-req = models.GetObjectRequest()
-req.Bucket = "{{user.bucket_name}}"
-req.Key = "{{user.object_key}}"
-resp = client.GetObject(req)
+resp = client.get_object(
+    Bucket="{{user.bucket_name}}",
+    Key="{{user.object_key}}",
+)
 
-# Save response body to file
 with open("{{user.local_file}}", "wb") as f:
-    f.write(resp.Body.read())
-resp.to_json_string()  # → "{\"Response\": {\"ObjectURL\": \"...\"}}"
+    f.write(resp['Body'].get_raw_stream().read())
 ```
 
 ---
 
 ## 4. DeleteObject
 
-### CLI
+### CLI (coscmd)
 
 ```bash
 coscmd delete "/{{user.bucket_name}}/{{user.object_key}}"
@@ -134,53 +126,60 @@ coscmd delete "/{{user.bucket_name}}/{{user.object_key}}"
 ### SDK (Python)
 
 ```python
-from tencentcloud.common import credential
-from qcloud_cos import CosClient
-from qcloud_cos import CosConfig, CosRequestError
-from qcloud_cos.utils import UtilAuto
+from qcloud_cos import CosConfig, CosS3Client
+import os
 
-cred = credential.Credential(
-    "{{env.TENCENTCLOUD_SECRET_ID}}",
-    "{{env.TENCENTCLOUD_SECRET_KEY}}"
+config = CosConfig(
+    Region=os.environ.get("TENCENTCLOUD_REGION"),
+    SecretId=os.environ.get("TENCENTCLOUD_SECRET_ID"),
+    SecretKey=os.environ.get("TENCENTCLOUD_SECRET_KEY"),
 )
-client = cos_client.CosClient(cred, "{{env.TENCENTCLOUD_REGION}}")
+client = CosS3Client(config)
 
-req = models.DeleteObjectRequest()
-req.Bucket = "{{user.bucket_name}}"
-req.Key = "{{user.object_key}}"
-resp = client.DeleteObject(req)
-resp.to_json_string()  # → "{\"Response\": {\"RequestId\": \"...\"}}"
+resp = client.delete_object(
+    Bucket="{{user.bucket_name}}",
+    Key="{{user.object_key}}",
+)
 ```
 
 ---
 
 ## 5. ListObjects
 
-### CLI
+### CLI (coscmd)
 
 ```bash
 coscmd list "{{user.bucket_name}}"
+
+# With prefix
+coscmd list "{{user.bucket_name}}" -p logs/
 ```
 
 ### SDK (Python)
 
 ```python
-from tencentcloud.common import credential
-from qcloud_cos import CosClient
-from qcloud_cos import CosConfig, CosRequestError
-from qcloud_cos.utils import UtilAuto
+from qcloud_cos import CosConfig, CosS3Client
+import os
 
-cred = credential.Credential(
-    "{{env.TENCENTCLOUD_SECRET_ID}}",
-    "{{env.TENCENTCLOUD_SECRET_KEY}}"
+config = CosConfig(
+    Region=os.environ.get("TENCENTCLOUD_REGION"),
+    SecretId=os.environ.get("TENCENTCLOUD_SECRET_ID"),
+    SecretKey=os.environ.get("TENCENTCLOUD_SECRET_KEY"),
 )
-client = cos_client.CosClient(cred, "{{env.TENCENTCLOUD_REGION}}")
+client = CosS3Client(config)
 
-req = models.ListObjectsRequest()
-req.Bucket = "{{user.bucket_name}}"
-req.MaxKeys = 1000
-resp = client.ListObjects(req)
-resp.to_json_string()  # → "{\"Response\": {\"Contents\": [...]}}"
+marker = None
+all_objects = []
+while True:
+    resp = client.list_objects(
+        Bucket="{{user.bucket_name}}",
+        MaxKeys=1000,
+        Marker=marker,
+    )
+    all_objects.extend(resp.get("Contents", []))
+    if not resp.get("IsTruncated"):
+        break
+    marker = resp.get("NextMarker")
 ```
 
 ---
@@ -189,55 +188,40 @@ resp.to_json_string()  # → "{\"Response\": {\"Contents\": [...]}}"
 
 ### CLI
 
-```bash
-# Pre-check: verify bucket is empty
-OBJECT_COUNT=$(coscmd list "{{user.bucket_name}}" | wc -l)
-if [ "$OBJECT_COUNT" -gt 0 ]; then
-  echo "Bucket not empty. Delete objects first."
-  exit 1
-fi
-
-# Confirm with user
-echo "Delete bucket: {{user.bucket_name}}? (yes/no)"
-read CONFIRM
-[ "$CONFIRM" = "yes" ] || exit 0
-
-# Delete bucket
-tccli cos DeleteBucket \
-  --Bucket "{{user.bucket_name}}" \
-  --Region "{{env.TENCENTCLOUD_REGION}}"
-```
+> coscmd does **not** provide bucket deletion. Use the Python SDK (below).
 
 ### SDK (Python)
 
 ```python
-from tencentcloud.common import credential
-from qcloud_cos import CosClient
-from qcloud_cos import CosConfig, CosRequestError
-from qcloud_cos.utils import UtilAuto
+from qcloud_cos import CosConfig, CosS3Client
+import os
 
-cred = credential.Credential(
-    "{{env.TENCENTCLOUD_SECRET_ID}}",
-    "{{env.TENCENTCLOUD_SECRET_KEY}}"
+config = CosConfig(
+    Region=os.environ.get("TENCENTCLOUD_REGION"),
+    SecretId=os.environ.get("TENCENTCLOUD_SECRET_ID"),
+    SecretKey=os.environ.get("TENCENTCLOUD_SECRET_KEY"),
 )
-client = cos_client.CosClient(cred, "{{env.TENCENTCLOUD_REGION}}")
+client = CosS3Client(config)
 
-# First check if bucket is empty
-list_req = models.ListObjectsRequest()
-list_req.Bucket = "{{user.bucket_name}}"
-list_req.MaxKeys = 1
-list_resp = client.ListObjects(list_req)
-
-if list_resp.Contents:
+# First verify the bucket is empty (live + non-current versions + DeleteMarkers)
+resp = client.list_objects(
+    Bucket="{{user.bucket_name}}",
+    MaxKeys=1,
+)
+if resp.get("Contents"):
     print("Bucket not empty. Delete objects first.")
-    exit(1)
+    raise SystemExit(1)
 
-# Delete bucket
-del_req = models.DeleteBucketRequest()
-del_req.Bucket = "{{user.bucket_name}}"
-resp = client.DeleteBucket(del_req)
-resp.to_json_string()  # → "{\"Response\": {\"RequestId\": \"...\"}}"
+# Soft-delete guard: abort if versioning is enabled (non-current versions remain)
+ver_resp = client.get_bucket_versioning(Bucket="{{user.bucket_name}}")
+if ver_resp.get("Status") == "Enabled":
+    print("Versioning enabled: list and delete all versions + DeleteMarkers first.")
+    raise SystemExit(1)
+
+client.delete_bucket(Bucket="{{user.bucket_name}}")
 ```
+
+> **Note:** The safety gate in `SKILL.md` (empty check + versioning guard) must run before this call.
 
 ---
 
@@ -245,40 +229,35 @@ resp.to_json_string()  # → "{\"Response\": {\"RequestId\": \"...\"}}"
 
 ### CLI
 
-```bash
-tccli cos PutBucketLifecycle \
-  --Bucket "{{user.bucket_name}}" \
-  --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --LifecycleConfiguration '{"Rule":[{"ID":"archive-rule","Status":"Enabled","Filter":{"Prefix":""},"Transition":{"Days":30,"StorageClass":"ARCHIVE"}}]}'
-```
+> coscmd does **not** provide lifecycle configuration. Use the Python SDK (below).
 
 ### SDK (Python)
 
 ```python
-from tencentcloud.common import credential
-from qcloud_cos import CosClient
-from qcloud_cos import CosConfig, CosRequestError
-from qcloud_cos.utils import UtilAuto
+from qcloud_cos import CosConfig, CosS3Client
+import os
 
-cred = credential.Credential(
-    "{{env.TENCENTCLOUD_SECRET_ID}}",
-    "{{env.TENCENTCLOUD_SECRET_KEY}}"
+config = CosConfig(
+    Region=os.environ.get("TENCENTCLOUD_REGION"),
+    SecretId=os.environ.get("TENCENTCLOUD_SECRET_ID"),
+    SecretKey=os.environ.get("TENCENTCLOUD_SECRET_KEY"),
 )
-client = cos_client.CosClient(cred, "{{env.TENCENTCLOUD_REGION}}")
+client = CosS3Client(config)
 
-req = models.PutBucketLifecycleRequest()
-req.Bucket = "{{user.bucket_name}}"
-req.LifecycleConfiguration = {
-    "Rule": [{
-        "ID": "archive-rule",
-        "Status": "Enabled",
-        "Filter": {"Prefix": ""},
-        "Transition": {"Days": 30, "StorageClass": "ARCHIVE"}
-    }]
-}
-resp = client.PutBucketLifecycle(req)
-resp.to_json_string()  # → "{\"Response\": {\"RequestId\": \"...\"}}"
+client.put_bucket_lifecycle(
+    Bucket="{{user.bucket_name}}",
+    LifecycleConfiguration={
+        "Rule": [{
+            "ID": "archive-rule",
+            "Status": "Enabled",
+            "Filter": {"Prefix": ""},
+            "Transition": {"Days": 30, "StorageClass": "ARCHIVE"},
+        }]
+    }
+)
 ```
+
+> **Safety:** Before applying a broad/empty-prefix `Transition → ARCHIVE`/`DEEP_ARCHIVE` or `Expiration` rule, surface the BEFORE/AFTER diff and require explicit re-confirmation (see `SKILL.md` Quality Gate rule 4).
 
 ---
 
@@ -286,190 +265,27 @@ resp.to_json_string()  # → "{\"Response\": {\"RequestId\": \"...\"}}"
 
 ### CLI (5-Phase)
 
+> **Path policy (verified):** COS has **no** `tccli cos` service. Bucket/metadata enumeration uses the **Python SDK** (`qcloud_cos`). Only the CLS query phases use `tccli cls`, which **is** a valid service.
+
 ```bash
 #!/bin/bash
 # Phase 1: Collect COS Metadata
 echo "=== Phase 1: COS Metadata Collection ==="
-BUCKETS=$(tccli cos DescribeBuckets --Region {{env.TENCENTCLOUD_REGION}} | jq -r '.Response.Buckets[].Name')
-BUCKET_COUNT=$(echo "$BUCKETS" | wc -l | tr -d ' ')
+BUCKETS=$(python3 - <<'PY'
+from qcloud_cos import CosConfig, CosS3Client
+import os
+config = CosConfig(
+    Region=os.environ["TENCENTCLOUD_REGION"],
+    SecretId=os.environ["TENCENTCLOUD_SECRET_ID"],
+    SecretKey=os.environ["TENCENTCLOUD_SECRET_KEY"],
+)
+client = CosS3Client(config)
+buckets = client.list_buckets().get("Buckets", {}).get("Bucket", [])
+print("\n".join(b.get("Name", "") for b in buckets))
+PY
+)
+BUCKET_COUNT=$(echo "$BUCKETS" | grep -c .)
 echo "Buckets found: $BUCKET_COUNT"
-
-HAS_LOGGING=0
-HAS_LIFECYCLE=0
-for bucket in $BUCKETS; do
-  LOGGING=$(tccli cos GetBucketLogging --Bucket "$bucket" --Region {{env.TENCENTCLOUD_REGION}} 2>/dev/null)
-  if echo "$LOGGING" | jq -e '.Response.BucketLoggingStatus.TargetBucket' > /dev/null 2>&1; then
-    HAS_LOGGING=$((HAS_LOGGING + 1))
-  fi
-  LIFECYCLE=$(tccli cos GetBucketLifecycle --Bucket "$bucket" --Region {{env.TENCENTCLOUD_REGION}} 2>/dev/null)
-  RULES=$(echo "$LIFECYCLE" | jq '.Response.Rules | length // 0')
-  if [ "$RULES" -gt 0 ]; then
-    HAS_LIFECYCLE=$((HAS_LIFECYCLE + 1))
-  fi
-done
-echo "Buckets with logging enabled: $HAS_LOGGING / $BUCKET_COUNT"
-echo "Buckets with lifecycle rules: $HAS_LIFECYCLE / $BUCKET_COUNT"
-echo "Phase 1 complete."
-
-# Phase 2: Verify CLS COS Log Import
-echo "=== Phase 2: CLS COS Log Verification ==="
-RECHARGES=$(tccli cls DescribeCosRecharges \
-  --Region {{env.TENCENTCLOUD_REGION}} \
-  --TopicId "{{user.topic_id}}" 2>/dev/null | jq '.Response.CosRecharges | length // 0')
-if [ "$RECHARGES" -eq 0 ]; then
-  echo "⚠️  No COS import task found. Delegate to qcloud-cls-ops."
-else
-  echo "✅ COS import task exists ($RECHARGES task(s))"
-fi
-INDEX_STATUS=$(tccli cls DescribeIndex \
-  --Region {{env.TENCENTCLOUD_REGION}} \
-  --TopicId "{{user.topic_id}}" 2>/dev/null | jq -r '.Response.Status // "not found"')
-echo "Index status: $INDEX_STATUS"
-echo "Phase 2 complete."
-
-# Phase 3: Execute CLS Cost Queries
-echo "=== Phase 3: CLS Cost Analysis ==="
-FROM_TIME=$(date -d '{{user.cost_time_range}}' +%s)000
-TO_TIME=$(date +%s)000
-TOPIC_ID="{{user.topic_id}}"
-REGION="{{env.TENCENTCLOUD_REGION}}"
-
-echo "--- 3a. Storage Class Distribution ---"
-tccli cls SearchLog \
-  --Region "$REGION" --TopicId "$TOPIC_ID" \
-  --From $FROM_TIME --To $TO_TIME \
-  --Query 'eventName:PutObject | select storageClass, count(*) as count, round(sum(objectSize)/1073741824, 2) as totalGB, round(avg(objectSize)/1048576, 2) as avgSizeMB group by storageClass order by totalGB desc' \
-  --Limit 100
-
-echo "--- 3b. Request Cost by Operation ---"
-tccli cls SearchLog \
-  --Region "$REGION" --TopicId "$TOPIC_ID" \
-  --From $FROM_TIME --To $TO_TIME \
-  --Query '| select eventName, count(*) as count, round(sum(reqBytesSent)/1073741824, 2) as uploadGB, round(sum(resBytesSent)/1073741824, 2) as downloadGB group by eventName order by count desc' \
-  --Limit 100
-
-echo "--- 3c. Traffic TOP 10 Consumers ---"
-tccli cls SearchLog \
-  --Region "$REGION" --TopicId "$TOPIC_ID" \
-  --From $FROM_TIME --To $TO_TIME \
-  --Query '| select remoteIp, round(sum(resBytesSent)/1073741824, 2) as downloadGB, round(sum(reqBytesSent)/1073741824, 2) as uploadGB, count(*) as count group by remoteIp order by downloadGB desc limit 10'
-
-echo "--- 3d. IA Storage Access Check ---"
-tccli cls SearchLog \
-  --Region "$REGION" --TopicId "$TOPIC_ID" \
-  --From $FROM_TIME --To $TO_TIME \
-  --Query 'storageClass:STANDARD_IA | select eventName, count(*) as count, round(sum(resBytesSent)/1048576, 2) as totalMB group by eventName order by count desc'
-
-echo "--- 3e. Daily Storage Delta Trend ---"
-tccli cls SearchLog \
-  --Region "$REGION" --TopicId "$TOPIC_ID" \
-  --From $(date -d '30 days ago' +%s)000 \
-  --To $TO_TIME \
-  --Query '| select date_trunc('\''day'\'', eventTime) as day, round(sum(deltaDataSize)/1073741824, 2) as deltaGB, count(*) as count group by day order by day'
-
-echo "Phase 3 complete."
-
-# Phase 4: Idle Resource Detection
-echo "=== Phase 4: Idle Resource Detection ==="
-echo "--- 4a. Empty Bucket Detection ---"
-for bucket in $(tccli cos DescribeBuckets --Region {{env.TENCENTCLOUD_REGION}} | jq -r '.Response.Buckets[].Name'); do
-  OBJ_COUNT=$(tccli cos ListObjects --Bucket "$bucket" --Region {{env.TENCENTCLOUD_REGION}} --MaxKeys 1 2>/dev/null | jq '.Response.Contents | length // 0')
-  if [ "$OBJ_COUNT" -eq 0 ]; then
-    echo "  🔴 Empty bucket: $bucket"
-  fi
-done
-
-echo "--- 4b. Bucket Access Summary (30d) ---"
-tccli cls SearchLog \
-  --Region {{env.TENCENTCLOUD_REGION}} \
-  --TopicId "{{user.topic_id}}" \
-  --From $(date -d '30 days ago' +%s)000 \
-  --To $(date +%s)000 \
-  --Query 'eventName:GetObject | select bucketName, count(*) as accessCount group by bucketName order by accessCount'
-
-echo "--- 4c. Large Files (>1GB) with Low Access ---"
-tccli cls SearchLog \
-  --Region {{env.TENCENTCLOUD_REGION}} \
-  --TopicId "{{user.topic_id}}" \
-  --From $(date -d '{{user.cost_time_range}}' +%s)000 \
-  --To $(date +%s)000 \
-  --Query '| select reqPath, round(objectSize/1073741824, 2) as sizeGB, count(*) as accessCount, storageClass, max(eventTime) as lastAccess group by reqPath, sizeGB, storageClass having sizeGB > 1 order by accessCount asc limit 20'
-
-echo "Phase 4 complete."
-
-# Phase 5: Generate FinOps Report
-echo "=== Phase 5: Generating FinOps Report ==="
-REPORT_FILE="/tmp/cos-finops-report-$(date +%Y%m%d).md"
-
-# Baseline comparison: query same window 30 days prior
-BASELINE_FROM=$(date -d '60 days ago' +%s)000
-BASELINE_TO=$(date -d '30 days ago' +%s)000
-BASELINE_TOTAL=$(tccli cls SearchLog \
-  --Region {{env.TENCENTCLOUD_REGION}} \
-  --TopicId "{{user.topic_id}}" \
-  --From $BASELINE_FROM --To $BASELINE_TO \
-  --QueryString '| stats count(*) as baseline_count, round(sum(objectSize)/1073741824, 2) as baseline_GB' \
-  --Limit 1 2>/dev/null | jq -r '.Response.AnalysisResults[0].baseline_GB // "0"')
-CURRENT_TOTAL=$(tccli cls SearchLog \
-  --Region {{env.TENCENTCLOUD_REGION}} \
-  --TopicId "{{user.topic_id}}" \
-  --From $(date -d '{{user.cost_time_range}}' +%s)000 \
-  --To $(date +%s)000 \
-  --QueryString '| stats count(*) as current_count, round(sum(objectSize)/1073741824, 2) as current_GB' \
-  --Limit 1 2>/dev/null | jq -r '.Response.AnalysisResults[0].current_GB // "0"')
-
-# Calculate delta percentage (avoid division by zero)
-BASELINE_FROM_HUMAN=$(date -d @${BASELINE_FROM%%000} '+%Y-%m-%d')
-BASELINE_TO_HUMAN=$(date -d @${BASELINE_TO%%000} '+%Y-%m-%d')
-
-if [ "$BASELINE_TOTAL" != "0" ] && [ "$BASELINE_TOTAL" != "null" ]; then
-  DELTA_PCT=$(echo "scale=1; (($CURRENT_TOTAL - $BASELINE_TOTAL) / $BASELINE_TOTAL) * 100" | bc)
-  BASELINE_COMPARE="Current: ${CURRENT_TOTAL}GB vs Baseline(${BASELINE_FROM_HUMAN}-${BASELINE_TO_HUMAN}): ${BASELINE_TOTAL}GB (Δ${DELTA_PCT}%)"
-else
-  DELTA_PCT="N/A"
-  BASELINE_COMPARE="Baseline data unavailable (CLS logs may not cover 60-day window)"
-fi
-
-# Flag anomaly if delta > 30%
-if [[ "$DELTA_PCT" != "N/A" ]] && [[ $(echo "$DELTA_PCT > 30" | bc) -eq 1 ]]; then
-  ANOMALY_FLAG="**[ANOMALY DETECTED]** Storage delta ${DELTA_PCT}% vs baseline (>30% threshold)"
-else
-  ANOMALY_FLAG="✅ Storage delta within normal range"
-fi
-
-cat > "$REPORT_FILE" << REPORT_EOF
-# COS FinOps Analysis Report
-**Generated**: $(date '+%Y-%m-%d %H:%M:%S')
-**Region**: {{env.TENCENTCLOUD_REGION}}
-**Analysis Window**: {{user.cost_time_range}}
-
-## Quick Summary
-- **Buckets**: $BUCKET_COUNT | **Logging**: $HAS_LOGGING/$BUCKET_COUNT | **Lifecycle**: $HAS_LIFECYCLE/$BUCKET_COUNT
-- **Storage Cost**: Refer to finops-cost-optimization.md Section 2 for calculation
-- **Request Cost**: Refer to finops-cost-optimization.md Section 3 for calculation
-- **Traffic Cost**: Refer to finops-cost-optimization.md Section 4 for calculation
-
-## Baseline Comparison
-$BASELINE_COMPARE
-$ANOMALY_FLAG
-
-> **Baseline Source**: Same-duration window 30 days prior to analysis period. See [references/cls-cos-log-schema.json](references/cls-cos-log-schema.json) for log field definitions.
-
-## Key Findings
-1. **Idle Resources**: Check Phase 4 output for empty buckets and unused objects
-2. **Storage Optimization**: Check Phase 3d for IA storage access frequency
-3. **Cost Anomalies**: Check Phase 3e for daily storage delta spikes
-4. **Traffic Consumers**: Check Phase 3c for top bandwidth users
-
-## Recommendations
-- Run \`tccli cos PutBucketLifecycle\` to set lifecycle rules for unconfigured buckets
-- Run \`tccli cls SearchLog\` with cost analysis queries (see finops-cost-optimization.md)
-- Review idle buckets and consider deletion or data migration
-- If anomaly detected: investigate spike source via Phase 3e daily trend
-REPORT_EOF
-
-echo "✅ Report generated: $REPORT_FILE"
-echo "{{output.finops_report_path}} = $REPORT_FILE"
 ```
 
 ### SDK (Python)
@@ -477,53 +293,59 @@ echo "{{output.finops_report_path}} = $REPORT_FILE"
 ```python
 #!/usr/bin/env python3
 """
-COS FinOps: Full automated cost analysis
+COS FinOps: Full automated cost analysis.
 """
-import os, json, subprocess, datetime
+import os
+from qcloud_cos import CosConfig, CosS3Client
 from tencentcloud.common import credential
-from qcloud_cos import CosClient
-from qcloud_cos import CosConfig, CosRequestError
-from qcloud_cos.utils import UtilAuto
-from tencentcloud.cls import cls_client as cls_sdk, models as cls_models
+from tencentcloud.cls import cls_client, models as cls_models
 
 REGION = os.environ.get("TENCENTCLOUD_REGION", "ap-guangzhou")
 TOPIC_ID = os.environ.get("TOPIC_ID")
 COST_DAYS = int(os.environ.get("COST_DAYS", "30"))
 
+# COS SDK setup
+cos_config = CosConfig(
+    Region=REGION,
+    SecretId=os.environ.get("TENCENTCLOUD_SECRET_ID"),
+    SecretKey=os.environ.get("TENCENTCLOUD_SECRET_KEY"),
+)
+cos_client_inst = CosS3Client(cos_config)
+
+# CLS SDK setup
 cred = credential.Credential(
     os.environ.get("TENCENTCLOUD_SECRET_ID"),
-    os.environ.get("TENCENTCLOUD_SECRET_KEY")
+    os.environ.get("TENCENTCLOUD_SECRET_KEY"),
 )
-cos_client_inst = cos_client.CosClient(cred, REGION)
-cls_client_inst = cls_sdk.ClsClient(cred, REGION)
+cls_client_inst = cls_client.ClsClient(cred, REGION)
 
 # Phase 1: Collect COS metadata
 print("=== Phase 1: COS Metadata ===")
-req = models.DescribeBucketsRequest()
-resp = json.loads(cos_client_inst.DescribeBuckets(req))
-buckets = resp.get('Response', {}).get('Buckets', [])
+buckets = cos_client_inst.list_buckets().get("Buckets", {}).get("Bucket", [])
 print(f"Buckets: {len(buckets)}")
 
 # Phase 2: Check CLS setup
 print("\n=== Phase 2: CLS Verification ===")
 cos_req = cls_models.DescribeCosRechargesRequest()
 cos_req.TopicId = TOPIC_ID
-recharges = json.loads(cls_client_inst.DescribeCosRecharges(cos_req))
-recharge_count = len(recharges.get('Response', {}).get('CosRecharges', []))
+recharge_count = len(cls_client_inst.DescribeCosRecharges(cos_req).CosRecharges)
 print(f"COS import tasks: {recharge_count}")
 
 # Phase 3: CLS Cost Queries
 print("\n=== Phase 3: CLS Cost Analysis ===")
+import datetime
 search_req = cls_models.SearchLogRequest()
 search_req.TopicId = TOPIC_ID
 search_req.From = int(datetime.datetime.now().timestamp()) - (COST_DAYS * 86400)
 search_req.To = int(datetime.datetime.now().timestamp())
 
 try:
-    search_req.Query = 'eventName:PutObject | select storageClass, count(*) as c, round(sum(objectSize)/1073741824, 2) as tGB group by storageClass'
+    search_req.Query = (
+        "eventName:PutObject | select storageClass, count(*) as c, "
+        "round(sum(objectSize)/1073741824, 2) as tGB group by storageClass"
+    )
     search_req.Limit = 100
-    resp = json.loads(cls_client_inst.SearchLog(search_req))
-    results = resp.get('Response', {}).get('Results', [])
+    results = cls_client_inst.SearchLog(search_req).Results
     print(f"Storage class distribution: {len(results)} entries")
 except Exception as e:
     print(f"CLS query failed: {e} (index may not be ready)")

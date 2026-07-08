@@ -8,8 +8,8 @@ compatibility: >-
   valid API credentials, network access to ags.tencentcloudapi.com.
 metadata:
   author: qcloud
-  version: "1.1.0"
-  last_updated: "2026-06-04"
+  version: "1.5.0"
+  last_updated: "2026-07-09"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "2025-09-20"
@@ -24,6 +24,13 @@ metadata:
     - TENCENTCLOUD_REGION
     - E2B_API_KEY
     - E2B_DOMAIN
+  related_skills:
+    - qcloud-vpc-ops          # 委托：VPC 网络配置
+    - qcloud-cam-ops          # 委托：权限策略配置
+    - qcloud-cls-ops          # 委托：日志分析查询
+    - qcloud-monitor-ops      # 委托：监控告警配置
+    - qcloud-finops-ops       # 反向：成本优化分析
+    - qcloud-tcop-ops         # 反向：资源优化与架构评估
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).
@@ -32,7 +39,7 @@ metadata:
 
 ## Overview
 
-Tencent Cloud Agent Runtime (AGSX) is a serverless sandbox service for AI Agent code execution and browser automation. AGSX provides 100ms cold start, 24-hour max lifecycle, and full e2b-protocol compatibility. Sandbox instances are created only via API/SDK/MCP (console is read-only).
+Tencent Cloud Agent Runtime (AGSX) is a serverless sandbox service for AI Agent code execution and browser automation. AGSX provides 100ms cold start, 24h max lifecycle, and full e2b-protocol compatibility. Sandbox instances are created only via API/SDK/MCP (console is read-only).
 
 This skill is an **operational runbook** for agents: explicit scope, credential rules, pre-flight checks, **SDK-first execution** (tccli does not support this product), response validation, and failure recovery. **Do not use the web console as the primary agent execution path**.
 
@@ -46,13 +53,7 @@ This skill is an **operational runbook** for agents: explicit scope, credential 
 
 ## Five Core Standards (Quality Gates)
 
-| # | Standard | How This Skill Fulfills It |
-|---|----------|---------------------------|
-| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT with precise AGSX keywords and API names; delegate TKE/CVM/billing to other skills |
-| 2 | **Structured I/O** | `{{env.*}}` for credentials (never ask user), `{{user.*}}` for resource params, `{{output.*}}` from API responses |
-| 3 | **Explicit Actionable Steps** | Every operation: Pre-flight -> Execute (SDK) -> Validate -> Recover, with numbered imperative steps |
-| 4 | **Complete Failure Strategies** | 10+ product-specific error codes; HALT vs retry per error type |
-| 5 | **Absolute Single Responsibility** | AGSX/Agent Runtime only; cross-product delegation to `qcloud-tke-ops`, `qcloud-cam-ops`, etc. |
+> See [shared-skills-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
 
 ### Well-Architected Framework Integration
 
@@ -74,9 +75,9 @@ This skill is an **operational runbook** for agents: explicit scope, credential 
 
 ### SHOULD NOT Use This Skill When
 
-- Task is purely billing / account management -> delegate to: `qcloud-billing-ops`
-- Task is CAM / permission model only -> delegate to: `qcloud-cam-ops`
-- Task is about TKE / CVM / SCF compute -> delegate to: `qcloud-tke-ops`
+- Task is purely billing / account management → delegate to: `qcloud-billing-ops`
+- Task is CAM / permission model only → delegate to: `qcloud-cam-ops`
+- Task is about TKE / CVM / SCF compute → delegate to: `qcloud-tke-ops`
 - Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 
 ### Delegation Rules
@@ -84,7 +85,7 @@ This skill is an **operational runbook** for agents: explicit scope, credential 
 - If AGSX sandbox requires VPC access, configure VPC via `qcloud-vpc-ops` before sandbox creation.
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs.
 - Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
-- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below.
 
 ## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
 
@@ -118,7 +119,7 @@ This skill is an **operational runbook** for agents: explicit scope, credential 
 
 > **`{{env.*}}` MUST NOT** be collected from the user. **`{{user.*}}`** MUST be collected interactively when missing.
 
-> **Security Warning (Credential Masking - MANDATORY):** **NEVER** log, print, or expose `TENCENTCLOUD_SECRET_KEY`, `E2B_API_KEY`, or any credential field value.
+> **Security Warning (Credential Masking — MANDATORY):** **NEVER** log, print, or expose `TENCENTCLOUD_SECRET_KEY`, `E2B_API_KEY`, or any credential field value.
 
 | Execution Path | Safe Pattern | Unsafe Pattern |
 |----------------|-------------|----------------|
@@ -137,7 +138,7 @@ This skill is an **operational runbook** for agents: explicit scope, credential 
 - **Timestamps**: ISO 8601 format when API returns strings.
 - **Idempotency**: CreateSandboxTool with duplicate ToolName returns `ResourceAlreadyExists`.
 
-### Response Field Table
+### Response Field Table (TE-4)
 
 | Operation | JSON Path | Type | Description |
 |-----------|-----------|------|-------------|
@@ -152,8 +153,8 @@ This skill is an **operational runbook** for agents: explicit scope, credential 
 
 | Operation | Initial State | Target State | Poll Interval | Max Wait |
 |-----------|---------------|--------------|---------------|----------|
-| CreateSandboxTool | -- | `AVAILABLE` | 5s | 120s |
-| StartSandboxInstance | -- | `RUNNING` | 2s | 60s |
+| CreateSandboxTool | — | `AVAILABLE` | 5s | 120s |
+| StartSandboxInstance | — | `RUNNING` | 2s | 60s |
 | StopSandboxInstance | `RUNNING` | absent | 5s | 60s |
 | DeleteSandboxTool | `AVAILABLE` | absent | 5s | 60s |
 
@@ -181,21 +182,32 @@ test -n "$TENCENTCLOUD_SECRET_KEY" && echo "SecretKey: set"
 | List sandbox tools | DescribeSandboxToolList | Low | None |
 | Create sandbox tool | CreateSandboxTool | Medium | Low |
 | Update sandbox tool | UpdateSandboxTool | Medium | Medium |
-| Delete sandbox tool | DeleteSandboxTool | Low | **High** - irreversible |
+| Delete sandbox tool | DeleteSandboxTool | Low | **High** — irreversible |
 | Start sandbox instance | StartSandboxInstance | Medium | Low |
 | List sandbox instances | DescribeSandboxInstanceList | Low | None |
-| Stop sandbox instance | StopSandboxInstance | Low | **High** - irreversible |
+| Stop sandbox instance | StopSandboxInstance | Low | **High** — irreversible |
 | Pause sandbox instance | PauseSandboxInstance | Low | None |
 | Resume sandbox instance | ResumeSandboxInstance | Low | None |
 | Create API key | CreateAPIKey | Medium | Low |
-| Delete API key | DeleteAPIKey | Low | **High** - irreversible |
+| Delete API key | DeleteAPIKey | Low | **High** — irreversible |
 | Pre-cache image | CreatePreCacheImageTask | Low | None |
+
+## Changelog
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-05-28 | Initial skill generated from qcloud-skill-generator template |
+| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions, 5 AGSX-specific safety rules incl. agent-pool cascade, active-agent deletion, force-termination no-rollback, pool config disruption, provisioning cost), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
+| 1.2.0 | 2026-07-09 | Added `related_skills` to frontmatter (VPC, CAM, CLS, Monitor, FinOps, TCOP) |
+| 1.5.0 | 2026-07-09 | TE-6: Error Code Reference table → `references/error-reference.md`; per-op Execution Flows → `references/execution-flows.md`; added JSON Path Conventions (TE-4); removed duplicate Prerequisites; moved Changelog earlier |
+
+---
 
 ## Execution Flows (Agent-Readable)
 
-Every operation: **Pre-flight -> Execute (SDK) -> Validate -> Recover**. Do not skip phases.
+Every operation: **Pre-flight → Execute (SDK) → Validate → Recover**. Do not skip phases.
 
-Since `cli_applicability: sdk-only`, only SDK paths are documented. See `references/api-sdk-usage.md` for complete code examples.
+Since `cli_applicability: sdk-only`, only SDK paths are documented. See [references/execution-flows.md](references/execution-flows.md) for complete per-operation flows.
 
 ### Operation: CreateSandboxTool
 
@@ -203,45 +215,34 @@ Since `cli_applicability: sdk-only`, only SDK paths are documented. See `referen
 
 | Check | Method | Expected | On Failure |
 |-------|--------|----------|------------|
-| Python SDK | `pip show tencentcloud-sdk-python` | Version >= 3.0.1300 | `pip install tencentcloud-sdk-python` |
+| Python SDK | `pip show tencentcloud-sdk-python` | Version ≥ 3.0.1300 | `pip install tencentcloud-sdk-python` |
 | Credentials | `test -n "$TENCENTCLOUD_SECRET_ID"` | Non-empty | HALT; user configures env |
 | Region | `TENCENTCLOUD_REGION` set or use default | `ap-guangzhou` supported | Suggest valid region |
 | Quota | Call DescribeSandboxToolList | Tool count < quota | HALT; user raises quota |
 
-#### Execution - Python SDK
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
+#### Execution — Python SDK
+
+See [execution-flows.md](references/execution-flows.md) § CreateSandboxTool.
 
 #### Post-execution Validation
 
-1. Read `{{output.resource_id}}` from `resp.ToolId`.
-2. Poll DescribeSandboxToolList until status = `AVAILABLE` (interval: 5s, max: 120s).
-3. On success, report `ToolId`, `ToolName`, `Status` to user.
-4. On terminal failure, go to Failure Recovery.
+See [execution-flows.md](references/execution-flows.md) § CreateSandboxTool.
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Backoff | Agent Action | UX Feedback |
-|---------------|-------------|---------|--------------|-------------|
-| `InvalidParameter` | 0 | -- | Fix args from API spec | `[ERROR] InvalidParameter: Check parameter values against API docs.` |
-| `ResourceAlreadyExists` | 0 | -- | Ask reuse vs new name | `[ERROR] ToolName already exists. Use different name or describe existing.` |
-| `QuotaExceeded` | 0 | -- | HALT | `[ERROR] Quota exceeded. Request increase in console.` |
-| `RequestLimitExceeded` | 3 | exponential | Back off; retry | `Rate limit. Retrying in {backoff}s...` |
+See [execution-flows.md](references/execution-flows.md) § CreateSandboxTool or [error-reference.md](references/error-reference.md).
 
 ---
 
 ### Operation: DescribeSandboxToolList
 
-#### Execution - Python SDK
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
+#### Execution — Python SDK
+
+See [execution-flows.md](references/execution-flows.md) § DescribeSandboxToolList.
 
 #### Present to User
 
-| Field | Path | Notes |
-|-------|------|-------|
-| ToolId | `$.Response.ToolSet[].ToolId` | stool-xxx format |
-| ToolName | `$.Response.ToolSet[].ToolName` | User-friendly name |
-| Status | `$.Response.ToolSet[].Status` | AVAILABLE | BUILDING | FAILED |
-| ToolType | `$.Response.ToolSet[].ToolType` | CodeSandbox | BrowserSandbox | CustomSandbox |
+See [execution-flows.md](references/execution-flows.md) § DescribeSandboxToolList.
 
 ---
 
@@ -249,25 +250,19 @@ Since `cli_applicability: sdk-only`, only SDK paths are documented. See `referen
 
 #### Pre-flight Checks
 
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| Tool exists | DescribeSandboxToolList by `{{user.tool_id}}` | Status = AVAILABLE | HALT; tool not found or not stable |
+See [execution-flows.md](references/execution-flows.md) § UpdateSandboxTool.
 
-#### Execution - Python SDK
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
+#### Execution — Python SDK
+
+See [execution-flows.md](references/execution-flows.md) § UpdateSandboxTool.
 
 #### Post-execution Validation
 
-1. Poll DescribeSandboxToolList until changes reflected (interval: 5s, max: 60s).
-2. Report updated fields to user.
+See [execution-flows.md](references/execution-flows.md) § UpdateSandboxTool.
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Agent Action |
-|---------------|-------------|--------------|
-| `ResourceNotFound` | 0 | HALT; verify ToolId |
-| `OperationConflict` | 3 (30s backoff) | Wait for tool to stabilize |
-| `RequestLimitExceeded` | 3 | Exponential backoff |
+See [execution-flows.md](references/execution-flows.md) § UpdateSandboxTool or [error-reference.md](references/error-reference.md).
 
 ---
 
@@ -275,23 +270,19 @@ Since `cli_applicability: sdk-only`, only SDK paths are documented. See `referen
 
 #### Pre-flight (Safety Gate)
 
-1. **MUST** obtain explicit confirmation: irreversible delete of `{{user.tool_id}}`.
-2. **MUST** check for active instances under this tool (call DescribeSandboxInstanceList with ToolId filter).
-3. **MUST NOT** proceed without clear user assent.
+See [execution-flows.md](references/execution-flows.md) § DeleteSandboxTool.
 
-#### Execution - Python SDK
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
+#### Execution — Python SDK
+
+See [execution-flows.md](references/execution-flows.md) § DeleteSandboxTool.
 
 #### Post-execution Validation
 
-Poll DescribeSandboxToolList until `ResourceNotFound` or absent (interval: 5s, max: 60s).
+See [execution-flows.md](references/execution-flows.md) § DeleteSandboxTool.
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Agent Action |
-|---------------|-------------|--------------|
-| `ResourceNotFound` | 0 | Already deleted |
-| `OperationConflict` | 3 (30s backoff) | Instances still running; stop first |
+See [execution-flows.md](references/execution-flows.md) § DeleteSandboxTool or [error-reference.md](references/error-reference.md).
 
 ---
 
@@ -299,42 +290,31 @@ Poll DescribeSandboxToolList until `ResourceNotFound` or absent (interval: 5s, m
 
 #### Pre-flight Checks
 
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| Tool exists | DescribeSandboxToolList | Status = AVAILABLE | HALT; create tool first |
-| API key | `test -n "$E2B_API_KEY"` | Non-empty | CreateAPIKey first |
+See [execution-flows.md](references/execution-flows.md) § StartSandboxInstance.
 
-#### Execution - Python SDK
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
+#### Execution — Python SDK
+
+See [execution-flows.md](references/execution-flows.md) § StartSandboxInstance.
 
 #### Post-execution Validation
 
-1. Poll DescribeSandboxInstanceList until Status = `RUNNING` (interval: 2s, max: 60s).
-2. Verify connectivity via e2b SDK: `Sandbox.connect(instance_id)`.
+See [execution-flows.md](references/execution-flows.md) § StartSandboxInstance.
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Agent Action |
-|---------------|-------------|--------------|
-| `ResourceNotFound` | 0 | HALT; verify ToolId |
-| `ResourceInsufficient` | 0 | HALT; quota or capacity |
-| `RequestLimitExceeded` | 3 | Exponential backoff |
+See [execution-flows.md](references/execution-flows.md) § StartSandboxInstance or [error-reference.md](references/error-reference.md).
 
 ---
 
 ### Operation: DescribeSandboxInstanceList
 
-#### Execution - Python SDK
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
+#### Execution — Python SDK
+
+See [execution-flows.md](references/execution-flows.md) § DescribeSandboxInstanceList.
 
 #### Present to User
 
-| Field | Path | Notes |
-|-------|------|-------|
-| InstanceId | `$.Response.InstanceSet[].InstanceId` | si-xxx format |
-| Status | `$.Response.InstanceSet[].Status` | RUNNING | PENDING | STOPPED |
-| CreatedAt | `$.Response.InstanceSet[].CreatedAt` | ISO 8601 |
-| ExpireAt | `$.Response.InstanceSet[].ExpireAt` | 24h max from creation |
+See [execution-flows.md](references/execution-flows.md) § DescribeSandboxInstanceList.
 
 ---
 
@@ -342,45 +322,35 @@ Poll DescribeSandboxToolList until `ResourceNotFound` or absent (interval: 5s, m
 
 #### Pre-flight (Safety Gate)
 
-1. **MUST** obtain explicit confirmation: stop `{{user.instance_id}}`.
-2. Display remaining TTL and any active connections.
-3. **MUST NOT** proceed without clear user assent.
+See [execution-flows.md](references/execution-flows.md) § StopSandboxInstance.
 
-#### Execution - Python SDK
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
+#### Execution — Python SDK
+
+See [execution-flows.md](references/execution-flows.md) § StopSandboxInstance.
 
 #### Post-execution Validation
 
-Poll DescribeSandboxInstanceList until Status = `STOPPED` or absent (interval: 5s, max: 60s).
+See [execution-flows.md](references/execution-flows.md) § StopSandboxInstance.
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Agent Action |
-|---------------|-------------|--------------|
-| `ResourceNotFound` | 0 | HALT; instance not found |
-| `OperationConflict` | 3 (30s backoff) | Instance in transition state |
+See [execution-flows.md](references/execution-flows.md) § StopSandboxInstance or [error-reference.md](references/error-reference.md).
 
 ---
 
 ### Operation: CreateAPIKey
 
-#### Execution - Python SDK
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
+#### Execution — Python SDK
 
-> **Security:** The API key value is returned ONLY on creation. Store immediately. Mask in all subsequent logs.
+See [execution-flows.md](references/execution-flows.md) § CreateAPIKey.
 
 #### Post-execution Validation
 
-1. Capture `resp.ApiKey` immediately (shown only once).
-2. Verify key appears in DescribeAPIKeyList.
-3. Test connectivity: set `E2B_API_KEY` and run e2b-code-interpreter.
+See [execution-flows.md](references/execution-flows.md) § CreateAPIKey.
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Agent Action |
-|---------------|-------------|--------------|
-| `InvalidParameter` | 0 | Fix name parameter |
-| `QuotaExceeded` | 0 | HALT; delete unused keys first |
+See [execution-flows.md](references/execution-flows.md) § CreateAPIKey or [error-reference.md](references/error-reference.md).
 
 ---
 
@@ -388,24 +358,19 @@ Poll DescribeSandboxInstanceList until Status = `STOPPED` or absent (interval: 5
 
 #### Pre-flight (Safety Gate)
 
-1. **MUST** warn: all sandbox instances using this key will lose connectivity.
-2. **MUST** obtain explicit confirmation for `{{user.key_id}}`.
-3. Suggest creating replacement key first if still in use.
+See [execution-flows.md](references/execution-flows.md) § DeleteAPIKey.
 
-#### Execution - Python SDK
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
+#### Execution — Python SDK
+
+See [execution-flows.md](references/execution-flows.md) § DeleteAPIKey.
 
 #### Post-execution Validation
 
-1. Verify key no longer appears in DescribeAPIKeyList.
-2. Note: existing connections using this key will break.
+See [execution-flows.md](references/execution-flows.md) § DeleteAPIKey.
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Agent Action |
-|---------------|-------------|--------------|
-| `ResourceNotFound` | 0 | HALT; KeyId already deleted |
-| `OperationConflict` | 3 (30s backoff) | Key in use; wait |
+See [execution-flows.md](references/execution-flows.md) § DeleteAPIKey or [error-reference.md](references/error-reference.md).
 
 ---
 
@@ -413,100 +378,41 @@ Poll DescribeSandboxInstanceList until Status = `STOPPED` or absent (interval: 5
 
 #### Pre-flight Checks
 
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| Image exists | DescribePreCacheImageTask | Valid image | HALT; verify Image name |
-| Region support | Check region | ap-guangzhou | Switch to supported region |
+See [execution-flows.md](references/execution-flows.md) § CreatePreCacheImageTask.
 
-#### Execution - Python SDK
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
+#### Execution — Python SDK
+
+See [execution-flows.md](references/execution-flows.md) § CreatePreCacheImageTask.
 
 #### Post-execution Validation
 
-1. Poll DescribePreCacheImageTask until Status = `COMPLETED`.
-2. Test StartSandboxInstance latency < 200ms.
+See [execution-flows.md](references/execution-flows.md) § CreatePreCacheImageTask.
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Agent Action |
-|---------------|-------------|--------------|
-| `InvalidParameter` | 0 | Check Image name format |
-| `UnsupportedOperation` | 0 | Switch to supported region |
+See [execution-flows.md](references/execution-flows.md) § CreatePreCacheImageTask or [error-reference.md](references/error-reference.md).
 
 ---
-
-## Prerequisites
-
-1. **Install Python SDK** (required - tccli does not support this product):
-
-   ```bash
-   pip install tencentcloud-sdk-python
-   # Or product-specific: pip install tencentcloud-sdk-python-ags
-   python3 --version  # Must be >= 3.8
-   ```
-
-2. **Install client-side SDK** (for runtime sandbox connections):
-
-   ```bash
-   pip install e2b-code-interpreter
-   ```
-
-3. **Configure Credentials** -- Environment variables (recommended for Agent execution):
-
-   ```bash
-   export TENCENTCLOUD_SECRET_ID="{{env.TENCENTCLOUD_SECRET_ID}}"
-   export TENCENTCLOUD_SECRET_KEY="{{env.TENCENTCLOUD_SECRET_KEY}}"
-   export TENCENTCLOUD_REGION="{{env.TENCENTCLOUD_REGION}}"
-   export E2B_API_KEY="{{env.E2B_API_KEY}}"
-   export E2B_DOMAIN="ap-guangzhou.tencentags.com"
-   ```
-
-4. **Verify Configuration**:
-
-   ```bash
-   python3 -c "
-   from tencentcloud.ags.v20250920 import ags_client
-   print('AGSX SDK: OK')
-   "
-   test -n "$TENCENTCLOUD_SECRET_ID" && echo "SecretId: set"
-   ```
-
-> **Security:** Never commit `.env` to version control. All credentials use `{{env.*}}` placeholders -- never real values.
 
 ## Reference Directory
 
-- [Core Concepts](references/core-concepts.md) -- AGSX domain model and sandbox types
-- [API & SDK Usage](references/api-sdk-usage.md) -- Full SDK examples for all 10 APIs
-- [Troubleshooting Guide](references/troubleshooting.md) -- Error remediation playbook
-- [Monitoring & Alerts](references/monitoring.md) -- CLS + CloudMonitor integration
-- [Integration](references/integration.md) -- e2b SDK + MCP client patterns
-- [Well-Architected Assessment](references/well-architected-assessment.md) -- 5-pillar audit checklist
-- [Example Config](assets/example-config.yaml) -- Reference configuration
-- [Eval Queries](assets/eval_queries.json) -- Test prompts for skill validation
+- [Core Concepts](references/core-concepts.md) — AGSX domain model and sandbox types
+- [API & SDK Usage](references/api-sdk-usage.md) — Full SDK examples for all 10 APIs
+- [Troubleshooting Guide](references/troubleshooting.md) — Error remediation playbook
+- [Monitoring & Alerts](references/monitoring.md) — CLS + CloudMonitor integration
+- [Integration](references/integration.md) — e2b SDK + MCP client patterns
+- [Well-Architected Assessment](references/well-architected-assessment.md) — 5-pillar audit checklist
+- [Example Config](assets/example-config.yaml) — Reference configuration
+- [Eval Queries](assets/eval_queries.json) — Test prompts for skill validation
+- [Execution Flows](references/execution-flows.md) — Detailed per-operation execution steps
+- [Error Reference](references/error-reference.md) — Full AGSX error code taxonomy
 
 ## Operational Best Practices
 
-- **Least privilege:** CAM policies scoped to `ags:*` actions only.
-- **Availability:** Use ap-guangzhou as primary; ap-shanghai as failover.
-- **Cost:** Terminate idle instances within 5min; right-size specs via monitoring.
-- **Security:** Rotate API keys quarterly; enable CLS logging on all tools.
-
----
-
-## Error Code Reference (10 Product-Specific Codes)
-
-| Code | Meaning | Retry? | Agent Action |
-|------|---------|--------|--------------|
-| `InvalidParameter` | Parameter validation failed | No | Fix parameter; retry with correct value |
-| `ResourceNotFound` | Target resource not found | No | Verify resource ID; suggest Describe |
-| `ResourceInsufficient` | Quota or capacity exhausted | No | HALT; request quota increase |
-| `InvalidSecretKey` | Credential invalid | No | HALT; fix credentials via CAM |
-| `RequestLimitExceeded` | API rate limit | Yes (3x) | Exponential backoff |
-| `InternalError` | Server-side error | Yes (3x) | Retry 2s/4s/8s; escalate with RequestId |
-| `OperationConflict` | Concurrent operation conflict | Yes (3x, 30s) | Wait; retry after stable state |
-| `UnauthorizedOperation` | CAM policy denies action | No | HALT; grant `ags:*` permission |
-| `UnsupportedOperation` | API not supported in region | No | Switch to supported region |
-| `QuotaExceeded` | Account quota reached | No | HALT; apply for quota increase |
+- **Least privilege**: CAM policies scoped to `ags:*` actions only
+- **Availability**: Use ap-guangzhou as primary; ap-shanghai as failover
+- **Cost**: Terminate idle instances within 5min; right-size specs via monitoring
+- **Security**: Rotate API keys quarterly; enable CLS logging on all tools
 
 ---
 
@@ -517,16 +423,16 @@ Every **Delete**, **Terminate**, or **irreversible** operation MUST have:
 1. **Explicit user confirmation** with resource identifier displayed
 2. **Dependency check** (active instances under tool, keys in use)
 3. **Impact display** (what resources will be affected)
-4. **Post-delete verification** (poll until 404 or deleted state)
+4. **Post-operation verification** (poll until target state reached)
 
 ---
 
 ## Quality Gate (GCL)
 
 This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
-is a **runtime** scoring layer that audits each AGSX execution against an explicit rubric,
-in addition to the build-time **Safety Gates** above and the build-time **2-round
-self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
+is a **runtime** scoring layer that audits each AGSX execution against an explicit
+rubric, in addition to the build-time **Safety Gates** above and the build-time
+**2-round self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
 
 > **SDK-only skill.** `tccli` does not ship an `ags` subcommand — all GCL traces use
 > `tencentcloud-sdk-python` execution paths. Spec Compliance dimension checks SDK-only
@@ -562,9 +468,9 @@ Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
 | # | Operation(s) | Gate (summary) |
 |---:|---|---|
-| 1 | `DeleteSandboxTool` | Tool ID + Name + active instance count (`DescribeSandboxInstanceList` filtered by `ToolId`) echo;... |
+| 1 | `DeleteSandboxTool` | Tool ID + Name + active instance count (`DescribeSandboxInstanceList` filtered by `ToolId`) echo; ... |
 | 2 | `DeleteAgent` (any active agent) / `StopSandboxInstance` | Agent / instance ID + name + status echo; surface remaining TTL (`ExpireAt`); warn that removing ... |
-| 3 | `TerminateAgentExecution` / force-stop a running execution | Execution ID + instance ID + start time echoed; warn that force termination does NOT roll back pa... |
+| 3 | `TerminateAgentExecution` / force-stop a running execution | Execution ID + instance ID + start time echoed; warn that force termination does NOT roll back partial ... |
 | 4 | `UpdateSandboxTool` (modify `DefaultTimeout`, `ToolType`, capacity, or security config) | Show current config → target config (`DefaultTimeout`, `ToolType`, `MaxConcurrency`, `VpcId`); fo... |
 | 5 | `CreateSandboxTool` / `CreateAPIKey` / `StartSandboxInstance` (provisioning new resources) | For `CreateSandboxTool`: surface the tool's `DefaultTimeout` cost implications (sandbox-hours bil... |
 
@@ -616,9 +522,3 @@ Error responses:
 }
 ```
 
-## Changelog
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2026-05-28 | Initial skill generated from qcloud-skill-generator template |
-| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 AGSX-specific safety rules incl. agent-pool cascade, active-agent deletion, force-termination no-rollback, pool config disruption, provisioning cost), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |

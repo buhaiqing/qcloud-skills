@@ -21,6 +21,7 @@ This file contains all Python SDK code examples extracted from the AGSX SKILL.md
 ## Quick Start - Your First Command
 
 ```python
+import os
 from tencentcloud.common import credential
 from tencentcloud.ags.v20250920 import ags_client, models
 
@@ -36,6 +37,7 @@ print(resp.to_json_string())
 ## CreateSandboxTool
 
 ```python
+import json
 from tencentcloud.ags.v20250920 import ags_client, models
 
 req = models.CreateSandboxToolRequest()
@@ -62,6 +64,7 @@ for tool in resp.ToolSet:
 ## UpdateSandboxTool
 
 ```python
+import json
 req = models.UpdateSandboxToolRequest()
 req.from_json_string(json.dumps({
     "ToolId": "{{user.tool_id}}",
@@ -73,6 +76,7 @@ resp = client.UpdateSandboxTool(req)
 ## DeleteSandboxTool
 
 ```python
+import json
 # Pre-check: confirm no active instances
 desc_req = models.DescribeSandboxInstanceListRequest()
 desc_req.from_json_string(json.dumps({"ToolId": "{{user.tool_id}}"}))
@@ -90,6 +94,7 @@ resp = client.DeleteSandboxTool(req)
 ## StartSandboxInstance
 
 ```python
+import json
 req = models.StartSandboxInstanceRequest()
 req.from_json_string(json.dumps({
     "ToolId": "{{user.tool_id}}",
@@ -105,6 +110,7 @@ resp = client.StartSandboxInstance(req)
 ## DescribeSandboxInstanceList
 
 ```python
+import json
 req = models.DescribeSandboxInstanceListRequest()
 req.from_json_string(json.dumps({"InstanceIds": ["{{user.instance_id}}"]}))
 resp = client.DescribeSandboxInstanceList(req)
@@ -115,6 +121,7 @@ for inst in resp.InstanceSet:
 ## StopSandboxInstance
 
 ```python
+import json
 req = models.StopSandboxInstanceRequest()
 req.from_json_string(json.dumps({"InstanceId": "{{user.instance_id}}"}))
 resp = client.StopSandboxInstance(req)
@@ -141,6 +148,7 @@ resp = client.DeleteAPIKey(req)
 ## CreatePreCacheImageTask
 
 ```python
+import json
 req = models.CreatePreCacheImageTaskRequest()
 req.from_json_string(json.dumps({
     "Image": "{{user.image_id}}",

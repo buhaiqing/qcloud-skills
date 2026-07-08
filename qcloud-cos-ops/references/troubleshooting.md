@@ -49,9 +49,14 @@ coscmd list bucket-name || echo "Credential error"
 coscmd list bucket-name -p path/file.txt
 ```
 
-**Step 2: Check ACL**
-```bash
-tccli cos GetBucketACL --Bucket bucket-name
+**Step 2: Check ACL** (SDK-only — no `tccli cos` service)
+```python
+from qcloud_cos import CosConfig, CosS3Client
+
+config = CosConfig(Region=region, SecretId=secret_id, SecretKey=secret_key)
+client = CosS3Client(config)
+resp = client.get_bucket_acl(Bucket="bucket-name")
+print(resp.get("ACL"))
 ```
 
 ### Bucket Creation Failures

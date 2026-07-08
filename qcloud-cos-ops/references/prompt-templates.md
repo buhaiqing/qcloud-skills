@@ -12,7 +12,7 @@
 | Override | Value |
 |---|---|
 | skill | `qcloud-cos-ops` |
-| CLI | `tccli cos help` |
+| CLI | `coscmd --help` (object ops); bucket/lifecycle/ACL/versioning via Python SDK `tencentcloud.cos` (no `tccli cos` service) |
 | max_iterations | 2 |
 
 

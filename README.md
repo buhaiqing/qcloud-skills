@@ -53,6 +53,12 @@ The canonical skill inventory is the set of `qcloud-*` directories in this repos
 | `qcloud-ssl-ops` | SSL certificates | Certificate query, deployment, renewal, delete protection, association checks |
 | `qcloud-agsx-ops` | Agent runtime / AGSX | SDK-only operations for agent pools and runtime resources |
 | `qcloud-finops-ops` | FinOps | Cost analysis, billing queries, anomaly detection, optimization recommendations; no automatic billing changes |
+| `qcloud-ccn-ops` | Cloud Connect Network (CCN) | CCN instances, VPC/DC/VPN attachments, route learning/propagation, bandwidth limits, cross-region/cross-account networking |
+| `qcloud-cicd-ops` | CI/CD & DevOps | Pipelines, code repositories, artifact repos, automated deployments; SDK-only operations |
+| `qcloud-dc-ops` | Direct Connect (DC) | Physical dedicated lines, direct connect tunnels, direct connect gateways, BGP routing |
+| `qcloud-migration-ops` | Cloud migration | Host migration (CVM online/offline), database migration (DTS), storage migration, migration assessment |
+| `qcloud-service-mesh-ops` | Service Mesh (TCM) | Istio-based service mesh, sidecar injection, traffic governance, canary deployments, mTLS, distributed tracing |
+| `qcloud-tcop-ops` | Optimization Platform (TCOP) | Cost optimization, resource optimization (right-sizing/idle), architecture review, savings plan/RI coverage, optimization reports |
 
 ### Cross-product and meta skills
 

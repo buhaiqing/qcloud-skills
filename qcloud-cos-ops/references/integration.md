@@ -18,12 +18,15 @@ export TENCENTCLOUD_REGION="ap-guangzhou"
 ## SDK Usage
 
 ```python
-from tencentcloud.cos import cos_client, models
+from qcloud_cos import CosConfig, CosS3Client
 
-client = cos_client.CosClient(cred, "ap-guangzhou")
-req = models.PutBucketRequest()
-req.Bucket = "my-bucket"
-resp = client.PutBucket(req)
+config = CosConfig(
+    Region="ap-guangzhou",
+    SecretId=secret_id,
+    SecretKey=secret_key,
+)
+client = CosS3Client(config)
+resp = client.create_bucket(Bucket="my-bucket")
 ```
 
 ## Cross-Skill Delegation

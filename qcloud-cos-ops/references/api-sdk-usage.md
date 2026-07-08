@@ -199,15 +199,14 @@ while True:
 ### Installation
 
 ```bash
-pip install tencentcloud-sdk-python-cos
+pip install cos-python-sdk-v5
 pip install coscmd
 ```
 
 ### Import
 
 ```python
-from tencentcloud.common import credential
-from tencentcloud.cos import cos_client, models
+from qcloud_cos import CosConfig, CosS3Client
 import os
 ```
 
@@ -215,92 +214,105 @@ import os
 
 ```python
 def create_bucket(bucket_name, region="ap-guangzhou"):
-    cred = credential.Credential(
-        os.environ.get("TENCENTCLOUD_SECRET_ID"),
-        os.environ.get("TENCENTCLOUD_SECRET_KEY")
+    config = CosConfig(
+        Region=region,
+        SecretId=os.environ.get("TENCENTCLOUD_SECRET_ID"),
+        SecretKey=os.environ.get("TENCENTCLOUD_SECRET_KEY")
     )
+    client = CosS3Client(config)
     
-    client = cos_client.CosClient(cred, region)
-    
-    req = models.PutBucketRequest()
-    req.Bucket = bucket_name
-    
-    resp = client.PutBucket(req)
-    return resp.Location
+    resp = client.create_bucket(Bucket=bucket_name)
+    return resp
 ```
 
 ### Upload Object
 
 ```python
 def upload_object(bucket_name, key, file_path, storage_class="STANDARD"):
-    client = cos_client.CosClient(cred, region)
+    config = CosConfig(
+        Region="ap-guangzhou",
+        SecretId=os.environ.get("TENCENTCLOUD_SECRET_ID"),
+        SecretKey=os.environ.get("TENCENTCLOUD_SECRET_KEY")
+    )
+    client = CosS3Client(config)
     
     with open(file_path, 'rb') as f:
         content = f.read()
     
-    req = models.PutObjectRequest()
-    req.Bucket = bucket_name
-    req.Key = key
-    req.Body = content
-    req.StorageClass = storage_class
-    
-    resp = client.PutObject(req)
-    return resp.ETag
+    resp = client.put_object(
+        Bucket=bucket_name,
+        Key=key,
+        Body=content,
+        StorageClass=storage_class
+    )
+    return resp['ETag']
 ```
 
 ### Download Object
 
 ```python
 def download_object(bucket_name, key, local_path):
-    client = cos_client.CosClient(cred, region)
+    config = CosConfig(
+        Region="ap-guangzhou",
+        SecretId=os.environ.get("TENCENTCLOUD_SECRET_ID"),
+        SecretKey=os.environ.get("TENCENTCLOUD_SECRET_KEY")
+    )
+    client = CosS3Client(config)
     
-    req = models.GetObjectRequest()
-    req.Bucket = bucket_name
-    req.Key = key
-    
-    resp = client.GetObject(req)
+    resp = client.get_object(Bucket=bucket_name, Key=key)
     
     with open(local_path, 'wb') as f:
-        f.write(resp.Body)
+        f.write(resp['Body'].get_raw_stream().read())
     
-    return resp.ETag
+    return resp['ETag']
 ```
 
 ### List Objects
 
 ```python
 def list_objects(bucket_name, prefix=""):
-    client = cos_client.CosClient(cred, region)
+    config = CosConfig(
+        Region="ap-guangzhou",
+        SecretId=os.environ.get("TENCENTCLOUD_SECRET_ID"),
+        SecretKey=os.environ.get("TENCENTCLOUD_SECRET_KEY")
+    )
+    client = CosS3Client(config)
     
-    req = models.ListObjectsRequest()
-    req.Bucket = bucket_name
-    req.Prefix = prefix
-    req.MaxKeys = 1000
+    resp = client.list_objects(
+        Bucket=bucket_name,
+        Prefix=prefix,
+        MaxKeys=1000
+    )
     
-    resp = client.ListObjects(req)
-    
-    return [(obj.Key, obj.Size, obj.StorageClass) for obj in resp.Contents]
+    contents = resp.get('Contents', [])
+    return [(obj['Key'], obj['Size'], obj['StorageClass']) for obj in contents]
 ```
 
 ### Set Lifecycle
 
 ```python
-def set_lifecycle(bucket_name):
-    req = models.PutBucketLifecycleRequest()
-    req.Bucket = bucket_name
-    req.LifecycleConfiguration = {
-        "Rule": [
-            {
-                "ID": "archive-logs",
-                "Status": "Enabled",
-                "Filter": {"Prefix": "logs/"},
-                "Transition": {"Days": 30, "StorageClass": "ARCHIVE"}
-            }
-        ]
-    }
+def set_lifecycle(bucket_name, region="ap-guangzhou"):
+    config = CosConfig(
+        Region=region,
+        SecretId=os.environ.get("TENCENTCLOUD_SECRET_ID"),
+        SecretKey=os.environ.get("TENCENTCLOUD_SECRET_KEY")
+    )
+    client = CosS3Client(config)
     
-    resp = client.PutBucketLifecycle(req)
-    return resp.RequestId
+    resp = client.put_bucket_lifecycle(
+        Bucket=bucket_name,
+        LifecycleConfiguration={
+            "Rule": [
+                {
+                    "ID": "archive-logs",
+                    "Status": "Enabled",
+                    "Filter": {"Prefix": "logs/"},
+                    "Transition": {"Days": 30, "StorageClass": "ARCHIVE"}
+                }
+            ]
+        }
+    )
+    return resp
 ```
 
 ## coscmd Tool

@@ -10,20 +10,23 @@ description: >-
   their own ops skills.
 license: MIT
 compatibility: >-
-  Official Tencent Cloud CLI (`tccli`, Python tool, pip installable) with coscmd
-  tool, Python 3.8+ runtime (for SDK fallback with tencentcloud-sdk-python-cos),
+  Official Tencent Cloud object CLI (`coscmd`, Python tool, pip installable) for
+  object operations, Python 3.8+ runtime with the COS Python SDK
+  (tencentcloud-sdk-python-cos) for bucket/lifecycle/ACL/versioning operations,
   valid API credentials, network access to Tencent Cloud COS endpoints.
 metadata:
   author: qcloud
-  version: "1.1.0"
-  last_updated: "2026-07-08"
+  version: "1.2.0"
+  last_updated: "2026-07-09"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/436"
   cli_applicability: "dual-path"
   cli_support_evidence: >-
-    tccli cos help confirms CLI support. coscmd tool provides enhanced object
-    operations including multipart upload, sync, and batch delete.
+    coscmd (the COS CLI) covers object operations (upload/download/list/delete/
+    copy, multipart, sync). Bucket/lifecycle/ACL/versioning operations use the
+    Python SDK (tencentcloud.cos). Note: there is NO `tccli cos` service — bucket
+    ops cannot be done via tccli.
   environment:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
@@ -40,7 +43,7 @@ COS (Cloud Object Storage) on Tencent Cloud provides scalable, secure, and highl
 
 ### CLI applicability
 
-- **`cli_applicability: dual-path`:** tccli for bucket operations; coscmd for object operations.
+- **`cli_applicability: dual-path`:** coscmd for object operations; Python SDK (`tencentcloud.cos`) for bucket/lifecycle/ACL/versioning operations.
 
 ## Five Core Standards
 
@@ -123,14 +126,25 @@ COS (Cloud Object Storage) on Tencent Cloud provides scalable, secure, and highl
 ## Quick Start
 
 ```bash
-# Create bucket
-tccli cos PutBucket --Bucket "my-bucket-12345" --Region "{{env.TENCENTCLOUD_REGION}}"
+# Create bucket — SDK only (no tccli cos service). See references/execution-flows.md §1
+python3 - <<'PY'
+from qcloud_cos import CosConfig, CosS3Client
+import os
+
+config = CosConfig(
+    Region=os.environ["TENCENTCLOUD_REGION"],
+    SecretId=os.environ["TENCENTCLOUD_SECRET_ID"],
+    SecretKey=os.environ["TENCENTCLOUD_SECRET_KEY"]
+)
+client = CosS3Client(config)
+client.create_bucket(Bucket="my-bucket-12345")
+PY
 
 # Upload object (coscmd recommended)
-coscmd upload local-file.txt /bucket-name/path/file.txt
+coscmd upload local-file.txt /my-bucket-12345/path/file.txt
 
 # Download object
-coscmd download /bucket-name/path/file.txt ./local-file.txt
+coscmd download /my-bucket-12345/path/file.txt ./local-file.txt
 ```
 
 ## Capabilities
@@ -152,6 +166,7 @@ coscmd download /bucket-name/path/file.txt ./local-file.txt
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial skill with bucket/object operations, lifecycle/ACL/versioning configuration, FinOpsAnalysis via CLS |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 COS-specific safety rules incl. versioning soft-delete, public ACL, broad-prefix cold transition, batch-delete DryRun), `references/prompt-templates.md` (Generator + Critic + Orchestrator, isolated-context enforcement, secret-content + public-ACL hygiene, FinOpsAnalysis read-only variant). `max_iter=2` per AGENTS.md §8 |
+| 1.2.0 | 2026-07-09 | Corrected execution path: removed all invalid `tccli cos` commands (no such tccli service). Bucket/lifecycle/ACL/versioning ops now use Python SDK (`tencentcloud.cos`); object ops use coscmd. Fixed broken SDK imports in `references/execution-flows.md` (`qcloud_cos` → `tencentcloud.cos`), added versioning empty-check guard to DeleteBucket SDK, updated `cli_support_evidence` and `compatibility`. |
 
 ## Execution Flows
 
@@ -168,7 +183,7 @@ coscmd download /bucket-name/path/file.txt ./local-file.txt
 
 #### CLI Execution
 
-**CLI** (`tccli cos PutBucket`): 见 [execution-flows.md §1](references/execution-flows.md#1-createbucket)
+**SDK** (`tencentcloud.cos` — 无 `tccli cos` 服务): 见 [execution-flows.md §1](references/execution-flows.md#1-createbucket)
 
 **SDK** (Python): 见 [execution-flows.md §1](references/execution-flows.md#1-createbucket)
 
@@ -263,13 +278,13 @@ Parse `$.Response.Location`, verify bucket exists via GetBucket.
 
 #### CLI
 
-**CLI** (`tccli cos DeleteBucket`): 见 [execution-flows.md §6](references/execution-flows.md#6-deletebucket)
+**SDK** (`tencentcloud.cos` — 无 `tccli cos` 服务): 见 [execution-flows.md §6](references/execution-flows.md#6-deletebucket)
 
 **SDK** (Python): 见 [execution-flows.md §6](references/execution-flows.md#6-deletebucket)
 
 ### Configure Lifecycle
 
-**CLI** (`tccli cos PutBucketLifecycle`): 见 [execution-flows.md §7](references/execution-flows.md#7-configurelifecycle)
+**SDK** (`tencentcloud.cos` — 无 `tccli cos` 服务): 见 [execution-flows.md §7](references/execution-flows.md#7-configurelifecycle)
 
 **SDK** (Python): 见 [execution-flows.md §7](references/execution-flows.md#7-configurelifecycle)
 
@@ -283,10 +298,10 @@ Full automated COS FinOps analysis via CLI — collects COS metadata, queries CL
 
 | Check | Method | Expected | On Failure |
 |-------|--------|----------|------------|
-| CLI install | `tccli cos help` | Exit 0 | Install: `pip install tccli` |
+| CLI install | `coscmd --help` + `python3 -c "from qcloud_cos import CosConfig, CosS3Client"` | Exit 0 | Install: `pip install coscmd cos-python-sdk-v5` |
 | Credentials | Check `TENCENTCLOUD_SECRET_ID/KEY` env | Non-empty | HALT; configure env |
 | Region | `{{env.TENCENTCLOUD_REGION}}` | Valid | Use default ap-guangzhou |
-| COS buckets | `tccli cos DescribeBuckets` | ≥ 1 bucket | HALT; no COS resources |
+| COS buckets | `python3 -c "from qcloud_cos import CosConfig, CosS3Client; client = CosS3Client(CosConfig(Region='...', SecretId='...', SecretKey='...')); print(client.list_buckets())"` (`list_buckets`) | ≥ 1 bucket | HALT; no COS resources |
 | CLS CLI | `tccli cls help SearchLog` | Exit 0 | Install: `pip install tccli` |
 | CLS topic | `tccli cls DescribeTopics --TopicId {{user.topic_id}}` | Topic exists | HALT; need CLS topic with COS logs |
 

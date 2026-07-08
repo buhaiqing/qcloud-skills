@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.3.0"
-  last_updated: "2026-06-13"
+  version: "1.4.0"
+  last_updated: "2026-07-09"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/583"
@@ -30,6 +30,17 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  related_skills:
+    - qcloud-apigw-ops        # 委托：API Gateway 触发器配置
+    - qcloud-cos-ops          # 委托：COS 触发器配置
+    - qcloud-ckafka-ops       # 委托：CKafka 触发器配置
+    - qcloud-vpc-ops          # 委托：VPC 网络配置
+    - qcloud-monitor-ops      # 委托：监控告警策略配置
+    - qcloud-cls-ops          # 委托：日志分析查询
+    - qcloud-cam-ops          # 委托：权限策略配置
+    - qcloud-finops-ops       # 反向：成本优化分析
+    - qcloud-tcop-ops         # 反向：资源优化与架构评估
+    - qcloud-aiops-diagnosis  # 反向：多指标问题诊断
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).
@@ -231,6 +242,7 @@ tccli scf ListFunctions --Region {{env.TENCENTCLOUD_REGION}} --Namespace default
 | 1.0.0 | 2026-05-28 | Initial release — function lifecycle, triggers, layers, versions, dual-path |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 SCF-specific safety rules incl. function-delete cascade, trigger disruption, namespace/layer cascade, code update env var overwrite, invocation side effects), `references/prompt-templates.md`. `max_iter=2` per AGENTS.md §8 |
 | 1.3.0 | 2026-06-13 | Rule O reverse delegation: `references/aiops-diagnosis.md`; Trigger & Scope aiops delegate for error/timeout/throttle/cold-start RCA |
+| 1.4.0 | 2026-07-09 | Added `related_skills` to frontmatter (APIGW, COS, CKafka, VPC, Monitor, CLS, CAM, FinOps, TCOP, AIOps) |
 
 ## Execution Flows (Agent-Readable)
 

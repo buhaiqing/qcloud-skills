@@ -43,6 +43,8 @@ htmlcov/
 
 # Local agent runtime cache (NOT .pixi — that one is upstream's Pixi env)
 .pi/
+.pi-subagents/
+.codegraph/
 .coverage
 .coverage.*
 .cache

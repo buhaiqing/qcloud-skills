@@ -1,72 +1,15 @@
 # COS CLI Usage
 
-## tccli vs coscmd
+> **Path policy (verified):** Tencent Cloud has **no** `tccli cos` service. COS object operations use the **coscmd** CLI; bucket/lifecycle/ACL/versioning operations use the **Python SDK** (`tencentcloud-sdk-python-cos`, module `tencentcloud.cos`). Do not emit `tccli cos ...` commands — they are not valid.
+
+## coscmd vs Python SDK
 
 | Tool | Primary Use | Installation |
 |------|-------------|--------------|
-| tccli cos | Bucket operations (Create/Delete/List) | `pip install tccli` |
-| coscmd | Object operations (Upload/Download/Sync) | `pip install coscmd` |
+| coscmd | Object operations (Upload/Download/List/Delete/Copy) | `pip install coscmd` |
+| Python SDK (`tencentcloud.cos`) | Bucket ops, lifecycle, ACL, versioning, multipart, batch delete | `pip install tencentcloud-sdk-python-cos` |
 
-**Recommendation:** Use tccli for bucket management; use coscmd for object operations.
-
-## tccli cos Commands
-
-### Create Bucket
-
-```bash
-tccli cos PutBucket \
-  --Bucket "my-bucket-12345" \
-  --Region ap-guangzhou
-```
-
-**Output:**
-```json
-{
-  "Response": {
-    "RequestId": "abc123",
-    "Location": "my-bucket-12345.cos.ap-guangzhou.myqcloud.com"
-  }
-}
-```
-
-### List Buckets
-
-```bash
-tccli cos GetService
-```
-
-### Delete Bucket
-
-```bash
-tccli cos DeleteBucket \
-  --Bucket "my-bucket-12345" \
-  --Region ap-guangzhou
-```
-
-**Safety Check:**
-```bash
-OBJECTS=$(coscmd list my-bucket-12345 | wc -l)
-if [ "$OBJECTS" -gt 0 ]; then
-  echo "Bucket not empty - cannot delete"
-  exit 1
-fi
-```
-
-### Set Bucket ACL
-
-```bash
-tccli cos PutBucketACL \
-  --Bucket "my-bucket-12345" \
-  --ACL "public-read"
-```
-
-### Set Lifecycle
-
-```bash
-tccli cos PutBucketLifecycle \
-  --Bucket "my-bucket-12345" \
-  --LifecycleConfiguration '{"Rule":[{"ID":"archive-rule","Status":"Enabled","Filter":{"Prefix":""},"Transition":{"Days":30,"StorageClass":"ARCHIVE"}}]}'
-```
+**Recommendation:** Use coscmd for interactive object operations; use the Python SDK for bucket management, lifecycle, ACL, and any automated/programmatic flow.
 
 ## coscmd Commands
 
@@ -120,32 +63,31 @@ coscmd delete -r /my-bucket-12345/remote-dir/
 
 ## CLI Coverage vs SDK
 
-| Operation | tccli | coscmd | SDK Required |
-|-----------|-------|--------|--------------|
-| CreateBucket | ✓ | ✓ | No |
-| DeleteBucket | ✓ | ✓ | No |
-| ListBuckets | ✓ | ✓ | No |
-| UploadObject | — | ✓ | No |
-| DownloadObject | — | ✓ | No |
-| ListObjects | ✓ | ✓ | No |
-| DeleteObject | — | ✓ | No |
-| BatchDelete | — | — | Yes |
-| MultipartUpload | — | ✓ | No |
-| SetLifecycle | ✓ | — | No |
-| SetBucketPolicy | ✓ | — | No |
-| SetBucketACL | ✓ | — | No |
-| SetObjectACL | ✓ | ✓ | No |
+| Operation | coscmd | Python SDK (`tencentcloud.cos`) |
+|-----------|--------|----------------------------------|
+| CreateBucket | — | ✓ |
+| DeleteBucket | — | ✓ |
+| ListBuckets | — | ✓ |
+| UploadObject | ✓ | ✓ |
+| DownloadObject | ✓ | ✓ |
+| ListObjects | ✓ | ✓ |
+| DeleteObject | ✓ | ✓ |
+| BatchDelete | — | ✓ |
+| MultipartUpload | ✓ | ✓ |
+| SetLifecycle | — | ✓ |
+| SetBucketPolicy | — | ✓ |
+| SetBucketACL | — | ✓ |
+| SetObjectACL | ✓ | ✓ |
 
-**Note:** Batch delete requires SDK or multiple coscmd calls.
+**Note:** Bucket-level operations (create/delete/list buckets, lifecycle, ACL, policy, versioning) are **SDK-only**; coscmd covers object-level operations only. Batch delete requires the Python SDK.
 
 ## jq Parsing Patterns
 
 ```bash
-VPC_ID=$(tccli cos PutBucket ... | jq -r '.Response.Location')
-
-ETAG=$(coscmd upload ... 2>&1 | grep "ETag" | cut -d'"' -f2)
-
+# coscmd does not emit JSON; parse its text output for object counts
 OBJECT_COUNT=$(coscmd list bucket | wc -l)
+
+# ETag is returned by the Python SDK response (resp.ETag), not coscmd stdout
 ```
 
 ## Pagination

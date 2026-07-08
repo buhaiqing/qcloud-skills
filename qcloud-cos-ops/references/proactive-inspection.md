@@ -7,7 +7,7 @@
 
 | Resource | Primary API |
 |----------|-------------|
-| Inventory | `tccli cos ListBuckets` (paginate `--Limit 100`) |
+| Inventory | Python SDK `qcloud_cos.CosS3Client.list_buckets` / `list_objects` (paginate `Marker`/`MaxKeys`) — no `tccli cos` service |
 
 SDK fallback: see product `references/api-sdk-usage.md` or `references/cli-usage.md`.
 

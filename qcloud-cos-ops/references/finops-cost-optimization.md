@@ -1,23 +1,46 @@
 # COS FinOps Cost Optimization Module
 
-> 基于 `tccli` CLI 的 COS 成本自动化分析流程。通过 COS API + CLS 日志分析，全自动完成成本采集、分析、优化建议和报告生成。
+> 通过 COS API + CLS 日志分析，全自动完成成本采集、分析、优化建议和报告生成。
+>
+> **执行路径说明（已校验）：** Tencent Cloud **没有 `tccli cos` 服务**。所有桶级元数据（桶清单、日志/生命周期/标签配置、对象计数）均通过 Python SDK（`qcloud_cos`，即 cos-python-sdk-v5）获取；仅对象级操作使用 `coscmd`；CLS 日志分析使用 `tccli cls`（该服务真实存在）。下文所有 `tccli cos` 调用已替换为对应的 SDK 写法。
 
 ## 数据流
 
 ```
-tccli cos DescribeBuckets          → 桶列表 + 存储量
-tccli cos GetBucketLogging         → 日志配置状态
-tccli cos GetBucketLifecycle       → 生命周期规则
-tccli cos GetBucketTagging         → 标签信息
+Python SDK DescribeBuckets         → 桶列表 + 存储量
+Python SDK GetBucketLogging        → 日志配置状态
+Python SDK GetBucketLifecycle      → 生命周期规则
+Python SDK GetBucketTagging        → 标签信息
 tccli cls SearchLog                → 存储分布、请求量、流量、访问频率
-                                      │
-                                      ├── storageClass 分布
-                                      ├── eventName 请求量
-                                      ├── remoteIp 流量 TOP
-                                      ├── deltaDataSize 增量趋势
-                                      └── reqPath 访问频率
-                                      │
-                                      └── 输出: 完整 FinOps 分析报告
+                                       │
+                                       ├── storageClass 分布
+                                       ├── eventName 请求量
+                                       ├── remoteIp 流量 TOP
+                                       ├── deltaDataSize 增量趋势
+                                       └── reqPath 访问频率
+                                       │
+                                       └── 输出: 完整 FinOps 分析报告
+```
+
+### 桶清单枚举（替换 `tccli cos DescribeBuckets`）
+
+所有示例中的 `for bucket in $(tccli cos DescribeBuckets ... | jq -r '.Response.Buckets[].Name')` 统一替换为下面的 SDK 枚举：
+
+```bash
+# 列出所有桶名（SDK via coscmd 不支持，必须用 qcloud_cos）
+python3 - <<'PY'
+from qcloud_cos import CosConfig, CosS3Client
+import os
+config = CosConfig(
+    Region=os.environ["TENCENTCLOUD_REGION"],
+    SecretId=os.environ["TENCENTCLOUD_SECRET_ID"],
+    SecretKey=os.environ["TENCENTCLOUD_SECRET_KEY"],
+)
+client = CosS3Client(config)
+resp = client.list_buckets()
+for b in resp.get("Buckets", {}).get("Bucket", []):
+    print(b.get("Name"))
+PY
 ```
 
 ---
@@ -32,9 +55,20 @@ tccli cls SearchLog                → 存储分布、请求量、流量、访�
 ### 1.1 获取所有存储桶清单
 
 ```bash
-# 列出所有存储桶
-tccli cos DescribeBuckets \
-  --Region "{{env.TENCENTCLOUD_REGION}}" | jq '.Response.Buckets[] | {Name, Location, CreationDate}'
+# 列出所有存储桶（SDK-only — 无 tccli cos 服务）
+python3 - <<'PY'
+from qcloud_cos import CosConfig, CosS3Client
+import os
+config = CosConfig(
+    Region=os.environ["TENCENTCLOUD_REGION"],
+    SecretId=os.environ["TENCENTCLOUD_SECRET_ID"],
+    SecretKey=os.environ["TENCENTCLOUD_SECRET_KEY"],
+)
+client = CosS3Client(config)
+resp = client.list_buckets()
+for b in resp.get("Buckets", {}).get("Bucket", []):
+    print({"Name": b.get("Name"), "Location": b.get("Location"), "CreationDate": b.get("CreationDate")})
+PY
 ```
 
 **输出示例：**
@@ -49,53 +83,60 @@ tccli cos DescribeBuckets \
 ### 1.2 遍历桶获取成本相关配置
 
 ```bash
-# 遍历所有桶，采集日志、生命周期、标签信息
-for bucket in $(tccli cos DescribeBuckets \
-  --Region "{{env.TENCENTCLOUD_REGION}}" | \
-  jq -r '.Response.Buckets[].Name'); do
-
-  echo "=== Bucket: $bucket ==="
-
-  # 日志配置
-  echo "--- Logging ---"
-  tccli cos GetBucketLogging \
-    --Bucket "$bucket" \
-    --Region "{{env.TENCENTCLOUD_REGION}}" | jq '.Response.BucketLoggingStatus'
-
-  # 生命周期规则
-  echo "--- Lifecycle ---"
-  tccli cos GetBucketLifecycle \
-    --Bucket "$bucket" \
-    --Region "{{env.TENCENTCLOUD_REGION}}" 2>/dev/null \
-    | jq '.Response.Rules' || echo "  No lifecycle rules"
-
-  # 标签
-  echo "--- Tags ---"
-  tccli cos GetBucketTagging \
-    --Bucket "$bucket" \
-    --Region "{{env.TENCENTCLOUD_REGION}}" 2>/dev/null \
-    | jq '.Response.TagSet' || echo "  No tags"
-
-  echo ""
-done
+# 遍历所有桶，采集日志、生命周期、标签信息（SDK-only）
+python3 - <<'PY'
+from qcloud_cos import CosConfig, CosS3Client
+import os
+config = CosConfig(
+    Region=os.environ["TENCENTCLOUD_REGION"],
+    SecretId=os.environ["TENCENTCLOUD_SECRET_ID"],
+    SecretKey=os.environ["TENCENTCLOUD_SECRET_KEY"],
+)
+client = CosS3Client(config)
+buckets = client.list_buckets().get("Buckets", {}).get("Bucket", [])
+for b in buckets:
+    bucket = b.get("Name")
+    print(f"=== Bucket: {bucket} ===")
+    try:
+        resp = client.get_bucket_logging(Bucket=bucket)
+        print("--- Logging ---", resp.get("LoggingEnabled", "Disabled"))
+    except Exception as e:
+        print("--- Logging ---", e)
+    try:
+        resp = client.get_bucket_lifecycle(Bucket=bucket)
+        rules = resp.get("Rules", [])
+        print("--- Lifecycle ---", rules if rules else "No lifecycle rules")
+    except Exception:
+        print("--- Lifecycle --- No lifecycle rules")
+    try:
+        resp = client.get_bucket_tagging(Bucket=bucket)
+        print("--- Tags ---", resp.get("TagSet", []))
+    except Exception:
+        print("--- Tags --- No tags")
+PY
 ```
 
 ### 1.3 获取桶中对象概览
 
 ```bash
-# 获取对象数量和大致分布
-for bucket in $(tccli cos DescribeBuckets \
-  --Region "{{env.TENCENTCLOUD_REGION}}" | \
-  jq -r '.Response.Buckets[].Name'); do
-
-  echo "=== $bucket ==="
-
-  tccli cos GetBucket \
-    --Bucket "$bucket" \
-    --Region "{{env.TENCENTCLOUD_REGION}}" \
-    --MaxKeys 1000 | jq '.Response | {ObjectCount: (.Contents | length) // 0, MaxKeys, IsTruncated}'
-
-done
+# 获取对象数量和大致分布（SDK-only）
+python3 - <<'PY'
+from qcloud_cos import CosConfig, CosS3Client
+import os
+config = CosConfig(
+    Region=os.environ["TENCENTCLOUD_REGION"],
+    SecretId=os.environ["TENCENTCLOUD_SECRET_ID"],
+    SecretKey=os.environ["TENCENTCLOUD_SECRET_KEY"],
+)
+client = CosS3Client(config)
+buckets = client.list_buckets().get("Buckets", {}).get("Bucket", [])
+for b in buckets:
+    bucket = b.get("Name")
+    resp = client.list_objects(Bucket=bucket, MaxKeys=1000)
+    contents = resp.get("Response", {}).get("Contents", []) or []
+    print(bucket, {"ObjectCount": len(contents),
+                   "IsTruncated": resp.get("Response", {}).get("IsTruncated")})
+PY
 ```
 
 ### 1.4 数据整理脚本
@@ -608,20 +649,24 @@ fi
 ### 6.1 空桶检测
 
 ```bash
-# 遍历所有桶，找出空桶
-for bucket in $(tccli cos DescribeBuckets \
-  --Region "{{env.TENCENTCLOUD_REGION}}" | \
-  jq -r '.Response.Buckets[].Name'); do
-
-  OBJECT_COUNT=$(tccli cos GetBucket \
-    --Bucket "$bucket" \
-    --Region "{{env.TENCENTCLOUD_REGION}}" \
-    --MaxKeys 1 | jq -r '.Response.Contents | length // 0')
-
-  if [ "$OBJECT_COUNT" -eq 0 ]; then
-    echo "⚠️  空桶: $bucket — 可安全删除"
-  fi
-done
+# 遍历所有桶，找出空桶（SDK-only）
+python3 - <<'PY'
+from qcloud_cos import CosConfig, CosS3Client
+import os
+config = CosConfig(
+    Region=os.environ["TENCENTCLOUD_REGION"],
+    SecretId=os.environ["TENCENTCLOUD_SECRET_ID"],
+    SecretKey=os.environ["TENCENTCLOUD_SECRET_KEY"],
+)
+client = CosS3Client(config)
+buckets = client.list_buckets().get("Buckets", {}).get("Bucket", [])
+for b in buckets:
+    bucket = b.get("Name")
+    resp = client.list_objects(Bucket=bucket, MaxKeys=1)
+    contents = resp.get("Contents", []) or []
+    if len(contents) == 0:
+        print(f"⚠️  空桶: {bucket} — 可安全删除（删除前仍需确认）")
+PY
 ```
 
 ### 6.2 30 天无访问桶检测
@@ -1130,8 +1175,20 @@ echo "CLS Topic: $TOPIC_ID"
 
 # === Phase 1: 采集元数据 ===
 echo "📦 Phase 1: 采集 COS 元数据..."
-BUCKET_LIST=$(tccli cos DescribeBuckets --Region "$REGION")
-BUCKET_COUNT=$(echo "$BUCKET_LIST" | jq '.Response.Buckets | length')
+BUCKET_LIST=$(python3 - <<'PY'
+from qcloud_cos import CosConfig, CosS3Client
+import os, json
+config = CosConfig(
+    Region=os.environ["TENCENTCLOUD_REGION"],
+    SecretId=os.environ["TENCENTCLOUD_SECRET_ID"],
+    SecretKey=os.environ["TENCENTCLOUD_SECRET_KEY"],
+)
+client = CosS3Client(config)
+resp = client.list_buckets()
+print(json.dumps(resp))
+PY
+)
+BUCKET_COUNT=$(echo "$BUCKET_LIST" | jq '.Buckets.Bucket | length')
 echo "  发现 $BUCKET_COUNT 个存储桶"
 
 # === Phase 2: 检查 CLS 连接 ===
