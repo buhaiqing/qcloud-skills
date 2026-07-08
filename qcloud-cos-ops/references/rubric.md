@@ -24,7 +24,7 @@
 | Every COS mutation operation invoked by this skill: `PutBucket`, `DeleteBucket`, `PutObject`, `DeleteObject` (single & batch), `PutBucketACL`, `PutBucketPolicy`, `PutBucketLifecycle`, `PutBucketVersioning`, `PutBucketReplication`, `PutBucketCORS`, `MultiUpload` (init / part / complete), `RestoreObject` (un-archive) | Pure read operations (`GetBucket` / `ListObjects`, `HeadObject`, `GetObject`, `GetBucketACL`, `GetBucketLifecycle`) — scored at the Orchestrator's discretion; recommend max_iter=1, no hard abort |
 | `coscmd` batch operations (`coscmd delete -r`, `coscmd delete -f prefix/`, `coscmd sync`) | CDN operations → `qcloud-cdn-ops` |
 | `FinOpsAnalysis` (read-only but multi-phase) | CLS log analytics — out of scope; delegate to `qcloud-cls-ops` per the skill's "Delegation Rules" |
-| Operations routed to Python SDK (`tencentcloud.cos`) when `coscmd` does not cover them (bucket/lifecycle/ACL/versioning) | |
+| Operations routed to Python SDK (`qcloud_cos`) when `coscmd` does not cover them (bucket/lifecycle/ACL/versioning) | |
 
 ---
 

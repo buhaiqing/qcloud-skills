@@ -1,13 +1,13 @@
 # COS CLI Usage
 
-> **Path policy (verified):** Tencent Cloud has **no** `tccli cos` service. COS object operations use the **coscmd** CLI; bucket/lifecycle/ACL/versioning operations use the **Python SDK** (`tencentcloud-sdk-python-cos`, module `tencentcloud.cos`). Do not emit `tccli cos ...` commands — they are not valid.
+> **Path policy (verified):** Tencent Cloud has **no** `tccli cos` service. COS object operations use the **coscmd** CLI; bucket/lifecycle/ACL/versioning operations use the **Python SDK** (`cos-python-sdk-v5`, module `qcloud_cos`). Do not emit `tccli cos ...` commands — they are not valid.
 
 ## coscmd vs Python SDK
 
 | Tool | Primary Use | Installation |
 |------|-------------|--------------|
 | coscmd | Object operations (Upload/Download/List/Delete/Copy) | `pip install coscmd` |
-| Python SDK (`tencentcloud.cos`) | Bucket ops, lifecycle, ACL, versioning, multipart, batch delete | `pip install tencentcloud-sdk-python-cos` |
+| Python SDK (`qcloud_cos`) | Bucket ops, lifecycle, ACL, versioning, multipart, batch delete | `pip install cos-python-sdk-v5` |
 
 **Recommendation:** Use coscmd for interactive object operations; use the Python SDK for bucket management, lifecycle, ACL, and any automated/programmatic flow.
 
@@ -63,7 +63,7 @@ coscmd delete -r /my-bucket-12345/remote-dir/
 
 ## CLI Coverage vs SDK
 
-| Operation | coscmd | Python SDK (`tencentcloud.cos`) |
+| Operation | coscmd | Python SDK (`qcloud_cos`) |
 |-----------|--------|----------------------------------|
 | CreateBucket | — | ✓ |
 | DeleteBucket | — | ✓ |

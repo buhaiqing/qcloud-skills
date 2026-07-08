@@ -22,11 +22,11 @@ metadata:
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/436"
   cli_applicability: "dual-path"
-  cli_support_evidence: >-
-    coscmd (the COS CLI) covers object operations (upload/download/list/delete/
-    copy, multipart, sync). Bucket/lifecycle/ACL/versioning operations use the
-    Python SDK (tencentcloud.cos). Note: there is NO `tccli cos` service — bucket
-    ops cannot be done via tccli.
+    cli_support_evidence: >-
+      coscmd (the COS CLI) covers object operations (upload/download/list/delete/
+      copy, multipart, sync). Bucket/lifecycle/ACL/versioning operations use the
+      Python SDK (qcloud_cos). Note: there is NO `tccli cos` service — bucket
+      ops cannot be done via tccli.
   environment:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
@@ -43,7 +43,7 @@ COS (Cloud Object Storage) on Tencent Cloud provides scalable, secure, and highl
 
 ### CLI applicability
 
-- **`cli_applicability: dual-path`:** coscmd for object operations; Python SDK (`tencentcloud.cos`) for bucket/lifecycle/ACL/versioning operations.
+- **`cli_applicability: dual-path`:** coscmd for object operations; Python SDK (`qcloud_cos`) for bucket/lifecycle/ACL/versioning operations.
 
 ## Five Core Standards
 
@@ -183,9 +183,7 @@ coscmd download /my-bucket-12345/path/file.txt ./local-file.txt
 
 #### CLI Execution
 
-**SDK** (`tencentcloud.cos` — 无 `tccli cos` 服务): 见 [execution-flows.md §1](references/execution-flows.md#1-createbucket)
-
-**SDK** (Python): 见 [execution-flows.md §1](references/execution-flows.md#1-createbucket)
+**SDK** (`qcloud_cos` — 无 `tccli cos` 服务): 见 [execution-flows.md §1](references/execution-flows.md#1-createbucket)
 
 #### Validation
 
@@ -278,15 +276,11 @@ Parse `$.Response.Location`, verify bucket exists via GetBucket.
 
 #### CLI
 
-**SDK** (`tencentcloud.cos` — 无 `tccli cos` 服务): 见 [execution-flows.md §6](references/execution-flows.md#6-deletebucket)
-
-**SDK** (Python): 见 [execution-flows.md §6](references/execution-flows.md#6-deletebucket)
+**SDK** (`qcloud_cos` — 无 `tccli cos` 服务): 见 [execution-flows.md §6](references/execution-flows.md#6-deletebucket)
 
 ### Configure Lifecycle
 
-**SDK** (`tencentcloud.cos` — 无 `tccli cos` 服务): 见 [execution-flows.md §7](references/execution-flows.md#7-configurelifecycle)
-
-**SDK** (Python): 见 [execution-flows.md §7](references/execution-flows.md#7-configurelifecycle)
+**SDK** (`qcloud_cos` — 无 `tccli cos` 服务): 见 [execution-flows.md §7](references/execution-flows.md#7-configurelifecycle)
 
 ---
 
