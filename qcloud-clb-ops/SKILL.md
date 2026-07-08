@@ -16,8 +16,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.2.1"
-  last_updated: "2026-07-06"
+  version: "1.3.0"
+  last_updated: "2026-07-09"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/214"
@@ -38,59 +38,49 @@ metadata:
 
 ## Overview
 
-CLB (Cloud Load Balancer, 负载均衡) provides security-focused traffic distribution services. Access traffic is automatically distributed across multiple backend servers, enhancing system capacity and eliminating single points of failure. Supports billion-level connections and ten-million concurrent requests. This skill is an **operational runbook** for agents: explicit scope, credential rules, pre-flight checks, **dual-path execution** (official **`tccli` CLI** and **Python SDK fallback**), response validation, and failure recovery. **Do not use the web console as the primary agent execution path**.
+CLB (Cloud Load Balancer, 负载均衡) distributes access traffic across multiple backend servers, eliminating single points of failure. This skill is an **operational runbook** for agents: explicit scope, credential rules, pre-flight checks, **dual-path execution** (`tccli` CLI primary + Python SDK fallback), response validation, and failure recovery. **Do not use the web console as the primary agent execution path**.
 
-> **UX Compliance:** This skill follows the [User Experience Specification](../qcloud-skill-generator/references/user-experience-spec.md). All operations include onboarding guidance, minimal prompts, smart defaults, clear feedback, and user-friendly error handling.
+> **UX Compliance:** Follows the [User Experience Specification](../qcloud-skill-generator/references/user-experience-spec.md). All operations include onboarding guidance, minimal prompts, smart defaults, and user-friendly error handling.
 
 ### CLI applicability (repository policy)
 
-- **`cli_applicability: dual-path`**: Official `tccli` fully supports CLB. You **MUST** ship **`references/cli-usage.md`** and, in **each** execution flow below, document **both** the SDK step **and** the `tccli` step. CLI is the **primary** execution path for simplicity; Python SDK is used for edge-case operations CLI doesn't expose.
+- **`cli_applicability: dual-path`**: `tccli clb` is the **primary** path. You **MUST** ship `references/cli-usage.md` and document **both** CLI and SDK steps in each execution flow. SDK fallback covers edge-case operations CLI doesn't expose.
 
-## Five Core Standards
+### Five Core Standards
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
+See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
 
 ### Well-Architected Framework Integration (卓越架构)
 
 | Pillar | Skill Integration | Reference |
 |--------|-------------------|-----------|
-| **可靠性 (Reliability)** | Multi-AZ deployment, health checks, backend server redundancy, cross-region binding | `references/well-architected-assessment.md` |
-| **安全性 (Security)** | CAM permissions, SSL/HTTPS certificates, security group rules, DDoS protection | `references/well-architected-assessment.md` |
-| **成本 (Cost)** | Instance type comparison (shared vs dedicated), pay-as-you-go vs prepaid, idle LB detection | `references/well-architected-assessment.md` |
-| **效率 (Efficiency)** | Listener batch operations, target group management, automation via target groups | `references/well-architected-assessment.md` |
+| **可靠性 (Reliability)** | Multi-AZ deployment, health checks, backend redundancy, cross-region binding | `references/well-architected-assessment.md` |
+| **安全性 (Security)** | CAM permissions, SSL/HTTPS certificates, security groups, DDoS protection | `references/well-architected-assessment.md` |
+| **成本 (Cost)** | Instance type comparison, pay-as-you-go vs prepaid, idle LB detection | `references/well-architected-assessment.md` |
+| **效率 (Efficiency)** | Listener batch ops, target group management, automation | `references/well-architected-assessment.md` |
 
 ## Trigger & Scope (Agent-Readable)
 
 ### SHOULD Use This Skill When
 
-- User mentions "CLB" OR "负载均衡" OR "Load Balancer" OR "LB" OR "腾讯云负载均衡"
-- Task involves CRUD or lifecycle operations on **LoadBalancer instances** (CreateLoadBalancer, DescribeLoadBalancers, ModifyLoadBalancerAttributes, DeleteLoadBalancer)
-- Task involves **Listeners** (TCP/UDP/HTTP/HTTPS) (CreateListener, DescribeListeners, ModifyListener, DeleteListener)
-- Task involves **Backend Servers/Targets** (RegisterTargets, DeregisterTargets, DescribeTargetHealth, ModifyTargetWeight)
-- Task involves **Target Groups** (CreateTargetGroup, DescribeTargetGroups, RegisterTargetGroupInstances)
-- Task involves **CLB access log analysis via CLS** — bandwidth cost, error diagnosis, slow request analysis, traffic pattern, SSL security, client anomaly detection (see `references/clb-log-analysis.md`)
-- Task keywords: traffic distribution, load balancing, listener, backend server, health check, SSL certificate, VIP, cross-region, Anycast
-- User asks to deploy, configure, troubleshoot, or monitor CLB **via API, SDK, CLI, or automation**
-- User describes traffic issues (connection failures, backend health problems, SSL errors) without naming product
+- User mentions "CLB" / "负载均衡" / "Load Balancer" / "LB" / "腾讯云负载均衡"
+- CRUD or lifecycle ops on **LoadBalancer instances**, **Listeners** (TCP/UDP/HTTP/HTTPS), **Backend Servers/Targets**, **Target Groups**
+- CLB access log analysis via CLS (see `references/clb-log-analysis.md`)
+- Keywords: traffic distribution, listener, backend server, health check, SSL certificate, VIP, cross-region, Anycast
+- Traffic issues (connection failures, backend health problems, SSL errors) without naming the product
 
 ### SHOULD NOT Use This Skill When
 
-- Task is purely billing / account management → delegate to: `qcloud-billing-ops` (when present)
-- Task is CAM / permission model only → delegate to: `qcloud-cam-ops` (when present)
-- Task is **VPC network only** (subnet, route table, NAT gateway) → delegate to: `qcloud-vpc-ops`
-- Task is **CVM instance management** → delegate to: `qcloud-cvm-ops`
-- Task is **SSL certificate management only** → delegate to: `qcloud-ssl-ops` (when present)
-- Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
+- Billing / account management → `qcloud-billing-ops` · CAM only → `qcloud-cam-ops` · VPC-only → `qcloud-vpc-ops`
+- CVM instance management → `qcloud-cvm-ops` · SSL-only → `qcloud-ssl-ops` · Architecture review → `qcloud-well-architected-review`
 
 ### Delegation Rules
 
-- CLB depends on VPC: verify VPC/Subnet exist via `qcloud-vpc-ops` before CreateLoadBalancer
-- CLB backend servers are CVM instances: use `qcloud-cvm-ops` to verify instance existence and status before RegisterTargets
-- SSL certificates for HTTPS listeners: verify certificate exists via SSL service or CAM
-- CLB access log analysis (FinOps/AiOps): delegate to `qcloud-cls-ops` for CLS log search and aggregation queries; reference `clb-log-analysis.md` for query templates
-- Multi-product requests: handle each product with its skill; do not merge unrelated APIs
-- Proactive inspection (read-only) → invoked by `qcloud-proactive-inspection`; see `references/proactive-inspection.md`
-- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+- CLB depends on VPC: verify VPC/Subnet via `qcloud-vpc-ops` before CreateLoadBalancer
+- Backend servers are CVM: use `qcloud-cvm-ops` to verify instance existence/status before RegisterTargets
+- HTTPS certificates: verify via SSL service or CAM
+- Access log analysis: delegate to `qcloud-cls-ops`; reference `clb-log-analysis.md` for query templates
+- Proactive inspection → `qcloud-proactive-inspection` (`references/proactive-inspection.md`); Well-Architected assessment → `qcloud-well-architected-review` (see Read-Only mode below)
 
 ## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
 
@@ -110,440 +100,179 @@ CLB (Cloud Load Balancer, 负载均衡) provides security-focused traffic distri
 
 | Placeholder | Meaning | Agent Action |
 |-------------|---------|--------------|
-| `{{env.TENCENTCLOUD_SECRET_ID}}` | From runtime environment | NEVER ask the user; fail if unset |
-| `{{env.TENCENTCLOUD_SECRET_KEY}}` | From runtime environment | NEVER ask the user; fail if unset |
-| `{{env.TENCENTCLOUD_REGION}}` | From runtime environment | Use default `ap-guangzhou` if unset |
-| `{{user.vip}}` | User-supplied VIP address | Ask once; reuse for operations |
-| `{{user.loadbalancer_id}}` | User-supplied LB ID (lb-xxx) | Ask once; reuse for subsequent ops |
-| `{{user.loadbalancer_name}}` | User-supplied LB name | Ask once; reuse |
-| `{{user.listener_id}}` | User-supplied listener ID | Ask once; reuse |
-| `{{user.listener_protocol}}` | Listener protocol | Ask once; options: TCP/UDP/HTTP/HTTPS |
-| `{{user.listener_port}}` | Listener port | Ask once; default based on protocol |
-| `{{user.instance_id}}` | Backend CVM instance ID | Ask once; delegate to qcloud-cvm-ops to verify |
-| `{{user.target_port}}` | Backend server port | Ask once; reuse |
-| `{{user.target_weight}}` | Backend server weight | Ask once; default 10 |
-| `{{output.loadbalancer_id}}` | From CreateLoadBalancer response | Parse `$.Response.LoadBalancerIds[0]` |
-| `{{output.listener_id}}` | From CreateListener response | Parse `$.Response.ListenerIds[0]` |
-| `{{output.request_id}}` | From any API response | Parse `$.Response.RequestId` for tracking |
+| `{{env.TENCENTCLOUD_SECRET_ID}}` / `{{env.TENCENTCLOUD_SECRET_KEY}}` | From runtime env | NEVER ask; fail if unset |
+| `{{env.TENCENTCLOUD_REGION}}` | From runtime env | Default `ap-guangzhou` if unset |
+| `{{user.loadbalancer_id}}` / `{{user.loadbalancer_name}}` | User-supplied LB ID/name | Ask once; reuse |
+| `{{user.listener_id}}` / `{{user.listener_protocol}}` / `{{user.listener_port}}` | Listener identity | Ask once; port default by protocol |
+| `{{user.instance_id}}` / `{{user.target_port}}` / `{{user.target_weight}}` | Backend target | Ask once; weight default 10; verify instance via qcloud-cvm-ops |
+| `{{output.loadbalancer_id}}` | From CreateLoadBalancer | Parse `$.Response.LoadBalancerIds[0]` |
+| `{{output.listener_id}}` | From CreateListener | Parse `$.Response.ListenerIds[0]` |
+| `{{output.request_id}}` | From any response | Parse `$.Response.RequestId` for tracking |
 
 > **`{{env.*}}` MUST NOT** be collected from the user. **`{{user.*}}`** MUST be collected interactively when missing.
 
-> **Security Warning (Credential Masking — MANDATORY):** **NEVER** log, print, or expose `TENCENTCLOUD_SECRET_KEY` in any output. Mask all credentials with `***` or `<masked>`. Check existence only: `test -n "$TENCENTCLOUD_SECRET_KEY"` ✅ | `echo $TENCENTCLOUD_SECRET_KEY` ❌
+> **Security (Credential Masking — MANDATORY):** NEVER log/print/expose `TENCENTCLOUD_SECRET_KEY`. Mask with `***` / `<masked>`. Check existence only: `test -n "$TENCENTCLOUD_SECRET_KEY"` ✅ | `echo $TENCENTCLOUD_SECRET_KEY` ❌
 
-## API and Response Conventions (Agent-Readable)
+## API and Response Conventions
 
 - **API spec is canonical**: https://cloud.tencent.com/document/api/214
-- **Errors**: Tencent Cloud uses `Response.Error.Code` / `Response.Error.Message` pattern
-- **Timestamps**: ISO 8601 format (e.g., `2026-05-21T10:00:00+08:00`)
-- **Idempotency**: Use unique names for LoadBalancer to avoid conflicts
+- **Errors**: `Response.Error.Code` / `Response.Error.Message` pattern
+- **Timestamps**: ISO 8601 (e.g., `2026-05-21T10:00:00+08:00`)
+- **Idempotency**: Use unique LB names; see [Idempotency Guidance](#idempotency-guidance)
 
-### JSON Path Reference
+### JSON Path Reference (common)
 
-Common paths used across operations:
-
-| Path | Description | Example Value |
-|------|-------------|---------------|
-| `$.Response.LoadBalancerIds[0]` | LB instance ID (CreateLoadBalancer) | `lb-12345678` |
+| Path | Description | Example |
+|------|-------------|---------|
+| `$.Response.LoadBalancerIds[0]` | LB ID (CreateLoadBalancer) | `lb-12345678` |
 | `$.Response.ListenerIds[0]` | Listener ID (CreateListener) | `lbl-12345678` |
-| `$.Response.LoadBalancerSet[0].LoadBalancerId` | LB instance ID (DescribeLoadBalancers) | `lb-12345678` |
-| `$.Response.LoadBalancerSet[0].LoadBalancerName` | LB name | `prod-api-lb` |
-| `$.Response.LoadBalancerSet[0].Status` | Status: 1=creating, 2=running | `2` |
-| `$.Response.LoadBalancerSet[0].LoadBalancerType` | Type: OPEN/Internal | `OPEN` |
-| `$.Response.ListenerSet[0].ListenerId` | Listener ID | `lbl-12345678` |
-| `$.Response.ListenerSet[0].Protocol` | Protocol: TCP/UDP/HTTP/HTTPS | `HTTPS` |
-| `$.Response.Targets[0].HealthStatus` | Health: alive/dead/unknown | `alive` |
+| `$.Response.LoadBalancerSet[0].LoadBalancerId` | LB ID (Describe) | `lb-12345678` |
+| `$.Response.LoadBalancerSet[0].Status` | 1=creating, 2=running | `2` |
+| `$.Response.LoadBalancerSet[0].LoadBalancerType` | OPEN / Internal | `OPEN` |
+| `$.Response.ListenerSet[0].Protocol` | TCP/UDP/HTTP/HTTPS | `HTTPS` |
+| `$.Response.Targets[0].HealthStatus` | alive / dead / unknown | `alive` |
 | `$.Response.Targets[0].InstanceId` | Backend CVM ID | `ins-12345678` |
 | `$.Response.Targets[0].Port` | Backend port | `8080` |
-| `$.Response.RequestId` | Request tracking ID | `abc123def-456g-789h` |
 
 ### Expected State Transitions
 
-| Operation | Initial State | Target State | Poll Interval | Max Wait |
-|-----------|---------------|--------------|---------------|----------|
-| CreateLoadBalancer | — | `Status=2` (running) | 5s | 300s |
-| CreateListener | — | Listener active | 5s | 120s |
-| RegisterTargets | — | Backend registered | 5s | 60s |
-| DeleteLoadBalancer | any | absent (404/empty) | 5s | 300s |
+| Operation | Initial → Target | Poll | Max Wait |
+|-----------|------------------|------|----------|
+| CreateLoadBalancer | — → `Status=2` | 5s | 300s |
+| CreateListener | — → active | 5s | 120s |
+| RegisterTargets | — → registered | 5s | 60s |
+| DeleteLoadBalancer | any → absent | 5s | 300s |
 
-## Quick Start
+## Execution Flows (Agent-Readable)
 
-### What This Skill Does
-This skill enables you to deploy, configure, troubleshoot, and monitor CLB (Load Balancer) resources on Tencent Cloud using the `tccli` CLI (primary) or `tencentcloud-sdk-python-clb` SDK (fallback).
+Every operation: **Pre-flight → Execute (CLI + SDK) → Validate → Recover**. Do not skip phases. Detailed CLI/SDK commands live in [references/execution-flows.md](references/execution-flows.md).
 
-### Prerequisites
-- [ ] `tccli` CLI installed (or Python 3.8+ runtime for SDK fallback)
-- [ ] Credentials configured: `TENCENTCLOUD_SECRET_ID`, `TENCENTCLOUD_SECRET_KEY`
-- [ ] Region set: `TENCENTCLOUD_REGION`
+> **Anchor note:** Links below use `#N-<slug>` anchors that map to `## N. <Title>` headings in `references/execution-flows.md` (e.g. `#1-create-loadbalancer`). If you rename a heading there, update the matching anchor here to avoid a silent broken link.
 
-### Verify Setup
-```bash
-# Check CLI and credentials
-tccli clb DescribeLoadBalancers --Region "{{env.TENCENTCLOUD_REGION}}"
-```
+### Quick Triage (diagnostic entry points)
 
-### Your First Command
-```bash
-# List load balancers
-tccli clb DescribeLoadBalancers --Region {{env.TENCENTCLOUD_REGION}}
-```
+- SLB 5xx / backend health failure / connection failure → [SLB 5xx Fast Diagnosis](references/slb-5xx-diagnosis-optimized.md) (MTTR < 30 min)
+- Access log analysis (bandwidth, slow requests, SSL security, client anomaly) → [CLB Log Analysis](references/clb-log-analysis.md)
+- Generic troubleshooting → [Troubleshooting Guide](references/troubleshooting.md)
 
-### Next Steps
-- [Core Concepts](references/core-concepts.md) — Understand CLB architecture
-- [Common Operations](#execution-flows) — Create, manage, and delete load balancers
-- [Troubleshooting](references/troubleshooting.md) — Fix common issues
+### Capabilities at a Glance
 
-## Capabilities at a Glance
+| Operation | Description | Complexity | Risk |
+|-----------|-------------|------------|------|
+| CreateLoadBalancer | Create LB instance | Medium | Low |
+| DescribeLoadBalancers | View LB details | Low | None |
+| ModifyLoadBalancerAttributes | Change LB config | Medium | Medium |
+| DeleteLoadBalancer | Remove LB | Low | **High — irreversible** |
+| CreateListener | Create listener | Medium | Low |
+| RegisterTargets | Bind backends | Medium | Medium |
+| DescribeTargetHealth | Check backend health | Low | None |
 
-| Operation | Description | Complexity | Risk Level |
-|-----------|-------------|------------|------------|
-| CreateLoadBalancer | Create a new load balancer instance | Medium | Low |
-| DescribeLoadBalancers | View LB instance details | Low | None |
-| ModifyLoadBalancerAttributes | Change LB configuration | Medium | Medium |
-| DeleteLoadBalancer | Remove a load balancer | Low | **High** — irreversible |
-| CreateListener | Create a listener (TCP/UDP/HTTP/HTTPS) | Medium | Low |
-| RegisterTargets | Bind backend servers to listener | Medium | Medium |
-| DescribeTargetHealth | Check backend server health | Low | None |
+### Create LoadBalancer
 
-### Quick Diagnosis Scenarios
+**Pre-flight:** SDK present (`pip show tencentcloud-sdk-python-clb`); CLI present (`tccli version`); credentials set; region valid; **VPC exists** (`tccli vpc DescribeVpcs`) else HALT → `qcloud-vpc-ops`.
+**Execute:** [execution-flows.md §1](references/execution-flows.md#1-create-loadbalancer).
+**Validate:** read `{{output.loadbalancer_id}}` from `$.Response.LoadBalancerIds[0]`; poll `DescribeLoadBalancers` until `Status=2`.
 
-| Scenario | Trigger | Target MTTR | Key Steps | Reference |
-|----------|---------|-------------|-----------|-----------|
-| **SLB 5xx — Backend Health Failure** | `HttpCode5XX` ↑ AND `HealthCheckFailedNum` > 0 | < 15 min | Triage → Identify unhealthy backends → Check SG/health config → Fix/re-register | [slb-5xx-diagnosis-optimized.md](references/slb-5xx-diagnosis-optimized.md) §2A |
-| **SLB 5xx — Traffic Overload** | `HttpCode5XX` ↑ AND `ClientConnum` spike | < 15 min | Triage → Analyze traffic pattern → Scale backends | [slb-5xx-diagnosis-optimized.md](references/slb-5xx-diagnosis-optimized.md) §2C |
-| **SLB 5xx — Backend Application Error** | `HttpCode5XX` ↑ AND all backends healthy | < 20 min | Triage → Check backend logs/process → Rollback or fix app | [slb-5xx-diagnosis-optimized.md](references/slb-5xx-diagnosis-optimized.md) §2B |
-| **SLB 5xx — LB Not Running** | `LB Status` ≠ 2 | < 5 min | Triage → Check LB status → Wait or contact support | [slb-5xx-diagnosis-optimized.md](references/slb-5xx-diagnosis-optimized.md) §2D |
-| **Backend Health Check Failures** | `HealthCheckFailedNum` > 0 | < 10 min | Check health config → Verify port/SG → Fix | [troubleshooting.md](references/troubleshooting.md)#health-check-failures |
-| **Connection Failures** | Clients cannot reach backend | < 15 min | Verify LB status → Check listener → Verify backend binding | [troubleshooting.md](references/troubleshooting.md)#connection-failures |
+### Create Listener
+
+**Pre-flight:** LB running (DescribeLoadBalancers); port not conflicting.
+**Execute:** [execution-flows.md §3](references/execution-flows.md#3-create-listener).
+**Validate:** capture `{{output.listener_id}}`; verify via `DescribeListeners`.
+
+### Register Targets (Bind Backend Servers)
+
+**Pre-flight:** Listener active; **CVM exists & RUNNING** (delegate `qcloud-cvm-ops`); CVM in same VPC as LB.
+**Execute:** [execution-flows.md §4](references/execution-flows.md#4-register-targets).
+**Validate:** `DescribeTargets` + `DescribeTargetHealth`.
+
+### Describe LoadBalancers / Describe Target Health
+
+**Execute:** [execution-flows.md §2](references/execution-flows.md#2-describe-loadbalancers) / [§5](references/execution-flows.md#5-describe-target-health).
+**Present:** ID/Name/VIP/Status/Type (LB) and InstanceId/Port/HealthStatus (targets) — see JSON Path Reference.
+
+### Delete LoadBalancer (Safety Gate)
+
+- **MUST** obtain explicit confirmation: irreversible delete of `{{user.loadbalancer_name}}` (`{{user.loadbalancer_id}}`)
+- **MUST** warn: all listeners and backend bindings will be removed
+- **MUST NOT** proceed without clear user assent
+- **Execute:** [execution-flows.md §6](references/execution-flows.md#6-delete-loadbalancer). **Validate:** poll until empty/404.
+
+### Idempotency Guidance
+
+- **CreateLoadBalancer:** pass a stable `ClientToken` (UUID). On timeout, re-run with same token — returns existing instance instead of duplicating.
+- **RegisterTargets:** partial success possible — always `DescribeTargetHealth` and diff against requested set; flag non-`RUNNING` targets.
+- **DeregisterTargets:** idempotent — re-deregistering a removed target succeeds; no pre-check needed for retries.
+
+## Failure Recovery
+
+| Error pattern | Max retries | Agent Action |
+|--------------|-------------|--------------|
+| `InvalidParameter.LBIdNotFound` / `ListenerIdNotFound` | 0 | HALT — verify ID |
+| `ResourceInsufficient` | 0 | HALT — contact administrator |
+| `InvalidSecretKey` / `InvalidSecretId` | 0 | HALT — check credentials |
+| `RequestLimitExceeded` | 3 | Exponential backoff, retry |
+| `InternalError` | 3 | Retry (2s/4s/8s), then HALT |
+| `FailedOperation.ResourceInOperating` | 3 | Wait 30s, retry |
+
+> Full CLB error taxonomy (parameter / status / auth / resource codes) in [references/error-reference.md](references/error-reference.md).
+
+## Safety Gates (Destructive Operations)
+
+Every **Delete**, **Deregister**, or **irreversible** operation MUST have: (1) explicit user confirmation with resource ID shown, (2) warning about dependent resources (listeners, backend bindings), (3) post-op verification (poll until 404/deleted). See also GCL rules below for `DeleteListeners` / batch `DeregisterTargets` / Internet↔Internal flip.
+
+## Quality Gate (GCL)
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate is a **runtime** scoring layer auditing each CLB execution against a rubric, in addition to the build-time Safety Gates and 2-round self-review in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
+
+| Property | Value | Source |
+|---|---|---|
+| GCL applicability | **required** | [AGENTS.md §8](../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **2** | per-skill override (AGENTS.md §8 default) |
+| Rubric | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CLB-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../AGENTS.md#6-trace--audit-mandatory) |
+
+### When the loop runs
+
+| Op class | Loop? | Why |
+|---|---|---|
+| Destructive: `DeleteLoadBalancers`, `DeleteListeners`, batch `DeregisterTargets` (>50%) | **yes** | Irreversible; live-traffic cut |
+| Sensitive mutating: `ModifyLoadBalancerAttributes` (Internet↔Internal), `ModifyListener`, `ModifyRule` | **yes** | Config drift / security risk |
+| Mutating: `CreateLoadBalancer`, `CreateListener`, `RegisterTargets`, `CreateRule`, `ModifyTargetPort/Weight` | **yes** | Cost / state-change risk |
+| Read-only: `Describe*` / `DescribeTaskStatus` | optional (max_iter=1) | Polling tail of parent op |
+
+### Decision flow (first match wins)
+
+1. **Safety = 0** or rule violation in `{1..5}` ⇒ **ABORT**. Internet↔Internal flip w/o diff ⇒ ABORT. Mass deregister w/o drain ⇒ ABORT.
+2. `current_iter >= max_iterations` ⇒ return best-so-far + unresolved items.
+3. All thresholds met ⇒ **PASS**.
+4. Otherwise ⇒ **RETRY** with Critic suggestions.
+
+### CLB-specific safety rules (rubric §4)
+
+| # | Operation(s) | Gate (summary) |
+|---:|---|---|
+| 1 | `DeleteLoadBalancers` | LB ID + Name echo + confirmation + listener/target dependency check |
+| 2 | `DeleteListeners` | Listener ID + protocol + port echoed; "traffic on port X will be cut" warning |
+| 3 | `DeregisterTargets` (batch > 50%) | DRAIN guard: `ConnectionDrainTimeout` ≥ 30s required |
+| 4 | `ModifyLoadBalancerAttributes` (Internet↔Internal) | Show BEFORE/AFTER type/IP/InternetAccessible; warn public↔private flip |
+| 5 | `RegisterTargets` | Reject `InstanceState ≠ RUNNING`; reject targets in different VPC |
+
+Missing any ⇒ **Safety = 0** ⇒ **ABORT**. Full rules: [`references/rubric.md`](references/rubric.md) §4; worked examples §6.
+
+## Reference Directory
+
+- **Core:** [Core Concepts](references/core-concepts.md) · [API & SDK Usage](references/api-sdk-usage.md) · [CLI Usage](references/cli-usage.md) · [Troubleshooting](references/troubleshooting.md) · [SLB 5xx Fast Diagnosis](references/slb-5xx-diagnosis-optimized.md) · [Monitoring & Alerts](references/monitoring.md) · [Integration](references/integration.md)
+- **Framework:** [Well-Architected Assessment](references/well-architected-assessment.md) · [AIOps Best Practices](references/aiops-best-practices.md) · [FinOps Cost Optimization](references/finops-cost-optimization.md) · [SecOps Security Operations](references/secops-security-operations.md)
+- **Execution detail:** [Execution Flows](references/execution-flows.md) · [Error Reference](references/error-reference.md)
+- **Assets:** [Example Config](assets/example-config.yaml) · [Eval Queries](assets/eval_queries.json)
 
 ## Changelog
 
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial CLB skill with dual-path CLI/SDK support |
-| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CLB-specific safety rules incl. listener-delete traffic cut, mass-deregister drain, Internet↔Internal flip guard), `references/prompt-templates.md` (Generator + Critic + Orchestrator, isolated-context enforcement). `max_iter=2` per AGENTS.md §8 |
-| 1.2.0 | 2026-07-04 | SLB 5xx fast diagnosis optimization: added `references/slb-5xx-diagnosis-optimized.md` (4-phase runbook, MTTR < 30 min target), updated `references/troubleshooting.md` with quick 5xx triage path, added Quick Diagnosis Scenarios table to SKILL.md |
-| 1.2.1 | 2026-07-06 | AIOps: fix duplicate --Region flags in slb-5xx-diagnosis-optimized.md (9 occurrences), hardcoded pricing TE-1 in finops-cost-optimization.md, add Backend 5xx Retry Guidance to troubleshooting.md, add Idempotency Guidance to SKILL.md, clarify DryRun scope in rubric.md, delete duplicate billing table in well-architected-assessment.md, add AIOps eval cases |
-
----
-
-## Execution Flows (Agent-Readable)
-
-Every operation: **Pre-flight → Execute (CLI and SDK) → Validate → Recover**. Do not skip phases.
-
-### Operation: Create LoadBalancer
-
-#### Pre-flight Checks
-
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| Python SDK | `pip show tencentcloud-sdk-python-clb` | Version ≥ minimum | Document install |
-| CLI | `tccli version` | Exit code 0 | Document CLI install |
-| Credentials | Check env vars: `TENCENTCLOUD_SECRET_ID`, `TENCENTCLOUD_SECRET_KEY` | Non-empty values | HALT; user configures env |
-| Region | Valid region code | `{{env.TENCENTCLOUD_REGION}}` valid | Suggest valid region |
-| VPC exists | `tccli vpc DescribeVpcs` | Target VPC exists | HALT; delegate to qcloud-vpc-ops |
-
-#### Execution
-
-- **CLI**: See [execution-flows.md](references/execution-flows.md#1-create-loadbalancer)
-- **SDK**: See [execution-flows.md](references/execution-flows.md#1-create-loadbalancer)
-
-#### Post-execution Validation
-
-1. Read `{{output.loadbalancer_id}}` from `$.Response.LoadBalancerIds[0]`
-2. Poll DescribeLoadBalancers until `Status=2`: See [execution-flows.md](references/execution-flows.md#1-create-loadbalancer)
-
-#### Failure Recovery
-
-| Error pattern | Max retries | Agent Action |
-|--------------|-------------|--------------|
-| `InvalidParameter.LBIdNotFound` | 0 | HALT — verify LB ID |
-| `ResourceInsufficient` | 0 | HALT — contact administrator |
-| `InvalidSecretKey` / `InvalidSecretId` | 0 | HALT — check credentials |
-| `RequestLimitExceeded` | 3 | Back off (exponential) and retry |
-| `InternalError` | 3 | Retry (2s/4s/8s), then HALT |
-| `FailedOperation.ResourceInOperating` | 3 | Wait 30s and retry |
-
-### Operation: Describe LoadBalancers
-
-#### Execution
-
-- **CLI**: See [execution-flows.md](references/execution-flows.md#2-describe-loadbalancers)
-
-#### Present to User
-
-| Field | Notes |
-|-------|-------|
-| ID | See JSON Path Reference: `$.Response.LoadBalancerSet[0].LoadBalancerId` |
-| Name | See JSON Path Reference: `$.Response.LoadBalancerSet[0].LoadBalancerName` |
-| VIP | `$.Response.LoadBalancerSet[0].VipIps[0]` |
-| Status | See JSON Path Reference: `$.Response.LoadBalancerSet[0].Status` |
-| Type | See JSON Path Reference: `$.Response.LoadBalancerSet[0].LoadBalancerType` |
-
-### Operation: Create Listener
-
-#### Pre-flight Checks
-
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| LoadBalancer exists | DescribeLoadBalancers | LB in running state | HALT |
-| Port not conflict | Check existing listeners | Port available | HALT; suggest different port |
-
-#### Execution
-
-- **CLI**: See [execution-flows.md](references/execution-flows.md#3-create-listener)
-- **SDK**: See [execution-flows.md](references/execution-flows.md#3-create-listener)
-
-#### Post-execution Validation
-
-1. Capture `{{output.listener_id}}` from `$.Response.ListenerIds[0]`
-2. Verify listener via DescribeListeners
-
-### Operation: Register Targets (Bind Backend Servers)
-
-#### Pre-flight Checks
-
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| Listener exists | DescribeListeners | Listener active | HALT |
-| CVM instance exists | Delegate to qcloud-cvm-ops | Instance RUNNING | HALT |
-| CVM in same VPC | DescribeInstances | Same VPC as LB | HALT; VPC mismatch |
-
-#### Execution
-
-- **CLI**: See [execution-flows.md](references/execution-flows.md#4-register-targets)
-- **SDK**: See [execution-flows.md](references/execution-flows.md#4-register-targets)
-
-#### Post-execution Validation
-
-1. Verify backend registered via DescribeTargets
-2. Check health status via DescribeTargetHealth
-
-### Operation: Describe Target Health
-
-#### Execution
-
-- **CLI**: See [execution-flows.md](references/execution-flows.md#5-describe-target-health)
-- **SDK**: See [execution-flows.md](references/execution-flows.md#5-describe-target-health)
-
-#### Present to User
-
-| Field | Notes |
-|-------|-------|
-| InstanceId | See JSON Path Reference: `$.Response.Targets[0].InstanceId` |
-| Port | See JSON Path Reference: `$.Response.Targets[0].Port` |
-| HealthStatus | See JSON Path Reference: `$.Response.Targets[0].HealthStatus` |
-
-### Operation: Delete LoadBalancer
-
-#### Pre-flight (Safety Gate)
-
-- **MUST** obtain explicit confirmation: irreversible delete of `{{user.loadbalancer_name}}` (`{{user.loadbalancer_id}}`)
-- **MUST** warn about: all listeners and backend bindings will be removed
-- **MUST NOT** proceed without clear user assent
-
-#### Execution
-
-- **CLI**: See [execution-flows.md](references/execution-flows.md#6-delete-loadbalancer)
-
-#### Post-execution Validation
-
-Poll DescribeLoadBalancers until LB returns empty or 404.
-
-### Idempotency Guidance
-
-**CreateLoadBalancer:** `tccli clb CreateLoadBalancer` supports `ClientToken` (UUID). Always pass a stable UUID per logical operation. If the call times out, re-run with the same ClientToken — CLB returns the existing instance rather than creating a duplicate.
-
-**RegisterTargets:** Partial success is possible when registering multiple targets. After the call, always run `DescribeTargetHealth` and diff the result against the requested set. Flag any TargetIds not in `RUNNING` state.
-
-**DeregisterTargets:** The call is idempotent — re-deregistering an already-deregistered target returns success. No pre-check needed for retries.
-
----
-
-## Prerequisites
-
-1. **Install `tccli` CLI** (primary execution path):
-
-   ```bash
-   pip install tccli
-   ```
-
-2. **Bootstrap Python runtime** (for SDK fallback):
-
-   ```bash
-   python3 --version  # Should be ≥ 3.8
-   pip install tencentcloud-sdk-python-clb
-   ```
-
-3. **Configure Credentials**:
-
-   ```bash
-   export TENCENTCLOUD_SECRET_ID="{{env.TENCENTCLOUD_SECRET_ID}}"
-   export TENCENTCLOUD_SECRET_KEY="{{env.TENCENTCLOUD_SECRET_KEY}}"
-   export TENCENTCLOUD_REGION="{{env.TENCENTCLOUD_REGION}}"
-   ```
-
-4. **Verify Configuration**:
-   ```bash
-   tccli clb DescribeLoadBalancers --Region "{{env.TENCENTCLOUD_REGION}}"
-   ```
-
-## Reference Directory
-
-### Core Documentation
-- [Core Concepts](references/core-concepts.md) — CLB architecture and components
-- [API & SDK Usage](references/api-sdk-usage.md) — API operation map and Python SDK
-- [CLI Usage](references/cli-usage.md) — `tccli clb` commands
-- [Troubleshooting Guide](references/troubleshooting.md) — Common issues and solutions
-- [SLB 5xx Fast Diagnosis](references/slb-5xx-diagnosis-optimized.md) — Optimized 5xx runbook (MTTR < 30 min)
-- [Monitoring & Alerts](references/monitoring.md) — CLB metrics (QCE/LB_PUBLIC namespace)
-- [Integration](references/integration.md) — Cross-skill integration and setup
-
-### Framework Integration
-- [Well-Architected Assessment](references/well-architected-assessment.md) — Four-pillar framework (Reliability, Security, Cost, Efficiency)
-- [AIOps Best Practices](references/aiops-best-practices.md) — Multi-metric correlation, diagnosis tree, proactive inspection
-- [FinOps Cost Optimization](references/finops-cost-optimization.md) — Billing models, idle detection, right-sizing
-- [SecOps Security Operations](references/secops-security-operations.md) — CAM policies, SSL security, network isolation
-
-### Assets
-- [Example Configuration](assets/example-config.yaml) — Sample config with UX and optimization settings
-- [Evaluation Queries](assets/eval_queries.json) — Trigger accuracy test queries
-
-## Error Code Reference
-
-### Parameter Validation Errors
-
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `InvalidParameter.LBIdNotFound` | LoadBalancer ID invalid | Verify LB ID; suggest `DescribeLoadBalancers` |
-| `InvalidParameter.ListenerIdNotFound` | Listener ID invalid | Verify listener ID |
-| `InvalidParameter.LocationNotFound` | Forwarding rule not found | Verify rule location/URL |
-| `InvalidParameter.PortCheckFailed` | Port conflict or invalid | Use different port |
-| `InvalidParameter.ProtocolCheckFailed` | Protocol mismatch | Check protocol support per CLB type |
-| `InvalidParameter.RegionNotFound` | Region invalid | Verify region is correct |
-| `InvalidParameter.FormatError` | Parameter format error | Check parameter format per API spec |
-| `InvalidParameter.InvalidFilter` | Query filter error | Fix filter parameter structure |
-| `InvalidParameter.RewriteAlreadyExist` | Rewrite rule already exists | Use different source URL |
-| `InvalidParameter.SomeRewriteNotFound` | Some rewrite rules not found | Verify rewrite rule IDs |
-| `InvalidParameter.ClientTokenLimitExceeded` | ClientToken expired | Generate new ClientToken |
-| `InvalidParameterValue.Duplicate` | Duplicate parameter value | Use unique values |
-| `InvalidParameterValue.InvalidFilter` | Filter input error | Fix filter name/values |
-| `InvalidParameterValue.Length` | Parameter length error | Shorten parameter value |
-| `InvalidParameterValue.Range` | Parameter range error | Adjust value to valid range |
-
-### CLB Status & Operation Errors
-
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `FailedOperation.InvalidLBStatus` | LB status abnormal | Wait for LB to stabilize; check `DescribeLoadBalancers` |
-| `FailedOperation.ResourceInOperating` | Resource being operated | Wait 30s; retry |
-| `FailedOperation.ResourceInCloning` | Resource being cloned | Wait for clone to complete |
-| `FailedOperation.NoListenerInLB` | No listener for operation | Create listener first |
-| `FailedOperation.EipTrafficCheckRisk` | EIP bandwidth exceeds threshold | Disable anti-misoperation in EIP console |
-| `FailedOperation.FrequencyCheckRisk` | Delete frequency too high | Slow down delete rate |
-| `FailedOperation.TargetNumCheckRisk` | Rule count risk too high | Pass `ForceDelete=true` |
-| `FailedOperation.TrafficCheckRisk` | Traffic check high risk | Confirm force delete with `ForceDelete=true` |
-
-### Auth & Resource Errors
-
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `AuthFailure` | CAM signature/auth error | Check CAM policies for CLB |
-| `OperationDenied` | Operation denied | Check account permissions |
-| `ResourcesSoldOut` | Resources sold out | Try different region or specification |
-| `InternalError` | Internal server error | Transient — retry; escalate if persists |
-
-## Safety Gates (Destructive Operations)
-
-Every **Delete**, **Deregister**, or **irreversible** operation MUST have:
-
-1. **Explicit user confirmation** with resource identifier displayed
-2. **Warning about dependent resources** (listeners, backend bindings)
-3. **Post-delete verification** (poll until 404 or deleted state)
-
----
-
-## Quality Gate (GCL)
-
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
-is a **runtime** scoring layer that audits each CLB execution against an explicit
-rubric, in addition to the build-time **Safety Gates** above and the build-time
-**2-round self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
-
-| Property | Value | Source |
-|---|---|---|
-| GCL applicability | **required** | [AGENTS.md §8](../AGENTS.md#8-per-skill-defaults-qcloud) |
-| `max_iterations` | **2** | per-skill override (matches AGENTS.md §8 default for `qcloud-clb-ops`) |
-| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CLB-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
-| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../AGENTS.md#6-trace--audit-mandatory) |
-
-### When the loop runs
-
-| Op class | Loop runs? | Why |
-|---|---|---|
-| Destructive: `DeleteLoadBalancers`, `DeleteListeners`, `DeregisterTargets` (batch > 50%) | **yes** | Irreversible; live-traffic cut; needs scoring |
-| Sensitive mutating: `ModifyLoadBalancerAttributes` (Internet↔Internal flip), `ModifyListener` (protocol/port), `ModifyRule` (production domain/URL) | **yes** | Configuration drift / security risk; needs scoring |
-| Mutating: `CreateLoadBalancer`, `CreateListener`, `RegisterTargets`, `CreateRule`, `ModifyTargetPort`, `ModifyTargetWeight` | **yes** | Cost / state-change risk; needs scoring |
-| Read-only: `DescribeLoadBalancers`, `DescribeListeners`, `DescribeTargets`, `DescribeTaskStatus` | optional (max_iter=1, no hard abort) | Polling tails are part of the parent op's trace |
-
-### Decision flow (first match wins)
-
-1. **Safety = 0** OR any rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result). Internet↔Internal flip without diff ⇒ ABORT. Mass deregister without drain ⇒ ABORT.
-2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
-3. **All thresholds met** ⇒ **PASS**
-4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
-
-### CLB-specific safety rules (rubric §4)
-
-Full rules: [`references/rubric.md`](references/rubric.md) §4.
-
-| # | Operation(s) | Gate (summary) |
-|---:|---|---|
-| 1 | `DeleteLoadBalancers` (any) | LB ID + Name echo + explicit confirmation + listener/target-binding dependency check + replicatio... |
-| 2 | `DeleteListeners` (any, single or batch) | Listener ID + protocol + port echoed; explicit confirmation with "traffic on port X will be cut i... |
-| 3 | `DeregisterTargets` (batch) with count > 50% of bound targets | DRAIN guard: refuse to proceed without explicit `ConnectionDrainTimeout` setting ≥ 30s; surface a... |
-| 4 | `ModifyLoadBalancerAttributes` switching Internet ↔ Internal | Show BEFORE/AFTER `LoadBalancerType` / `AddressIPVersion` / `InternetAccessible`; warn that the p... |
-| 5 | `RegisterTargets` (any) | Reject targets whose `InstanceState ≠ RUNNING` (per `DescribeInstances`); reject targets in a dif... |
-
-Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
-
-### Sibling — CVM / CDB / COS / CLB Quality Gates
-
-| Skill | §4 Distinctive rules |
-|---|---|
-| `qcloud-cvm-ops` | instances, disks, re-image |
-| `qcloud-cdb-ops` | accounts, privileges, SQL data-plane boundary |
-| `qcloud-cos-ops` | versioning, public ACL, cold transition, batch delete |
-| `qcloud-clb-ops` (this) | listener traffic-cut, mass drain, direction flip, non-running target reject |
-
-See [`references/rubric.md`](references/rubric.md) §6 for worked examples.
-
----
-
-## Output Schema
-
-All responses follow Tencent Cloud API structure:
-
-```json
-{
-  "Response": {
-    "RequestId": "abc123",
-    "LoadBalancerIds": ["lb-xxx"],
-    // Product-specific fields
-  }
-}
-```
-
-Error responses:
-
-```json
-{
-  "Response": {
-    "RequestId": "abc123",
-    "Error": {
-      "Code": "InvalidParameter.LBIdNotFound",
-      "Message": "LoadBalancer instance ID error"
-    }
-  }
-}
-```
+| 1.1.0 | 2026-06-04 | GCL rollout: `## Quality Gate (GCL)`, `references/rubric.md`, `references/prompt-templates.md` |
+| 1.2.0 | 2026-07-04 | SLB 5xx fast diagnosis: `references/slb-5xx-diagnosis-optimized.md`, quick 5xx triage, Quick Diagnosis Scenarios table |
+| 1.2.1 | 2026-07-06 | AIOps fixes: duplicate `--Region` flags, hardcoded pricing, retry guidance, idempotency note |
+| 1.3.0 | 2026-07-09 | SKILL.md consolidation: removed duplicate Quick Start / Prerequisites / Output Schema / error-code tables (moved to new `references/error-reference.md`); merged Capabilities into Execution Flows; added Quick Triage entry points; reduced 549 → 276 lines while preserving all operational info |
