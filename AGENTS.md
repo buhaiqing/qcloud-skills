@@ -19,7 +19,7 @@ qcloud-skills/
     references/                # Supporting docs: cli-usage, api-sdk-usage, troubleshooting
 ```
 
-**No repo-root `assets/` directory.** All schemas, handoff contracts, and skill-specific config live under the owning skill's `assets/` (or `references/` for Markdown-only contracts).
+All schemas, handoff contracts, and skill-specific config live under the owning skill's `assets/` (or `references/` for Markdown-only contracts).
 
 ## Skills inventory (24)
 
@@ -36,7 +36,7 @@ Run `ls qcloud-*-ops/` for canonical list.
 - **Cross-skill delegation**: Check target skill's `## Trigger & Scope` for `delegate-to` markers.
 - **Five Core Standards (P0)**: Clear Boundaries, Structured I/O (`{{env.*}}`/`{{user.*}}`/`{{output.*}}`), Explicit Actionable Steps, Complete Failure Strategies (≥10 product-specific error codes with HALT vs retry), Absolute Single Responsibility.
 - **Token Efficiency (P0)**: Minimize tokens while preserving executability. Rules: TE-1 (API queries instead of hardcoded tables), TE-3 (error tables ≤3 columns), TE-4 (JSON paths centralized), TE-5 (YAML anchors), TE-6 (eliminate cross-file duplication).
-  - **TE Audit Trigger**: After any `SKILL.md`/`references/*.md`/`rubric.md`/`prompt-templates.md` change, scan for >10-line repetitive blocks, duplicate GCL text, or >5 inline hardcoded values. Extract to `references/` or annotate with `<!-- Use API for latest -->`. Record result in commit footer: `TE-Audit: ...`.
+  - **TE Audit Trigger**: After any `SKILL.md`/`references/*.md`/`rubric.md`/`prompt-templates.md` change, scan for >10-line repetitive blocks or >5 inline hardcoded values. Record result in commit footer: `TE-Audit: ...`.
 - **Subagent concurrency limit (P0)**: Max 3 concurrent subagents.
 - **No web console execution path** (only for docs reference).
 - **Minimal-change principle**: Don't reformat/rename/restructure unrelated files.
@@ -84,7 +84,7 @@ After modifying `SKILL.md`, `references/`, or `assets/`, MUST run 2 rounds befor
 
 **Round 1 — Self-check against template & standards**:
 1. Re-read `qcloud-skill-generator/references/qcloud-skill-template.md` and `qcloud-skill-generator/SKILL.md`.
-2. Verify Five Core Standards.
+2. Verify Five Core Standards (see Key Conventions above).
 3. Verify Token Efficiency rules (TE-1/TE-3/TE-4/TE-5/TE-6).
 4. Cross-check `cli_applicability` against CLI support.
 5. Verify YAML frontmatter validity, bumped `version`/`last_updated`, and `related_skills`.
@@ -95,7 +95,7 @@ After modifying `SKILL.md`, `references/`, or `assets/`, MUST run 2 rounds befor
 **Round 2 — Adversarial review**:
 1. Apply R1 Security, R2 API Fidelity, R3 Safety Gates, R4 UX from `qcloud-skill-generator/references/governance-and-adversarial-review.md`.
 2. Walk through Adversarial Scenarios.
-3. Verify cross-skill delegation.
+3. Verify cross-skill delegation (manual review step; verify delegate-to markers are present in referenced skills and chains are not broken).
 
 **Fix-on-find**: Any problem must be fixed in same change set.
 
@@ -209,11 +209,12 @@ If any YES, trigger GCL Multi sub-Agent architecture.
 
 ### GCL Execution Steps (when triggered)
 
+0. **Pre-flight check**: Confirm current branch is not `main`/`master`/`trunk` and `git remote -v` points to the expected remote. Pause if on a protected branch or mismatched remote.
 1. Create worktree: `git worktree add ../<repo>-<feature> -b feature/<feature>`
 2. Announce model configuration: Generator (vendor X) + Critics (vendor Y, ≥2, different from Generator)
 3. Launch Generator Agent in worktree
 4. Launch ≥2 parallel Critic Agents (Data Quality, Safety Rules, Spec Compliance, Token Efficiency)
-5. Execute GCL loop (max 3 rounds): Generator code → Critics parallel review → Generator fix → Critics re-review
+5. Execute GCL loop (max_iter per skill defaults — see `docs/gcl-spec.md` §8): Generator code → Critics parallel review → Generator fix → Critics re-review
 6. Main Agent makes PASS/RETRY/ABORT decision, merges, deletes worktree
 
 ### Exceptions
