@@ -29,6 +29,7 @@ metadata:
     - qcloud-cam-ops          # 委托：权限策略配置
     - qcloud-cls-ops          # 委托：日志分析查询
     - qcloud-monitor-ops      # 委托：监控告警配置
+    - qcloud-tke-ops          # 委托：TKE/CVM/SCF 计算资源
     - qcloud-finops-ops       # 反向：成本优化分析
     - qcloud-tcop-ops         # 反向：资源优化与架构评估
 ---
