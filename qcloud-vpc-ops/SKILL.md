@@ -22,7 +22,7 @@ metadata:
   last_updated: "2026-07-03"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
-  api_profile: "2024-01-01 - https://cloud.tencent.com/document/api/215"
+  api_profile: "https://cloud.tencent.com/document/api/215"
   cli_applicability: "dual-path"
   cli_support_evidence: >-
     tccli vpc help confirms full CLI support for VPC operations including
@@ -32,6 +32,12 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+related_skills:
+  - qcloud-ccn-ops
+  - qcloud-vpn-ops
+  - qcloud-cvm-ops
+  - qcloud-clb-ops
+  - qcloud-cam-ops
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).
@@ -187,7 +193,11 @@ tccli vpc CreateVpc --Region "{{env.TENCENTCLOUD_REGION}}" --VpcName "my-vpc" --
 
 ## Changelog
 
-> See `metadata.version` and `metadata.last_updated` in the frontmatter YAML.
+| Version | Date | Summary |
+|---------|------|---------|
+| 1.2.0 | 2026-07-03 | AIOps: Add TE-6 dedup, shared-boilerplate references, dual-path alignment |
+| 1.1.0 | 2026-06-15 | Add GCL Quality Gate, rubric, prompt-templates; TE-4 JSON path centralization |
+| 1.0.0 | 2026-05-21 | Initial VPC ops skill |
 
 ---
 
@@ -227,6 +237,7 @@ tccli vpc CreateVpc \
 
 #### Execution — Python SDK (Fallback Path)
 
+> SDK code: see [references/sdk-code-examples.md](references/sdk-code-examples.md).
 
 #### Post-execution Validation
 
@@ -263,6 +274,7 @@ tccli vpc DescribeVpcs \
 
 #### Execution — Python SDK (Fallback Path)
 
+> SDK code: see [references/sdk-code-examples.md](references/sdk-code-examples.md).
 
 #### Present to User
 
@@ -310,6 +322,7 @@ tccli vpc DeleteVpc \
 
 #### Execution — Python SDK (Fallback Path)
 
+> SDK code: see [references/sdk-code-examples.md](references/sdk-code-examples.md).
 
 #### Post-execution Validation
 
@@ -339,6 +352,7 @@ tccli vpc CreateSubnet \
 
 #### Execution — Python SDK (Fallback Path)
 
+> SDK code: see [references/sdk-code-examples.md](references/sdk-code-examples.md).
 
 #### Validation
 
@@ -362,6 +376,7 @@ tccli vpc DeleteSubnet \
 
 #### Execution — Python SDK (Fallback Path)
 
+> SDK code: see [references/sdk-code-examples.md](references/sdk-code-examples.md).
 
 #### Validation
 
@@ -385,6 +400,7 @@ tccli vpc DescribeSubnets \
 
 #### Execution — Python SDK (Fallback Path)
 
+> SDK code: see [references/sdk-code-examples.md](references/sdk-code-examples.md).
 
 #### Present to User
 
@@ -417,6 +433,7 @@ tccli vpc CreateRouteTable \
 
 #### Execution — Python SDK (Fallback Path)
 
+> SDK code: see [references/sdk-code-examples.md](references/sdk-code-examples.md).
 
 #### Validation
 
@@ -434,6 +451,7 @@ tccli vpc DescribeRouteTables \
 
 #### Execution — Python SDK (Fallback Path)
 
+> SDK code: see [references/sdk-code-examples.md](references/sdk-code-examples.md).
 
 #### Present to User
 
@@ -461,6 +479,7 @@ tccli vpc DeleteRouteTable \
 
 #### Execution — Python SDK (Fallback Path)
 
+> SDK code: see [references/sdk-code-examples.md](references/sdk-code-examples.md).
 
 #### Validation
 
@@ -497,6 +516,7 @@ tccli vpc CreateVpcPeeringConnection \
 
 #### Execution — Python SDK (Fallback Path)
 
+> SDK code: see [references/sdk-code-examples.md](references/sdk-code-examples.md).
 
 #### Post-execution Validation
 
@@ -551,6 +571,7 @@ tccli vpc AcceptVpcPeeringConnection \
 
 #### Execution — Python SDK (Fallback Path)
 
+> SDK code: see [references/sdk-code-examples.md](references/sdk-code-examples.md).
 
 #### Post-execution Validation
 
@@ -585,6 +606,7 @@ tccli vpc DescribeVpcPeeringConnections \
 
 #### Execution — Python SDK (Fallback Path)
 
+> SDK code: see [references/sdk-code-examples.md](references/sdk-code-examples.md).
 
 #### Present to User
 
@@ -621,6 +643,7 @@ tccli vpc DeleteVpcPeeringConnection \
 
 #### Execution — Python SDK (Fallback Path)
 
+> SDK code: see [references/sdk-code-examples.md](references/sdk-code-examples.md).
 
 #### Post-execution Validation
 

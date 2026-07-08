@@ -21,7 +21,7 @@ metadata:
   last_updated: "2026-07-04"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
-  api_profile: "2017-03-20 - https://cloud.tencent.com/document/api/236"
+  api_profile: "https://cloud.tencent.com/document/api/236"
   cli_applicability: "dual-path"
   cli_support_evidence: >-
     Verified via `tccli cdb help` - CLI exposes CreateDBInstance,
@@ -55,15 +55,9 @@ TencentDB for MySQL (CDB) on Tencent Cloud provides a stable, reliable, and elas
 
 - **`cli_applicability: dual-path`**: Official `tccli` fully supports CDB. You **MUST** ship **`references/cli-usage.md`** and, in **each** execution flow below, document **both** the SDK step **and** the `tccli` step. CLI is the **primary** execution path for simplicity; Python SDK is used for edge-case operations CLI doesn't expose or for complex parameter handling.
 
-## Five Core Standards (Quality Gates)
+## Five Core Standards
 
-| # | Standard | How This Skill Fulfills It |
-|---|----------|---------------------------|
-| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT Use conditions with precise triggers (MySQL, CDB, 云数据库) and delegation rules (ES → qcloud-es-ops, Redis → qcloud-redis-ops, PostgreSQL → qcloud-postgres-ops) |
-| 2 | **Structured I/O** | Placeholder conventions (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`) with type and source documented per operation |
-| 3 | **Explicit Actionable Steps** | Every operation: Pre-flight → Execute → Validate → Recover, with numbered imperative steps for CLI and SDK paths |
-| 4 | **Complete Failure Strategies** | Error taxonomy table with ≥ 12 CDB-specific codes; HALT vs retry per error type |
-| 5 | **Absolute Single Responsibility** | One product (CDB/MySQL), primary resource model (DBInstance); cross-product delegation documented |
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
 
 ### Well-Architected Framework Integration (卓越架构)
 
@@ -190,23 +184,23 @@ See [Core Concepts](references/core-concepts.md) → [Execution Flows](#executio
 
 > **推荐**: 对于慢查询问题，使用 [CDB 慢查询快速诊断决策树](references/cdb-slow-query-diagnosis-optimized.md) 进行结构化诊断。
 
-### 快速诊断场景
+### Quick Diagnosis Scenarios
 
-| 场景 | 特征 | 诊断时间 | 恢复时间 | 参考文档 |
-|------|------|----------|----------|----------|
-| **超长查询** | QueryTime > 10s | ≤ 2 分钟 | ≤ 5 分钟 | [决策树 §4.1](references/cdb-slow-query-diagnosis-optimized.md#41-type-a-超长查询诊断) |
-| **资源瓶颈** | CPU > 80% | ≤ 3 分钟 | ≤ 15 分钟 | [决策树 §4.2](references/cdb-slow-query-diagnosis-optimized.md#42-type-b-资源瓶颈诊断) |
-| **锁等待** | LockTime/QueryTime > 50% | ≤ 2 分钟 | ≤ 5 分钟 | [决策树 §4.3](references/cdb-slow-query-diagnosis-optimized.md#43-type-c-锁等待诊断) |
-| **查询优化** | QueryTime 1-10s | ≤ 3 分钟 | ≤ 10 分钟 | [决策树 §4.4](references/cdb-slow-query-diagnosis-optimized.md#44-type-d-查询优化诊断) |
+| Scenario | Symptoms | Diagnosis TTR | Recovery TTR | Reference |
+|----------|----------|--------------|-------------|-----------|
+| **Long-running Queries** | QueryTime > 10s | ≤ 2 min | ≤ 5 min | [Decision Tree §4.1](references/cdb-slow-query-diagnosis-optimized.md#41-type-a-超长查询诊断) |
+| **Resource Bottleneck** | CPU > 80% | ≤ 3 min | ≤ 15 min | [Decision Tree §4.2](references/cdb-slow-query-diagnosis-optimized.md#42-type-b-资源瓶颈诊断) |
+| **Lock Wait** | LockTime/QueryTime > 50% | ≤ 2 min | ≤ 5 min | [Decision Tree §4.3](references/cdb-slow-query-diagnosis-optimized.md#43-type-c-锁等待诊断) |
+| **Query Optimization** | QueryTime 1-10s | ≤ 3 min | ≤ 10 min | [Decision Tree §4.4](references/cdb-slow-query-diagnosis-optimized.md#44-type-d-查询优化诊断) |
 
-### 自动化恢复策略优先级
+### Auto-Recovery Priority
 
-| 优先级 | 策略 | 适用场景 | MTTR |
-|--------|------|----------|------|
-| P0 | 终止超长查询 | Type A, 紧急情况 | ≤ 5 分钟 |
-| P1 | 参数调优 | Type B, Type C | ≤ 15 分钟 |
-| P2 | SQL 重写 | Type D | ≤ 10 分钟 |
-| P3 | 规格升级 | Type B, 长期方案 | ≤ 30 分钟 |
+| Priority | Strategy | Applicable Scenario | MTTR |
+|----------|----------|---------------------|------|
+| P0 | Kill long-running query | Type A, urgent | ≤ 5 min |
+| P1 | Parameter tuning | Type B, Type C | ≤ 15 min |
+| P2 | SQL rewrite | Type D | ≤ 10 min |
+| P3 | Spec upgrade | Type B, long-term | ≤ 30 min |
 
 ### 快速检查命令
 
@@ -439,7 +433,7 @@ See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PA
 The CVM Quality Gate uses the same 5-dimension backbone and the same G/C/O prompt
 architecture, with a different §4 rule set (CVM: `TerminateInstances` / HARD-stop /
 `ResizeInstanceDisks` / `RunInstances` / `ResetInstances`). See
-[`qcloud-cvm-ops/SKILL.md` §Quality Gate](../cvm-ops/SKILL.md#quality-gate-gcl) for
+[`qcloud-cvm-ops/SKILL.md` §Quality Gate](../qcloud-cvm-ops/SKILL.md#quality-gate-gcl) for
 contrast.
 
 ---

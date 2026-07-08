@@ -36,6 +36,8 @@ later mutations, e.g. `ListAttachedUserPolicies` before `DeleteUser`).
 ---
 
 ## 2. Five rubric dimensions (mandatory)
+> **TE-6:** 5-dimension skeleton → [`gcl-prompt-backbone.md`](../../qcloud-skill-generator/references/gcl-prompt-backbone.md).
+
 
 Each dimension is scored `0`, `0.5`, or `1`. Thresholds are taken from
 [AGENTS.md §3](../../AGENTS.md#3-rubric-mandatory-per-skill) and §8 (`qcloud-cam-ops` →

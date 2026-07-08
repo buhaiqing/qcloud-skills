@@ -17,7 +17,7 @@ compatibility: >-
 metadata:
   author: qcloud
   version: "1.1.0"
-  last_updated: "2026-06-04"
+  last_updated: "2026-07-08"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/248"
@@ -216,25 +216,27 @@ tccli monitor DescribeAlarmPolicies --Region {{env.TENCENTCLOUD_REGION}}
 #### Execution — CLI
 
 ```bash
-tccli monitor GetMonitorData \
+tccli monitor CreateAlarmPolicy \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Module "monitor" \
+  --PolicyName "{{user.policy_name}}" \
   --Namespace "{{user.namespace}}" \
-  --MetricName "{{user.metric_name}}" \
-  --Dimensions "[\"Name\":\"{{user.dimension_name}}\",\"Value\":\"{{user.dimension_value}}\"}]" \
-  --StartTime "2026-05-20T00:00:00+08:00" \
-  --EndTime "2026-05-21T00:00:00+08:00" \
-  --Period 300
+  --Conditions '[
+    {"MetricName":"{{user.metric_name}}","Period":300,"Statistics":["{{user.statistics}}"],"ContinuePeriod":{{user.continue_period}},"Threshold":{{user.threshold}},"Operator":"{{user.operator}}"}
+  ]' \
+  --EventConditions '[]'
 ```
 
-→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
+#### Execution — Python SDK (Fallback Path)
+
+→ SDK code: see [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 #### Present to User
 
 | Field | Path | Notes |
 |-------|------|-------|
-| Timestamp | `$.Response.MetricDataPoints[0].Timestamps` | Unix timestamp |
-| Values | `$.Response.MetricDataPoints[0].Values` | Metric values |
-| Unit | `$.Response.MetricDataPoints[0].Unit` | Unit of measurement |
+| Policy ID | `$.Response.PolicyId` | Created alarm policy ID |
+| Request ID | `$.Response.RequestId` | For traceability |
 
 ### Operation: Delete Alarm Policy
 

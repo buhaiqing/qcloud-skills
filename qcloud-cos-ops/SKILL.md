@@ -16,10 +16,10 @@ compatibility: >-
 metadata:
   author: qcloud
   version: "1.1.0"
-  last_updated: "2026-06-04"
+  last_updated: "2026-07-08"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
-  api_profile: "2024-01-01 - https://cloud.tencent.com/document/api/436"
+  api_profile: "https://cloud.tencent.com/document/api/436"
   cli_applicability: "dual-path"
   cli_support_evidence: >-
     tccli cos help confirms CLI support. coscmd tool provides enhanced object
@@ -44,13 +44,7 @@ COS (Cloud Object Storage) on Tencent Cloud provides scalable, secure, and highl
 
 ## Five Core Standards
 
-| # | Standard | Implementation |
-|---|----------|---------------|
-| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT for bucket/object ops; delegate CDN/MySQL to their skills |
-| 2 | **Structured I/O** | `{{env.*}}`/`{{user.*}}`/`{{output.*}}` with COS API fields |
-| 3 | **Explicit Steps** | Pre-flight → Execute → Validate → Recover for bucket/object operations |
-| 4 | **Failure Strategies** | 15+ COS error codes with HALT/retry logic |
-| 5 | **Single Responsibility** | Bucket/Object operations only; delegate database/file system to their skills |
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
 
 ### Well-Architected Framework
 
@@ -467,8 +461,8 @@ See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PA
 
 | Skill | Backbone | Distinctive §4 rule |
 |---|---|---|
-| [`qcloud-cvm-ops`](../cvm-ops/SKILL.md#quality-gate-gcl) | 5 dimensions + G/C/O | compute (instances, disks, re-image) |
-| [`qcloud-cdb-ops`](../cdb-ops/SKILL.md#quality-gate-gcl) | 5 dimensions + G/C/O | database (accounts, privileges, data-plane boundary) |
+| [`qcloud-cvm-ops`](../qcloud-cvm-ops/SKILL.md#quality-gate-gcl) | 5 dimensions + G/C/O | compute (instances, disks, re-image) |
+| [`qcloud-cdb-ops`](../qcloud-cdb-ops/SKILL.md#quality-gate-gcl) | 5 dimensions + G/C/O | database (accounts, privileges, data-plane boundary) |
 | `qcloud-cos-ops` (this skill) | 5 dimensions + G/C/O | object storage (versioning, public ACL, cold transition, batch delete) |
 
 ---

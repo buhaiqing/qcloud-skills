@@ -17,7 +17,7 @@ compatibility: >-
 metadata:
   author: qcloud
   version: "1.2.0"
-  last_updated: "2026-06-13"
+  last_updated: "2026-07-08"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/228"
@@ -31,6 +31,11 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+related_skills:
+  - qcloud-redis-ops
+  - qcloud-clb-ops
+  - qcloud-aiops-diagnosis
+  - qcloud-monitor-ops
 ---
 
 # Tencent Cloud CDN Operations Skill

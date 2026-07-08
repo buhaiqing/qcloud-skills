@@ -15,7 +15,7 @@ compatibility: >-
 metadata:
   author: qcloud
   version: "1.1.0"
-  last_updated: "2026-06-04"
+  last_updated: "2026-07-08"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/239"
@@ -30,6 +30,11 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+related_skills:
+  - qcloud-vpc-ops
+  - qcloud-monitor-ops
+  - qcloud-cdb-ops
+  - qcloud-cam-ops
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).

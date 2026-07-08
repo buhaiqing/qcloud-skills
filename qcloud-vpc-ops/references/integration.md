@@ -87,23 +87,21 @@ cred = credential.Credential(
     os.environ.get("TENCENTCLOUD_SECRET_KEY")
 )
 
-# From config file (alternative)
-cred = credential.Credential(
-    secret_id="AKID...",
-    secret_key="..."
-)
+# From config file (alternative) — NOT recommended: use env vars instead
+# cred = credential.Credential(secret_id=os.environ.get("TENCENTCLOUD_SECRET_ID"), secret_key=os.environ.get("TENCENTCLOUD_SECRET_KEY"))
 ```
 
 ### Client Initialization
 
 ```python
 # Basic client
-client = vpc_client.VpcClient(cred, "ap-guangzhou")
+region = os.environ.get("TENCENTCLOUD_REGION", "ap-guangzhou")
+client = vpc_client.VpcClient(cred, region)
 
 # With HTTP profile (timeout)
 from tencentcloud.common.profile.http_profile import HttpProfile
 http_profile = HttpProfile(timeout=30)
-client = vpc_client.VpcClient(cred, "ap-guangzhou", http_profile)
+client = vpc_client.VpcClient(cred, region, http_profile)
 
 # With client profile
 from tencentcloud.common.profile.client_profile import ClientProfile

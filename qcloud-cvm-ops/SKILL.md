@@ -609,6 +609,15 @@ Optional: `references/monitoring.md`, `references/finops-analysis.md`, `referenc
 
 > Boilerplate: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#quality-gate-gcl).
 
+### GCL Properties
+
+| Property | Value | Source |
+|----------|-------|--------|
+| GCL applicability | **required** | [AGENTS.md §8](../AGENTS.md#8-per-skill-defaults-qcloud) |
+| `max_iterations` | **2** (<br>optional ops: 1) | per-skill override |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CVM-specific safety rules |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator |
+
 ### When the CVM loop runs
 
 | Op class | Loop? | Why |

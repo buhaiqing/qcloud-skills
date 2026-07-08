@@ -47,17 +47,9 @@ TKE (Tencent Kubernetes Engine) is Tencent Cloud's managed Kubernetes service pr
 
 - **`cli_applicability: dual-path`**: Official `tccli` fully supports TKE. You **MUST** ship **`references/cli-usage.md`** and, in **each** execution flow below, document **both** the SDK step **and** the `tccli` step. CLI is the **primary** execution path; Python SDK is used for edge-case operations CLI doesn't expose.
 
-## Five Core Standards (Quality Gates)
+## Five Core Standards
 
-| # | Standard | How This Skill Fulfills It |
-|---|----------|---------------------------|
-| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT Use conditions with precise triggers (TKE, 容器服务, k8s) and delegation rules (VPC → qcloud-vpc-ops, CLB → qcloud-clb-ops, CVM → qcloud-cvm-ops) |
-| 2 | **Structured I/O** | Placeholder conventions (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`) with type and source documented per operation |
-| 3 | **Explicit Actionable Steps** | Every operation: Pre-flight → Execute → Validate → Recover, with numbered imperative steps for CLI and SDK paths |
-| 4 | **Complete Failure Strategies** | Error taxonomy table with ≥ 12 TKE-specific codes; HALT vs retry per error type |
-| 5 | **Absolute Single Responsibility** | One product (TKE), primary resource model (Cluster); cross-product delegation documented |
-
-Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates) for detailed descriptions.
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
 
 ### Well-Architected Framework Integration (卓越架构)
 
@@ -242,29 +234,29 @@ tccli tke DescribeClusters --Region {{env.TENCENTCLOUD_REGION}} --Offset 0 --Lim
 ### Operation: DescribeClusters
 
 **CLI**: `tccli tke DescribeClusters --Region {{env.TENCENTCLOUD_REGION}} [--ClusterId {{user.cluster_id}}]`
-**SDK**: 等价命令见 [references/api-sdk-usage.md](references/api-sdk-usage.md) §DescribeClusters。
-**输出字段**: 见 [Response Field Table](#response-field-table)。
+**SDK**: equivalent command in [references/api-sdk-usage.md](references/api-sdk-usage.md) §DescribeClusters.
+**Output fields**: see [Response Field Table](#response-field-table).
 
 ### Operation: CreateClusterAsGroup (Node Pool)
 
-**Pre-flight**: Cluster 是否 Running、Instance type 是否可用 — 检查表见 [references/cli-usage.md](references/cli-usage.md) §Pre-flight。
-**CLI**: `tccli tke CreateClusterAsGroup ...` — 完整命令见 [references/cli-usage.md](references/cli-usage.md) §CreateClusterAsGroup。
-**SDK**: 示例见 [references/api-sdk-usage.md](references/api-sdk-usage.md) §CreateClusterAsGroup。
-**验证**: 轮询 DescribeClusterAsGroups 直到 NodePoolStatus = Running (max 300s)。
-**错误处理**: 见 [通用错误表](#error-code-reference-tke-specific)。
+**Pre-flight**: Check Cluster Running state, Instance type availability — see [references/cli-usage.md](references/cli-usage.md) §Pre-flight.
+**CLI**: `tccli tke CreateClusterAsGroup ...` — full command in [references/cli-usage.md](references/cli-usage.md) §CreateClusterAsGroup.
+**SDK**: example in [references/api-sdk-usage.md](references/api-sdk-usage.md) §CreateClusterAsGroup.
+**Verify**: poll DescribeClusterAsGroups until NodePoolStatus = Running (max 300s).
+**Error handling**: see [Error Code Reference](#error-code-reference-tke-specific).
 
 ### Operation: DeleteCluster
 
 **Pre-flight (Safety Gate)**:
-- **MUST** 显式确认：删除集群 `{{user.cluster_name}}` (`{{user.cluster_id}}`)
-- **MUST** 警示：删除所有节点、Pod 和数据；提示用户先导出 YAML
-- **MUST** 检查：节点健康（DescribeClusterInstances）；用户手动确认 workload（kubectl 不在本 Skill 范围内）
-- **MUST** 检查：节点池已缩容到 0 或先删除
+- **MUST** confirm: delete cluster `{{user.cluster_name}}` (`{{user.cluster_id}}`)
+- **MUST** warn: deletes all nodes, pods, and data; prompt user to export YAML first
+- **MUST** check: node health (DescribeClusterInstances); user manually confirms workloads (kubectl outside this Skill scope)
+- **MUST** check: node pool scaled to 0 or deleted first
 
 **CLI**: `tccli tke DeleteCluster --ClusterId "{{user.cluster_id}}" --InstanceDeleteMode "TerminateAndDestroy"`
-**SDK**: 示例见 [references/api-sdk-usage.md](references/api-sdk-usage.md) §DeleteCluster。
-**验证**: 轮询 DescribeClusters 直到 NotFound (max 600s)。
-**错误处理**: 见 [通用错误表](#error-code-reference-tke-specific)。
+**SDK**: see [references/api-sdk-usage.md](references/api-sdk-usage.md) §DeleteCluster.
+**Verify**: poll DescribeClusters until NotFound (max 600s).
+**Error handling**: see [Error Code Reference](#error-code-reference-tke-specific).
 
 ### Operation: InstallComponents (Addon Management)
 

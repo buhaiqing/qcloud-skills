@@ -48,17 +48,9 @@ CKafka (Cloud Kafka) is Tencent Cloud's fully managed, distributed message queue
 
 - **`cli_applicability: dual-path`**: Official `tccli` fully supports CKafka. You **MUST** ship **`references/cli-usage.md`** and, in **each** execution flow below, document **both** the SDK step **and** the `tccli` step. CLI is the **primary** execution path for simplicity; Python SDK is used for edge-case operations CLI doesn't expose or for complex parameter handling.
 
-## Five Core Standards (Quality Gates)
+## Five Core Standards
 
-| # | Standard | How This Skill Fulfills It |
-|---|----------|---------------------------|
-| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT Use conditions with precise triggers (CKafka, Kafka, 消息队列) and delegation rules (TDMQ → other skills, VPC → qcloud-vpc-ops) |
-| 2 | **Structured I/O** | Placeholder conventions (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`) with type and source documented per operation |
-| 3 | **Explicit Actionable Steps** | Every operation: Pre-flight → Execute → Validate → Recover, with numbered imperative steps for CLI and SDK paths |
-| 4 | **Complete Failure Strategies** | Error taxonomy table with ≥ 12 CKafka-specific codes; HALT vs retry per error type |
-| 5 | **Absolute Single Responsibility** | One product (CKafka), primary resource model (Instance, Topic); cross-product delegation documented |
-
-Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates) for detailed descriptions.
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
 
 ### Well-Architected Framework Integration (卓越架构)
 

@@ -46,19 +46,9 @@ CLB (Cloud Load Balancer, 负载均衡) provides security-focused traffic distri
 
 - **`cli_applicability: dual-path`**: Official `tccli` fully supports CLB. You **MUST** ship **`references/cli-usage.md`** and, in **each** execution flow below, document **both** the SDK step **and** the `tccli` step. CLI is the **primary** execution path for simplicity; Python SDK is used for edge-case operations CLI doesn't expose.
 
-## Five Core Standards (Quality Gates)
+## Five Core Standards
 
-Every generated skill MUST satisfy these five standards. Use them as a design checklist:
-
-| # | Standard | How This Skill Fulfills It |
-|---|----------|---------------------------|
-| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT Use conditions with precise triggers (CLB, 负载均衡) and delegation rules (VPC → qcloud-vpc-ops, CVM → qcloud-cvm-ops) |
-| 2 | **Structured I/O** | Placeholder conventions (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`) with type and source documented per operation |
-| 3 | **Explicit Actionable Steps** | Every operation: Pre-flight → Execute → Validate → Recover, with numbered imperative steps for CLI and SDK paths |
-| 4 | **Complete Failure Strategies** | Error taxonomy table with ≥ 12 CLB-specific codes; HALT vs retry per error type |
-| 5 | **Absolute Single Responsibility** | One product (CLB), primary resource model (LoadBalancer); cross-product delegation documented |
-
-Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates) for detailed descriptions.
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
 
 ### Well-Architected Framework Integration (卓越架构)
 
@@ -264,14 +254,14 @@ Every operation: **Pre-flight → Execute (CLI and SDK) → Validate → Recover
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Backoff | Agent Action | UX Feedback |
-|--------------|-------------|---------|--------------|-------------|
-| `InvalidParameter.LBIdNotFound` | 0 | — | HALT | `[ERROR] LoadBalancer ID not found - verify ID and retry` |
-| `ResourceInsufficient` | 0 | — | HALT | `[ERROR] Resource quota exceeded - contact administrator` |
-| `InvalidSecretKey` / `InvalidSecretId` | 0 | — | HALT | `[ERROR] Credentials invalid - check TENCENTCLOUD_SECRET_ID/KEY` |
-| `RequestLimitExceeded` | 3 | exponential | Back off and retry | `⚠️ Rate limit reached - retrying with backoff...` |
-| `InternalError` | 3 | 2s, 4s, 8s | Retry then HALT | `[ERROR] Internal server error - retrying...` |
-| `FailedOperation.ResourceInOperating` | 3 | 30s | Wait and retry | `⚠️ Resource busy - waiting 30s before retry...` |
+| Error pattern | Max retries | Agent Action |
+|--------------|-------------|--------------|
+| `InvalidParameter.LBIdNotFound` | 0 | HALT — verify LB ID |
+| `ResourceInsufficient` | 0 | HALT — contact administrator |
+| `InvalidSecretKey` / `InvalidSecretId` | 0 | HALT — check credentials |
+| `RequestLimitExceeded` | 3 | Back off (exponential) and retry |
+| `InternalError` | 3 | Retry (2s/4s/8s), then HALT |
+| `FailedOperation.ResourceInOperating` | 3 | Wait 30s and retry |
 
 ### Operation: Describe LoadBalancers
 

@@ -31,6 +31,11 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+related_skills:
+  - qcloud-vpc-ops
+  - qcloud-cvm-ops
+  - qcloud-monitor-ops
+  - qcloud-aiops-diagnosis
 ---
 
 # Tencent Cloud CAM Operations Skill

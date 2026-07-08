@@ -17,10 +17,10 @@ compatibility: >-
 metadata:
   author: qcloud
   version: "1.1.0"
-  last_updated: "2026-06-04"
+  last_updated: "2026-07-08"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
-  api_profile: "2018-04-16 - https://cloud.tencent.com/document/api/845"
+  api_profile: "https://cloud.tencent.com/document/api/845"
   cli_applicability: "dual-path"
   cli_support_evidence: >-
     Verified via `tccli es help` - CLI exposes CreateInstance, DescribeInstances,
@@ -50,17 +50,9 @@ Elasticsearch Service (ES) on Tencent Cloud provides a fully managed, elasticall
 
 - **`cli_applicability: dual-path`**: Official `tccli` fully supports ES. You **MUST** ship **`references/cli-usage.md`** and, in **each** execution flow below, document **both** the SDK step **and** the `tccli` step. CLI is the **primary** execution path for simplicity; Python SDK is used for edge-case operations CLI doesn't expose or for complex parameter handling.
 
-## Five Core Standards (Quality Gates)
+## Five Core Standards
 
-| # | Standard | How This Skill Fulfills It |
-|---|----------|---------------------------|
-| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT Use conditions with precise triggers (ES, Elasticsearch, 弹性搜索) and delegation rules (VPC → qcloud-vpc-ops, COS → qcloud-cos-ops) |
-| 2 | **Structured I/O** | Placeholder conventions (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`) with type and source documented per operation |
-| 3 | **Explicit Actionable Steps** | Every operation: Pre-flight → Execute → Validate → Recover, with numbered imperative steps for CLI and SDK paths |
-| 4 | **Complete Failure Strategies** | Error taxonomy table with ≥ 12 ES-specific codes; HALT vs retry per error type |
-| 5 | **Absolute Single Responsibility** | One product (ES), primary resource model (Instance); cross-product delegation documented |
-
-Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates) for detailed descriptions.
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
 
 ### Well-Architected Framework Integration (卓越架构)
 

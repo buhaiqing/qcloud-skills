@@ -22,7 +22,7 @@ metadata:
   last_updated: "2026-06-09"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
-  api_profile: "https://cloud.tencent.com/document/api/240 — 2019-07-25"
+  api_profile: "https://cloud.tencent.com/document/api/240"
   cli_applicability: "dual-path"
   cli_support_evidence: >-
     Verified via `tccli mongodb help` — 79 available actions for version
@@ -48,15 +48,9 @@ TencentDB for MongoDB on Tencent Cloud provides fully managed MongoDB database s
 
 - **`cli_applicability: dual-path`:** Official `tccli` supports MongoDB with 79 actions for API version 2019-07-25. CLI is the **primary** execution path. Python SDK is the **fallback** for edge cases.
 
-## Five Core Standards (Quality Gates)
+## Five Core Standards
 
-| # | Standard | How This Skill Fulfills It |
-|---|----------|---------------------------|
-| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT Use conditions with precise triggers and delegation rules |
-| 2 | **Structured I/O** | Placeholder conventions (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`) with type and source documented |
-| 3 | **Explicit Actionable Steps** | Every operation: Pre-flight → Execute → Validate → Recover, with numbered imperative steps |
-| 4 | **Complete Failure Strategies** | Error taxonomy table with ≥ 10 product-specific codes; HALT vs retry per error type |
-| 5 | **Absolute Single Responsibility** | One product (MongoDB), one primary resource (DBInstance); cross-product delegation to other skills |
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
 
 ### Token Efficiency (TE)
 

@@ -10,7 +10,7 @@ Collection of Tencent Cloud AI Agent skills (OpenSpec) for ops runbooks. Each sk
 qcloud-skills/
   scripts/                     # Shared executables: validate_*, gcl_runner, gcl_trace_aggregate
   audit-results/               # Runtime output (gitignored)
-  qcloud-[product]-ops/        # 24 skill directories
+  qcloud-[product]-ops/        # 31 skill directories
     SKILL.md                   # YAML frontmatter + Markdown runbook
     assets/
       eval_queries.json        # Intent classification test set
@@ -21,9 +21,9 @@ qcloud-skills/
 
 All schemas, handoff contracts, and skill-specific config live under the owning skill's `assets/` (or `references/` for Markdown-only contracts).
 
-## Skills inventory (24)
+## Skills inventory (31)
 
-- Product-scoped (20): `cvm`, `cdb`, `clb`, `cos`, `es`, `redis`, `monitor`, `tke`, `vpc`, `cam`, `cdn`, `cbs`, `cls`, `ckafka`, `scf`, `mongodb`, `postgres`, `ssl`, `agsx`, `finops`
+- Product-scoped (27): `cvm`, `cdb`, `clb`, `cos`, `es`, `redis`, `monitor`, `tke`, `vpc`, `cam`, `cdn`, `cbs`, `cls`, `ckafka`, `scf`, `mongodb`, `postgres`, `ssl`, `agsx`, `finops`, `ccn`, `vpn`, `dc`, `cicd`, `service-mesh`, `migration`, `tcop`
 - Cross-product (3): `qcloud-aiops-diagnosis`, `qcloud-proactive-inspection`, `qcloud-well-architected-review`
 - Meta-skill (1): `qcloud-skill-generator` (scaffolds/updates other skills)
 

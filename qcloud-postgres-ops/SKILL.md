@@ -19,10 +19,10 @@ compatibility: >-
 metadata:
   author: qcloud
   version: "1.1.0"
-  last_updated: "2026-06-04"
+  last_updated: "2026-07-08"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
-  api_profile: "https://cloud.tencent.com/document/api/409 — 2017-03-12"
+  api_profile: "https://cloud.tencent.com/document/api/409"
   cli_applicability: "dual-path"
   cli_support_evidence: >-
     Verified via `tccli postgres help` — actions covering instance lifecycle,

@@ -20,6 +20,8 @@
 ---
 
 ## 2. Five rubric dimensions (mandatory)
+> **TE-6:** 5-dimension skeleton → [`gcl-prompt-backbone.md`](../../qcloud-skill-generator/references/gcl-prompt-backbone.md).
+
 
 | # | Dimension | Threshold | Why for Proactive Inspection |
 |---|---|---|---|

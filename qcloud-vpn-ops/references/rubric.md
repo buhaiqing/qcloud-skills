@@ -11,6 +11,8 @@ This rubric applies to every VPN operation that runs through `scripts/gcl_runner
 | Read-only | `DescribeVpnGateways`, `DescribeVpnConnections`, `DescribeCustomerGateways`, `DescribeVpnGatewaySslServers`, `DescribeVpnGatewaySslClients` | optional | 1 |
 
 ## 2. Five rubric dimensions (mandatory)
+> **TE-6:** 5-dimension skeleton → [`gcl-prompt-backbone.md`](../../qcloud-skill-generator/references/gcl-prompt-backbone.md).
+
 
 Each scored 0.0–1.0.
 
