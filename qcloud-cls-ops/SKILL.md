@@ -46,26 +46,11 @@ CLS (Cloud Log Service) is Tencent Cloud's fully managed log service providing l
 
 - **`cli_applicability: dual-path`**: Official `tccli` fully supports CLS. You **MUST** ship **`references/cli-usage.md`** and, in **each** execution flow below, document **both** the SDK step **and** the `tccli` step. CLI is the **primary** execution path for simplicity; Python SDK is used for edge-case operations CLI doesn't expose or for complex parameter handling.
 
-## Five Core Standards (Quality Gates)
+## Five Core Standards
 
-| # | Standard | How This Skill Fulfills It |
-|---|----------|---------------------------|
-| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT with precise triggers and delegation rules |
-| 2 | **Structured I/O** | Placeholder conventions (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`) per operation |
-| 3 | **Explicit Actionable Steps** | Every operation: Pre-flight → Execute → Validate → Recover |
-| 4 | **Complete Failure Strategies** | Error taxonomy with ≥ 12 CLS-specific codes; HALT vs retry per error type |
-| 5 | **Absolute Single Responsibility** | One product (CLS), primary resource model (Logset + Topic + Index) |
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
 
-Refer to the [meta-skill](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates) for detailed descriptions.
-
-### Well-Architected Framework Integration (卓越架构)
-
-| Pillar | Skill Integration | Reference |
-|--------|-------------------|-----------|
-| **可靠性 (Reliability)** | Multi-AZ log storage, log shipping to COS/CKafka for DR, index auto-rebuild, data lifecycle management | `references/well-architected-assessment.md` |
-| **安全性 (Security)** | CAM permissions, log encryption at rest, log encryption in transit (TLS), access control for log search | `references/well-architected-assessment.md` |
-| **成本 (Cost)** | Log retention policies, log shipping to COS for cold storage, log sampling configuration, index optimization | `references/well-architected-assessment.md` |
-| **效率 (Efficiency)** | High-performance log search (SQL-like syntax), real-time alerting, automated log collection, machine group auto-scaling | `references/well-architected-assessment.md` |
+> Well-Architected pillars (Reliability, Security, Cost, Efficiency): see `references/well-architected-assessment.md`.
 
 ## Trigger & Scope (Agent-Readable)
 
@@ -222,13 +207,7 @@ tccli cls DescribeLogsets --Region {{env.TENCENTCLOUD_REGION}}
 
 ## Changelog
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2026-05-28 | Initial skill with CreateLogset, CreateTopic, CreateIndex, SearchLog, CreateMachineGroup, CreateConfig, Delete operations |
-| 1.1.0 | 2026-05-31 | Add ImportCOSAccessLogs and COSAccessLogAnalysis operations; add cos-log-analysis.md reference |
-| 1.2.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CLS-specific safety rules incl. logset cascade delete, topic data loss, index removal unsearchable, machine group collection stop, config change gap), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
-| 1.4.0 | 2026-07-04 | Merged Quick Start into compact Env|Setup table; trimmed Capabilities to 2 columns (Operation + Risk Level); replaced inline SDK blocks with trimmed request-specific code + reference to references/sdk-templates.md; created references/sdk-templates.md with CLS init + polling + try-except. Bumped version. |
-| 1.5.0 | 2026-07-05 | TE refactor: extracted 7 repeated Failure Recovery sections → `references/failure-recovery-reference.md`; consolidated GCL safety rules table → single-sentence reference to rubric.md §4; rubric.md §3.5 added `<!-- Use API for latest -->` annotations to PartitionCount / Period / AlarmPeriod sets. |
+> See `metadata.version` and `metadata.last_updated` in the frontmatter YAML.
 
 ---
 
@@ -649,157 +628,63 @@ Multi-step analysis of COS access logs imported into CLS. Covers troubleshooting
 
 ## Error Code Reference
 
+> See `references/troubleshooting.md` and `references/failure-recovery-reference.md` for full list. Key codes:
 
-| Error Code | Description | Recovery |
-|------------|-------------|----------|
-| `InvalidParameter` | Parameter format invalid | Fix per API spec; retry `[ERROR] Parameter invalid → Check format → Retry` |
-| `InvalidParameterValue` | Parameter value invalid | Fix value; retry `[ERROR] Invalid value → Correct input → Retry` |
-| `ResourceNotFound.LogsetNotExist` | Logset does not exist | HALT; verify logset ID `[ERROR] Logset not found → Verify LogsetId` |
-| `ResourceNotFound.TopicNotExist` | Topic does not exist | HALT; verify topic ID `[ERROR] Topic not found → Verify TopicId` |
-| `ResourceNotFound.IndexNotExist` | Index does not exist | HALT; create index first `[ERROR] Index not found → Create index first` |
-| `ResourceNotFound.MachineGroupNotExist` | Machine group not found | HALT; verify group ID `[ERROR] Machine group not found → Verify GroupId` |
-| `ResourceInUse.LogsetName` | Logset name already exists | Use unique name `[ERROR] Logset name in use → Choose unique name` |
-| `ResourceInUse.TopicName` | Topic name already exists | Use unique name `[ERROR] Topic name in use → Choose unique name` |
-| `ResourceInUse.IndexAlreadyExist` | Index already exists | Use ModifyIndex or delete first `[ERROR] Index exists → Modify or delete first` |
-| `QuotaExceeded.Logset` | Logset quota exceeded | HALT; request quota increase `[ERROR] Logset quota exceeded → Request increase` |
-| `QuotaExceeded.Topic` | Topic quota exceeded | HALT; request quota increase `[ERROR] Topic quota exceeded → Request increase` |
-| `LimitExceeded.SearchTimeRange` | Search time range too large | Reduce to max 31 days `[ERROR] Time range too large → Max 31 days` |
-| `InvalidParameter.QuerySyntax` | Log query syntax error | Fix query syntax `[ERROR] Query syntax error → Check syntax` |
-| `RequestLimitExceeded` | API rate limit exceeded | Exponential backoff `⚠️ Rate limit → Retrying...` |
-| `OperationConflict` | Concurrent operation conflict | Wait; retry `⚠️ Operation in progress → Waiting...` |
-| `InternalError` | Internal server error | Retry; HALT if persists `[ERROR] Internal error → Retry → Escalate` |
-| `UnauthorizedOperation` | Permission denied | HALT; check CAM permissions `[ERROR] Permission denied → Check CAM` |
-| `InvalidParameter.Bucket` | COS bucket parameter invalid | Verify bucket name and region `[ERROR] Invalid COS bucket → Verify name/region` |
-| `ResourceNotFound.BucketNotExist` | COS bucket not found | HALT; verify bucket exists `[ERROR] COS bucket not found → Verify bucket` |
-| `ResourceInUse.CosRechargeAlreadyExist` | COS import task exists | Use ModifyCosRecharge or delete first `[ERROR] Import task exists → Modify or delete first` |
-| `QuotaExceeded.CosRecharge` | COS import task quota reached | HALT; delete unused import tasks `[ERROR] Import task quota exceeded → Clean up tasks` |
-
-## Safety Gates
-
-### DeleteLogset Safety Gate
-
-**MUST** obtain explicit confirmation before deleting:
-
-```
-⚠️ WARNING: Deleting logset will PERMANENTLY REMOVE all topics and logs within it.
-
-Logset to delete: {{user.logset_name}} ({{user.logset_id}})
-This action is IRREVERSIBLE and data cannot be recovered.
-
-Topics that will be deleted:
-- [List topics via DescribeTopics]
-
-Confirm deletion by typing the logset name: {{user.logset_name}}
-```
-
-**MUST** check:
-- No active collection configs using this logset
-- No active alarm rules depending on this logset
-- No log shipping tasks configured
-
-### DeleteTopic Safety Gate
-
-**MUST** obtain explicit confirmation before deleting:
-
-```
-⚠️ WARNING: Deleting topic will PERMANENTLY REMOVE all logs stored in it.
-
-Topic to delete: {{user.topic_name}} ({{user.topic_id}})
-Logset: {{user.logset_name}}
-Estimated data loss: [Check storage size via DescribeTopics]
-
-This action is IRREVERSIBLE.
-
-Confirm deletion by typing: DELETE {{user.topic_name}}
-```
-
-**MUST** check:
-- No active collection configs shipping to this topic
-- No active index (delete index first if exists)
-- No active alarm rules for this topic
-- User has backup if needed
-
-### DeleteIndex Safety Gate
-
-**MUST** warn:
-
-```
-⚠️ WARNING: Deleting index will DISABLE log search for this topic.
-
-Topic: {{user.topic_name}} ({{user.topic_id}})
-Existing logs will remain but cannot be searched until index is recreated.
-
-Proceed? (yes/no)
-```
-
----
+| Code | Recovery |
+|------|----------|
+| `ResourceNotFound.*` | Verify resource ID |
+| `ResourceInUse.*` | Resolve conflict first |
+| `QuotaExceeded.*` | HALT; request quota increase |
+| `RequestLimitExceeded` | Retry with exponential backoff |
+| `UnauthorizedOperation` | HALT; check CAM permissions |
+| `InternalError` | Retry 3x; escalate with RequestId |
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
-is a **runtime** scoring layer that audits each CLS execution against an explicit rubric,
-in addition to the build-time **Safety Gates** above and the build-time **2-round
-self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
+> Boilerplate: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#quality-gate-gcl).
 
-| Property | Value | Source |
-|---|---|---|
-| GCL applicability | **recommended** | [AGENTS.md §8](../AGENTS.md#8-per-skill-defaults-qcloud) |
-| `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-cls-ops`) |
-| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CLS-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
-| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../AGENTS.md#6-trace--audit-mandatory) |
+### When the CLS loop runs
 
-### When the loop runs
-
-| Op class | Loop runs? | Why |
+| Op class | Loop? | Why |
 |---|---|---|
 | Destructive: `DeleteLogset`, `DeleteTopic`, `DeleteIndex` | **yes** | No recycle bin; cascade to shippers and alarms |
 | Sensitive mutating: `ModifyTopic` (retention reduction), `ModifyConfig`, `DeleteConfigAttachment` | **yes** | Hard-truncate historical data; collection gap |
 | Mutating: `CreateLogset`, `CreateTopic`, `CreateIndex`, `CreateShipper`, `ApplyConfigToMachineGroup` | **yes** | Cost / search availability / pipeline risk |
-| Read-only: `DescribeLogsets`, `DescribeTopics`, `DescribeIndex`, `SearchLog` | optional (max_iter=1, no hard abort) | Pre-flight for parent mutations |
+| Read-only: `DescribeLogsets`, `DescribeTopics`, `DescribeIndex`, `SearchLog` | optional (max_iter=1) | Pre-flight for parent mutations |
 
-### Decision flow (first match wins)
+### CLS-specific safety rules
 
-1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result)
-2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
-3. **All thresholds met** ⇒ **PASS**
-4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
+> Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-### CLS-specific safety rules (rubric §4)
-
-Full rules: [`references/rubric.md`](references/rubric.md) §4 — 5 rules covering `DeleteLogset` cascade, `DeleteTopic` shipper orphan, `ModifyTopic` retention truncation, `CreateIndex` cost projection, and `ModifyConfig` async-apply gap.
+| # | Ops | Gate (summary) |
+|---:|---|---|
+| 1 | `DeleteLogset` | Cascade check: enumerate all topics, shippers, alarms depending on this logset |
+| 2 | `DeleteTopic` | Shipper orphan check: enumerate all shippers shipping to this topic |
+| 3 | `ModifyTopic` (retention reduction) | Show current → target retention; warn historical data beyond new retention is deleted |
+| 4 | `CreateIndex` | Show estimated storage cost per day before commit |
+| 5 | `ModifyConfig` / `DeleteConfigAttachment` | Warn that existing machine group collection stops until re-apply |
 
 Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
-### Worked example — `DeleteLogset` with active COS shipper
+### Worked example — DeleteLogset with active COS shipper
 
-| Dimension | Score |
-|---|---|
-| Correctness | 0.5 (logset deleted, but cascade not surfaced) |
-| **Safety** | **0** (rule 1 violated — no shipper enumeration) |
-| Idempotency | 1 |
-| Traceability | 0.5 |
-| Spec Compliance | 1 |
+Safety=0 (rule 1 violated — no shipper enumeration). `decision: ABORT`.
+Recovery: Restore from COS archive if available; recreate pipeline.
 
-`decision: ABORT`. Recovery suggestion: "Restore from COS archive if available; recreate logset + topic + shipper pipeline."
+See [`references/rubric.md`](references/rubric.md) §6 for full examples (PASS on `CreateTopic` + SAFETY_FAIL on `ModifyTopic` retention reduction).
 
-See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `CreateTopic` and SAFETY_FAIL on `ModifyTopic` retention reduction).
-
----
+> Decision flow: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#decision-flow-first-match-wins).
 
 ## Reference Directory
 
-| File | Description |
-|------|-------------|
-| [references/cli-usage.md](references/cli-usage.md) | Complete tccli command reference for CLS |
-| [references/core-concepts.md](references/core-concepts.md) | CLS architecture: Logset, Topic, Index, MachineGroup, Config |
-| [references/failure-recovery-reference.md](references/failure-recovery-reference.md) | Error taxonomy and per-operation recovery patterns; referenced by all execution flows |
-| [references/cos-log-analysis.md](references/cos-log-analysis.md) | COS access log analysis — fields, scenarios, query templates |
-| [references/troubleshooting.md](references/troubleshooting.md) | Common issues and solutions |
-| [references/integration.md](references/integration.md) | SDK setup, Cloud Shell, automation patterns |
-| [references/well-architected-assessment.md](references/well-architected-assessment.md) | Architecture review checklist |
-| [references/query-language.md](references/query-language.md) | Log search syntax and examples |
-| [examples/](../examples/) | Sample scripts and use cases |
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#reference-directory).
+
+Core: `references/cli-usage.md`, `references/core-concepts.md`, `references/failure-recovery-reference.md`, `references/sdk-templates.md`, `references/troubleshooting.md`, `references/well-architected-assessment.md`, `references/rubric.md`, `references/prompt-templates.md`.
+Optional: `references/cos-log-analysis.md`, `references/query-language.md`, `references/integration.md`.
+
+---
+
+*Generated for Tencent Cloud CLS Operations Skill*[examples/](../examples/) | Sample scripts and use cases |
 
 ---
 

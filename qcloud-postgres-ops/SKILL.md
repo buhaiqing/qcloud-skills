@@ -48,24 +48,11 @@ TencentDB for PostgreSQL on Tencent Cloud provides fully managed PostgreSQL data
 
 - **`cli_applicability: dual-path`:** Official `tccli` supports PostgreSQL. CLI is the **primary** execution path. Python SDK is the **fallback** for edge cases.
 
-## Five Core Standards (Quality Gates)
+## Five Core Standards
 
-| # | Standard | How This Skill Fulfills It |
-|---|----------|---------------------------|
-| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT Use conditions with precise triggers and delegation rules |
-| 2 | **Structured I/O** | Placeholder conventions (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`) with type and source documented |
-| 3 | **Explicit Actionable Steps** | Every operation: Pre-flight → Execute → Validate → Recover, with numbered imperative steps |
-| 4 | **Complete Failure Strategies** | Error taxonomy table with ≥ 10 product-specific codes; HALT vs retry per error type |
-| 5 | **Absolute Single Responsibility** | One product (PostgreSQL), one primary resource (DBInstance); cross-product delegation to other skills |
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
 
-### Well-Architected Framework Integration
-
-| Pillar | Skill Integration | Reference |
-|--------|-------------------|-----------|
-| **可靠性 (Reliability)** | Multi-AZ deployment, backup/restore, read replicas, RTO/RPO guidelines, data migration | `references/well-architected-assessment.md` |
-| **安全性 (Security)** | CAM permissions, SSL/TLS, VPC isolation, security groups, password policies, audit logging | `references/well-architected-assessment.md` |
-| **成本 (Cost)** | Prepaid vs postpaid comparison, right-sizing, reserved instances, backup cost management | `references/well-architected-assessment.md` |
-| **效率 (Efficiency)** | Batch operations, parameter templates, CI/CD automation, connection pooling, slow query optimization | `references/well-architected-assessment.md` |
+> Well-Architected pillars (Reliability, Security, Cost, Efficiency): see `references/well-architected-assessment.md`.
 
 ## Trigger & Scope (Agent-Readable)
 
@@ -571,111 +558,61 @@ tccli postgres ModifyDBInstanceSecurityGroups \
 
 ## Error Code Reference
 
-| Code | Meaning | Recovery |
-|------|---------|----------|
-| InvalidParameterValue.NotFoundInstance | 未找到实例 | Verify instance ID; suggest DescribeDBInstances |
-| InvalidParameterValue.IllegalInstanceStatus | 实例状态不允许操作 | Check status; wait for running state |
-| InvalidParameterValue.SpecNotOnSale | 购买规格错误 | Use DescribeProductConfig for available specs |
-| InvalidParameterValue.ZoneClosed | 可用区已关闭售卖 | Choose different AZ |
-| InvalidParameterValue.PostPaidInstanceBeyondLimit | 后付费实例超限 | Delete unused or switch to prepaid |
-| InvalidParameterValue.PasswordRuleFailed | 密码不符合规范 | 8-32 chars, letters + digits + special chars |
-| FailedOperation.DeletionProtectionEnabled | 实例开启了销毁保护 | Disable deletion protection first |
-| FailedOperation.OperationNotAllowedInInstanceLocking | 实例锁定中 | Retry 3x with 30s backoff |
-| InternalError.TradeError | 交易系统错误 | Retry 3x with 5s backoff; escalate with RequestId |
-| LimitExceeded.TooManyRequests | 请求太过频繁 | Retry 3x with exponential backoff |
-| AuthFailure | CAM鉴权错误 | HALT; check credentials |
-| InternalError | 内部错误 | Retry 3x (2s, 4s, 8s); escalate with RequestId |
+> See `references/troubleshooting.md` for full list. Key codes:
 
-## Safety Gates (Destructive Operations)
-
-Every **Delete**, **Isolate**, or **irreversible** operation MUST have:
-
-1. **Explicit user confirmation** with resource identifier (`{{user.instance_name}}` / `{{user.instance_id}}`)
-2. **Pre-backup reminder** — suggest `CreateBackup` before destructive ops
-3. **Deletion protection check** — verify status before delete
-4. **Post-delete verification** — poll describe until status=deleted or 404
-
----
+| Code | Recovery |
+|------|----------|
+| `NotFoundInstance` | Verify instance ID via DescribeDBInstances |
+| `IllegalInstanceStatus` | Wait for running state |
+| `DeletionProtectionEnabled` | Disable deletion protection first |
+| `OperationNotAllowedInInstanceLocking` | Retry 3x with 30s backoff |
+| `RequestLimitExceeded` | Retry 3x with exponential backoff |
+| `InternalError` | Retry 3x; escalate with RequestId |
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
-is a **runtime** scoring layer that audits each PostgreSQL execution against an explicit
-rubric, in addition to the build-time **Safety Gates** above and the build-time
-**2-round self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
+> Boilerplate: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#quality-gate-gcl).
 
-> **Standard PostgreSQL has no UNDROP.** Unlike Oracle Flashback, a `DropDatabase` or
-> `REVOKE ALL` is immediately effective — running applications fail on the next query with
-> lazy privilege errors that look like transient auth failures.
+> **PostgreSQL has no UNDROP.** A `DropDatabase` or `REVOKE ALL` is immediately effective — running apps fail on the next query with lazy auth errors that look like transient failures.
 
-| Property | Value | Source |
+### When the PG loop runs
+
+| Op class | Loop? | Why |
 |---|---|---|
-| GCL applicability | **required** | [AGENTS.md §8](../AGENTS.md#8-per-skill-defaults-qcloud) |
-| `max_iterations` | **2** | per-skill override (matches AGENTS.md §8 default for `qcloud-postgres-ops`) |
-| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 PostgreSQL-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
-| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../AGENTS.md#6-trace--audit-mandatory) |
+| Destructive: `IsolateDBInstance`, `DeleteDBInstance`, `RestoreDBInstance` (overwrite target) | **yes** | Irreversible; needs scoring |
+| Sensitive mutating: `UpgradeDBInstance` (spec change), `ResetAccountPassword`, `ModifyAccountPrivileges` (`REVOKE ALL`) | **yes** | Restart/immediate connection drop/silent privilege loss; needs scoring |
+| Mutating: `CreateDBInstances`, `CreateAccount`, `ModifyDBInstanceName` | **yes** | Cost/security/connectivity risk; needs scoring |
+| Read-only: `DescribeDBInstances`, `DescribeAccounts`, `DescribeDBBackups`, `DescribeSlowLogData` | optional (max_iter=1) | Polling tails in parent trace |
 
-### When the loop runs
+### PG-specific safety rules
 
-| Op class | Loop runs? | Why |
-|---|---|---|
-| Destructive: `IsolateDBInstance`, `DeleteDBInstance`, `RestoreDBInstance` (overwrite target), `DropDatabase` (data-plane boundary — HALT if via raw `psql`) | **yes** | Irreversible or recycle-bin window only; needs scoring |
-| Sensitive mutating: `ModifyDBInstanceSpec` (storage/memory change), `ResetAccountPassword` / `ModifyAccountPassword`, `ModifyAccountPrivileges` (`REVOKE ALL`) | **yes** | Restart / immediate connection drop / silent privilege loss; needs scoring |
-| Mutating: `CreateDBInstances`, `CreateAccount`, `UpgradeDBInstance`, `ModifyDBInstanceName`, `OpenWanService` / `CloseWanService` | **yes** | Cost / security / connectivity risk; needs scoring |
-| Read-only: `DescribeDBInstances`, `DescribeAccounts`, `DescribeDBBackups`, `DescribeSlowLogData`, `DescribeErrorLogData` | optional (max_iter=1, no hard abort) | Polling tails are part of the parent op's trace |
+> Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-### Decision flow (first match wins)
-
-1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result)
-2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
-3. **All thresholds met** ⇒ **PASS**
-4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
-
-### PostgreSQL-specific safety rules (rubric §4)
-
-Full rules: [`references/rubric.md`](references/rubric.md) §4.
-
-| # | Operation(s) | Gate (summary) |
+| # | Ops | Gate (summary) |
 |---:|---|---|
-| 1 | `IsolateDBInstance` / `DeleteDBInstance` (any, batch or single) | ID + Name + Status echo + explicit confirmation + retention-window warning + dependency check (re... |
-| 2 | `RestoreDBInstance` / restore-from-backup (data plane boundary) | Source `BackupId` named + `DescribeDBBackups` re-confirms; explicit confirmation that the action ... |
-| 3 | `UpgradeDBInstance` (downgrade: `Storage`; also any `Memory` change) | Show current spec → target spec; warn that spec changes trigger a restart (30-60s downtime, brief... |
-| 4 | `ResetAccountPassword` / `ModifyAccountPassword` (any account, **especially** `postgres` / superuser) | Account name echoed; warn that the password change takes immediate effect; all active connections... |
-| 5 | `CreateAccount` (especially with wildcard `Host`) and `ModifyAccountPrivileges` with `REVOKE ALL` | For `CreateAccount`: surface the account name, host pattern (PG API does not always expose `Host`... |
+| 1 | `IsolateDBInstance` / `DeleteDBInstance` | ID + Name + Status echo + explicit confirmation + retention-window warning + dependency check |
+| 2 | `RestoreDBInstance` | Source `BackupId` named + `DescribeDBBackups` re-confirms; explicit data-overwrite warning |
+| 3 | `UpgradeDBInstance` | Show current → target spec; warn restart (30-60s downtime) |
+| 4 | `ResetAccountPassword` / `ModifyAccountPassword` | Account name echoed; warn immediate effect on active connections |
+| 5 | `CreateAccount` (wildcard `Host`) / `ModifyAccountPrivileges` (`REVOKE ALL`) | Surface account name + host pattern; warn running apps will fail on next query |
 
 Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
-### Worked example — `ModifyAccountPrivileges` (`REVOKE ALL`) on running connections
+### Worked example — ModifyAccountPrivileges (REVOKE ALL) on running connections
 
-| Dimension | Score |
-|---|---|
-| Correctness | 1 (`ModifyAccountPrivileges` succeeded) |
-| **Safety** | **0** (rule 5 violated — no BEFORE/AFTER privilege diff, no running-connection warning) |
-| Idempotency | 1 |
-| Traceability | 0.5 (API call logged but no `DescribeAccounts` follow-up) |
-| Spec Compliance | 0.5 |
+Safety=0 (rule 5 violated — no BEFORE/AFTER privilege diff, no running-connection warning). `decision: ABORT`.
+Recovery: Re-run with `DescribeAccounts` BEFORE/AFTER; warn that running apps will fail on next query.
 
-`decision: ABORT`. Recovery suggestion: "Re-run with `DescribeAccounts` BEFORE/AFTER; warn that running apps connecting as `app_user` will fail on next query; require explicit confirmation with account name."
+See [`references/rubric.md`](references/rubric.md) §6 for full examples (PASS on `CreateDBInstances` + SAFETY_FAIL on `DeleteDBInstance`).
 
-See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `CreateDBInstances` and SAFETY_FAIL on `DeleteDBInstance` reflecting no-UNDROP).
-
----
+> Decision flow: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#decision-flow-first-match-wins).
 
 ## Output Schema
 
-All responses follow Tencent Cloud API structure:
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#output-schema-api-response).
 
 ```json
-{
-  "Response": {
-    "RequestId": "abc123",
-    "DealNames": ["2026053112345678"],
-    "DBInstanceSet": [
-      {
-        "DBInstanceId": "postgres-6ielucen",
-        "DBInstanceName": "my-pg",
-        "DBInstanceStatus": "running",
+{ "Response": { "RequestId": "...", "DealNames": ["..."], "DBInstanceSet": [{ "DBInstanceId": "postgres-xxx", "DBInstanceStatus": "running",
         "DBVersion": "16",
         "Memory": 4,
         "Storage": 100,
@@ -701,36 +638,16 @@ Error responses:
 }
 ```
 
-## Changelog
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2026-05-31 | Initial release — PostgreSQL instance lifecycle, backup/restore, accounts, parameters, slow logs, SSL, read-only replicas, security groups |
-| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 PG-specific safety rules incl. instance-isolate/terminate, data-plane drop guard, spec-change restart, root password no-recovery, wildcard host account), `references/prompt-templates.md`. `max_iter=2` per AGENTS.md §8 |
-
 ## Reference Directory
 
-- [Core Concepts](references/core-concepts.md) — Architecture, states, versions, limits
-- [API & SDK Usage](references/api-sdk-usage.md) — Operation map, Python SDK examples
-- [CLI Usage](references/cli-usage.md) — tccli postgres command reference
-- [Troubleshooting Guide](references/troubleshooting.md) — Error codes + diagnostic workflows
-- [Monitoring & Alerts](references/monitoring.md) — Metrics, alarms, anomaly patterns
-- [Integration](references/integration.md) — SDK setup, env vars, cross-skill delegation
-- [Well-Architected Assessment](references/well-architected-assessment.md) — 4-pillar assessment
-- [AIOps Integration](references/aiops-self-healing.md) — Proactive monitoring, self-healing, capacity forecasting
-- [FinOps Optimization](references/finops-cost-optimization.md) — Cost optimization, idle detection, right-sizing
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#reference-directory).
 
-## AIOps Integration (智能运维)
+Core: `references/core-concepts.md`, `references/api-sdk-usage.md`, `references/cli-usage.md`, `references/sdk-templates.md`, `references/troubleshooting.md`, `references/well-architected-assessment.md`, `references/rubric.md`, `references/prompt-templates.md`.
+Optional: `references/monitoring.md`, `references/aiops-self-healing.md`, `references/finops-cost-optimization.md`.
 
-> **AIOps Principle:** Predictive before reactive. Correlate before escalate. Attempt self-heal before alerting human.
+## Changelog
 
-→ 完整自愈流程、主动巡检、容量预测、告警风暴处理、可观测性管道：见 [`references/aiops-self-healing.md`](references/aiops-self-healing.md)
-
-## FinOps Optimization (财务优化)
-
-> **FinOps Principle:** Every resource should justify its cost. Idle resources are waste. Right-sizing is a continuous process.
-
-→ 完整闲置检测、成本对比、规格优化、成本报告、异常检测：见 [`references/finops-cost-optimization.md`](references/finops-cost-optimization.md)
+> See `metadata.version` and `metadata.last_updated` in the frontmatter YAML.
 
 ### Operational Best Practices (Enhanced)
 

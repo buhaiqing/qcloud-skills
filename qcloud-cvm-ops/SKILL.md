@@ -41,11 +41,11 @@ metadata:
 
 CVM operational runbook: dual-path (`tccli` + Python SDK), explicit pre-flight/validate/recover, web console not an agent path.
 
-## Five Core Standards (Quality Gates)
+## Five Core Standards
 
-1-5: Clear Boundaries, Structured I/O (`{{env.*}}`/`{{user.*}}`/`{{output.*}}`), Explicit Steps (Pre-flight→Execute→Validate→Recover), Complete Failure Strategies (≥12 CVM codes), Single Responsibility (CVM instances+CBS disks).
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
 
-[WA integration](references/well-architected-assessment.md): Reliability (multi-AZ/backup/DR), Security (CAM/SSH/SG), Cost (type comparison/RI/idle), Efficiency (batch/auto-scaling/schedule).
+> Well-Architected pillars: see `references/well-architected-assessment.md`.
 
 ## Trigger & Scope
 
@@ -131,12 +131,7 @@ tccli cvm DescribeInstances --Region {{env.TENCENTCLOUD_REGION}}
 
 ## Changelog
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2026-05-21 | Initial skill with RunInstances, DescribeInstances, Start/Stop/Reboot/Terminate, CBS disk operations, Snapshot/Image management |
-| 1.1.0 | 2026-06-04 | Phase 1 GCL pilot: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CVM-specific safety rules), `references/prompt-templates.md` (Generator + Critic + Orchestrator, isolated-context enforcement). `max_iter=2` per AGENTS.md §8 |
-| 1.2.0 | 2026-06-27 | Round 1 self-review fixes: added ResetInstances execution flow (G1), TerminateInstances DryRun pre-flight (G2), SDK fallback for ResizeInstanceDisks/CreateSnapshot/CreateImage (G3-G5), StopInstances HARD gate (G6). Bumped version. |
-| 1.3.0 | 2026-07-04 | Added ModifyInstanceSpec, AttachDisks, DetachDisk operations; created references/sdk-templates.md; replaced inline SDK blocks with references; merged Prerequisites into Quick Start; removed duplicate Variables section. Bumped version. |
+> See `metadata.version` and `metadata.last_updated` in the frontmatter YAML.
 
 ---
 
@@ -594,156 +589,61 @@ Poll DescribeDisks until disk `NOT_ATTACHED` state and `InstanceId` is absent.
 
 ## Reference Directory
 
-### Core References
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#reference-directory).
 
-- [Core Concepts](references/core-concepts.md) — Architecture, limits, regions, instance types
-- [API & SDK Usage](references/api-sdk-usage.md) — Operation map, pagination, response schemas
-- [CLI Usage Guide](references/cli-usage.md) — `tccli cvm` command reference
-- [Troubleshooting Guide](references/troubleshooting.md) — CVM-specific error codes and fixes
-- [Monitoring & Alerts](references/monitoring.md) — CVM metrics and alarm configuration
-- [Integration](references/integration.md) — Cloud Shell, SDK setup, environment variables
-
-### Well-Architected Framework
-
-- [Well-Architected Assessment](references/well-architected-assessment.md) — Four-pillar assessment (Reliability, Security, Cost, Efficiency)
-
-### FinOps Cost Optimization
-
-- [FinOps Analysis](references/finops-analysis.md) — Cost anomaly detection, right-sizing, RI recommendations, idle resource analysis, monthly cost reports
-
-### SecOps Security Operations
-
-- [Audit Rules](references/audit-rules.md) — 50+ audit rules across lifecycle, security, network, credential, backup, cost, monitoring, and tagging with automated audit script
-- [SecOps Checklist](references/secops-checklist.md) — Security audit logs, credential rotation, security group audit, network isolation, compliance checklist
-
-### AIOps Intelligent Operations
-
-- [Proactive Inspection](references/proactive-inspection.md) — Five-step closed-loop inspection workflow (Discovery → Collection → Detection → Diagnosis → Report)
-- [AIOps Diagnosis](references/aiops-diagnosis.md) — Delegate to `qcloud-aiops-diagnosis` for multi-metric RCA and alarm storm bundling
-
-## Operational Best Practices
-
-- **Least privilege**: CAM policies scoped to `cvm:*` APIs only
-- **Availability**: Multi-AZ deployment with auto-recovery enabled
-- **Cost**: Use prepaid for stable workloads, postpaid for variable
-- **Backup**: Regular snapshots, cross-region image replication for DR
-
----
+Core: `references/core-concepts.md`, `references/api-sdk-usage.md`, `references/cli-usage.md`, `references/sdk-templates.md`, `references/troubleshooting.md`, `references/well-architected-assessment.md`, `references/rubric.md`, `references/prompt-templates.md`.
+Optional: `references/monitoring.md`, `references/finops-analysis.md`, `references/secops-checklist.md`, `references/audit-rules.md`, `references/proactive-inspection.md`, `references/aiops-diagnosis.md`.
 
 ## Error Code Reference (CVM-Specific)
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `InvalidParameter` | Generic parameter error | Fix per API spec |
-| `InvalidParameter.ImageIdMalformed` | Image ID format wrong | Use `img-xxx` format |
-| `InvalidParameterValue.InstanceTypeUnsupported` | Type not in zone | Check zone-type matrix |
-| `InvalidParameterValue.ZoneNotSupported` | Zone invalid for operation | Use valid zone |
-| `MissingParameter` | Required param absent | Add missing param |
-| `ResourceNotFound.InstanceNotFound` | Instance ID invalid | Verify via Describe |
-| `ResourceInsufficient.CvmInstanceQuotaIsFull` | Instance quota exceeded | Request quota increase |
-| `QuotaExceeded.SecurityGroupLimit` | SG quota exceeded | Use existing SG |
-| `InvalidVpc.NotFound` | VPC ID invalid | Delegate to VPC skill |
-| `InvalidSubnet.NotFound` | Subnet ID invalid | Delegate to VPC skill |
-| `OperationConflict.InstanceOperationConflict` | Another op in progress | Retry (3x, 30s) |
-| `RequestLimitExceeded` | API rate limit | Retry (3x, exp backoff) |
-| `InternalError` | Server error | Retry (3x); escalate |
+> See `references/troubleshooting.md` for full error list. Key codes:
 
----
-
-## Safety Gates (Destructive Operations)
-
-Every **TerminateInstances**, **ResizeDisk**, or **irreversible** operation MUST have:
-
-1. **Explicit user confirmation** with instance ID and name displayed
-2. **Pre-backup reminder** (snapshot suggestion)
-3. **Dependency check** (CBS disks, CLB attachments, auto-scaling group membership)
-4. **Post-operation verification** (poll until 404 or terminal state)
-
----
+| Code | Recovery |
+|------|----------|
+| `ResourceNotFound.InstanceNotFound` | Verify via Describe |
+| `ResourceInsufficient.CvmInstanceQuotaIsFull` | Request quota increase |
+| `RequestLimitExceeded` | Retry (3x, exp backoff) |
+| `InternalError` | Retry (3x); escalate with RequestId |
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
-is a **runtime** scoring layer that audits each CVM execution against an explicit
-rubric, in addition to the build-time **Safety Gates** above and the build-time
-**2-round self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
+> Boilerplate: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#quality-gate-gcl).
 
-| Property | Value | Source |
+### When the CVM loop runs
+
+| Op class | Loop? | Why |
 |---|---|---|
-| GCL applicability | **required** | [AGENTS.md §8](../AGENTS.md#8-per-skill-defaults-qcloud) |
-| `max_iterations` | **2** | per-skill override (matches AGENTS.md §8 default for `qcloud-cvm-ops`) |
-| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CVM-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
-| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../AGENTS.md#6-trace--audit-mandatory) |
+| Destructive: `TerminateInstances`, `ResetInstance`, `ResizeInstanceDisks` (shrink), `TerminateDisks` (CBS) | **yes** | Irreversible; needs scoring |
+| Mutating: `RunInstances`, `StopInstances`, `RebootInstances`, `ModifyInstanceAttribute`, `CreateImage`, `CreateSnapshot` | **yes** | Cost/state-change risk; needs scoring |
+| Read-only: `DescribeInstances`, `DescribeImages`, `DescribeSnapshots` | optional (max_iter=1) | Polling tails in parent trace |
 
-### When the loop runs
+### CVM-specific safety rules
 
-| Op class | Loop runs? | Why |
-|---|---|---|
-| Destructive: `TerminateInstances`, `ResetInstance`, `ResizeInstanceDisks` (shrink blocked by rule 3), `TerminateDisks` (CBS) | **yes** | Irreversible or near-irreversible; needs scoring |
-| Mutating: `RunInstances`, `StopInstances`, `RebootInstances`, `ModifyInstanceAttribute`, `ResizeInstanceDisks` (grow only), `CreateImage`, `CreateSnapshot` | **yes** | Cost / state-change risk; needs scoring |
-| Read-only: `DescribeInstances`, `DescribeImages`, `DescribeSnapshots`, `DescribeAccountQuota` | optional (max_iter=1, no hard abort) | Polling tails are part of the parent op's trace |
+> Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-### Decision flow (first match wins)
-
-1. **Safety = 0** OR rule violation in `{1, 2, 5}` ⇒ **ABORT** (no partial result)
-2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
-3. **All thresholds met** ⇒ **PASS**
-4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
-
-### CVM-specific safety rules (rubric §4)
-
-Full rules: [`references/rubric.md`](references/rubric.md) §4.
-
-| # | Operation(s) | Gate (summary) |
+| # | Ops | Gate (summary) |
 |---:|---|---|
-| 1 | `TerminateInstances` (any, batch or single) | ID + Name echo + explicit confirmation + `DeleteWithInstance` query + dependency check (CLB / ASG... |
-| 2 | `StopInstances` with `--StopType HARD` | Block on production instance (heuristic: name matches `^(prod|prd|live)-` or any instance with `T... |
-| 3 | `ResizeInstanceDisks` | Target `DiskSize` ≥ current `DiskSize`; `DiskType` must be resizable (no `LOCAL_BASIC`/`LOCAL_SSD... |
-| 4 | `RunInstances` | `ClientToken` MUST be set; zone-instance type matrix MUST be validated (`DescribeZoneInstanceConf... |
-| 5 | `ResetInstance` | `ImageId` MUST differ from current; current state MUST be `STOPPED` or `SHUTDOWN`; explicit confi... |
+| 1 | `TerminateInstances` | ID + Name echo + explicit confirmation + `DeleteWithInstance` + dependency check (CLB/ASG) |
+| 2 | `StopInstances` (`--StopType HARD`) | Block on prod instance (name matches `^(prod|prd|live)-` or `Tag:Role=production`) |
+| 3 | `ResizeInstanceDisks` | Target `DiskSize` ≥ current; `DiskType` must support resize |
+| 4 | `RunInstances` | `ClientToken` MUST be set; zone-type matrix validated via `DescribeZoneInstanceConfigInfos` |
+| 5 | `ResetInstance` | `ImageId` MUST differ; state MUST be `STOPPED`/`SHUTDOWN`; explicit confirmation |
 
 Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
-### Worked example — `StopInstances` (HARD on prod)
+### Worked example — StopInstances (HARD on prod)
 
-| Dimension | Score |
-|---|---|
-| Correctness | 0.5 (state did transition, but gate should have caught it) |
-| **Safety** | **0** (rule 2 violated) |
-| Idempotency | 1 |
-| Traceability | 1 |
-| Spec Compliance | 1 |
+Safety=0 (rule 2 violated — prod instance not blocked). `decision: ABORT`.
+Recovery: `StartInstances` to power back on; re-run with `StopType=SOFT` or explicit prod exception.
 
-`decision: ABORT`. Recovery suggestion emitted: power back on with `StartInstances` and re-run with `StopType=SOFT` (or with explicit prod exception).
+See [`references/rubric.md`](references/rubric.md) §6 for full examples (PASS on `TerminateInstances` + RETRY on `RunInstances`).
 
-See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `TerminateInstances` and RETRY on `RunInstances`).
-
----
+> Decision flow: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#decision-flow-first-match-wins).
 
 ## Output Schema
 
-Standard Tencent Cloud API response:
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#output-schema-api-response).
 
 ```json
-{
-  "Response": {
-    "RequestId": "abc123",
-    "InstanceIdSet": ["ins-xxx"],
-    ...
-  }
-}
+{ "Response": { "RequestId": "...", "InstanceIdSet": ["ins-xxx"], "Error": { "Code": "...", "Message": "..." } } }
 ```
-
-Error response:
-
-```json
-{
-  "Response": {
-    "RequestId": "abc123",
-    "Error": {
-      "Code": "InvalidParameter",
-      "Message": "Parameter validation failed"
-    }
-  }
-}

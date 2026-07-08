@@ -48,26 +48,11 @@ VPC (Virtual Private Cloud) on Tencent Cloud provides isolated network environme
 
 - **`cli_applicability: dual-path`:** Official `tccli` supports VPC. You **MUST** ship **`references/cli-usage.md`** and document **both** the SDK step **AND** the `tccli` step for every VPC operation.
 
-## Five Core Standards (Quality Gates)
+## Five Core Standards
 
-Every generated skill MUST satisfy these five standards. Use them as a design checklist:
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
 
-| # | Standard | How This Skill Fulfills It |
-|---|----------|---------------------------|
-| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT Use conditions with VPC-specific triggers and delegation to CVM/CBS skills |
-| 2 | **Structured I/O** | Placeholder conventions (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`) with VPC API field types |
-| 3 | **Explicit Actionable Steps** | Every VPC operation: Pre-flight → Execute → Validate → Recover, numbered imperative steps |
-| 4 | **Complete Failure Strategies** | Error taxonomy with 12+ VPC-specific codes; HALT vs retry per error type |
-| 5 | **Absolute Single Responsibility** | VPC/Subnet/RouteTable only; delegate CVM, CBS, MySQL, CLB to their skills |
-
-### Well-Architected Framework Integration (卓越架构)
-
-| Pillar | Skill Integration | Reference |
-|--------|-------------------|-----------|
-| **可靠性 (Reliability)** | Multi-AZ subnet deployment, VPC peering DR, route table backup | `references/well-architected-assessment.md` |
-| **安全性 (Security)** | Network ACLs, security groups, flow logs, VPC isolation | `references/well-architected-assessment.md` |
-| **成本 (Cost)** | NAT gateway cost optimization, VPC peering vs Direct Connect | `references/well-architected-assessment.md` |
-| **效率 (Efficiency)** | Batch subnet creation, automated route table updates | `references/well-architected-assessment.md` |
+> Well-Architected pillars (Reliability, Security, Cost, Efficiency): see `references/well-architected-assessment.md`.
 
 ## Trigger & Scope (Agent-Readable)
 
@@ -143,22 +128,16 @@ Every generated skill MUST satisfy these five standards. Use them as a design ch
 - **Errors:** Map to `Response.Error.Code` and `Response.Error.Message`
 - **Timestamps:** ISO 8601 format (e.g., `2026-05-21T10:00:00+08:00`)
 
-### JSON Path Reference
+### JSON Path Reference (TE-4)
 
-| Path | Maps To |
-|------|---------|
-| `vpc.id` | `$.Response.Vpc.VpcId` |
-| `vpc.name` | `$.Response.VpcSet[].VpcName` |
-| `vpc.cidr` | `$.Response.VpcSet[].CidrBlock` |
-| `vpc.state` | `$.Response.VpcSet[].State` |
-| `subnet.id` | `$.Response.Subnet.SubnetId` / `$.Response.SubnetSet[].SubnetId` |
-| `subnet.name` | `$.Response.SubnetSet[].SubnetName` |
-| `subnet.cidr` | `$.Response.SubnetSet[].CidrBlock` |
-| `subnet.zone` | `$.Response.SubnetSet[].Zone` |
-| `subnet.ips` | `$.Response.SubnetSet[].AvailableIpAddressCount` |
-| `rtable.id` | `$.Response.RouteTable.RouteTableId` / `$.Response.RouteTableSet[].RouteTableId` |
-| `rtable.name` | `$.Response.RouteTableSet[].RouteTableName` |
-| `rtable.routes` | `$.Response.RouteTableSet[].RouteSet` |
+| Key | Path |
+|-----|------|
+| vpc.id | `$.Response.Vpc.VpcId` |
+| subnet.id | `$.Response.Subnet.SubnetId` |
+| rtable.id | `$.Response.RouteTable.RouteTableId` |
+| peering.id | `$.Response.PeeringConnectionId` |
+
+Full paths: `tccli vpc DescribeVpcs --help` or `references/api-sdk-usage.md`.
 
 ### State Transitions
 
@@ -208,11 +187,7 @@ tccli vpc CreateVpc --Region "{{env.TENCENTCLOUD_REGION}}" --VpcName "my-vpc" --
 
 ## Changelog
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2026-05-21 | Initial VPC skill with dual-path execution |
-| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 VPC-specific safety rules incl. VPC cascade delete, subnet resource dependency, EIP bound-release, route blackhole, SG rule loss), `references/prompt-templates.md`. `max_iter=2` per AGENTS.md §8 |
-| 1.2.0 | 2026-07-03 | Scope split per `qcloud-skill-generator` Single Responsibility: this skill keeps **VPC/Subnet/RouteTable + same-region VPC Peering Connection**; multi-region / cross-account orchestration moved to new `qcloud-ccn-ops`; IPSec / SSL VPN / hybrid cloud moved to new `qcloud-vpn-ops`. Added 4 peering execution flows (`CreateVpcPeeringConnection` / `AcceptVpcPeeringConnection` / `DescribeVpcPeeringConnections` / `DeleteVpcPeeringConnection`) and 4 peering-specific error codes. Bumped `last_updated`. |
+> See `metadata.version` and `metadata.last_updated` in the frontmatter YAML.
 
 ---
 
@@ -663,12 +638,7 @@ Poll `DescribeVpcPeeringConnections` for the ID; expect empty / 404 within 60s.
 
 ## Reference Directory
 
-- [Core Concepts](references/core-concepts.md)
-- [API & SDK Usage](references/api-sdk-usage.md)
-- [CLI Usage](references/cli-usage.md)
-- [Troubleshooting](references/troubleshooting.md)
-- [Well-Architected Assessment](references/well-architected-assessment.md)
-- [Integration](references/integration.md)
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#reference-directory).
 - [FinOps Cost Optimization](references/finops-cost-optimization.md)
 - [SecOps Security Operations](references/secops-security-operations.md)
 - [AIOps Best Practices](references/aiops-best-practices.md)
@@ -694,93 +664,45 @@ Poll `DescribeVpcPeeringConnections` for the ID; expect empty / 404 within 60s.
 | `ResourceQuotaExceeded.PeerConn` | Peering: per-region peering quota exceeded | HALT; raise quota via console |
 | `ResourceInUse.PeerConn` | Peering: route table still references peering as next hop | Delete the dependent routes first, then retry |
 
-## Safety Gates (Destructive Operations)
-
-Every **Delete VPC/Subnet** MUST have:
-
-1. Explicit user confirmation with resource ID
-2. Dependency check (instances, CLB, NAT gateway)
-3. Pre-warning about impact
-4. Post-delete verification (poll until 404)
-
----
-
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate is a
-**runtime** scoring layer that audits each VPC execution against an explicit rubric, in
-addition to the build-time **Safety Gates** chapter above and the build-time **2-round
-self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
-VPC destructive ops are **graph operations** — deleting one node removes connectivity for
-many siblings — so a single bad `DeleteVpc` can take down production CLBs in another VPC
-via cross-VPC peering.
+> Boilerplate: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#quality-gate-gcl).
 
-| Property | Value | Source |
+### When the VPC loop runs
+
+| Op class | Loop? | Why |
 |---|---|---|
-| GCL applicability | **required** | [AGENTS.md §8](../AGENTS.md#8-per-skill-defaults-qcloud) |
-| `max_iterations` | **2** | per-skill override (matches AGENTS.md §8 default for `qcloud-vpc-ops`) |
-| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 VPC-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
-| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../AGENTS.md#6-trace--audit-mandatory) |
+| Destructive: `DeleteVpc`, `DeleteSubnet`, `DeleteRouteTable`, `DeleteRoutes` (`0.0.0.0/0`), `ReleaseAddresses` (EIP), `DeleteSecurityGroup` | **yes** | Graph ops; one bad `DeleteVpc` removes connectivity for sibling CVMs/CLBs/NATs/peers |
+| Mutating: `CreateVpc`, `CreateSubnet`, `CreateRouteTable`, `CreateRoutes`, `CreateVpcPeeringConnection` | **yes** | CIDR subset, zone-in-region, route-next-hop, peering state need scoring |
+| Read-only: `DescribeVpcs`, `DescribeSubnets`, `DescribeRouteTables`, `DescribeVpcPeeringConnections` | optional (max_iter=1) | Polling tails in parent trace |
 
-### When the loop runs
+### VPC-specific safety rules
 
-| Op class | Loop runs? | Why |
-|---|---|---|
-| Destructive: `DeleteVpc`, `DeleteSubnet`, `DeleteRouteTable`, `DeleteRoutes` (default `0.0.0.0/0`), `ReleaseAddresses` (EIP), `DeleteSecurityGroup` | **yes** | Graph operations; one bad call removes connectivity for many sibling resources (CVM, CLB, NAT, peering) — needs scoring |
-| Mutating: `CreateVpc`, `CreateSubnet`, `CreateRouteTable`, `CreateRoutes`, `AssociateNetworkInterface`, `DisassociateNetworkInterface`, `CreateSecurityGroup`, `ModifySecurityGroupPolicies` | **yes** | State / graph-change risk; CIDR subset, zone-in-region, route-next-hop, SG-rule validation all need scoring |
-| Read-only: `DescribeVpcs`, `DescribeSubnets`, `DescribeRouteTables`, `DescribeSecurityGroups`, `DescribeAddresses`, `DescribeVpcResourceDashboard`, `DescribeSubnetResourceDashboard` | optional (max_iter=1, no hard abort) | Polling tails are part of the parent op's trace |
+> Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-### Decision flow (first match wins)
-
-1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result)
-2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
-3. **All thresholds met** ⇒ **PASS**
-4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
-
-### VPC-specific safety rules (rubric §4)
-
-Full rules: [`references/rubric.md`](references/rubric.md) §4.
-
-| # | Operation(s) | Gate (summary) |
+| # | Ops | Gate (summary) |
 |---:|---|---|
-| 1 | `DeleteVpc` (any) | VPC ID + Name + CIDR echo; enumerate ALL subnets, route tables, security groups, and dependent re... |
-| 2 | `DeleteSubnet` (any, especially with running resources) | Subnet ID + VPC ID + CIDR echo; check if subnet has running resources via `DescribeSubnetResource... |
-| 3 | `ReleaseAddresses` (EIP — single or batch) | EIP ID + IP address echoed; check if EIP is bound to a CVM / CLB / NAT Gateway via `DescribeAddre... |
-| 4 | `DeleteRouteTable` / `DeleteRoutes` (any, especially default route `0.0.0.0/0`) | Route table ID + VPC ID + all route entries listed; for default route deletion (`0.0.0.0/0`): war... |
-| 5 | `DeleteSecurityGroup` (any with rules) | Security group ID + Name + Inbound/Outbound rule count; warn that all instances bound to this SG ... |
+| 1 | `DeleteVpc` | VPC ID + Name + CIDR echo; enumerate ALL subnets, route tables, SGs, peering connections |
+| 2 | `DeleteSubnet` | Subnet ID + VPC ID + CIDR echo; check `DescribeSubnetResourceDashboard` for running resources |
+| 3 | `ReleaseAddresses` (EIP) | EIP ID + IP echoed; check if bound to CVM/CLB/NAT via `DescribeAddresses` |
+| 4 | `DeleteRouteTable` / `DeleteRoutes` (`0.0.0.0/0`) | Route table ID + all route entries listed; warn blackhole risk |
+| 5 | `DeleteSecurityGroup` (with rules) | SG ID + Name + rule count; warn all bound instances lose SG protection |
 
 Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
-### Worked example — `DeleteSubnet` with running CVMs (cascading connectivity loss)
+### Worked example — DeleteSubnet with running CVMs
 
-| Dimension | Score |
-|---|---|
-| Correctness | 0.5 (subnet was deleted, but the gate should have caught the situation) |
-| **Safety** | **0** (rule 2 violated) |
-| Idempotency | 1 |
-| Traceability | 1 |
-| Spec Compliance | 1 |
+Safety=0 (rule 2 violated — `DescribeSubnetResourceDashboard` not called). `decision: ABORT`.
+Recovery: migrate ENI to another subnet or restore the subnet.
 
-`decision: ABORT`. The running CVM `ins-prod-db-01` lost its ENI. Recovery suggestion emitted:
-"Migrate the CVM's ENI to another subnet in the same VPC (`CreateNetworkInterface` + `AssociateNetworkInterface` + `DisassociateNetworkInterface`), or restore the subnet with the original CIDR if available. Going forward, add a hard pre-flight `DescribeInstances --Filters Name=SubnetId` gate to the skill's pre-flight for every `DeleteSubnet` call."
+See [`references/rubric.md`](references/rubric.md) §6 for full examples (PASS on `DeleteVpc` + RETRY on `ReleaseAddresses`).
 
-See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `DeleteVpc` with confirmation and RETRY on `ReleaseAddresses` with bound CLB).
-
----
+> Decision flow: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#decision-flow-first-match-wins).
 
 ## Output Schema
 
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#output-schema-api-response).
+
 ```json
-{
-  "Response": {
-    "RequestId": "abc123",
-    "Vpc": {
-      "VpcId": "vpc-xxx",
-      "VpcName": "test-vpc",
-      "CidrBlock": "10.0.0.0/16",
-      "State": "AVAILABLE"
-    }
-  }
-}
+{ "Response": { "RequestId": "...", "Vpc": { "VpcId": "vpc-xxx", "VpcName": "...", "CidrBlock": "10.0.0.0/16", "State": "AVAILABLE" } } }
 ```

@@ -45,24 +45,11 @@ SSL Certificate Service (SSL 证书服务) on Tencent Cloud provides certificate
 
 - **`cli_applicability: dual-path`:** Official `tccli` supports SSL Certificate Service. CLI is the **primary** execution path. Python SDK is the **fallback** for edge cases.
 
-## Five Core Standards (Quality Gates)
+## Five Core Standards
 
-| # | Standard | How This Skill Fulfills It |
-|---|----------|---------------------------|
-| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT Use conditions with precise triggers and delegation rules |
-| 2 | **Structured I/O** | Placeholder conventions (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`) with type and source documented |
-| 3 | **Explicit Actionable Steps** | Every operation: Pre-flight → Execute → Validate → Recover, with numbered imperative steps |
-| 4 | **Complete Failure Strategies** | Error taxonomy table with ≥ 10 product-specific codes; HALT vs retry per error type |
-| 5 | **Absolute Single Responsibility** | One product (SSL Certificate), one primary resource (Certificate); cross-product delegation to other skills |
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
 
-### Well-Architected Framework Integration
-
-| Pillar | Skill Integration | Reference |
-|--------|-------------------|-----------|
-| **可靠性 (Reliability)** | Certificate expiry monitoring, auto-renewal, multi-domain certificate management | `references/well-architected-assessment.md` |
-| **安全性 (Security)** | Private key protection, certificate chain validation, domain verification, CRL/OCSP | `references/well-architected-assessment.md` |
-| **成本 (Cost)** | Free vs paid certificate comparison, wildcard vs single domain, multi-year pricing | `references/well-architected-assessment.md` |
-| **效率 (Efficiency)** | Batch certificate deployment, automated domain validation, renewal automation | `references/well-architected-assessment.md` |
+> Well-Architected pillars (Reliability, Security, Cost, Efficiency): see `references/well-architected-assessment.md`.
 
 ## Trigger & Scope (Agent-Readable)
 
@@ -421,402 +408,81 @@ tccli ssl DescribeCertificates --Limit 100 | \
 
 ## Error Code Reference
 
-| Code | Meaning | Recovery |
-|------|---------|----------|
-| InvalidParameter.InvalidCertificate | 证书内容无效 | Verify PEM format; check certificate validity period |
-| InvalidParameter.InvalidPrivateKey | 私钥内容无效 | Check private key is valid PEM format |
-| InvalidParameter.CertificateNotMatch | 证书和私钥不匹配 | Ensure public/private key pair matches |
-| LimitExceeded | 证书数量超限 | Delete unused certificates |
-| AuthFailure | CAM鉴权错误 | HALT; check credentials |
-| InvalidParameterValue | 参数值错误 | Check parameter values per API spec |
-| FailedOperation | 操作失败 | Retry; if persistent contact support |
-| FailedOperation.CertificateNotFound | 证书不存在 | Verify certificate ID |
-| InvalidParameter.DuplicateCertificate | 证书已存在 | Certificate with same content already uploaded |
-| RequestLimitExceeded | 请求频率过高 | Retry with backoff |
-| InvalidParameter.CertificateExpired | 证书已过期 | Renew or upload new certificate |
-| FailedOperation.DomainVerificationFailed | 域名验证失败 | Check DNS record or verification file |
-| InvalidParameter.DvAuthFail | 域名验证不通过 | Try alternative verification method |
+> See `references/troubleshooting.md` for full list. Key codes:
 
-## Safety Gates (Destructive Operations)
-
-Every **Delete** or **irreversible** operation MUST have:
-
-1. **Explicit user confirmation** with resource identifier (`{{user.certificate_name}}` / `{{user.certificate_id}}`)
-2. **Deployment check** — verify if certificate is in use by other resources
-3. **Post-delete verification** — confirm certificate no longer listed
-
----
+| Code | Recovery |
+|------|----------|
+| `CertificateNotFound` | Verify certificate ID |
+| `CertificateNotMatch` | Ensure public/private key pair matches |
+| `DomainVerificationFailed` | Check DNS record or verification file |
+| `RequestLimitExceeded` | Retry with backoff |
+| `CertificateExpired` | Renew or upload new certificate |
 
 ## Quality Gate (GCL)
 
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot. The Quality Gate
-is a **runtime** scoring layer that audits each SSL execution against an explicit rubric,
-in addition to the build-time **Safety Gates** above and the build-time **2-round
-self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update).
+> Boilerplate: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#quality-gate-gcl).
 
-| Property | Value | Source |
-|---|---|---|
-| GCL applicability | **recommended** | [AGENTS.md §8](../AGENTS.md#8-per-skill-defaults-qcloud) |
-| `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-ssl-ops`) |
-| Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 SSL-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
-| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../AGENTS.md#6-trace--audit-mandatory) |
+### When the SSL loop runs
 
-### When the loop runs
-
-| Op class | Loop runs? | Why |
+| Op class | Loop? | Why |
 |---|---|---|
 | Destructive: `DeleteCertificate` (deployed cert) | **yes** | Immediate TLS handshake failure on bound resources |
 | Sensitive mutating: `DeployCertificateInstance`, `ReplaceCertificate`, `UploadCertificate` | **yes** | Live traffic impact; chain completeness |
 | Mutating: `ApplyCertificate`, `DownloadCertificate`, `ModifyCertificateAlias` | **yes** | Validation timing / DNS access risk |
-| Read-only: `DescribeCertificates`, `DescribeCertificateDetail`, `DescribeDeployCertificateDetail` | optional (max_iter=1, no hard abort) | Pre-flight for deploy/delete |
+| Read-only: `DescribeCertificates`, `DescribeCertificateDetail`, `DescribeDeployCertificateDetail` | optional (max_iter=1) | Pre-flight for deploy/delete |
 
-### Decision flow (first match wins)
+### SSL-specific safety rules
 
-1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result)
-2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
-3. **All thresholds met** ⇒ **PASS**
-4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
+> Full rules: [`references/rubric.md`](references/rubric.md) §4.
 
-### SSL-specific safety rules (rubric §4)
-
-Full rules: [`references/rubric.md`](references/rubric.md) §4.
-
-| # | Operation(s) | Gate (summary) |
+| # | Ops | Gate (summary) |
 |---:|---|---|
-| 1 | `DeleteCertificate` (any; especially if deployed) | Certificate ID + name + domain + issuer + deploy status echo; check if cert is deployed to any re... |
-| 2 | `DeployCertificateInstance` (deploy to specific resource type: CLB, CDN, API GW, TKE, WAF, Live, TEO, VOD, TCB) | Show certificate domain + resource type + resource ID + resource region; warn that deploying repl... |
-| 3 | `ReplaceCertificate` / `CertificateRollback` (replace in-place on a resource) | Show old cert domain + expiration → new cert domain + expiration; warn that the replacement is im... |
-| 4 | `ApplyCertificate` (apply for a new DV/OV/EV cert; includes `ApplyCertificatePackage`) | Show domain name(s), validation method (DNS / HTTP), and certificate type (DV/OV/EV); warn that D... |
-| 5 | `UploadCertificate` (upload PEM / PKCS12 / SSL certificate with private key) | Show certificate subject, issuer, valid-from, valid-to, SAN count; warn if the certificate chain ... |
+| 1 | `DeleteCertificate` (especially if deployed) | Certificate ID + name + domain + deploy status echo; check deployed resources via `DescribeDeployCertificateDetail` |
+| 2 | `DeployCertificateInstance` | Show cert domain + resource type + ID + region; warn deploying replaces existing cert |
+| 3 | `ReplaceCertificate` / `CertificateRollback` | Show old → new cert domain + expiration; warn replacement is immediate |
+| 4 | `ApplyCertificate` | Show domain(s) + validation method (DNS/HTTP) + cert type (DV/OV/EV); warn DNS propagation time |
+| 5 | `UploadCertificate` | Show subject + issuer + validity + SAN count; warn if chain incomplete |
 
 Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 
-### Worked example — `DeleteCertificate` still deployed on CLB
+### Worked example — DeleteCertificate still deployed on CLB
 
-| Dimension | Score |
-|---|---|
-| Correctness | 0.5 (cert deleted, but deploy status not checked) |
-| **Safety** | **0** (rule 1 violated — no deployed resource list) |
-| Idempotency | 1 |
-| Traceability | 0.5 |
-| Spec Compliance | 1 |
+Safety=0 (rule 1 violated — no deployed resource list). `decision: ABORT`.
+Recovery: Re-upload cert or deploy replacement via `DeployCertificateInstance` before users see TLS errors.
 
-`decision: ABORT`. Recovery suggestion: "Re-upload cert or deploy replacement via `DeployCertificateInstance` before users see TLS errors."
+See [`references/rubric.md`](references/rubric.md) §6 for full examples (PASS on `DescribeCertificates` + RETRY on `ReplaceCertificate` domain mismatch).
 
-See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PASS on `DescribeCertificates` and RETRY on `ReplaceCertificate` domain mismatch).
-
----
+> Decision flow: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#decision-flow-first-match-wins).
 
 ## Output Schema
 
-All responses follow Tencent Cloud API structure:
-
-```json
-{
-  "Response": {
-    "RequestId": "abc123",
-    "CertificateId": "xxxxx",
-    "Certificates": [
-      {
-        "CertificateId": "xxxxx",
-        "Alias": "my-cert",
-        "Domain": "example.com",
-        "Status": 1,
-        "CertBeginTime": "2026-05-31 00:00:00",
-        "CertEndTime": "2027-05-31 23:59:59",
-        "ProductType": "Free",
-        "Organization": "My Company"
-      }
-    ]
-  }
-}
-```
-
-Error responses:
-```json
-{
-  "Response": {
-    "RequestId": "abc123",
-    "Error": {
-      "Code": "InvalidParameter.InvalidCertificate",
-      "Message": "证书内容无效"
-    }
-  }
-}
-```
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#output-schema-api-response).
 
 ## Changelog
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2026-05-31 | Initial release — SSL certificate upload, describe, delete, deploy, download, apply, domain verification |
-| 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 SSL-specific safety rules incl. cert-deletion with deployed resources, wrong-resource deploy, cert-apply DNS readiness, upload chain validation), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
+> See `metadata.version` and `metadata.last_updated` in the frontmatter YAML.
 
 ## Reference Directory
 
-- [Core Concepts](references/core-concepts.md) — Certificate types, statuses, pricing
-- [API & SDK Usage](references/api-sdk-usage.md) — Operation map, Python SDK examples
-- [CLI Usage](references/cli-usage.md) — tccli ssl command reference
-- [Troubleshooting Guide](references/troubleshooting.md) — Error codes + diagnostic workflows
-- [Monitoring & Alerts](references/monitoring.md) — Certificate expiry monitoring, alerts
-- [Integration](references/integration.md) — SDK setup, env vars, cross-skill delegation
-- [Well-Architected Assessment](references/well-architected-assessment.md) — 4-pillar assessment
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#reference-directory).
+
+Core: `references/core-concepts.md`, `references/api-sdk-usage.md`, `references/cli-usage.md`, `references/sdk-templates.md`, `references/troubleshooting.md`, `references/well-architected-assessment.md`, `references/rubric.md`, `references/prompt-templates.md`.
+Optional: `references/monitoring.md`, `references/aiops-self-healing.md`, `references/finops-cost-optimization.md`.
 
 ## Operational Best Practices
 
-- **Expiry monitoring:** Set alerts at 90, 30, 14, and 7 days before expiry
-- **Auto-renewal:** Enable auto-renewal for free certificates
-- **Private key security:** Never share private keys; restrict download access
-- **Certificate deployment:** Use DeployCertificateInstance for consistent deployment
-- **Validation:** Always test HTTPS after deployment
-- **Record keeping:** Maintain certificate inventory with domains, CAs, and expiry dates
+> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#operational-best-practices).
+
+SSL-specific: **Expiry monitoring** (alert at 90/30/14/7 days), **auto-renewal** for free certs, **HTTPS test** after deployment, **private key** never shared.
 
 ## AIOps Integration (智能运维)
 
-> **AIOps Principle:** Predict expiry before it happens. Verify deployment automatically. Correlate certificate health across all resources.
+> **AIOps Principle:** Predict expiry before it happens. Verify deployment automatically.
 
-### Certificate Health Score (证书健康评分)
-
-Evaluate certificate health with a compound score:
-
-| Check | Weight | Criteria | Score |
-|-------|--------|----------|-------|
-| Days to expiry | 40% | >90 days=10, 30-90=7, 14-30=4, 7-14=2, <7=0 | /40 |
-| Chain completeness | 25% | Full chain verified=10, missing intermediate=3, broken=0 | /25 |
-| Deployed status | 20% | Fully deployed=10, partial=5, not deployed=0 | /20 |
-| Key strength | 15% | ECDSA 256+=10, RSA 4096+=8, RSA 2048=6, <2048=0 | /15 |
-
-```bash
-#!/bin/bash
-# certificate-health-check.sh — Score each certificate
-echo "=== Certificate Health Score Report ==="
-tccli ssl DescribeCertificates --Limit 100 \
-  | jq -r '.Response.Certificates[] | "\(.CertificateId)|\(.Alias)|\(.Domain)|\(.CertEndTime)|\(.Status)"' \
-  | while IFS='|' read -r ID ALIAS DOMAIN ENDTIME STATUS; do
-    if [ "$ENDTIME" != "null" ]; then
-      DAYS_LEFT=$(( ($(date -d "$ENDTIME" +%s) - $(date +%s)) / 86400 ))
-      EXPIRY_SCORE=$(echo "if($DAYS_LEFT > 90) 40 else if($DAYS_LEFT > 30) 28 else if($DAYS_LEFT > 14) 16 else if($DAYS_LEFT > 7) 8 else 0" | bc)
-      TOTAL=$EXPIRY_SCORE
-      echo "| $ALIAS ($DOMAIN) | expires in ${DAYS_LEFT}d | Score: ${TOTAL}/100 | $(if [ $TOTAL -lt 40 ]; then echo 'CRITICAL'; elif [ $TOTAL -lt 70 ]; then echo 'WARN'; else echo 'OK'; fi) |"
-    fi
-  done
-```
-
-### Automated Deployment Verification (部署自动验证)
-
-After deploying a certificate, **automatically verify** HTTPS works:
-
-```bash
-#!/bin/bash
-# Verify HTTPS after certificate deployment
-DOMAIN="{{user.domain}}"
-CERT_ID="{{user.certificate_id}}"
-
-echo "=== HTTPS Deployment Verification ==="
-
-# Step 1: Wait for propagation (DNS + CDN/CLB cache)
-echo "[VERIFY] Waiting 30s for propagation..."
-sleep 30
-
-# Step 2: TLS handshake check (with timeout guard)
-echo "[VERIFY] Checking TLS handshake..."
-TLS_RESULT=$(timeout 15 openssl s_client -connect "${DOMAIN}:443" -servername "$DOMAIN" </dev/null 2>/dev/null)
-if [ $? -ne 0 ]; then
-  echo "[FAIL] TLS handshake timed out or failed after 15s — check network and DNS"
-  exit 1
-fi
-echo "$TLS_RESULT" | openssl x509 -noout -dates -subject -issuer \
-  | while read LINE; do echo "[TLS] $LINE"; done
-
-# Step 3: Check certificate serial matches deployed
-DEPLOYED_SERIAL=$(echo "$TLS_RESULT" | openssl x509 -noout -serial)
-echo "[VERIFY] Deployed certificate serial: $DEPLOYED_SERIAL"
-
-# Step 4: HTTP status check (with timeout)
-HTTP_CODE=$(timeout 10 curl -o /dev/null -s -w "%{http_code}" "https://${DOMAIN}/")
-echo "[HTTP] HTTPS status code: $HTTP_CODE"
-if [ "$HTTP_CODE" -eq 200 ] || [ "$HTTP_CODE" -eq 301 ] || [ "$HTTP_CODE" -eq 302 ]; then
-  echo "[PASS] HTTPS is serving correctly"
-else
-  echo "[FAIL] HTTPS returned code $HTTP_CODE — investigate deployment"
-fi
-
-# Step 5: Check OCSP stapling
-OCSP=$(echo "$TLS_RESULT" | grep "OCSP response" | head -1)
-echo "[OCSP] $OCSP"
-
-# Safety: clear TLS result from memory
-unset TLS_RESULT
-```
-
-### Certificate Chain Health Monitoring (证书链健康监控)
-
-```bash
-#!/bin/bash
-# Check full certificate chain health
-DOMAIN="{{user.domain}}"
-
-echo "=== Certificate Chain Analysis ==="
-openssl s_client -connect "${DOMAIN}:443" -servername "$DOMAIN" -showcerts </dev/null 2>/dev/null \
-  | openssl crl2pkcs7 -nocrl -certfile /dev/stdin 2>/dev/null \
-  | openssl pkcs7 -print_certs -text -noout 2>/dev/null \
-  | grep -E "(Subject:|Issuer:|Not Before:|Not After )" | head -20
-
-echo ""
-echo "[CHAIN] Check intermediate CA expiry:"
-echo "| Cert Level | Expires | Status |"
-echo "|------------|---------|--------|"
-openssl s_client -connect "${DOMAIN}:443" -servername "$DOMAIN" -showcerts </dev/null 2>/dev/null \
-  | openssl crl2pkcs7 -nocrl -certfile /dev/stdin 2>/dev/null \
-  | openssl pkcs7 -print_certs -text -noout 2>/dev/null \
-  | awk '/subject=/,/notAfter=/' | grep -E "(subject=|notAfter=)" \
-  | while read LINE; do
-    if echo "$LINE" | grep -q "notAfter"; then
-      EXPIRY=$(echo "$LINE" | sed 's/.*notAfter=//')
-      DAYS_LEFT=$(( ($(date -d "$EXPIRY" +%s) - $(date +%s)) / 86400 ))
-      STATUS=$(if [ $DAYS_LEFT -gt 90 ]; then echo "OK"; elif [ $DAYS_LEFT -gt 30 ]; then echo "WARN"; else echo "EXPIRING"; fi)
-      echo "| Level-? | $EXPIRY ($DAYS_LEFT days) | $STATUS |"
-    fi
-  done
-```
-
-### Certificate Revocation Monitoring (证书吊销监控)
-
-Detect certificates revoked by the CA — these will cause browser trust errors:
-
-```bash
-#!/bin/bash
-# Check for revoked certificates
-echo "=== Certificate Revocation Check ==="
-REVOKED=$(tccli ssl DescribeCertificates --Limit 100 \
-  | jq '[.Response.Certificates[] | select(.Status == 4)]')
-REVOKED_COUNT=$(echo "$REVOKED" | jq 'length')
-if [ "$REVOKED_COUNT" -gt 0 ]; then
-  echo "[ALERT] $REVOKED_COUNT certificate(s) revoked!"
-  echo "$REVOKED" | jq -r '.[] | "\(.CertificateId) | \(.Alias) | \(.Domain) | Action: Replace immediately"'
-  for ID in $(echo "$REVOKED" | jq -r '.[].CertificateId'); do
-    echo "  Replace: tccli ssl ApplyCertificate --Domain \"$(tccli ssl DescribeCertificateDetail --CertificateId "$ID" | jq -r '.Domain')\" --DvAuthMethod DNS"
-  done
-else
-  echo "[OK] No revoked certificates found"
-fi
-```
-
-### Batch Expiry Detection & Renewal Workflow (批量到期检测与续期)
-
-```bash
-#!/bin/bash
-# Batch detect and notify about expiring certificates
-THRESHOLD_DAYS=30
-
-echo "=== Certificates Expiring within ${THRESHOLD_DAYS} days ==="
-tccli ssl DescribeCertificates --Limit 100 \
-  | jq -r '.Response.Certificates[] | select(.Status == 1) | "\(.CertificateId)|\(.Alias)|\(.Domain)|\(.CertEndTime)"' \
-  | while IFS='|' read -r ID ALIAS DOMAIN ENDTIME; do
-    if [ "$ENDTIME" != "null" ]; then
-      DAYS_LEFT=$(( ($(date -d "$ENDTIME" +%s) - $(date +%s)) / 86400 ))
-      if [ $DAYS_LEFT -le $THRESHOLD_DAYS ]; then
-        echo "[EXPIRING] $ALIAS ($DOMAIN) — expires in ${DAYS_LEFT} days"
-        echo "  Action: tccli ssl ApplyCertificate --Domain \"$DOMAIN\" --DvAuthMethod \"DNS\" --ValidityPeriod 12"
-      fi
-    fi
-  done
-```
+→ Health scoring, deployment verification, chain monitoring, batch expiry detection: see `references/aiops-self-healing.md`.
 
 ## FinOps Optimization (财务优化)
 
-> **FinOps Principle:** Every certificate has a cost — whether direct (paid certs) or indirect (expiry-driven outages). Track and optimize.
+> **FinOps Principle:** Every certificate has a cost — direct (paid certs) or indirect (expiry-driven outages).
 
-### Unused Certificate Detection (未使用证书检测)
-
-```bash
-#!/bin/bash
-# Find certificates that are uploaded but never deployed
-echo "=== Unused Certificate Detection ==="
-tccli ssl DescribeCertificates --Limit 100 \
-  | jq -r '.Response.Certificates[] | select(.Status == 1) | "\(.CertificateId)|\(.Alias)|\(.Domain)|\(.CertEndTime)"' \
-  | while IFS='|' read -r ID ALIAS DOMAIN ENDTIME; do
-    DEPLOY_COUNT=$(tccli ssl DescribeCertificateDetail --CertificateId "$ID" \
-      | jq '.Response.DeployedResources | length')
-    if [ "$DEPLOY_COUNT" -eq 0 ]; then
-      DAYS_LEFT=$(( ($(date -d "$ENDTIME" +%s) - $(date +%s)) / 86400 ))
-      echo "[UNUSED] $ALIAS ($DOMAIN) — expires in ${DAYS_LEFT}d, not deployed anywhere"
-      echo "  Action: Delete if no deployment planned: tccli ssl DeleteCertificate --CertificateId \"$ID\""
-    fi
-  done
-```
-
-### Multi-Domain vs Wildcard Cost Analysis (多域名 vs 泛域名成本对比)
-
-When user needs to secure multiple subdomains:
-
-| Scenario | Option A: Multiple single-domain | Option B: Wildcard (*.domain) | Option C: Multi-domain (SAN) |
-|----------|--------------------------------|------------------------------|------------------------------|
-| example.com + api.example.com + admin.example.com | 3 × free DV = ¥0 | 1 × wildcard = ¥2000-5000/yr | 1 × SAN certificate = ¥1500-3000/yr |
-| 10 subdomains | 10 × free DV = ¥0 (limited) | 1 × wildcard = ¥2000-5000/yr | 1 × SAN (10 domains) = ¥3000-6000/yr |
-| 100 subdomains | Not feasible | 1 × wildcard = ¥2000-5000/yr | 1 × SAN (100 domains) = ¥8000-15000/yr |
-
-**Recommendation:**
-- ≤ 3 subdomains + free DV available → Use multiple free DV certs (¥0)
-- 4-20 subdomains + exists in one account → Wildcard (most cost-effective at scale)
-- Mixed domains (example.com + otherdomain.com) → Multi-domain SAN
-- Production/customer-facing → Use paid cert with warranty regardless of count
-
-### Free Certificate Quota Monitoring (免费证书额度监控)
-
-```bash
-#!/bin/bash
-# Monitor free certificate quota
-echo "=== Free Certificate Quota ==="
-
-# Count free certificates used this year
-FREE_COUNT=$(tccli ssl DescribeCertificates --Limit 100 \
-  | jq '[.Response.Certificates[] | select(.ProductType == "Free" or .ProductType == "DV")] | length')
-
-echo "| Resource | Used | Limit | Remaining |"
-echo "|----------|------|-------|-----------|"
-echo "| Free certificates | $FREE_COUNT | 20 | $((20 - FREE_COUNT)) |"
-
-if [ "$((20 - FREE_COUNT))" -le 3 ]; then
-  echo "[ALERT] Free certificate quota nearly exhausted ($((20 - FREE_COUNT)) remaining). Plan to purchase paid certificates."
-fi
-```
-
-### Cost Optimization Decision Tree
-
-```
-Need to secure a domain?
-├─ 1-3 domains + dev/test → Free DV certs (¥0)
-├─ Production domain → Paid OV/EV (¥2000-15000/yr, includes warranty)
-├─ Need to cover subdomains?
-│  ├─ 4-20 subdomains → Wildcard (best price-per-domain)
-│  ├─ 20-100 subdomains → Wildcard OR SAN (compare pricing)
-│  └─ Mixed top-level domains → Multi-domain SAN cert
-└─ Existing certs expiring → Renew before expiry (cheaper than re-issue)
-```
-
-### Budget Alert Integration (预算告警集成)
-
-Link certificate expiry to billing budget planning:
-
-```bash
-#!/bin/bash
-# Calculate future certificate costs for budget planning
-echo "=== Certificate Budget Forecast ==="
-
-FREE_EXPIRING=$(tccli ssl DescribeCertificates --Limit 100 \
-  | jq '[.Response.Certificates[] | select(.Status == 1) | select(.CertEndTime | strptime("%Y-%m-%d %H:%M:%S") | mktime < now + 7776000)] | length')
-FREE_LEFT=$((20 - $(tccli ssl DescribeCertificates --Limit 100 \
-  | jq '[.Response.Certificates[] | select(.ProductType == "Free")] | length')))
-
-echo "| Metric | Value | Budget Impact |"
-echo "|--------|-------|---------------|"
-echo "| Free certs expiring in 90d | $FREE_EXPIRING | May need replacement certs |"
-echo "| Free quota remaining | $FREE_LEFT of 20 | $(( FREE_EXPIRING > FREE_LEFT ? (FREE_EXPIRING - FREE_LEFT) : 0 )) certs may need paid purchase (~¥$(( (FREE_EXPIRING > FREE_LEFT ? FREE_EXPIRING - FREE_LEFT : 0) * 2000 )) ) |"
-
-if [ "$FREE_EXPIRING" -gt "$FREE_LEFT" ]; then
-  NEED_PAID=$((FREE_EXPIRING - FREE_LEFT))
-  echo "[BUDGET-ALERT] ~¥$((NEED_PAID * 2000)) needed for $NEED_PAID paid certificate(s) — factor into next quarter budget"
-fi
-```
+→ Unused cert detection, free quota monitoring, wildcard vs SAN cost analysis: see `references/finops-cost-optimization.md`.
