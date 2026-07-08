@@ -2,170 +2,102 @@
 
 ## Repo purpose
 
-Collection of Tencent Cloud AI Agent skills (OpenSpec) for ops runbooks. Each skill is a `SKILL.md` file with YAML frontmatter that an agent reads as an instruction document — these are **NOT executable code**. Live work happens via `tccli` CLI (primary) or `tencentcloud-sdk-python` (fallback) at runtime.
+Collection of Tencent Cloud AI Agent skills (OpenSpec) for ops runbooks. Each skill is a `SKILL.md` file with YAML frontmatter. Live work happens via `tccli` CLI (primary) or `tencentcloud-sdk-python` (fallback).
 
 ## Layout
 
 ```
-qcloud-skills/                 # repo root — cross-cutting tooling only (see Asset placement below)
+qcloud-skills/
   scripts/                     # Shared executables: validate_*, gcl_runner, gcl_trace_aggregate
-  audit-results/               # Runtime output (gitignored); not skill source
-  qcloud-[product]-ops/        # 24 skill directories (see Skills Inventory below)
-    SKILL.md                   # YAML frontmatter (metadata) + Markdown runbook
+  audit-results/               # Runtime output (gitignored)
+  qcloud-[product]-ops/        # 24 skill directories
+    SKILL.md                   # YAML frontmatter + Markdown runbook
     assets/
-      eval_queries.json        # Intent classification test set (should_trigger true/false)
+      eval_queries.json        # Intent classification test set
       example-config.yaml      # Optional example YAML
-      *.schema.json            # JSON Schema / handoff contracts owned by THIS skill
-    references/                # Supporting docs: cli-usage, api-sdk-usage, troubleshooting, ...
+      *.schema.json            # JSON Schema / handoff contracts
+    references/                # Supporting docs: cli-usage, api-sdk-usage, troubleshooting
 ```
 
-**There is no repo-root `assets/` directory.** Every schema, handoff contract, and skill-specific config lives under the owning skill's `assets/` (or `references/` for Markdown-only contracts).
+**No repo-root `assets/` directory.** All schemas, handoff contracts, and skill-specific config live under the owning skill's `assets/` (or `references/` for Markdown-only contracts).
 
 ## Skills inventory (24)
 
-Product-scoped skills (20): `cvm`, `cdb`, `clb`, `cos`, `es`, `redis`, `monitor`, `tke`, `vpc`, `cam`, `cdn`, `cbs`, `cls`, `ckafka`, `scf`, `mongodb`, `postgres`, `ssl`, `agsx`, `finops`.
+- Product-scoped (20): `cvm`, `cdb`, `clb`, `cos`, `es`, `redis`, `monitor`, `tke`, `vpc`, `cam`, `cdn`, `cbs`, `cls`, `ckafka`, `scf`, `mongodb`, `postgres`, `ssl`, `agsx`, `finops`
+- Cross-product (3): `qcloud-aiops-diagnosis`, `qcloud-proactive-inspection`, `qcloud-well-architected-review`
+- Meta-skill (1): `qcloud-skill-generator` (scaffolds/updates other skills)
 
-Cross-product skills (3): `qcloud-aiops-diagnosis` (multi-metric correlation), `qcloud-proactive-inspection` (5-step pipeline), `qcloud-well-architected-review` (4-pillar assessment).
-
-Meta-skill (1): `qcloud-skill-generator` — **scaffolds/updates** other skills, not for live ops. Always check this before manually editing a `SKILL.md` if the change is structural.
-
-Run `ls qcloud-*-ops/` for the canonical list. The `README.md` skill list is also maintained but lags behind when new skills land.
+Run `ls qcloud-*-ops/` for canonical list.
 
 ## Key conventions
 
-- **Dual-path execution**: `tccli` CLI is primary; `tencentcloud-sdk-python` is fallback. The `cli_applicability` frontmatter field declares the policy per skill: `cli-first` / `dual-path` (most common — must ship `references/cli-usage.md` and document BOTH paths in every flow) / `cli-only` (read-only skills) / `sdk-only` (e.g. `qcloud-agsx-ops` — `tccli` does not ship an `ags` subcommand; verify via `tccli ags help`).
-- **Pre-check → Execute → Verify → Recover** is the standard 4-step runbook shape. Every operation must follow it.
-- **Cross-skill delegation**: CVM → VPC/CLB/COS; Monitor → CVM/CLB/VPC; CDB/ES → VPC/Monitor/COS; **Well-Architected** → `qcloud-well-architected-review` (orchestrator) dispatches read-only workers on each `qcloud-*-ops`; **proactive inspection** → `qcloud-proactive-inspection` delegates Discovery to product skills. Check the target skill's `## Trigger & Scope` for explicit `delegate-to` markers before inventing a flow.
-- **Five Core Standards** (P0 quality gates, all skills must satisfy): Clear Boundaries, Structured I/O (`{{env.*}}` / `{{user.*}}` / `{{output.*}}` placeholders), Explicit Actionable Steps, Complete Failure Strategies (≥ 10 product-specific error codes with HALT vs retry), Absolute Single Responsibility.
-- **Token Efficiency** (P0 — 强制): 在保持 Agent 可执行性的前提下最小化 Token 消耗。规则包括 TE-1（API 查替代硬编码表）、TE-3（紧凑错误表 ≤3 列）、TE-4（JSON paths 集中声明）、TE-5（YAML anchors）、TE-6（消除跨文件重复）。详见下方 Round 1 检查清单。
+- **Dual-path execution**: `tccli` primary; `tencentcloud-sdk-python` fallback. `cli_applicability` field: `cli-first` / `dual-path` (most common, requires `references/cli-usage.md`) / `cli-only` (read-only) / `sdk-only` (verify via `tccli <product> help`).
+- **Pre-check → Execute → Verify → Recover**: Standard 4-step runbook shape.
+- **Cross-skill delegation**: Check target skill's `## Trigger & Scope` for `delegate-to` markers.
+- **Five Core Standards (P0)**: Clear Boundaries, Structured I/O (`{{env.*}}`/`{{user.*}}`/`{{output.*}}`), Explicit Actionable Steps, Complete Failure Strategies (≥10 product-specific error codes with HALT vs retry), Absolute Single Responsibility.
+- **Token Efficiency (P0)**: Minimize tokens while preserving executability. Rules: TE-1 (API queries instead of hardcoded tables), TE-3 (error tables ≤3 columns), TE-4 (JSON paths centralized), TE-5 (YAML anchors), TE-6 (eliminate cross-file duplication).
+  - **TE Audit Trigger**: After any `SKILL.md`/`references/*.md`/`rubric.md`/`prompt-templates.md` change, scan for >10-line repetitive blocks, duplicate GCL text, or >5 inline hardcoded values. Extract to `references/` or annotate with `<!-- Use API for latest -->`. Record result in commit footer: `TE-Audit: ...`.
+- **Subagent concurrency limit (P0)**: Max 3 concurrent subagents.
+- **No web console execution path** (only for docs reference).
+- **Minimal-change principle**: Don't reformat/rename/restructure unrelated files.
+- **Commit hygiene**:
+  - Default: One commit per logical unit.
+  - **Hard stops (MUST pause)**: Credentials/secrets in diff, irreversible destructive ops without confirmation, bypassed safety gates, wrong remote/branch/protected branch, sensitive info in commit, mass destructive changes.
+- **Python lint gate**: After `*.py` changes, run `ruff check <changed-files>`. After Python SDK code blocks in Markdown, run `python3 scripts/check_markdown_python.py --root .`.
+- **UX spec mandatory**: `qcloud-skill-generator/references/user-experience-spec.md`.
+- **Asset & schema placement (mandatory)**:
+  | Location | Allowed contents |
+  |---|---|
+  | `qcloud-*-ops/assets/` | `eval_queries.json`, `example-config.yaml`, `*.schema.json`, skill-specific templates |
+  | `qcloud-*-ops/references/` | Runbooks, Markdown output contracts, delegation stubs |
+  | `scripts/` | Shared executables used by multiple skills |
+  | `audit-results/` | Generated traces/reports |
 
-  **TE 巡检强制触发规则：** 每次 `SKILL.md` / `references/*.md` / `references/rubric.md` / `references/prompt-templates.md` 变更完成后，**必须**运行一轮 TE 巡检，判断是否需要将内联内容外迁至 `references/` 子文档并建立关联：
-
-  1. 扫描变更后 SKILL.md 中是否存在 **>10 行的重复性内容块**（错误表、JSON paths、代码片段），如有 → 提取至 `references/<topic>.md`，原位置保留 `<!-- see references/<topic>.md -->` 引用占位。
-  2. 扫描 `references/rubric.md` 和 `references/prompt-templates.md` 是否存在 **GCL Quality Gate / Prompt 文本重复**（多个技能共享相同结构），如有 → 提取至 `qcloud-skill-generator/references/gcl-prompt-backbone.md`，各技能引用而非复制（TE-6）。
-  3. 扫描 `references/` 子文档是否包含 **>5 处内联硬编码值**（实例规格列表、Region 列表等），如有 → 标注 `<!-- Use API for latest -->` 并附查询命令（TE-1）。
-  4. 巡检结果写入变更 commit message 的 footer：`TE-Audit: moved N blocks to references/; N inline tables annotated`；若无需迁移，也需记录 `TE-Audit: no refactor needed`。
-- **Subagent 并发上限 (P0 — 强制，不可打破):** 同时运行的 subagent 数量 **不得超过 3 个**。此限制适用于所有场景：并行编码、并行评审、并行研究。超过 3 个并发 subagent 会导致 429 限流和资源争用，历史教训表明并发越高失败率越高。调度原则：先启动 3 个，等待完成后再启动下一批。
-- **No web console as agent execution path.** The console may be referenced for product docs but never for state changes.
-- **Minimal-change principle.** Prefer owner-scoped, minimal diffs. Do not reformat, rename, or restructure unrelated skill files while updating one skill; defer broad cleanups to an explicit follow-up task.
-- **Commit hygiene — default behavior.** Agent decides commit granularity autonomously unless a hard-stop condition below applies. Reasonable defaults: one commit per logical unit (a single skill's self-review fixes, a single new script, a single `.gitignore`/`AGENTS.md`/`CI` change). Cross-product or cross-class changes get split. Ask the user only when the call is genuinely ambiguous AND the cost of getting it wrong is high.
-- **Commit hygiene — hard stops (MUST pause and report).** Before `git commit` / `git push`, agent MUST stop and surface to the user when ANY of the following applies:
-  1. Credentials, secrets, or unmasked sensitive identifiers (API keys, SecretId/SecretKey, tokens, internal hostnames/IPs, customer account IDs, bucket/instance IDs when paired with account context) appear in the staged diff or in any output path (env dump, log, error message).
-  2. Irreversible destructive operation is being committed without an explicit user confirmation in the trace (e.g. `rm -rf`, `tccli` delete without `--DryRun` gate, schema drop, force-push to `main`).
-  3. A safety gate from the touched skill's rubric is being bypassed or weakened (e.g. dropping a DryRun step, removing a HARD-stop production block).
-  4. Push targets the wrong remote, wrong branch, or a protected branch without explicit user instruction.
-  5. Commit message / author / co-author contains sensitive information (customer name, internal host, ticket ID marked confidential).
-  6. The change set is destructive at scale (mass file deletion, mass rename, history rewrite via `git filter-branch` / `reset --hard` / force-push) — surface the affected file count and the rollback path before acting.
-  These are non-negotiable; "looks small" or "user said go ahead earlier" does not exempt them.
-- **Python lint gate.** After any `*.py` file change, run `ruff check <changed-python-files-or-dirs>` before declaring done; CI enforces `ruff check .` for regression coverage.
-  After any `SKILL.md` or `references/*.md` edit that adds/modifies Python SDK code blocks, run `python3 scripts/check_markdown_python.py --root .` to catch Python-specific bugs in embedded snippets: bash `$()` expansion inside Python strings, `time.strftime`/`datetime` usage without corresponding import, redundant `json.loads(json.dumps(...))`, and f-string `{{...}}` placeholder errors. Exit non-zero ⇒ fix before declaring done.
-- **UX spec** in `qcloud-skill-generator/references/user-experience-spec.md` is mandatory for all generated skills.
-- **Asset & schema placement (mandatory)** — skill-owned artifacts MUST NOT be placed at repo root. Use this split:
-
-  | Location | Allowed contents | Forbidden |
-  |---|---|---|
-  | `qcloud-*-ops/assets/` | `eval_queries.json`, `example-config.yaml`, `*.schema.json`, skill-specific templates | Cross-skill executables |
-  | `qcloud-*-ops/references/` | Runbooks, output contracts in Markdown, delegation stubs | Duplicate JSON schemas that belong in `assets/` |
-  | `scripts/` (repo root) | Shared **executables** used by multiple skills (`validate_*.py`, `gcl_runner.py`, `gcl_trace_aggregate.py`) | JSON Schema, handoff contracts, example YAML |
-  | `audit-results/` (runtime) | Generated traces/reports (`gcl-trace-*.json`, inspection outputs) | Source-of-truth schema files |
-
-  **Owner skill rule:** the skill that **defines and primarily consumes** the contract owns the file. Secondary consumers link to the owner via relative path — they do not copy or re-home the schema.
-
-  | Artifact | Owner skill | Secondary consumers (link only) |
-  |---|---|---|
-  | `gcl-quality-summary.schema.json` | `qcloud-monitor-ops` | `qcloud-proactive-inspection` (report embed), `scripts/gcl_trace_aggregate.py` (docstring) |
-  | `finops-handoff.schema.json` | `qcloud-aiops-diagnosis` | `qcloud-finops-ops` |
-  | `inspection-handoff.schema.json` | `qcloud-aiops-diagnosis` | `qcloud-proactive-inspection` |
-
-  **When adding a new `*.schema.json` or handoff contract:**
-  1. Pick the owner skill (primary consumer of the JSON contract).
-  2. Create under `qcloud-<owner>-ops/assets/<name>.schema.json`.
-  3. Reference from owner `SKILL.md` / `references/` and owner `example-config.yaml` if config-driven.
-  4. Secondary skills cite the owner path (e.g. `../qcloud-monitor-ops/assets/...`) — never `assets/` at repo root.
-  5. If a repo-root `scripts/*.py` emits JSON matching the schema, its docstring MUST point at the owner skill path (script ≠ schema owner).
-
-  **Anti-pattern (banned):** creating `assets/` at repo root because a script is shared — shared **code** lives in `scripts/`; shared **contracts** still belong to an owning skill.
+  **Owner skill rule**: Skill defining/primarily consuming a contract owns it. Secondary consumers link via relative path.
 
 ## Coding Discipline (Karpathy Guidelines)
 
-Behavioral guidelines to reduce common LLM coding mistakes, derived from Andrej Karpathy's observations on LLM coding pitfalls. These complement the Key conventions above.
-
 ### 1. Think Before Coding
-
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
-
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them — don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
+- Explicitly state assumptions; ask if uncertain.
+- Present multiple interpretations if they exist.
+- Suggest simpler approaches when warranted.
 
 ### 2. Simplicity First
-
-**Minimum code that solves the problem. Nothing speculative.**
-
 - No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+- No single-use abstractions.
+- No unrequested flexibility/configurability.
+- Rewrite 200-line solutions that could be 50 lines.
 
 ### 3. Surgical Changes
-
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it — don't delete it.
-
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
+- Touch only what you must.
+- Match existing style.
+- Don't refactor working code.
+- Remove only your own unused imports/variables/functions.
 
 ### 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan with verify checkpoints.
-
----
+- Define verifiable success criteria.
+- For multi-step tasks, state a brief plan with verify checkpoints.
 
 ## Mandatory rule: 2-round self-review after every skill update
 
-After any modification to a skill's `SKILL.md`, `references/`, or `assets/`, the agent **MUST** run **2 rounds of self-review** before declaring done. This is non-negotiable.
+After modifying `SKILL.md`, `references/`, or `assets/`, MUST run 2 rounds before declaring done.
 
-**Round 1 — Self-check against the template & standards** (run before claiming complete):
-1. Re-read `qcloud-skill-generator/references/qcloud-skill-template.md` and `qcloud-skill-generator/SKILL.md` for the canonical shape; diff the changed skill against the template.
-2. Run the **Five Core Standards** checklist (above). Each must be marked satisfied or N/A with reason.
-3. Run the **Token Efficiency** checklist. Verify each TE rule:
-   - **TE-1**: Hardcoded tables annotated with "Use API for latest" and query command
-   - **TE-3**: Error tables ≤3 columns, compact format; per-operation tables replaced with reference to main table
-   - **TE-4**: JSON paths centralized at file top, not duplicated per operation
-   - **TE-5**: example-config.yaml uses YAML anchors to eliminate repeated fields
-   - **TE-6**: SKILL.md has no inline Python/CLI scripts duplicated in references/; GCL G/C/O skeletons in `qcloud-skill-generator/references/gcl-prompt-backbone.md`; product `prompt-templates.md` §4 defers to `references/rubric.md` §4 (§5 product anti-patterns only)
-4. Cross-check `cli_applicability` against actual CLI support. If `dual-path`, confirm every execution flow shows BOTH `tccli` and SDK steps; if `sdk-only`, confirm the absence of `references/cli-usage.md` is intentional and `cli_support_evidence` cites the verification (`tccli ags help` → "Invalid product" for agsx).
-5. Verify the YAML frontmatter is valid, `version` and `last_updated` are bumped, and `related_skills` reflect the new state.
-6. Confirm credentials are never printed in any output path — only `<masked>`.
-7. Check that eval_queries.json coverage of new triggers is updated (add 2–4 positive + 2–4 negative cases for new functionality).
-8. **Asset placement:** any new `*.schema.json`, handoff contract, or skill config YAML is under the **owning** `qcloud-*-ops/assets/` — not repo-root `assets/`. Cross-skill scripts stay in `scripts/` only; they reference the owner schema path in docstring/comments. Secondary consumers link to owner; no duplicate copies.
+**Round 1 — Self-check against template & standards**:
+1. Re-read `qcloud-skill-generator/references/qcloud-skill-template.md` and `qcloud-skill-generator/SKILL.md`.
+2. Verify Five Core Standards.
+3. Verify Token Efficiency rules (TE-1/TE-3/TE-4/TE-5/TE-6).
+4. Cross-check `cli_applicability` against CLI support.
+5. Verify YAML frontmatter validity, bumped `version`/`last_updated`, and `related_skills`.
+6. Confirm credentials never printed (only `<masked>`).
+7. Check `eval_queries.json` coverage (2-4 positive + 2-4 negative cases for new functionality).
+8. Verify asset placement (no repo-root `assets/`).
 
-**Round 2 — Adversarial review** (mirror the meta-skill's governance doc):
-1. Apply the four review categories from `qcloud-skill-generator/references/governance-and-adversarial-review.md`: **R1 Security** (credential leaks), **R2 API Fidelity** (invented methods, wrong params — must match official API doc), **R3 Safety Gates** (delete confirmations, pre-backup, rollback), **R4 UX** (Quick Start present, error format, output schema).
-2. Walk through the **Adversarial Scenarios** in the same file and confirm none apply.
-3. Verify cross-skill delegation works: if the new flow touches another product, confirm the `delegate-to` skill is named and the right `SKILL.md` reference is included.
+**Round 2 — Adversarial review**:
+1. Apply R1 Security, R2 API Fidelity, R3 Safety Gates, R4 UX from `qcloud-skill-generator/references/governance-and-adversarial-review.md`.
+2. Walk through Adversarial Scenarios.
+3. Verify cross-skill delegation.
 
-**Fix-on-find** — any problem surfaced in either round must be fixed in the same change set, not deferred. The change is not "done" until both rounds report clean. Do not skip a round because the diff "looks small"; templates and reference paths drift silently.
+**Fix-on-find**: Any problem must be fixed in same change set.
 
 ## Prerequisites for execution
 
@@ -175,299 +107,157 @@ export TENCENTCLOUD_SECRET_KEY=your_secret_key
 export TENCENTCLOUD_REGION=ap-guangzhou
 ```
 
-Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` additionally needs `TENCENTCLOUD_FINOPS_CONFIG` pointing at `assets/example-config.yaml` in production.
+Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` additionally needs `TENCENTCLOUD_FINOPS_CONFIG`.
 
 ## SKILL.md frontmatter — required fields
 
-- `name` / `description` — skill identity and trigger conditions (triggers are how agents route; vague descriptions break routing).
-- `compatibility` — execution environment (CLI/SDK, Python version, network).
-- `cli_applicability` — `dual-path` / `cli-first` / `cli-only` / `sdk-only`. Determines whether `references/cli-usage.md` is mandatory.
-- `cli_support_evidence` — cite the verification command (e.g. `tccli cvm help` showing the operations, or `tccli ags help` returning "Invalid product" for sdk-only).
-- `environment` — list of required env vars.
-- `metadata.version` / `metadata.last_updated` — bump on every change.
+- `name` / `description` (skill identity and triggers)
+- `compatibility` (execution environment)
+- `cli_applicability` (`dual-path`/`cli-first`/`cli-only`/`sdk-only`)
+- `cli_support_evidence` (verification command)
+- `environment` (required env vars)
+- `metadata.version` / `metadata.last_updated` (bump on every change)
 
 ## Evaluation
 
-`assets/eval_queries.json` per skill holds intent-classification test cases (`should_trigger: true/false`). No test runner exists in-repo; these are for external evaluation harnesses. When adding capability, add eval cases in the same change.
+- `assets/eval_queries.json`: Intent-classification test cases (`should_trigger: true/false`).
+- **Build-time regression commands**:
+  | Change scope | Command |
+  |---|---|
+  | Full local validation | `python3 scripts/validate_local.py` |
+  | SKILL.md frontmatter | `python3 scripts/validate_skills_frontmatter.py` |
+  | well-architected-assessment.md JSON | `python3 scripts/validate_product_assessment.py` |
+  | GCL rubric/prompt/Quality Gate | `python3 scripts/check_gcl_conformance.py` |
+  | gcl_runner.py/gcl_trace_aggregate.py | GCL smoke command + `python3 scripts/gcl_trace_aggregate.py --since-hours 168` |
+  | Python files | `ruff check <changed-files>` |
+  | Script tests | `cd scripts && python3 -m unittest discover -p "*_test.py" -v` |
+  | GCL alarm wiring | `python3 scripts/gcl_alarm_wire.py plan --summary scripts/fixtures/gcl-quality-summary-healthy.json` |
+  | Markdown specs/links | `python3 scripts/check_markdown_links.py` |
+  | Python SDK code blocks in Markdown | `python3 scripts/check_markdown_python.py --root .` |
 
-**Build-time regression:** after changing any `references/well-architected-assessment.md` Worker Output Contract example JSON, run:
-
-```bash
-python3 scripts/validate_product_assessment.py
-python3 scripts/validate_skills_frontmatter.py
-```
-
-Exit non-zero ⇒ fix finding ID / pillar mismatch before claiming done.
-
-**Validation command matrix:**
-
-| Change scope | Required command |
-|---|---|
-| Full local validation before PR / handoff | `python3 scripts/validate_local.py` |
-| Any `SKILL.md` frontmatter or metadata change | `python3 scripts/validate_skills_frontmatter.py` |
-| Any `references/well-architected-assessment.md` Worker Output Contract example JSON change | `python3 scripts/validate_product_assessment.py` |
-| Any GCL rubric, prompt template, or `## Quality Gate (GCL)` section change | `python3 scripts/check_gcl_conformance.py` |
-| Any `scripts/gcl_runner.py` or `scripts/gcl_trace_aggregate.py` change | GCL smoke command in `.github/workflows/validate-skills.yml` + `python3 scripts/gcl_trace_aggregate.py --since-hours 168` |
-| Any Python file change | `ruff check <changed-python-files-or-dirs>` |
-| Any script test or GCL runner change | `cd scripts && python3 -m unittest discover -p "*_test.py" -v` |
-| Any GCL alarm wiring change | `python3 scripts/gcl_alarm_wire.py plan --summary scripts/fixtures/gcl-quality-summary-healthy.json` |
-| Any Markdown spec, README, or path-reference change | `python3 scripts/check_markdown_links.py` |
-| Any SKILL.md / references/*.md edit with Python SDK code blocks | `python3 scripts/check_markdown_python.py --root .` |
-
-**Runtime GCL:** `scripts/gcl_runner.py` implements the Orchestrator loop (trace → external Critic → PASS/RETRY/SAFETY_FAIL). Critic scores MUST be injected from an isolated agent context via `--critic-json` or stdin. Production GCL MUST use externally supplied isolated Critic scores; `--structural-critic-only` is allowed only for CI/local structural smoke tests and MUST NOT be used for production execution, human acceptance, or quality pass decisions.
+- **Runtime GCL**: `scripts/gcl_runner.py` requires external isolated Critic scores in production. `--structural-critic-only` only for CI/local smoke tests.
 
 ## Adding or modifying a skill
 
-1. **New skill** → use `qcloud-skill-generator` (do not hand-roll). It enforces the 2-round review internally.
-2. **Existing skill update** → read the meta-skill's `SKILL.md` workflow section, then apply the 2-round self-review above.
-3. After `git add`, re-run round 2 once more against the staged version to catch anything the in-editor view hid.
+1. **New skill**: Use `qcloud-skill-generator` (enforces 2-round review).
+2. **Existing skill update**: Read meta-skill workflow, apply 2-round self-review.
+3. After `git add`, re-run Round 2 against staged version.
 
 ## Files that do NOT exist
 
-- No repo-root **`assets/`** directory — all skill schemas and handoff contracts live under `qcloud-*-ops/assets/` (see **Asset & schema placement** above).
-- No `package.json`, `Makefile`, CI configs, build scripts, typechecker, or non-stdlib test runner — **except**:
-  - `scripts/validate_product_assessment.py` — Well-Architected worker JSON regression
-  - `scripts/validate_skills_frontmatter.py` — SKILL.md frontmatter checks
-  - `scripts/gcl_runner.py` — GCL Orchestrator (Phase 2; external Critic required in production)
-  - `scripts/gcl_runner_test.py` — unit tests for GCL runner behavior
-  - `scripts/gcl_trace_aggregate.py` — GCL trace → quality summary (Phase 3; feeds monitor-ops / inspection)
-  - `scripts/gcl_alarm_wire.py` — Cloud Monitor alarm wiring for GCL metrics
-  - `scripts/check_gcl_conformance.py` — GCL rubric/prompt/Quality Gate conformance check
-  - `scripts/check_markdown_links.py` — local Markdown path/reference existence check
-  - `scripts/check_markdown_python.py` — Python-in-Markdown lint: bash `$()` in strings, missing imports, json.loads(dumps()), f-string braces
-  - `scripts/te6_gcl_compress.py` — TE-6 maintenance tool for compressing duplicated GCL prompt/Quality Gate text
-  - `scripts/validate_local.py` — one-command local validation suite mirroring CI gates
-  - `.github/workflows/validate-skills.yml` — CI for the above
-- No `CLAUDE.md`, `opencode.json`, `.cursorrules` in this repo.
-- `.omc/`, `.omo/`, `.codebuddy/`, `.omc/project-memory.json` are gitignored cache data — not source.
-- `docs/superpowers/plans/` contains historical planning notes; safe to read but not a runtime source of truth.
-
----
+- No repo-root `assets/` directory.
+- No `package.json`, `Makefile`, non-stdlib test runner (except listed scripts in `scripts/` and `.github/workflows/validate-skills.yml`).
+- No `CLAUDE.md`, `opencode.json`, `.cursorrules`.
+- `.omc/`, `.omo/`, `.codebuddy/`, `.omc/project-memory.json` are gitignored.
+- `docs/superpowers/plans/` contains historical notes, not runtime source.
 
 ## Key References
 
 | Document | Description |
 |----------|-------------|
-| `qcloud-skill-generator/SKILL.md` | **Meta Skill generator** — full workflow, P0/P1 checklist, Token Efficiency rules |
-| `qcloud-skill-generator/references/governance-and-adversarial-review.md` | Governance & adversarial review — R1–R4 pre-merge security/resilience/UX scenarios |
+| `qcloud-skill-generator/SKILL.md` | Meta Skill generator — full workflow, P0/P1 checklist, Token Efficiency rules |
+| `qcloud-skill-generator/references/governance-and-adversarial-review.md` | Governance & adversarial review — R1–R4 pre-merge security/resilience/UX |
 | `qcloud-skill-generator/references/qcloud-skill-template.md` | Canonical SKILL.md template |
-| `qcloud-skill-generator/references/user-experience-spec.md` | UX compliance requirements for all skills |
-| `docs/gcl-spec.md` | **Runtime GCL spec** — rubric, trace schema, prompt templates, per-skill defaults, roadmap/changelog |
-| `docs/reflexion-memory.md` | **Reflexion rules** — lightweight cross-session failure-pattern memory governance |
-| `docs/failure-patterns.md` | **Reflexion memory store** — bounded structured failure patterns for cross-session learning |
-
----
+| `qcloud-skill-generator/references/user-experience-spec.md` | UX compliance requirements |
+| `docs/gcl-spec.md` | Runtime GCL spec — rubric, trace schema, prompt templates |
+| `docs/reflexion-memory.md` | Reflexion rules — cross-session failure-pattern memory governance |
+| `docs/failure-patterns.md` | Reflexion memory store |
 
 ## Runtime Quality Gates: GCL & Reflexion
 
-Detailed runtime-quality specifications are intentionally externalized to reduce always-loaded context size:
-
-| Spec | Read before modifying |
-|---|---|
-| `docs/gcl-spec.md` | any `## Quality Gate (GCL)` section, `references/rubric.md`, `references/prompt-templates.md`, `scripts/gcl_runner.py`, `scripts/gcl_trace_aggregate.py`, `scripts/gcl_alarm_wire.py`, `scripts/check_gcl_conformance.py`, or GCL-related CI wiring |
-| `docs/reflexion-memory.md` | `docs/failure-patterns.md`, trace `failure_pattern` extraction, Reflexion retrieval/persistence logic, or failure-memory governance |
-| `docs/failure-patterns.md` | only when retrieving or updating reusable failure patterns; keep it bounded and deduplicated |
+Detailed specs externalized to reduce context size. Read before modifying:
+- `docs/gcl-spec.md`: GCL-related changes
+- `docs/reflexion-memory.md`: Reflexion-related changes
+- `docs/failure-patterns.md`: Only when retrieving/updating failure patterns
 
 ### GCL hard constraints
 
-- Production GCL requires isolated Generator and Critic contexts; shared-context G+C is banned.
-- Critic is read-only: it MUST NOT call `tccli`, use SDK clients, mutate resources, or self-score Generator output.
-- Critic MUST NOT see the raw user request; it may use sanitized `{{output.operation_intent}}`, Generator output, trace, and rubric.
-- Orchestrator owns `operation_intent` generation before Critic scoring; it MUST omit raw user wording, credentials, and unmasked sensitive identifiers.
-- `Safety = 0` / `SAFETY_FAIL` MUST abort immediately; never return partial or best-effort output.
-- Every GCL loop MUST be bounded by `max_iterations`; unbounded retry loops are banned.
-- Every GCL run MUST persist a masked trace under `audit-results/gcl-trace-*.json`.
-- Production GCL MUST use externally supplied isolated Critic scores; `--structural-critic-only` is allowed only for CI/local structural smoke tests and MUST NOT be used for production execution, human acceptance, or quality pass decisions.
-- GCL prompt templates MUST use `{{env.*}}` / `{{user.*}}` / `{{output.*}}`; bare `{...}` placeholders are banned.
-- GCL `required` / `recommended` skills MUST keep `## Quality Gate (GCL)` in `SKILL.md`, plus `references/rubric.md` and `references/prompt-templates.md`.
+- Production GCL requires isolated Generator and Critic contexts.
+- Critic is read-only (no `tccli`/SDK calls, no resource mutation).
+- Critic sees only sanitized `{{output.operation_intent}}`, Generator output, trace, and rubric.
+- Orchestrator generates `operation_intent` before Critic scoring (omits raw user wording, credentials, sensitive IDs).
+- `Safety = 0` / `SAFETY_FAIL` aborts immediately.
+- Every GCL loop bounded by `max_iterations`.
+- Every GCL run persists masked trace under `audit-results/gcl-trace-*.json`.
+- Production MUST use external isolated Critic scores; `--structural-critic-only` only for CI/local smoke tests.
+- GCL prompt templates use `{{env.*}}`/`{{user.*}}`/`{{output.*}}` (no bare `{...}`).
 
 ### Reflexion hard constraints
 
-- Reflexion retrieval is an optional hint, not a mandatory gate.
-- `docs/failure-patterns.md` MUST stay ≤ 200 lines; prune low-frequency entries when needed.
-- Deduplicate patterns by `skill` + `command` + `error`; increment `count` on matches.
-- Patterns MUST come from GCL trace `failure_pattern` fields or self-review findings, not ad-hoc subjective notes.
-- Promote high-frequency patterns to anti-pattern docs and remove duplicates from memory.
+- Reflexion retrieval is optional hint, not mandatory gate.
+- `docs/failure-patterns.md` ≤ 200 lines.
+- Deduplicate patterns by `skill` + `command` + `error`.
+- Patterns from GCL trace `failure_pattern` or self-review findings only.
+- Promote high-frequency patterns to anti-pattern docs.
 
 ### Relationship to build-time self-review
 
-Build-time 2-round self-review and runtime GCL are independent gates. A clean self-review does not exempt runtime scoring; a passing GCL rubric does not exempt sloppy skill updates.
+Build-time 2-round self-review and runtime GCL are independent gates.
 
----
+## GCL Trigger Check (MANDATORY)
 
-## GCL 自动触发强制提醒
+Before coding, check if GCL is required:
 
-**重要：** 每次收到编码任务时，必须先执行以下检查，再开始执行。
+### Check List
 
-### 检查流程
+1. **Task type**: Contains 修复/新增/重构/变更/优化/测试 or fix/add/refactor/change/optimize/test? → YES
+2. **Code lines**: Expected change >5 lines? → YES
+3. **File type**: Modifying `*/SKILL.md`, `*/references/rubric.md`, `*/references/prompt-templates.md`, `AGENTS.md`, `qcloud-skill-generator/SKILL.md`, `docs/gcl-spec.md`, `docs/reflexion-memory.md`? → YES
+4. **Ops config**: Modifying YAML/JSON/TOML/HCL/Terraform/K8s/Ansible/Docker Compose? → YES (no exceptions)
 
-```
-收到任务
-    ↓
-执行 GCL 触发检查清单
-    ↓
-如果任何一项为"是" → 启动 GCL 多子 Agent 架构
-    ↓
-如果所有项为"否" → 直接在主 Agent 中执行
-```
+If any YES, trigger GCL Multi sub-Agent architecture.
 
-### 检查清单（必须逐项检查）
+### GCL Execution Steps (when triggered)
 
-#### 1. 任务类型检查
-- [ ] 任务是否包含以下关键词之一？
-  - 修复、新增、重构、变更、优化、测试
-  - fix, add, refactor, change, optimize, test
-- **如果是 → 必须触发 GCL**
+1. Create worktree: `git worktree add ../<repo>-<feature> -b feature/<feature>`
+2. Announce model configuration: Generator (vendor X) + Critics (vendor Y, ≥2, different from Generator)
+3. Launch Generator Agent in worktree
+4. Launch ≥2 parallel Critic Agents (Data Quality, Safety Rules, Spec Compliance, Token Efficiency)
+5. Execute GCL loop (max 3 rounds): Generator code → Critics parallel review → Generator fix → Critics re-review
+6. Main Agent makes PASS/RETRY/ABORT decision, merges, deletes worktree
 
-#### 2. 代码行数检查
-- [ ] 预计代码变更是否 > 5 行？
-- **如果是 → 必须触发 GCL**
+### Exceptions
 
-#### 3. 文件类型检查
-- [ ] 是否修改以下文件之一？
-  - `*/SKILL.md`
-  - `*/references/rubric.md`
-  - `*/references/prompt-templates.md`
-  - `AGENTS.md`
-  - `qcloud-skill-generator/SKILL.md`
-  - `docs/gcl-spec.md`
-  - `docs/reflexion-memory.md`
-- **如果是 → 必须触发 GCL**
+- <5-line typo/comment fixes
+- Pure doc/formatting changes
 
-#### 4. 运维配置检查
-- [ ] 是否修改以下类型的配置文件？
-  - YAML (.yaml, .yml)
-  - JSON (.json)
-  - TOML (.toml)
-  - HCL (.hcl)
-  - Terraform (.tf)
-  - Kubernetes manifests
-  - Ansible playbooks
-  - Docker Compose
-- **如果是 → 必须触发 GCL（无例外）**
+### Verification
 
-### 自动化验证脚本
+After task completion, run: `python3 scripts/verify_gcl_execution.py "<task_description>" <commit_hash>`
 
-可以使用以下脚本自动检查是否需要触发 GCL：
+## Reflection & Retrospective (P0)
 
-```bash
-python3 scripts/check_gcl_trigger.py <task_description> [file1] [file2] ...
-```
+### Core Concept
 
-脚本会自动检查任务描述和文件列表，返回是否需要触发 GCL。
+Every task must produce at least one reusable asset:
+- `docs/failure-patterns.md` entry
+- Check list/rule
+- Script/utility function
+- Template
+- Decision record
+- Troubleshooting flow
 
-### 如果触发 GCL，必须执行以下步骤 (Multi sub-Agent 架构)
+### Trigger Points
 
-**⚠️ 强制执行指令（MANDATORY）：**
+- After completing a SKILL.md change
+- After GCL Critic finds new issues
+- After optimizing 3+ skills
+- After fixing repeated bugs
+- After complex tradeoff decisions
 
-在执行任何编码任务前，**必须**运行以下检查：
+### Execution Flow
 
-```bash
-# Step 0: 强制执行检查点
-python3 scripts/check_gcl_trigger.py "<task_description>" <file1> <file2> ...
-```
+1. After task complete, ask:
+   - What pitfalls were encountered? → failure-patterns.md
+   - What code/pattern is reusable? → template/script
+   - What experience should be documented? → update references/AGENTS.md
+2. Produce at least one asset
+3. Place asset per Asset placement rules
+4. Complete and record
 
-如果脚本返回 **必须触发 GCL**（退出码 1），则**必须**执行以下完整流程。
+### Prohibited Behaviors
 
-**架构图:**
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   Main Agent (Orchestrator)                  │
-│  - Coordinates all sub-agents                               │
-│  - Aggregates Critic results                                │
-│  - Makes final PASS/RETRY/ABORT decision                    │
-│  - Controls iteration count (max 3)                         │
-│  - Persists trace for audit                                 │
-└──────────┬──────────────────────────────────────┬──────────┘
-           │ spawn Generator Agent                │ spawn Critic Agents (并行)
-           ▼                                      ▼
-┌──────────────────────┐           ┌──────────────────────────┐
-│  Generator Agent     │           │    Critic Agents (N≥2)   │
-│  - Generates output  │ ──notify─►│                          │
-│  - Uses domain logic │  ◄─feedback│  - Data Quality Critic   │
-│  - Captures trace    │           │  - Safety Rules Critic   │
-└──────────────────────┘           │  - Spec Compliance Critic│
-                                   └──────────────────────────┘
-```
-
-**执行步骤:**
-
-1. **创建 worktree**
-   ```bash
-   git worktree add ../<repo>-<feature> -b feature/<feature>
-   ```
-
-2. **输出模型配置公示**
-   ```
-   ╔══════════════════════════════════════════════════════════╗
-   ║      Multi sub-Agent GCL 模型配置                         ║
-   ╠══════════════════════════════════════════════════════════╣
-   ║ Generator: [模型名]  (厂商: [厂商名])                     ║
-   ║ Critics:   [模型名]  (厂商: [厂商名]) × N 个并行          ║
-   ║ 不同厂商: ✅ / ❌ (Generator 与 Critics 必须不同厂商)      ║
-   ║ Critic ≥ Generator: ✅ / ❌                              ║
-   ║ 最大轮次: 3                                               ║
-   ║ Critic 数量: ≥2 (建议 3-4 个，覆盖不同维度)                ║
-   ╚══════════════════════════════════════════════════════════╝
-   ```
-
-3. **启动 Generator 子 Agent**
-   - 使用 `run_in_background: true`
-   - 在 worktree 中独立开发
-   - 负责编码实现
-
-4. **启动至少 2 个 Critic 子 Agent (并行)**
-   - 使用 `run_in_background: true`
-   - 所有 Critics **并行**运行，非串行
-   - 每个 Critic 专注于不同维度：
-     * **Critic 1 (Data Quality)**: 数据完整性、准确性
-     * **Critic 2 (Safety Rules)**: 安全规则、凭证保护
-     * **Critic 3 (Spec Compliance)**: 规范符合性
-     * **Critic 4 (Token Efficiency)**: TE-1/TE-3/TE-4/TE-5/TE-6
-
-5. **执行 GCL 循环（最多 3 轮）**
-   - Generator 编码 → Critics **并行**评审 → Generator 修复 → Critics 再评审
-   - 每轮结束后向用户输出进度摘要
-   - Orchestrator 聚合所有 Critic 评分，做出决策
-
-6. **汇总结果并提交**
-   - Main Agent 做出最终 PASS/RETRY/ABORT 决策
-   - 合并到主分支
-   - 删除 worktree
-
-### 例外情况（仅限代码变更）
-
-- 小于 5 行的 typo 修复 / 注释改动
-- 纯文档/格式化改动
-
-### 验证机制（强制）
-
-任务完成后，**必须**运行验证脚本确认 GCL 被正确执行：
-
-```bash
-python3 scripts/verify_gcl_execution.py "<task_description>" <commit_hash>
-```
-
-**不得跳过任何检查步骤！**
-
----
-
-## 🚨 **!!! IMPORTANT — 定期反思与复盘，沉淀可复用资产 !!!**
-
-**⚠️ 此为 P0 级强制规范，优先级高于其他所有编码任务。每次会话结束时必须自我检查。**
-
-### 核心理念
-
-每一次任务——无论大小——如果只修了一个 bug、加了一个功能就走了，没有留下任何可复用的东西，**这次工作的价值就损失了一半**。反思和复盘的目的是：
-
-1. **不让同样的错误发生两次** — 踩过的坑需要变成规则、检查清单、或者自动化脚本
-2. **不让做过的努力白费** — 解决的复杂问题应该沉淀为模板、文档、或者通用工具函数
-3. **不让团队重复造轮子** — 你踩过的坑、找到的最佳实践、摸索出的套路，应该让下一个 AI 和人直接复用
-
-### 沉淀物资产出的形式
-
-每次反思复盘后，必须产出至少一项以下形式的**可复用资产**：
-
-| 资产类型 | 适用场景 | 举例 |
-|---------|---------|------|
-| 📝 **failure-patterns.md 条目** | 踩坑/错误/异常行为-|------|\n| 📝 **failure-patterns.md 条目** | 踩坑/错误/异常行为 | \`pattern: CVM ModifyInstanceSpec 参数不全 → InstanceType 缺失 → HALT\` |\n| 📋 **检查清单/规则** | 容易被遗忘的步骤 | \`升级 SKILL.md 版本时必须同时更新 changelog\` |\n| 🛠️ **脚本/工具函数** | 重复出现的操作 | \`check_markdown_python.py\` 捕获 Python 片段中的常见错误 |\n| 🏗️ **模板** | 重复出现的任务结构 | SDK 初始化样板、API 调用模式 |\n| 📄 **决策记录** | 复杂权衡的决策 | 为什么选 SDK 而不是 CLI、为什么不用某个 API 参数 |\n| 🔍 **排查流程** | 常见问题排查 | 慢查询排查决策树、磁盘挂载失败排查步骤 |\n\n### 执行时机（必须触发）\n\n| 时机 | 原因 | 最少产出 |\n|------|------|---------|\n| **每完成一个 SKILL.md 变更** | 编码过程中一定有取舍和踩坑 | 1 条 failure-patterns.md 或 1 个模板提取 |\n| **每次 GCL Critic 发现新问题** | Critic 发现的缺陷是系统性改进信号 | 1 条检查清单规则 或 1 条 failure-pattern |\n| **每完成 3 个技能的优化**（如本次 cvm→cdb→cls→cbs 批量优化） | 批量改造后应提炼通用模式 | docs/failure-patterns.md 新条目 + 跨技能改进建议 |\n| **每次修复了 1 个以上的反复出现的同类 bug** | 重复 bug = 缺少系统化防护 | 检查清单或自动化校验工具 |\n| **每次决策遇到 2 个以上可行方案需要权衡时** | 复杂决策不做记录下次还会纠结 | 决策记录（ADR） |\n\n### 执行流程\n\n```\n任务完成 ✅\n  ↓\n问自己三个问题：\n  1. 这次任务中踩了什么坑？下次如何避免？→ failure-patterns.md\n  2. 有什么代码/模式是其他技能也能用的？→ 提取为通用模板/脚本\n  3. 有什么经验应该写成文档让后来的 AI 知道？→ 更新 references/ 或 AGENTS.md\n  ↓\n至少产出 1 项可复用资产（failure-pattern、检查清单、脚本、模板、决策记录）\n  ↓\n如果资产在 docs/failure-patterns.md 中 → 更新并去重\n如果资产是新的脚本/模板 → 按 Asset placement 规则放置（qcloud-*-ops/ 下）\n如果资产是 AGENTS.md 规则 → 直接更新本文件\n  ↓\n完成并记录\n```\n\n### 与其他质量门的关系\n\n| 门禁 | 关系 |\n|------|------|\n| **GCL Generator-Critic Loop** | GCL 的 Critic 发现的问题 → 必须纳入 failure-patterns.md |\n| **2-round self-review** | Round 2 评审中发现的可复用模式 → 沉淀为模板/规则 |\n| **Reflexion memory** | \`docs/failure-patterns.md\` 既是 Reflexion 的数据源，也是反思复盘的输出目标 |\n| **Token Efficiency (TE)** | 提取通用模板（TE-6）本身就是一次高效的复盘产出 |\n\n### 禁止行为 ❌\n\n- ❌ 任务完成后直接走，不留下任何文档或记录\n- ❌ 踩了坑修复了，但不记录到 failure-patterns.md 中\n- ❌ 多次遇到同类问题却始终不建立系统化的防护（检查清单/脚本）\n- ❌ 只在脑子里想"下次注意"，而不形成可被其他 AI 读取的正式记录\n\n> **记住：一次反思都不做 = 白干。做了反思但不沉淀 = 只做了一半。沉淀了但不复用 = 浪费。复用却不改进 = 停滞。闭环是：反思 → 沉淀 → 复用 → 改进 → 再反思。**\n"}]
+- Leaving no docs/records after task
+- Fixing pitfalls without recording to failure-patterns.md
+- Not building systematic safeguards for repeated issues
+- Only thinking "next time" without formal record

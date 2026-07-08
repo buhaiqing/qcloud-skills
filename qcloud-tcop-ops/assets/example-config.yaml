@@ -1,0 +1,55 @@
+# TCOP Example Configuration
+# Tencent Cloud Optimization Platform (TCOP) Example Configuration
+
+defaults: &defaults
+  period: "last-30d"
+  region: "ap-guangzhou"
+  product_filter: "all"
+
+cost_analysis:
+  <<: *defaults
+  group_by: "product"  # product / project / region / day
+
+waste_analysis:
+  <<: *defaults
+  thresholds: &waste_thresholds
+    cpu_idle_pct: 5
+    idle_days: 30
+
+rightsizing:
+  <<: *defaults
+  min_confidence: "medium"  # high / medium / low
+  products:
+    - name: "cvm"
+      utilization_window_days: 30
+    - name: "cdb"
+      utilization_window_days: 14
+
+idle_resources:
+  <<: *defaults
+  resource_types:
+    - "cvm"
+    - "cdb"
+    - "clb"
+    - "cbs"
+  thresholds:
+    <<: *waste_thresholds
+
+savings_plan:
+  <<: *defaults
+  target_coverage_pct: 60
+
+architecture_assessment:
+  <<: *defaults
+  pillars:
+    - "reliability"
+    - "security"
+    - "cost"
+    - "efficiency"
+
+report:
+  <<: *defaults
+  type: "summary"  # summary / detail / json
+  include_architecture: true
+  recipients:
+    - email: "ops@example.com"

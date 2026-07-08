@@ -1,0 +1,90 @@
+{
+  "skill": "qcloud-tcop-ops",
+  "description": "Intent classification test set for TCOP (Tencent Cloud Optimization Platform) operations skill",
+  "test_cases": [
+    {
+      "query": "帮我看一下这个月的云费用，分析成本构成",
+      "should_trigger": true,
+      "expected_flow": "DescribeCostAnalysis",
+      "reason": "Cost analysis for monthly spending"
+    },
+    {
+      "query": "有哪些闲置的云资源？帮我查查",
+      "should_trigger": true,
+      "expected_flow": "DescribeIdleResources",
+      "reason": "Idle resource detection"
+    },
+    {
+      "query": "我的CVM实例规格是不是买大了？有没有降配建议",
+      "should_trigger": true,
+      "expected_flow": "DescribeRightSizingRecommendations",
+      "reason": "Right-sizing recommendations"
+    },
+    {
+      "query": "savings plan覆盖率怎么样，需要补充吗",
+      "should_trigger": true,
+      "expected_flow": "DescribeSavingsPlanCoverage",
+      "reason": "Savings plan coverage analysis"
+    },
+    {
+      "query": "生成一份上月云资源优化报告",
+      "should_trigger": true,
+      "expected_flow": "GenerateOptimizationReport",
+      "reason": "Generate optimization report"
+    },
+    {
+      "query": "做一次架构评估，看看有哪些风险",
+      "should_trigger": true,
+      "expected_flow": "DescribeArchitectureAssessment",
+      "reason": "Architecture assessment request"
+    },
+    {
+      "query": "有哪些浪费钱的项目，怎么优化",
+      "should_trigger": true,
+      "expected_flow": "DescribeWasteAnalysis",
+      "reason": "Waste analysis request"
+    },
+    {
+      "query": "TCOP平台上能做什么优化分析",
+      "should_trigger": true,
+      "expected_flow": "overview",
+      "reason": "General TCOP capability inquiry"
+    },
+    {
+      "query": "腾讯云优化平台怎么用",
+      "should_trigger": true,
+      "expected_flow": "overview",
+      "reason": "TCOP Chinese name triggers"
+    },
+    {
+      "query": "创建一台CVM实例",
+      "should_trigger": false,
+      "reason": "Resource CRUD, not optimization analysis - delegate to qcloud-cvm-ops"
+    },
+    {
+      "query": "本月账单明细",
+      "should_trigger": false,
+      "reason": "Billing query, not TCOP - delegate to qcloud-finops-ops"
+    },
+    {
+      "query": "配置CAM权限策略",
+      "should_trigger": false,
+      "reason": "IAM permission management, not TCOP - delegate to qcloud-cam-ops"
+    },
+    {
+      "query": "服务器CPU使用率监控",
+      "should_trigger": false,
+      "reason": "Real-time monitoring, not TCOP - delegate to qcloud-monitor-ops"
+    },
+    {
+      "query": "给对象存储设置跨域规则",
+      "should_trigger": false,
+      "reason": "COS resource configuration, not TCOP"
+    },
+    {
+      "query": "我的云数据库连不上了",
+      "should_trigger": false,
+      "reason": "CDB connectivity issue, not TCOP - delegate to qcloud-cdb-ops"
+    }
+  ]
+}
