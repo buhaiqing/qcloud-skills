@@ -225,6 +225,7 @@ __marimo__/
 .omc/
 .omo/
 .codebuddy/
+.vscode/
 
 # GCL / audit traces (runtime artifacts)
 audit-results/

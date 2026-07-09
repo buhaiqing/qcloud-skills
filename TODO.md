@@ -7,9 +7,9 @@
 
 | 维度 | 状态 |
 |------|------|
-| 31 个 skill 目录 | ✅ 全部就位（27 product + 3 cross-product + 1 meta） |
-| GCL 覆盖率 | ✅ `check_gcl_conformance.py` 已覆盖全部 31 个 skill |
-| GCL 通过率 | ✅ 31/31 通过，全部符合 Tier-A conformance |
+| 32 个 skill 目录 | ✅ 全部就位（28 product + 3 cross-product + 1 meta） |
+| GCL 覆盖率 | ✅ `check_gcl_conformance.py` 已覆盖全部 32 个 skill |
+| GCL 通过率 | ✅ 32/32 通过，全部符合 Tier-A conformance |
 | 硬编码区域修复 | ✅ Batch 2 完成（`b8d1a10`） |
 | AGENTS.md 路径修正 | ✅ Batch 3 完成（`b636cce`） |
 | 幽灵链接修复 | ✅ Batch 4 完成（`c3bc268`） |
@@ -40,5 +40,5 @@
 | 1 | **qcloud-dc-ops 场景增强** | DC skill 已存在但场景较基础，可补充专线故障切换、多云接入等 | 0.5-1 天 |
 | 2 | **qcloud-migration-ops 场景增强** | 迁移 skill 已存在，可补充更多迁移场景 | ✅ 已完成（`32141e3`）— 新增 ModifyMigrationTaskStatus、ListMigrationProject、Cutover/Switchover、Migration Validation 4 个执行流，rubric 安全规则扩至 5 条，troubleshooting 补充割接失败模式 |
 | 3 | **跨 skill 编排测试** | 验证 aiops-diagnosis + monitor-ops + 产品 skill 的跨 skill 调用链路 | ✅ 已完成（`f92111b` + `c079df0`）— 16 个测试覆盖 handoff payload、mode selection、bundle structure |
-| 4 | **新技能：消息队列（TDMQ）** | 目前没有 TDMQ（RocketMQ/Pulsar）skill | 3 天 |
+| 4 | **新技能：消息队列（TDMQ）** | 目前没有 TDMQ（RocketMQ/Pulsar）skill | ✅ 已完成（`e839f05`）— 新增 `qcloud-tdmq-ops` skill，含 10 个执行流（RocketMQ/Pulsar/RabbitMQ/CMQ）、rubric 8 节、prompt 7 节，GCL conform 32/32 | 3 天 |
 | 5 | **新技能：API 网关** | 目前没有 API Gateway skill | 2 天 |
