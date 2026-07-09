@@ -1,7 +1,7 @@
 # CDN Quality-Gate Rubric (GCL)
 
 > Runtime scoring rubric for the **Generator-Critic-Loop (GCL)** of `qcloud-cdn-ops`.
-> Source-of-truth: [AGENTS.md §3 Rubric](../../AGENTS.md#3-rubric-mandatory-per-skill) and §8 Per-Skill Defaults (`qcloud-cdn-ops` → **recommended**, `max_iterations = 3`).
+> Source-of-truth: [AGENTS.md §3 Rubric](../../AGENTS.md#3-rubric-mandatory-per-skill) and §8 Per-Skill Defaults (`qcloud-cdn-ops` → **recommended**, dynamic `max_iterations` per operation risk).
 >
 > This rubric is the **runtime** counterpart to the **build-time** 2-round self-review
 > in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update) and to the **Safety Gates** chapter
@@ -15,7 +15,8 @@
 > is recoverable, domain delete is not), (b) global edge surface (CDN serves from many
 > POPs, so configuration changes propagate asynchronously and DNS switching is the
 > hidden cost of `DeleteCdnDomain`), (c) `recommended` GCL posture (not `required`)
-> with `max_iter=3` per AGENTS.md §8, and (d) cost-side blind spot on
+> with dynamic `max_iterations` per operation risk (2 for destructive, 1 for cache mutations,
+> 3 for sensitive config changes), and (d) cost-side blind spot on
 > `PushUrlsCache` (prefetch bypasses CDN cache and bills the origin).
 
 ---
@@ -40,8 +41,13 @@ CDN-specific scope notes:
   cert swap (transient TLS handshake failures are not "recoverable in seconds"
   when the origin also has the cert wrong).
 - **`recommended`, not `required`.** Per AGENTS.md §8, `qcloud-cdn-ops` is
-  `recommended` GCL with `max_iter=3`. The rubric still requires
-  `Safety = 1` (because `DeleteCdnDomain` with active DNS is catastrophic and
+  `recommended` GCL with dynamic `max_iterations` per operation risk:
+  - `DeleteCdnDomain`: `max_iter=2` (irreversible, stricter iteration)
+  - `PurgeUrlsCache` / `PurgePathCache`: `max_iter=1` (recoverable from origin)
+  - `UpdateDomainConfig` (HTTPS/origin swap): `max_iter=3` (complex config propagation)
+  - Other mutations: `max_iter=2`
+  - Read-only: `max_iter=1`
+  The rubric still requires `Safety = 1` (because `DeleteCdnDomain` with active DNS is catastrophic and
   `UpdateDomainConfig` can silently break TLS for paying users), but the
   threshold for blocking retries is `correctness < 0.5` rather than
   `correctness < 1.0` for non-destructive ops.
@@ -201,7 +207,7 @@ in §2 — `DeleteCdnDomain` and `UpdateDomainConfig` HTTPS / origin swap. For c
 mutations (`PurgeUrlsCache` / `PurgePathCache` / `PushUrlsCache`) and `StopCdnDomain` /
 `StartCdnDomain`, `correctness = 0.5` is acceptable (state is recoverable from the
 origin / a re-`StartCdnDomain`), per the `recommended` GCL posture in AGENTS.md §8
-(`max_iter=3`, not 2).
+(dynamic `max_iterations` per operation risk).
 
 `rule_violations` is **CDN-specific** (rules 1–5 in §4) and is the audit trail the
 Operations team reads to track which safety rules fire most often. Rule 1
@@ -294,13 +300,14 @@ spiked.
 |---|---|---|
 | 1.0.0 | 2026-06-04 | Phase 1 CDN rollout: rubric (5 rules: domain-deletion CNAME break, wildcard `/*` purge mass flush, path purge broad impact, origin/SSL config change, preload origin cost) |
 | 1.1.0 | 2026-06-19 | Tier A flesh-out: added §1 Scope (CDN mutation operations + irrecoverability scoping + `recommended` GCL posture), §2 Five dimensions (5-dim backbone with CDN thresholds: correctness = 1.0 scoped to `DeleteCdnDomain` + HTTPS cert swap only; cache mutations / `StopCdnDomain` are recoverable), §3 Per-dimension checklist (5 sub-sections, ~35 rows, CDN-specific checks: `DescribeCdnData` hit ratio, `DescribeDomainsConfig` BEFORE/AFTER diff, `PurgeUrlsCache` quota, `PushUrlsCache` aggregate-size cost gate, `UpdatePayType` billing-mode confirmation, wildcard recurse-confirm), §5 Output schema with `rule_violations` CDN-specific extension and threshold scoping note, §6 Worked examples (PASS on `PurgeUrlsCache` specific URLs / SAFETY_FAIL on `DeleteCdnDomain` with active DNS / RETRY on `UpdateDomainConfig` HTTPS cert swap with transient TLS failures / RETRY on `PushUrlsCache` quota over-draw), §8 See also. Customised to CDN-specific safety surface: cache-as-state (origin is source of truth, purge is recoverable), global edge propagation async, `recommended` GCL posture with `max_iter=3`, DNS-CNAME-hidden break on `DeleteCdnDomain`, prefetch bypasses cache and bills origin |
+| 1.2.0 | 2026-07-10 | P0 GCL optimization: dynamic `max_iterations` per operation risk (2 for destructive, 1 for cache mutations, 3 for sensitive config changes); early stop mechanisms (safety rule satisfaction, score convergence); updated §1 Scope, §2 CDN-specific notes, §5 Output schema threshold note, §8 See also |
 
 ## 8. See also
 
 - [AGENTS.md §3 Rubric](../../AGENTS.md#3-rubric-mandatory-per-skill) — generic rubric spec
 - [AGENTS.md §5 Termination](../../AGENTS.md#5-termination-first-match-wins) — `PASS` / `MAX_ITER` / `SAFETY_FAIL` semantics
 - [AGENTS.md §7 Prompt Templates](../../AGENTS.md#7-prompt-templates-mandatory-per-skill) — Generator / Critic / Orchestrator skeletons
-- [AGENTS.md §8 Per-Skill Defaults](../../AGENTS.md#8-per-skill-defaults-qcloud) — `qcloud-cdn-ops` is `recommended`, `max_iter=3`
+- [AGENTS.md §8 Per-Skill Defaults](../../AGENTS.md#8-per-skill-defaults-qcloud) — `qcloud-cdn-ops` is `recommended`, dynamic `max_iterations` per operation risk
 - [AGENTS.md §14 Reflexion Integration](../../AGENTS.md#14-reflexion-integration-lightweight-reflexion) — failure pattern memory for cross-session learning
 - [`prompt-templates.md`](prompt-templates.md) — G/C/O prompt skeletons (CDN-specific per-op variants)
 - [SKILL.md §Safety Gates](../SKILL.md#safety-gates-destructive-operations) — build-time sibling (DeleteCdnDomain / PurgeUrlsCache `/*` / PurgePathCache)

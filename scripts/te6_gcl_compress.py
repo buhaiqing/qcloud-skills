@@ -38,7 +38,7 @@ GCL_META: dict[str, dict[str, str | int | bool]] = {
     "qcloud-ckafka-ops": {"max_iter": 2, "cli": "ckafka", "title": "CKafka"},
     "qcloud-mongodb-ops": {"max_iter": 2, "cli": "mongodb", "title": "MongoDB"},
     "qcloud-postgres-ops": {"max_iter": 2, "cli": "postgres", "title": "PostgreSQL"},
-    "qcloud-cdn-ops": {"max_iter": 3, "cli": "cdn", "title": "CDN"},
+    "qcloud-cdn-ops": {"max_iter": "dynamic", "cli": "cdn", "title": "CDN"},
     "qcloud-cls-ops": {"max_iter": 3, "cli": "cls", "title": "CLS"},
     "qcloud-scf-ops": {"max_iter": 3, "cli": "scf", "title": "SCF"},
     "qcloud-ssl-ops": {"max_iter": 3, "cli": "ssl", "title": "SSL"},

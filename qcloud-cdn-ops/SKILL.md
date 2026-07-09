@@ -16,8 +16,8 @@ compatibility: >-
   Tencent Cloud CDN endpoints.
 metadata:
   author: qcloud
-  version: "1.2.0"
-  last_updated: "2026-07-08"
+  version: "1.3.0"
+  last_updated: "2026-07-10"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/228"
@@ -116,6 +116,7 @@ CDN (Content Delivery Network) is Tencent Cloud's content delivery service provi
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial release — CDN domain management, cache purge, config update |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CDN-specific safety rules incl. domain-deletion CNAME break, wildcard `/*` purge mass flush, origin config change, preload origin cost), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
+| 1.3.0 | 2026-07-10 | P0 GCL optimization: dynamic `max_iterations` per operation risk (2 for destructive, 1 for cache mutations, 3 for sensitive config changes); early stop mechanisms (safety rule satisfaction, score convergence) |
 | 1.2.0 | 2026-06-13 | Rule P reverse delegation: `references/aiops-diagnosis.md`; Trigger & Scope aiops delegate for origin 5xx/cache/latency RCA |
 
 ## Safety Gates
@@ -142,10 +143,20 @@ self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-aft
 | Property | Value | Source |
 |---|---|---|
 | GCL applicability | **recommended** | [AGENTS.md §8](../AGENTS.md#8-per-skill-defaults-qcloud) |
-| `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-cdn-ops`) |
+| `max_iterations` | **dynamic** | per-operation risk-based strategy (see below) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CDN-specific safety rules |
 | Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../AGENTS.md#6-trace--audit-mandatory) |
+
+### Dynamic max_iterations strategy
+
+| Operation class | `max_iterations` | Rationale |
+|---|---|---|
+| Destructive: `DeleteCdnDomain` | **2** | Irreversible; stricter iteration with early abort on safety violations |
+| Cache mutation: `PurgeUrlsCache` / `PurgePathCache` with `/*` or `/` | **1** | Recoverable from origin; single iteration sufficient for safety gates |
+| Sensitive mutating: `UpdateDomainConfig` (origin / HTTPS cert swap), `StopCdnDomain` | **3** | Complex config propagation; needs iterative verification |
+| Mutating: `AddCdnDomain`, `PushUrlsCache`, `UpdatePayType`, `EnableCdnDomain` | **2** | Cost/config risk; moderate iteration |
+| Read-only: `DescribeDomainsConfig`, `DescribeCdnData`, `DescribePurgeQuota` | **1** | Pre-flight only; no hard abort |
 
 ### When the loop runs
 
@@ -159,10 +170,12 @@ self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-aft
 
 ### Decision flow (first match wins)
 
-1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result)
-2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
-3. **All thresholds met** ⇒ **PASS**
-4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
+1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (immediate stop, no partial result)
+2. **All CDN safety rules satisfied** AND other dimensions meet thresholds ⇒ **PASS** (early stop)
+3. **Consecutive Critic scores converge** (Δ < 0.1 for 2 rounds) ⇒ **PASS** (convergence stop)
+4. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+5. **All dimension thresholds met** ⇒ **PASS**
+6. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
 
 ### CDN-specific safety rules (rubric §4)
 
