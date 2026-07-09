@@ -53,5 +53,5 @@
 | P1 | **早期停止机制** | Safety 规则满足 + Critic 分数收敛（Δ < 0.1 for 2 rounds）时提前通过 | ✅ 已完成（`50d6a7f`） |
 | P2 | **并行 Critic 专业化** | Data Quality Critic + Safety Rules Critic 并行评审，不同维度专门化 | ✅ 已完成（`ccedfd1`） |
 | P3 | **自适应退避策略** | 根据错误类型动态调整重试间隔（指数退避 vs 固定间隔） | ✅ 已完成（`bfe7a5f`） |
-| P4 | **安全规则优先级分级** | CDN 操作按风险分级：高风险（DeleteCdnDomain）→ 立即中止，中风险（UpdateDomainConfig）→ 迭代，低风险（只读）→ 跳过 | 🔄 进行中 |
-| P5 | **上下文感知 GCL** | 读取操作历史（reflexion memory）自动调整策略，新操作 vs 重复操作区别处理 | ⏳ 待处理 |
+| P4 | **安全规则优先级分级** | CDN 操作按风险分级：高风险（DeleteCdnDomain）→ 立即中止，中风险（UpdateDomainConfig）→ 迭代，低风险（只读）→ 跳过 | ✅ 已完成（`69a2547`） |
+| P5 | **上下文感知 GCL** | 读取操作历史（reflexion memory）自动调整策略，新操作 vs 重复操作区别处理 | 🔄 进行中 |

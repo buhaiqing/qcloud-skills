@@ -111,6 +111,38 @@ P4 optimization: CDN operations are graded by risk level; GCL strictness adapts 
 
 **Priority override**: Any CRITICAL or HIGH operation with `correctness < 0.5` triggers immediate ABORT regardless of iteration count.
 
+### P5: Context-aware GCL
+
+P5 optimization: GCL adapts based on operation history from reflexion memory.
+
+**Operation classification**:
+| Type | Definition | GCL behavior |
+|---|---|---|
+| **First-time** | No prior execution in reflexion memory | Full iteration, conservative thresholds |
+| **Repeat** | Same op + same target (e.g., `PurgeUrlsCache` on `cdn.example.com`) within 7 days | Reduced iteration if prior execution passed all gates |
+| **Failure-recovery** | Same op + same error pattern (e.g., `InvalidParameter.DomainExists`) | Heightened scrutiny, check failure pattern |
+
+**Reflexion memory lookup**:
+```
+1. Check docs/failure-patterns.md for skill = "qcloud-cdn-ops" + command pattern
+2. If found and count > 3: apply anti-pattern warning to Generator
+3. If same operation succeeded in last 3 runs with score > 0.9: enable confidence early stop
+4. If same operation failed in last run: require explicit user re-confirmation
+```
+
+**Context-aware thresholds**:
+| Context | Correctness threshold | Safety threshold | max_iter adjustment |
+|---|---|---|---|
+| First-time op | ≥ 0.5 (standard) | = 1 (strict) | +1 if CRITICAL/HIGH |
+| Repeat op (prior success) | ≥ 0.5 (standard) | ≥ 0.5 (relaxed) | -1 (faster) |
+| Repeat op (prior failure) | ≥ 0.7 (elevated) | = 1 (strict) | +1 |
+| High-frequency pattern | Apply anti-pattern gate | — | — |
+
+**CDN-specific context rules**:
+- `DeleteCdnDomain` on same domain: Always require fresh CNAME check (never skip)
+- `UpdateDomainConfig` retry: Always re-read full config (never trust cache)
+- `PushUrlsCache` after quota error: Check `DescribePushQuota` before retry
+
 ---
 
 ## 3. Per-dimension scoring checklist
@@ -353,6 +385,7 @@ spiked.
 |---|---|---|
 | 1.0.0 | 2026-06-04 | Phase 1 CDN rollout: rubric (5 rules: domain-deletion CNAME break, wildcard `/*` purge mass flush, path purge broad impact, origin/SSL config change, preload origin cost) |
 | 1.1.0 | 2026-06-19 | Tier A flesh-out: added §1 Scope (CDN mutation operations + irrecoverability scoping + `recommended` GCL posture), §2 Five dimensions (5-dim backbone with CDN thresholds: correctness = 1.0 scoped to `DeleteCdnDomain` + HTTPS cert swap only; cache mutations / `StopCdnDomain` are recoverable), §3 Per-dimension checklist (5 sub-sections, ~35 rows, CDN-specific checks: `DescribeCdnData` hit ratio, `DescribeDomainsConfig` BEFORE/AFTER diff, `PurgeUrlsCache` quota, `PushUrlsCache` aggregate-size cost gate, `UpdatePayType` billing-mode confirmation, wildcard recurse-confirm), §5 Output schema with `rule_violations` CDN-specific extension and threshold scoping note, §6 Worked examples (PASS on `PurgeUrlsCache` specific URLs / SAFETY_FAIL on `DeleteCdnDomain` with active DNS / RETRY on `UpdateDomainConfig` HTTPS cert swap with transient TLS failures / RETRY on `PushUrlsCache` quota over-draw), §8 See also. Customised to CDN-specific safety surface: cache-as-state (origin is source of truth, purge is recoverable), global edge propagation async, `recommended` GCL posture with `max_iter=3`, DNS-CNAME-hidden break on `DeleteCdnDomain`, prefetch bypasses cache and bills origin |
+| 1.7.0 | 2026-07-10 | P5 GCL optimization: context-aware GCL (first-time vs repeat vs failure-recovery); reflexion memory lookup; context-adaptive thresholds |
 | 1.6.0 | 2026-07-10 | P4 GCL optimization: safety rule priority grading (CRITICAL/HIGH/MEDIUM/LOW/MINIMAL); immediate abort for correctness < 0.5 on high-risk ops |
 | 1.5.0 | 2026-07-10 | P3 GCL optimization: adaptive backoff strategy (transient exponential, quota fixed, propagation polling); added §2.2 P3 backoff strategy |
 | 1.4.0 | 2026-07-10 | P2 GCL optimization: parallel Critic specialization (Data Quality Critic + Safety Rules Critic); score aggregation with safety precedence |
