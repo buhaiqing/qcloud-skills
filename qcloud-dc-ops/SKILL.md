@@ -14,8 +14,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-07-03"
+  version: "1.1.0"
+  last_updated: "2026-07-09"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/product/216"
@@ -153,11 +153,16 @@ tccli dc DescribeAccessPoints --Region "{{env.TENCENTCLOUD_REGION}}"
 | DescribeDirectConnectTunnels | List tunnels | Low | None |
 | CreateDirectConnectGateway | Create DC gateway | Medium | Medium |
 | DescribeDirectConnectGateways | List gateways | Low | None |
+| CreateRedundantTunnel | Create backup tunnel for failover | Medium | Medium |
+| ConfigureTunnelHealthCheck | Enable BFD/NQA health check | Medium | Medium |
+| FailoverSwitch | Promote backup tunnel / reroute | Medium | **High** — reroutes live traffic |
+| CreateCloudAttachService | Attach DC to CCN (multi-cloud/region) | Medium | Medium |
 
 ## Changelog
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1.0 | 2026-07-09 | Scenario enhancement: added redundant-tunnel (failover) provisioning, BFD/NQA health-check config, manual FailoverSwitch runbook, and multi-cloud/multi-region access via `CreateCloudAttachService` (CCN). Fixed credential masking in Prerequisites. Rubric safety rules extended to 5. |
 | 1.0.0 | 2026-07-03 | Initial DC skill, dual-path execution. Scope: DC CRUD, tunnel management, gateway configuration. Delegates VPN to `qcloud-vpn-ops`, CCN to `qcloud-ccn-ops`. |
 
 ---
@@ -304,6 +309,141 @@ Poll `DescribeDirectConnects`; expect DC absent within 60s.
 | `OperationDenied.HasTunnels` | Delete all tunnels first |
 | `OperationDenied.DCInUse` | Remove dependencies first |
 
+### Operation: Create Redundant Tunnel (Failover Prep)
+
+Provision a **backup tunnel** (on a second physical line / second DC, or a second tunnel on the
+same DC) so traffic can fail over when the primary fails.
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| Primary DC/tunnel healthy | `DescribeDirectConnectTunnels` | `State=AVAILABLE` | Fix primary first |
+| Gateway exists | `DescribeDirectConnectGateways` | Gateway exists | Create gateway first |
+| Backup line available | `DescribeDirectConnects` | Second DC AVAILABLE or port free | Order backup line |
+
+#### Execution — CLI
+
+```bash
+tccli dc CreateDirectConnectTunnel \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --DirectConnectId "{{user.backup_dc_id}}" \
+  --DirectConnectTunnelName "{{user.backup_tunnel_name}}" \
+  --DirectConnectGatewayId "{{user.gateway_id}}" \
+  --NetworkType "VPC" \
+  --NetworkRegion "{{user.network_region}}" \
+  --Bandwidth {{user.backup_bandwidth}} \
+  --BfdEnable 1 \
+  --NqaEnable 1
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
+
+#### Post-execution Validation
+
+Poll `DescribeDirectConnectTunnels --Filters "Name=direct-connect-id,Values={{user.backup_dc_id}}"` until `State=AVAILABLE`.
+
+### Operation: Configure Tunnel Health Check (BFD / NQA)
+
+Enables sub-second failure detection so failover is automatic.
+
+#### Execution — CLI
+
+```bash
+tccli dc ModifyDirectConnectTunnelExtra \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --DirectConnectTunnelId "{{output.tunnel_id}}" \
+  --BfdEnable 1 \
+  --BfdInfo '{"ProbeInterval":1000,"ProbeThreshold":3,"ProbeTimeout":200}' \
+  --NqaEnable 1 \
+  --NqaInfo '{"ProbeInterval":1000,"ProbeThreshold":3,"ProbeTimeout":200}'
+```
+
+#### Post-execution Validation
+
+Verify via `DescribeDirectConnectTunnelExtra --DirectConnectTunnelId "{{output.tunnel_id}}"` that `BfdEnable=1` and `NqaEnable=1`.
+
+### Operation: Failover Switch (Promote Backup)
+
+#### Pre-flight (Safety Gate)
+
+- **MUST** confirm the primary tunnel is actually down (BFD/NQA `Down`, or `DescribeDirectConnectTunnelExtra` shows session lost).
+- **MUST** confirm the backup tunnel is `AVAILABLE` and healthy.
+- **MUST** warn: switching withdraws primary routes and **reroutes live production traffic** to the backup path.
+- **MUST** confirm failover not already applied (primary `ImportDirectRoute` still `true` before switch).
+- With BFD/NQA enabled, failover is automatic; only run a manual switch when automatic failover did not trigger.
+
+#### Execution — CLI
+
+```bash
+# 1. Verify backup tunnel health
+tccli dc DescribeDirectConnectTunnelExtra \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --DirectConnectTunnelId "{{user.backup_tunnel_id}}"
+
+# 2. Withdraw primary routes (manual switch) — reroute to backup
+tccli dc ModifyDirectConnectTunnelExtra \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --DirectConnectTunnelId "{{user.primary_tunnel_id}}" \
+  --ImportDirectRoute false
+
+# 3. Confirm backup now carries traffic (route propagation / on-prem ping)
+```
+
+#### Post-execution Validation
+
+1. `DescribeDirectConnectTunnels` shows primary `State` down and backup `AVAILABLE`.
+2. On-prem connectivity test (ping VPC CIDR) succeeds via backup path.
+
+#### Failure Recovery
+
+| Error pattern | Recovery |
+|---|---|
+| `ResourceNotFound.DirectConnectTunnel` | Verify tunnel IDs |
+| Backup not `AVAILABLE` | Wait for backup provisioning; do NOT withdraw primary yet |
+| `OperationDenied` | Automatic failover still active; avoid double-switch |
+| Already switched (primary routes already withdrawn) | Verify backup carries traffic via `DescribeDirectConnectTunnelExtra`; treat as no-op, do not re-withdraw |
+
+### Operation: Multi-cloud / Multi-region Access (Cloud Attach → CCN)
+
+Attach the dedicated line to a **Cloud Attach Service (CCN)** so on-prem/other-cloud traffic
+reaches multiple VPCs and regions. CCN routing configuration is delegated to `qcloud-ccn-ops`.
+
+#### Pre-flight Checks
+
+| Check | Method | Expected | On Failure |
+|-------|--------|----------|------------|
+| DC gateway exists | `DescribeDirectConnectGateways` | Gateway exists | Create gateway first |
+| CCN instance exists | delegate to `qcloud-ccn-ops` | CCN ID known | Create CCN first |
+| Region support | `DescribeAccessPoints` | Region supported | Use supported region |
+
+#### Execution — CLI
+
+```bash
+tccli dc CreateCloudAttachService \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --Data '{"CcasType":"CCN","ProviderName":"tencent","DirectConnectGatewayId":"{{user.gateway_id}}","CcnId":"{{user.ccn_id}}"}'
+```
+
+#### Execution — Python SDK (Fallback Path)
+
+→ SDK 代码示例见 [references/sdk-code-examples.md](references/sdk-code-examples.md)
+
+#### Post-execution Validation
+
+1. Capture `{{output.cloud_attach_id}}` from `$.Response.CloudAttach.CloudAttachId`.
+2. Delegate CCN attachment verification to `qcloud-ccn-ops` (`AttachCcnInstances`).
+
+#### Failure Recovery
+
+| Error pattern | Recovery |
+|---|---|
+| `ResourceNotFound.DirectConnectGateway` | Verify gateway ID |
+| `InvalidParameter.CcnNotFound` | Create/verify CCN via `qcloud-ccn-ops` |
+| `OperationDenied.GatewayInUse` | Gateway already attached; verify existing `CloudAttachId` matches expected CCN; reuse or detach first |
+
 ## Error Code Reference (DC-Specific)
 
 | Code | Description | Recovery |
@@ -330,6 +470,11 @@ Every **DeleteDirectConnect** MUST have:
 3. Pre-warning about physical disconnection requirements
 4. Post-delete verification (poll until absent)
 
+**FailoverSwitch** and **CreateCloudAttachService** are semi-destructive (affect live routing):
+
+- **FailoverSwitch** MUST confirm primary is actually down, backup is `AVAILABLE`, and warn that it reroutes production traffic. With BFD/NQA enabled, prefer automatic failover.
+- **CreateCloudAttachService** MUST confirm the CCN ID and delegate detach/routing cleanup to `qcloud-ccn-ops`.
+
 ## Quality Gate (GCL)
 
 This skill participates in the **Generator-Critic-Loop (GCL)** quality gate for all mutation operations.
@@ -352,6 +497,10 @@ This skill participates in the **Generator-Critic-Loop (GCL)** quality gate for 
 | `DeleteDirectConnectTunnel` | Yes (blocking) | Cuts connection |
 | `CreateDirectConnectGateway` | Yes | Creates gateway |
 | `DeleteDirectConnectGateway` | Yes (blocking) | Removes routing, dependency cleanup required |
+| `CreateRedundantTunnel` | Yes | Provisions backup path |
+| `ConfigureTunnelHealthCheck` | Yes | Enables BFD/NQA detection |
+| `FailoverSwitch` | Yes (blocking) | Reroutes live production traffic |
+| `CreateCloudAttachService` | Yes | Attaches DC to CCN (delegate routing to `qcloud-ccn-ops`) |
 | `DescribeDirectConnects` | No | Read-only |
 | `DescribeDirectConnectTunnels` | No | Read-only |
 | `DescribeDirectConnectGateways` | No | Read-only |
@@ -377,9 +526,9 @@ tccli version
 2. **Configure Credentials:**
 
 ```bash
-export TENCENTCLOUD_SECRET_ID="AKID..."
-export TENCENTCLOUD_SECRET_KEY="..."
-export TENCENTCLOUD_REGION="ap-guangzhou"
+export TENCENTCLOUD_SECRET_ID="{{env.TENCENTCLOUD_SECRET_ID}}"
+export TENCENTCLOUD_SECRET_KEY="{{env.TENCENTCLOUD_SECRET_KEY}}"
+export TENCENTCLOUD_REGION="{{env.TENCENTCLOUD_REGION}}"
 ```
 
 3. **Verify:**
