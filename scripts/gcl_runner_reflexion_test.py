@@ -200,6 +200,45 @@ class TestFormatForInjectionIntegration(unittest.TestCase):
         self.assertIn("MissingParameter", result)
         self.assertIn("RequestLimitExceeded", result)
 
+    def test_format_for_injection_real_output_format(self) -> None:
+        """Real function (no mock) to address F-002: mock-based tests miss format regressions."""
+        from reflexion_retrieve import format_for_injection as real_format
+
+        patterns: list[dict[str, Any]] = [
+            {
+                "category": "cli_parameter",
+                "skill": "qcloud-cvm-ops",
+                "command": "TerminateInstances",
+                "error": "MissingParameter",
+                "fix": "Use JSON array format",
+                "count": 5,
+                "reusable": True,
+            },
+        ]
+        result = real_format(patterns)
+
+        self.assertIsInstance(result, str)
+        self.assertTrue(result.startswith("- ["))
+        self.assertIn("qcloud-cvm-ops", result)
+        self.assertIn("error=", result)
+        self.assertIn("-> fix=", result)
+        self.assertIn("(count=5)", result)
+        self.assertIn("`MissingParameter`", result)
+        self.assertIn("`Use JSON array format`", result)
+
+        cred_patterns = [
+            {
+                "category": "runtime",
+                "skill": "qcloud-cos-ops",
+                "error": "SecretKey=FAKE_SECRET_ID_FOR_TESTONLY",
+                "fix": "Rotate credentials",
+                "count": 1,
+            }
+        ]
+        cred_result = real_format(cred_patterns)
+        self.assertNotIn("FAKE_SECRET_ID", cred_result)
+        self.assertIn("<masked>", cred_result)
+
 
 class TestReflexionPatternsEnvVar(unittest.TestCase):
     """Test (3): REFLEXION_PATTERNS env var is set when patterns exist."""
