@@ -227,7 +227,7 @@ NOT passing — the threshold here is `1.0`, not the generic `≥ 0.5`.
 
 ---
 
-## 7. GCL → Cloud Monitor Alerting
+### GCL → Cloud Monitor Alerting
 
 > AIOps闭环：Safety=0 / high-severity rule violation → 告警上 Cloud Monitor。
 
@@ -265,7 +265,7 @@ NOT passing — the threshold here is `1.0`, not the generic `≥ 0.5`.
 
 ---
 
-## 8. Changelog
+## 7. Changelog
 
 | Version | Date | Change |
 |---|---|---|
@@ -273,7 +273,7 @@ NOT passing — the threshold here is `1.0`, not the generic `≥ 0.5`.
 | 1.1.0 | 2026-06-19 | Tier A conformance: flesh out to 8 sections (Scope, Dimensions, Per-dim checklist, Output schema, Worked examples, See also). Elevated Correctness threshold to **1.0 required for ALL destructive CAM ops** (CAM has no soft-delete / recycle-bin grace period, unlike CDB or CVM). Per-dim checklist now covers `AddUser` / `Attach*` / `Detach*` / `CreateApiKey` / `RotateAccessKey` / trust-policy diffs. Three worked examples: PASS on `AddUser` (least-privilege starting point), SAFETY_FAIL on `DeleteUser` with orphaned API keys, RETRY on `RotateAccessKey` pivot around the 2-key limit |
 | 1.2.0 | 2026-07-06 | AIOps闭环: add §7 GCL→Monitor alerting (trigger conditions, field mapping to gcl-quality-summary.schema.json); add RequestLimitExceeded to troubleshooting.md; add UpdateAssumeRolePolicy+OIDC to cli-usage.md; add MFA/SSO test cases to eval_queries.json |
 
-## 9. See also
+## 8. See also
 
 - [AGENTS.md §3 Rubric](../../AGENTS.md#3-rubric-mandatory-per-skill) — generic rubric spec
 - [AGENTS.md §8 Per-Skill Defaults](../../AGENTS.md#8-per-skill-defaults-qcloud) — `qcloud-cam-ops` is `required`, `max_iter=2`
