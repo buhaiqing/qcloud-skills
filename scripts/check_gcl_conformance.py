@@ -27,13 +27,20 @@ from typing import Any
 # Mirrors AGENTS.md §8. Single source of truth — when AGENTS.md changes,
 # update this set and re-run check.
 GCL_SKILLS: frozenset[str] = frozenset({
+    # Product-scoped (27)
     "qcloud-cvm-ops", "qcloud-cdb-ops", "qcloud-clb-ops", "qcloud-cos-ops",
     "qcloud-es-ops", "qcloud-redis-ops", "qcloud-tke-ops", "qcloud-vpc-ops",
     "qcloud-cam-ops", "qcloud-cdn-ops", "qcloud-cbs-ops", "qcloud-cls-ops",
     "qcloud-ckafka-ops", "qcloud-scf-ops", "qcloud-mongodb-ops",
     "qcloud-postgres-ops", "qcloud-ssl-ops", "qcloud-agsx-ops",
-    "qcloud-finops-ops", "qcloud-monitor-ops", "qcloud-aiops-diagnosis",
-    "qcloud-proactive-inspection", "qcloud-well-architected-review",
+    "qcloud-finops-ops", "qcloud-monitor-ops",
+    "qcloud-ccn-ops", "qcloud-vpn-ops", "qcloud-dc-ops",
+    "qcloud-cicd-ops", "qcloud-service-mesh-ops", "qcloud-migration-ops",
+    "qcloud-tcop-ops",
+    # Cross-product (3)
+    "qcloud-aiops-diagnosis", "qcloud-proactive-inspection",
+    "qcloud-well-architected-review",
+    # Meta-skill (1)
     "qcloud-skill-generator",
 })
 
