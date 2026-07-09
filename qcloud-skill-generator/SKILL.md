@@ -467,6 +467,8 @@ This workflow follows the **"fail first, evaluate first"** principle: define wha
 [ ] Step 1: Define Evaluation Targets — What does success look like?
 [ ] Step 2: Analyze Sources — Extract operations, fields, errors from API spec
     ↓ [Feedback Loop: Sources complete? If gaps found → research, then return]
+[ ] Step 2.5: Consult Reflexion Memory — `python3 scripts/reflexion_retrieve.py retrieve --skill qcloud-[product]-ops`; fold top failure patterns into troubleshooting/recovery
+    ↓ [Feedback Loop: prior failure modes captured? If patterns exist → inject into Step 4/5]
 [ ] Step 3: Scaffold Layout — Create directory from template
 [ ] Step 4: Populate SKILL.md — Fill template with verified data
     ↓ [Feedback Loop: Five core standards satisfied? If not → fix and re-verify]
@@ -519,6 +521,22 @@ Extract from API spec and official docs:
 - [ ] Error codes are documented in API spec or official docs
 - [ ] `cli_applicability` is correctly determined (`cli-first` / `dual-path` / `sdk-only` / `cli-only` for read-only skills)
 - [ ] API version drift report generated (if updating existing skill)
+
+---
+
+### Step 2.5: Consult Reflexion Memory (Self-Evolution)
+
+Before generating or realigning a skill, load the repository's accumulated failure patterns so the new skill does not repeat known mistakes. This closes the self-evolution loop: `docs/failure-patterns.md` is written by GCL runs and read back here.
+
+```bash
+python3 scripts/reflexion_retrieve.py retrieve --skill qcloud-[product]-ops --command "[primary operation, e.g. RunInstances]"
+```
+
+- Each returned line is `- [skill] error=`...` -> fix=`...` (count=N)`.
+- Fold the relevant patterns into the generated skill's `references/troubleshooting.md` (error taxonomy) and recovery flows: the `error` becomes a new error-code row, the `fix` becomes the recovery action.
+- If no patterns return, proceed normally — the store is empty for this skill.
+
+> This step is read-only against `docs/failure-patterns.md`; it never mutates cloud resources.
 
 ---
 
