@@ -106,7 +106,7 @@ def parse_existing(path: Path) -> dict[str, dict[str, Any]]:
                 row[h] = v
 
             skill = row.get("skill", "").strip()
-            command = row.get("command", "").strip()
+            command = row.get("command", row.get("operation", "")).strip()
             error = row.get("errorpattern", row.get("error", "")).strip()
             if not skill:
                 continue
