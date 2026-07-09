@@ -97,6 +97,20 @@ Per [`prompt-templates.md`](prompt-templates.md) §4 P3, retry intervals adapt t
 | Config propagation | Progressive polling (2s→5s→10s→30s) | `UpdateDomainConfig` deploy |
 | Permanent | No retry (HALT) | `InvalidParameter`, `ResourceNotFound` |
 
+### P4: Safety rule priority grading
+
+P4 optimization: CDN operations are graded by risk level; GCL strictness adapts accordingly.
+
+| Risk level | Operations | GCL strictness | Safety threshold |
+|---|---|---|---|
+| **CRITICAL** | `DeleteCdnDomain` | Strictest: Safety = 1.0 required, no fallback, immediate abort on any concern | Safety = 1.0 (mandatory) |
+| **HIGH** | `UpdateDomainConfig` (origin/HTTPS cert swap), `StopCdnDomain`, wildcard purge (`/*`, `/`) | High: iterative verification, propagation polling, overlap window check | Safety = 1.0 (mandatory) |
+| **MEDIUM** | `AddCdnDomain`, `PushUrlsCache`, `UpdatePayType`, `EnableCdnDomain` | Medium: standard iteration (max_iter=2), cost warning for large preloads | Safety ≥ 0.5 |
+| **LOW** | `PurgeUrlsCache` (specific URLs), `PurgePathCache` (non-root paths), `StartCdnDomain` | Low: reduced iteration, safety gates sufficient | Safety ≥ 0.5 |
+| **MINIMAL** | Read-only: `DescribeDomainsConfig`, `DescribeCdnData`, `DescribePurgeQuota` | Minimal: max_iter=1, optional GCL, no hard abort | N/A |
+
+**Priority override**: Any CRITICAL or HIGH operation with `correctness < 0.5` triggers immediate ABORT regardless of iteration count.
+
 ---
 
 ## 3. Per-dimension scoring checklist
@@ -339,6 +353,7 @@ spiked.
 |---|---|---|
 | 1.0.0 | 2026-06-04 | Phase 1 CDN rollout: rubric (5 rules: domain-deletion CNAME break, wildcard `/*` purge mass flush, path purge broad impact, origin/SSL config change, preload origin cost) |
 | 1.1.0 | 2026-06-19 | Tier A flesh-out: added §1 Scope (CDN mutation operations + irrecoverability scoping + `recommended` GCL posture), §2 Five dimensions (5-dim backbone with CDN thresholds: correctness = 1.0 scoped to `DeleteCdnDomain` + HTTPS cert swap only; cache mutations / `StopCdnDomain` are recoverable), §3 Per-dimension checklist (5 sub-sections, ~35 rows, CDN-specific checks: `DescribeCdnData` hit ratio, `DescribeDomainsConfig` BEFORE/AFTER diff, `PurgeUrlsCache` quota, `PushUrlsCache` aggregate-size cost gate, `UpdatePayType` billing-mode confirmation, wildcard recurse-confirm), §5 Output schema with `rule_violations` CDN-specific extension and threshold scoping note, §6 Worked examples (PASS on `PurgeUrlsCache` specific URLs / SAFETY_FAIL on `DeleteCdnDomain` with active DNS / RETRY on `UpdateDomainConfig` HTTPS cert swap with transient TLS failures / RETRY on `PushUrlsCache` quota over-draw), §8 See also. Customised to CDN-specific safety surface: cache-as-state (origin is source of truth, purge is recoverable), global edge propagation async, `recommended` GCL posture with `max_iter=3`, DNS-CNAME-hidden break on `DeleteCdnDomain`, prefetch bypasses cache and bills origin |
+| 1.6.0 | 2026-07-10 | P4 GCL optimization: safety rule priority grading (CRITICAL/HIGH/MEDIUM/LOW/MINIMAL); immediate abort for correctness < 0.5 on high-risk ops |
 | 1.5.0 | 2026-07-10 | P3 GCL optimization: adaptive backoff strategy (transient exponential, quota fixed, propagation polling); added §2.2 P3 backoff strategy |
 | 1.4.0 | 2026-07-10 | P2 GCL optimization: parallel Critic specialization (Data Quality Critic + Safety Rules Critic); score aggregation with safety precedence |
 | 1.3.0 | 2026-07-10 | P1 GCL optimization: early stop mechanisms (confidence early stop Δ ≥ 0.9, single-op early stop for max_iter=1 ops, irreversible abort for DeleteCdnDomain with score < 1.0); added §5.1 Early stop criteria table |
