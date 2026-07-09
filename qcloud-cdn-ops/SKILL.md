@@ -16,7 +16,7 @@ compatibility: >-
   Tencent Cloud CDN endpoints.
 metadata:
   author: qcloud
-  version: "1.4.0"
+  version: "1.5.0"
   last_updated: "2026-07-10"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
@@ -116,6 +116,7 @@ CDN (Content Delivery Network) is Tencent Cloud's content delivery service provi
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial release — CDN domain management, cache purge, config update |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CDN-specific safety rules incl. domain-deletion CNAME break, wildcard `/*` purge mass flush, origin config change, preload origin cost), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
+| 1.5.0 | 2026-07-10 | P2 GCL optimization: parallel Critic specialization (Data Quality Critic + Safety Rules Critic); score aggregation with safety precedence; enhanced Quality Gate table |
 | 1.4.0 | 2026-07-10 | P1 GCL optimization: early stop mechanisms (confidence early stop Δ ≥ 0.9, single-op early stop for max_iter=1 ops, irreversible abort for DeleteCdnDomain with score < 1.0); enhanced decision flow with 8 rules |
 | 1.3.0 | 2026-07-10 | P0 GCL optimization: dynamic `max_iterations` per operation risk (2 for destructive, 1 for cache mutations, 3 for sensitive config changes); early stop mechanisms (safety rule satisfaction, score convergence) |
 | 1.2.0 | 2026-06-13 | Rule P reverse delegation: `references/aiops-diagnosis.md`; Trigger & Scope aiops delegate for origin 5xx/cache/latency RCA |
@@ -146,7 +147,8 @@ self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-aft
 | GCL applicability | **recommended** | [AGENTS.md §8](../AGENTS.md#8-per-skill-defaults-qcloud) |
 | `max_iterations` | **dynamic** | per-operation risk-based strategy (see below) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CDN-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + **2 parallel Critics** + Orchestrator, isolated-context |
+| **Parallel Critics** | **Data Quality Critic** + **Safety Rules Critic** | See [`prompt-templates.md`](references/prompt-templates.md) §2 P2 |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../AGENTS.md#6-trace--audit-mandatory) |
 
 ### Dynamic max_iterations strategy

@@ -74,6 +74,18 @@ irreversible operations listed in the per-operation table below.
 **Safety = 0 → ABORT immediately**, regardless of total score. See
 [AGENTS.md §5](../../AGENTS.md#5-termination-first-match-wins) → `SAFETY_FAIL`.
 
+### P2: Parallel Critic assignment
+
+Per SKILL.md §Quality Gate, two specialized Critics run in parallel:
+
+| Critic | Scopes | Authoritative for |
+|---|---|---|
+| **Data Quality Critic** | Correctness, Spec Compliance, Idempotency | Quality metrics |
+| **Safety Rules Critic** | Safety (primary), Traceability | Safety gate decisions |
+
+**Aggregation rule**: Safety score is **never** fallback — Safety Rules Critic is authoritative.
+If Safety = 0 from either Critic → immediate ABORT.
+
 ---
 
 ## 3. Per-dimension scoring checklist
@@ -316,6 +328,7 @@ spiked.
 |---|---|---|
 | 1.0.0 | 2026-06-04 | Phase 1 CDN rollout: rubric (5 rules: domain-deletion CNAME break, wildcard `/*` purge mass flush, path purge broad impact, origin/SSL config change, preload origin cost) |
 | 1.1.0 | 2026-06-19 | Tier A flesh-out: added §1 Scope (CDN mutation operations + irrecoverability scoping + `recommended` GCL posture), §2 Five dimensions (5-dim backbone with CDN thresholds: correctness = 1.0 scoped to `DeleteCdnDomain` + HTTPS cert swap only; cache mutations / `StopCdnDomain` are recoverable), §3 Per-dimension checklist (5 sub-sections, ~35 rows, CDN-specific checks: `DescribeCdnData` hit ratio, `DescribeDomainsConfig` BEFORE/AFTER diff, `PurgeUrlsCache` quota, `PushUrlsCache` aggregate-size cost gate, `UpdatePayType` billing-mode confirmation, wildcard recurse-confirm), §5 Output schema with `rule_violations` CDN-specific extension and threshold scoping note, §6 Worked examples (PASS on `PurgeUrlsCache` specific URLs / SAFETY_FAIL on `DeleteCdnDomain` with active DNS / RETRY on `UpdateDomainConfig` HTTPS cert swap with transient TLS failures / RETRY on `PushUrlsCache` quota over-draw), §8 See also. Customised to CDN-specific safety surface: cache-as-state (origin is source of truth, purge is recoverable), global edge propagation async, `recommended` GCL posture with `max_iter=3`, DNS-CNAME-hidden break on `DeleteCdnDomain`, prefetch bypasses cache and bills origin |
+| 1.4.0 | 2026-07-10 | P2 GCL optimization: parallel Critic specialization (Data Quality Critic + Safety Rules Critic); score aggregation with safety precedence |
 | 1.3.0 | 2026-07-10 | P1 GCL optimization: early stop mechanisms (confidence early stop Δ ≥ 0.9, single-op early stop for max_iter=1 ops, irreversible abort for DeleteCdnDomain with score < 1.0); added §5.1 Early stop criteria table |
 | 1.2.0 | 2026-07-10 | P0 GCL optimization: dynamic `max_iterations` per operation risk (2 for destructive, 1 for cache mutations, 3 for sensitive config changes); early stop mechanisms (safety rule satisfaction, score convergence); updated §1 Scope, §2 CDN-specific notes, §5 Output schema threshold note, §8 See also |
 
