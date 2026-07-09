@@ -73,3 +73,41 @@
    # Test from source to Tencent Cloud
    curl -I https://msp.tencentcloudapi.com
    ```
+
+## Cutover Failure Patterns
+
+### Cutover Aborted — Sync Lag Exceeded
+
+| Symptom | Cause | Recovery |
+|---------|-------|----------|
+| Final sync lag > 60s before cutover | Source write rate exceeds sync bandwidth | Pause source writes; wait for lag to drop; consider off-hours cutover |
+| Sync lag growing during cutover window | Network bandwidth contention | Increase DTS instance specs; schedule cutover during low-traffic window |
+
+### Post-Cutover Application Failure
+
+| Symptom | Cause | Recovery |
+|---------|-------|----------|
+| Health endpoint returns 5xx | Target application config mismatch | **Immediate rollback**; compare env vars, config files, connection strings |
+| SSL/TLS certificate error | Certificate not installed on target | Revert DNS; install certificate on target; retry |
+| Database connection refused | Security group or network ACL blocking | Open target security group; verify VPC/ subnet routing |
+| Performance degradation > 2x | Target instance under-sized | Scale up target spec; if > 5 min to scale, rollback first |
+
+### Data Inconsistency Post-Cutover
+
+| Symptom | Cause | Recovery |
+|---------|-------|----------|
+| Row count mismatch | Some tables missed in final sync | Incremental sync affected tables; verify with checksum |
+| Checksum mismatch | Write happened on source during final sync | Re-sync table; tighten write-block window |
+| Missing objects (storage) | Object created after last sync | Manual object copy; set lifecycle policy for ongoing sync |
+| Sequence/auto-increment mismatch | Source continued accepting writes | Reset sequences on target to MAX(source)+gap |
+
+### Rollback Recovery
+
+| Step | Command/Action | Verification |
+|------|---------------|--------------|
+| 1. Revert DNS/proxy | Update DNS A record or LB target group to source | `dig +short {{user.endpoint}}` returns source IP |
+| 2. Verify source health | `curl https://{{user.source_endpoint}}/health` | HTTP 200 |
+| 3. Notify stakeholders | Slack/email/IM with rollback reason and timeline | Confirmation received |
+| 4. Stop migration task | `tccli msp ModifyMigrationTaskStatus --TaskId "{{user.task_id}}" --Status STOPPED` | Status = STOPPED |
+| 5. Post-mortem doc | Document: timestamp, error root cause, data gap, retry plan | Doc filed in audit-results/ |
+| 6. Retry planning | Address root cause before next cutover attempt | All root cause items resolved |
