@@ -1,0 +1,40 @@
+# Example configuration for qcloud-apigw-ops
+# Safe defaults — no real credentials; use {{env.*}} placeholders at runtime.
+
+service:
+  name: "my-svc"
+  protocol: "http&https"          # http | https | http&https
+  desc: "managed by qcloud-apigw-ops"
+
+api:
+  name: "hello"
+  service_type: "http"
+  service_timeout: 15
+  protocol: "HTTP"
+  auth_type: "NONE"               # NONE | APP | OAUTH
+  request_config:
+    path: "/hello"
+    method: "GET"
+  service_config:
+    product: "clb"
+    backend_type: "HTTP"
+    url: "/"
+    method: "GET"
+
+release:
+  environment: "release"          # test | prepub | release
+  desc: "v1.0"
+
+usage_plan:
+  name: "plan-100qps"
+  max_request_num: 1000000
+  max_request_num_pre_sec: 100
+
+sub_domain:
+  domain: "api.example.com"
+  protocol: "https"
+  net_type: "OUTER"
+  is_default_mapping: true
+
+delete:
+  skip_verification: 0            # keep safety verification ON (1 = bypass, never default)

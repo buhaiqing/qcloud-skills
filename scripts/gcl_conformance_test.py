@@ -11,10 +11,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SkillListTests(unittest.TestCase):
-    def test_32_skills_from_agents_md(self) -> None:
-        """The conformance checker must enumerate the same 32 skills declared in AGENTS.md."""
+    def test_33_skills_from_agents_md(self) -> None:
+        """The conformance checker must enumerate the same 33 skills declared in AGENTS.md."""
         expected = {
-            # Product-scoped (28)
+            # Product-scoped (29)
             "qcloud-cvm-ops", "qcloud-cdb-ops", "qcloud-clb-ops", "qcloud-cos-ops",
             "qcloud-es-ops", "qcloud-redis-ops", "qcloud-tke-ops", "qcloud-vpc-ops",
             "qcloud-cam-ops", "qcloud-cdn-ops", "qcloud-cbs-ops", "qcloud-cls-ops",
@@ -23,7 +23,7 @@ class SkillListTests(unittest.TestCase):
             "qcloud-finops-ops", "qcloud-monitor-ops", "qcloud-ccn-ops",
             "qcloud-vpn-ops", "qcloud-dc-ops", "qcloud-cicd-ops",
             "qcloud-service-mesh-ops", "qcloud-migration-ops", "qcloud-tcop-ops",
-            "qcloud-tdmq-ops",
+            "qcloud-tdmq-ops", "qcloud-apigw-ops",
             # Cross-product (3)
             "qcloud-aiops-diagnosis", "qcloud-proactive-inspection",
             "qcloud-well-architected-review",
@@ -34,8 +34,8 @@ class SkillListTests(unittest.TestCase):
 
 
 class ConformanceTests(unittest.TestCase):
-    def test_all_32_pass(self) -> None:
-        """All 32 skills must pass GCL Tier-A conformance."""
+    def test_all_33_pass(self) -> None:
+        """All 33 skills must pass GCL Tier-A conformance."""
         result = gclc.check_all(ROOT)
         failing = [r for r in result if not r["ok"]]
         self.assertEqual(
