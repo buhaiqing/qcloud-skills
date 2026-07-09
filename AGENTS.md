@@ -21,9 +21,9 @@ qcloud-skills/
 
 All schemas, handoff contracts, and skill-specific config live under the owning skill's `assets/` (or `references/` for Markdown-only contracts).
 
-## Skills inventory (32)
+## Skills inventory (33)
 
-- Product-scoped (28): `cvm`, `cdb`, `clb`, `cos`, `es`, `redis`, `monitor`, `tke`, `vpc`, `cam`, `cdn`, `cbs`, `cls`, `ckafka`, `scf`, `mongodb`, `postgres`, `ssl`, `agsx`, `finops`, `ccn`, `vpn`, `dc`, `cicd`, `service-mesh`, `migration`, `tcop`, `tdmq`
+- Product-scoped (29): `cvm`, `cdb`, `clb`, `cos`, `es`, `redis`, `monitor`, `tke`, `vpc`, `cam`, `cdn`, `cbs`, `cls`, `ckafka`, `scf`, `mongodb`, `postgres`, `ssl`, `agsx`, `finops`, `ccn`, `vpn`, `dc`, `cicd`, `service-mesh`, `migration`, `tcop`, `tdmq`, `apigw`
 - Cross-product (3): `qcloud-aiops-diagnosis`, `qcloud-proactive-inspection`, `qcloud-well-architected-review`
 - Meta-skill (1): `qcloud-skill-generator` (scaffolds/updates other skills)
 

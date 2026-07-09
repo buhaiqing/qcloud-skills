@@ -1,0 +1,55 @@
+{
+  "skill": "qcloud-apigw-ops",
+  "test_cases": [
+    {
+      "query": "创建一个 API 网关服务",
+      "should_trigger": true,
+      "reason": "Service creation is core API Gateway scope"
+    },
+    {
+      "query": "在 service-abc 下新建一个 /hello GET 接口",
+      "should_trigger": true,
+      "reason": "API definition under a service is API Gateway scope"
+    },
+    {
+      "query": "把服务发布到 release 环境",
+      "should_trigger": true,
+      "reason": "ReleaseService to release is API Gateway scope"
+    },
+    {
+      "query": "创建一个使用计划并绑定密钥",
+      "should_trigger": true,
+      "reason": "Usage plan + secret binding is API Gateway scope"
+    },
+    {
+      "query": "给服务绑定自定义域名 api.example.com",
+      "should_trigger": true,
+      "reason": "Custom domain binding is API Gateway scope"
+    },
+    {
+      "query": "删除这个 API 网关服务",
+      "should_trigger": true,
+      "reason": "Service deletion is destructive API Gateway op"
+    },
+    {
+      "query": "写一个 SCF 函数处理订单逻辑",
+      "should_trigger": false,
+      "reason": "Function code → qcloud-scf-ops"
+    },
+    {
+      "query": "配置 CLB 的四层负载均衡",
+      "should_trigger": false,
+      "reason": "CLB routing → qcloud-clb-ops"
+    },
+    {
+      "query": "创建一个 CVM 实例",
+      "should_trigger": false,
+      "reason": "CVM → qcloud-cvm-ops"
+    },
+    {
+      "query": "给 API 配置限流每秒 100 次",
+      "should_trigger": true,
+      "reason": "Rate-limit via usage plan is API Gateway scope"
+    }
+  ]
+}
