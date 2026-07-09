@@ -87,10 +87,11 @@ class FinOpsHandoffTests(unittest.TestCase):
         self.assertEqual(self.sample["source_skill"], "qcloud-finops-ops")
 
     def test_invalid_source_skill_rejected(self) -> None:
+        if not HAS_JSONSCHEMA:
+            self.fail("jsonschema not installed: cannot validate schema const constraint")
         bad = {**self.sample, "source_skill": "qcloud-cvm-ops"}
-        if HAS_JSONSCHEMA:
-            with self.assertRaises(jsonschema.ValidationError):
-                jsonschema.validate(bad, self.schema)
+        with self.assertRaises(jsonschema.ValidationError):
+            jsonschema.validate(bad, self.schema)
 
 
 class ProactiveInspectionHandoffTests(unittest.TestCase):
@@ -146,7 +147,8 @@ class ModeSelectionTests(unittest.TestCase):
             return "F1"
         if handoff_source == "finops" and top_product_delta:
             return "F2"
-        if handoff_source == "proactive_inspection" and confidence in ("CRITICAL", "HIGH"):
+        if handoff_source == "proactive_inspection" and confidence == "CRITICAL":
+            # spec: finding_severity >= CRITICAL (CRITICAL is highest severity)
             return "P1"
         if resolved and prevention:
             return "A1"
