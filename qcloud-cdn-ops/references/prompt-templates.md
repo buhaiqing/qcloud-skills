@@ -137,6 +137,38 @@ When both Critics return scores:
 
 API flows: [SKILL.md](../SKILL.md) (Pre-flight → Execute → Verify → Recover).
 
+### P3: Adaptive backoff strategy
+
+P3 optimization: Dynamic retry interval adjustment based on error type.
+
+| Error Category | Examples | Backoff Strategy |
+|---|---|---|
+| **Transient** | `InternalError`, `RequestLimitExceeded`, `OperationDenied.DomainInDeploy` | **Exponential backoff**: 2s → 4s → 8s → 16s (max 60s) |
+| **Quota exhausted** | `LimitExceeded.PurgeUrlsRateLimit`, `LimitExceeded.CdnDomainQuota` | **Fixed interval**: Wait exact quota refill time (check via DescribePurgeQuota) |
+| **Config propagation** | `UpdateDomainConfig` async deploy | **Progressive polling**: 2s → 5s → 10s → 30s until Status = online |
+| **Permanent** | `InvalidParameter`, `ResourceNotFound`, `AuthFailure.*` | **No retry**: HALT and surface error immediately |
+
+CDN-specific backoff rules:
+- `PurgeUrlsCache`: Rate limit 100 URLs/min — backoff 600ms per URL over limit
+- `PushUrlsCache`: Daily quota 1000 — no retry on quota exceeded, wait for reset
+- `AddCdnDomain` / `UpdateDomainConfig`: Config deploy takes 30-120s — progressive polling
+- `DeleteCdnDomain`: DNS TTL propagation ~300s — warn user before retry
+
+Orchestrator retry decision:
+```
+IF error.category == "permanent":
+    ABORT with error
+ELIF error.category == "transient" AND retry_count < 3:
+    sleep(exponential_backoff(retry_count))
+    RETRY
+ELIF error.category == "quota":
+    sleep(quota_refill_time OR fixed_interval(30s))
+    RETRY
+ELIF error.category == "propagation":
+    poll DescribeDomainsConfig until Status == target OR timeout(120s)
+    RETRY
+```
+
 ---
 
 ## 5. Anti-patterns (banned)
@@ -210,6 +242,7 @@ API flows: [SKILL.md](../SKILL.md) (Pre-flight → Execute → Verify → Recove
 | 1.1.0 | 2026-06-19 | Tier A conformance: flesh out to 7 sections (Generator / Critic / Orchestrator / Per-operation / Anti-patterns / Changelog / See also). Generator Pre-flight now mandates `DescribeDomainsConfig` BEFORE / AFTER every mutation, `dig <domain> CNAME` BEFORE `DeleteCdnDomain`, `DescribeCdnData --Type hit` BEFORE `/*` purge, `DescribePurgeQuota` / `DescribePushQuota` BEFORE purge / push, `DescribeCertificates` cross-check for HTTPS cert swap, and `aggregate_size_gb` cost gate for `PushUrlsCache` > 1 GB. Critic §2 adds DNS orphan detection (`dns_orphan_check`), `UpdateDomainConfig` field-set replacement audit (`update_domain_config_audit`), and `PushUrlsCache` cost-gate audit (`push_cost_gate`). Orchestrator §3 elevates ABORT triggers for DNS orphan, wildcard purge without hit ratio, HTTPS cert without overlap window, and `PushUrlsCache` over-quota retry. Anti-patterns §5 adds 11 CDN-specific entries: `/*` purge without recurse-confirm, root-path purge as normal path, HTTPS cert swap without overlap window, origin swap without content parity, `PushUrlsCache` over-quota retry, `UpdatePayType` silent flip, `InvalidParameter.DomainExists` blind retry, `UpdateDomainConfig` retry without re-read, `PushUrlsCache` retry without quota re-check, trusting `Status=configuring` as terminal, skipping the propagation-window validation read. Per-operation variants §4 adds `AddCdnDomain` rule 0 (pre-flight hygiene), HTTPS cert overlap window note, `UpdatePayType` confirmation, batch `--DryRun`. Read-Only Assessment variant (§4) added for `qcloud-well-architected-review` delegation; FinOpsAnalysis variant (§4) added for CDN-side FinOps read-only flow |
 | 1.3.0 | 2026-06-19 | TE-6 §4: defer per-op gates to rubric §4 only |
 | 1.2.0 | 2026-06-19 | TE-6: G/C/O → gcl-prompt-backbone |
+| 1.7.0 | 2026-07-10 | P3 GCL optimization: adaptive backoff strategy (transient exponential, quota fixed, propagation polling); CDN-specific backoff rules |
 | 1.6.0 | 2026-07-10 | P2 GCL optimization: parallel Critic specialization (Data Quality Critic + Safety Rules Critic); score aggregation with safety precedence |
 | 1.5.0 | 2026-07-10 | P1 GCL optimization: early stop triggers in Orchestrator template (confidence, safety, convergence, single-op); enhanced decision flow |
 | 1.4.0 | 2026-07-10 | P0 GCL optimization: dynamic `max_iterations` per operation risk in Generator/Orchestrator templates; early stop mechanisms |
