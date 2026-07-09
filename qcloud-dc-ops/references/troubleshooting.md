@@ -60,3 +60,13 @@
    tccli vpc DescribeRouteTables \
      --Filters "Name=route-table-id,Values=rtb-xxx"
    ```
+
+## Failover Failure Patterns & Recovery
+
+| Symptom | Likely Cause | Recovery |
+|---------|-------------|----------|
+| Automatic failover did not trigger | BFD/NQA not enabled on tunnel | Enable via `ModifyDirectConnectTunnelExtra --BfdEnable 1 --NqaEnable 1`; verify with `DescribeDirectConnectTunnelExtra` |
+| Backup tunnel unhealthy at switch time | Backup provisioning incomplete | Wait for `State=AVAILABLE` before `FailoverSwitch`; never withdraw primary first |
+| Full outage after manual switch | Primary withdrawn, backup not carrying traffic | Restore primary routes (`ImportDirectRoute true`); verify BGP session on backup |
+| Health check flapping | Probe interval too aggressive | Increase `ProbeInterval` / `ProbeThreshold` in `BfdInfo`/`NqaInfo` |
+| Cloud attach not routing | CCN not attached / routes not propagated | Delegate to `qcloud-ccn-ops`: verify `AttachCcnInstances` and route tables |

@@ -1,6 +1,6 @@
 {
   "skill": "qcloud-dc-ops",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "意图分类测试集。should_trigger=true 表示应触发本 Skill（Direct Connect 场景），false 表示应路由到其他 Skill 或不触发。",
   "notes": [
     "本测试集用于验证 Agent 能否正确识别 Direct Connect 相关 query 并路由到 qcloud-dc-ops。",
@@ -85,6 +85,24 @@
       "should_trigger": false,
       "expected_skill": "qcloud-tke-ops",
       "description": "K8s - 应路由到 tke-ops"
+    },
+    {
+      "id": "dc-013",
+      "query": "配置专线冗余通道做故障切换",
+      "should_trigger": true,
+      "description": "专线故障切换 (failover) 场景"
+    },
+    {
+      "id": "dc-014",
+      "query": "给专线配置 BFD/NQA 健康检查",
+      "should_trigger": true,
+      "description": "通道健康检测配置"
+    },
+    {
+      "id": "dc-015",
+      "query": "通过云联网把专线接入多云多地域",
+      "should_trigger": true,
+      "description": "多云接入 (Cloud Attach → CCN) 场景"
     }
   ]
 }
