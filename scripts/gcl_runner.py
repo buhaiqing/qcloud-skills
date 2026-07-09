@@ -24,11 +24,14 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from reflexion_retrieve import load_failure_patterns, format_for_injection
 
 # Per AGENTS.md §8 defaults (override via --max-iter)
 SKILL_MAX_ITER: dict[str, int] = {
@@ -86,15 +89,21 @@ def has_credential_leak(text: str) -> bool:
     return any(p.search(text) for p in SECRET_PATTERNS)
 
 
-def run_command(command: str, timeout: int = 120) -> dict[str, Any]:
+def run_command(
+    command: str, timeout: int = 120, env: dict[str, str] | None = None
+) -> dict[str, Any]:
     """Execute generator command; capture exit code and masked output."""
     try:
+        proc_env = dict(os.environ)
+        if env:
+            proc_env.update(env)
         proc = subprocess.run(
             command,
             shell=True,
             capture_output=True,
             text=True,
             timeout=timeout,
+            env=proc_env,
         )
         combined = (proc.stdout or "") + (proc.stderr or "")
         masked = mask_secrets(combined)
@@ -247,18 +256,31 @@ def persist_trace(root: Path, trace: dict[str, Any]) -> Path:
 def cmd_run(args: argparse.Namespace) -> int:
     root = args.root
     max_iter = args.max_iter or SKILL_MAX_ITER.get(args.skill, 3)
+    try:
+        prior_patterns = load_failure_patterns(args.skill, args.command)
+    except Exception:
+        prior_patterns = []
+    prior_block = format_for_injection(prior_patterns)
+
     trace: dict[str, Any] = {
         "skill": args.skill,
         "request": args.request,
         "rubric_version": "v1",
         "iterations": [],
+        "preflight_reflexion": {
+            "skill": args.skill,
+            "command": args.command,
+            "matched": len(prior_patterns),
+            "injection": prior_block,
+        },
     }
+    gen_env = {"REFLEXION_PATTERNS": prior_block} if prior_block else None
 
     critic_feedback = ""
     command = args.command
 
     for iteration in range(1, max_iter + 1):
-        generator = run_command(command, timeout=args.timeout)
+        generator = run_command(command, timeout=args.timeout, env=gen_env)
         generator["args"] = {"iter": iteration, "critic_feedback": critic_feedback or None}
 
         if args.structural_critic_only:
