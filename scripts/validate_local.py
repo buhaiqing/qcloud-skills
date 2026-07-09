@@ -4,17 +4,120 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shlex
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 
 @dataclass(frozen=True)
 class Step:
     name: str
     argv: tuple[str, ...]
+
+
+def _compute_quality_score(report: dict[str, Any]) -> float:
+    """Compute overall quality score (0-100) from skill report."""
+    by_skill = report.get("by_skill", {})
+    if not by_skill:
+        return 100.0
+
+    total_execs = report.get("total_executions", 0)
+    if total_execs == 0:
+        return 100.0
+
+    total_passed = sum(s.get("pass", 0) for s in by_skill.values())
+    pass_rate = total_passed / total_execs if total_execs > 0 else 1.0
+
+    all_dims: dict[str, list[float]] = {}
+    for skill_stats in by_skill.values():
+        dims = skill_stats.get("dimensions_avg", {})
+        for dim, val in dims.items():
+            all_dims.setdefault(dim, []).append(val)
+
+    dim_avg = sum(sum(v) / len(v) for v in all_dims.values()) / len(all_dims) if all_dims else 1.0
+
+    score = (pass_rate * 0.6 + dim_avg * 0.4) * 100
+    return round(score, 2)
+
+
+def _determine_upgrade_signal(report: dict[str, Any]) -> str:
+    """Determine upgrade signal severity from report."""
+    upgrade_list = report.get("upgrade_signal", [])
+    by_skill = report.get("by_skill", {})
+
+    if not upgrade_list:
+        return "none"
+
+    total_skills = len(by_skill)
+    upgrade_count = len(upgrade_list)
+
+    if total_skills == 0:
+        return "none"
+
+    upgrade_ratio = upgrade_count / total_skills
+
+    if upgrade_ratio >= 0.5:
+        return "critical"
+    if upgrade_ratio >= 0.25:
+        return "major"
+    return "minor"
+
+
+def _generate_recommendations(report: dict[str, Any]) -> list[str]:
+    """Generate recommendations based on quality report."""
+    recommendations: list[str] = []
+    by_skill = report.get("by_skill", {})
+    upgrade_list = report.get("upgrade_signal", [])
+
+    for skill in upgrade_list:
+        stats = by_skill.get(skill, {})
+        pass_rate = stats.get("pass_rate", 0.0)
+        dims = stats.get("dimensions_avg", {})
+
+        if pass_rate < 0.9:
+            recommendations.append(f"{skill}: improve pass rate ({pass_rate:.0%} < 90%)")
+
+        low_dims = [d for d, v in dims.items() if v < 0.8]
+        if low_dims:
+            recommendations.append(f"{skill}: strengthen dimensions: {', '.join(low_dims)}")
+
+    return recommendations
+
+
+def run_quality_score(root: Path, python: str = sys.executable) -> dict[str, Any]:
+    """Run skill_quality_score.py and return transformed output."""
+    argv = (python, "scripts/skill_quality_score.py", "score", "--json")
+    print(f"$ {shlex.join(argv)}")
+
+    result = subprocess.run(argv, cwd=root, capture_output=True, text=True)
+
+    if result.returncode != 0:
+        return {
+            "quality_score": 0.0,
+            "upgrade_signal": "critical",
+            "recommendations": ["Failed to run quality score check"],
+            "raw_error": result.stderr,
+        }
+
+    try:
+        report = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return {
+            "quality_score": 0.0,
+            "upgrade_signal": "critical",
+            "recommendations": ["Failed to parse quality score output"],
+        }
+
+    return {
+        "quality_score": _compute_quality_score(report),
+        "upgrade_signal": _determine_upgrade_signal(report),
+        "recommendations": _generate_recommendations(report),
+        "_raw_report": report,
+    }
 
 
 def build_steps(python: str = sys.executable, github_output: bool = False) -> list[Step]:
@@ -83,6 +186,19 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _print_quality_summary(result: dict[str, Any]) -> None:
+    """Print quality score summary in a readable format."""
+    print("\n==> Skill Quality Score")
+    print(f"quality_score: {result['quality_score']}")
+    print(f"upgrade_signal: {result['upgrade_signal']}")
+    if result["recommendations"]:
+        print("recommendations:")
+        for rec in result["recommendations"]:
+            print(f"  - {rec}")
+    else:
+        print("recommendations: []")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     root = args.root.resolve()
@@ -98,6 +214,13 @@ def main(argv: list[str] | None = None) -> int:
         if rc != 0:
             print(f"\nFAILED: {step.name} exited with {rc}", file=sys.stderr)
             return rc
+
+    quality_result = run_quality_score(root)
+    _print_quality_summary(quality_result)
+
+    if quality_result["upgrade_signal"] == "critical":
+        print("\nWARNING: Critical upgrade signal detected", file=sys.stderr)
+        return 1
 
     print("\nOK: local validation suite passed")
     return 0
