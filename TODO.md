@@ -28,7 +28,7 @@
 
 | # | Skill | 失败项 | 现象 | 修复方向 | 预估工作量 |
 |---|-------|--------|------|----------|-----------|
-| B1 | `qcloud-cam-ops` | rubric 节数 9/8 | rubric.md 含 9 个 `## N.` 编号节，超出模板预期的 8 节 | 审查 rubric.md，删除或合并多余的编号节（如 §9 重复或错位） | 0.5h |
+| B1 | `qcloud-cam-ops` | rubric 节数 9/8 | rubric.md 含 9 个 `## N.` 编号节，超出模板预期的 8 节 | ✅ 已修复 — rubric.md 已重编号为 8 节，通过 Tier-A conformance | 0.5h |
 | B2 | `qcloud-tcop-ops` | rubric 0/8, prompt 0/7 | rubric.md / prompt-templates.md 使用非标准格式（表格 + 无编号节标题），不符合 `qcloud-skill-template.md` 的 `## N.` 编号节要求 | ✅ 已修复 (`5610fdc`) — rubric.md 含 8 节、prompt-templates.md 含 7 节，通过 Tier-A conformance | 1-2h |
 
 ## 可考虑的新方向
@@ -38,7 +38,7 @@
 | # | 方向 | 说明 | 预估工作量 |
 |---|------|------|-----------|
 | 1 | **qcloud-dc-ops 场景增强** | DC skill 已存在但场景较基础，可补充专线故障切换、多云接入等 | 0.5-1 天 |
-| 2 | **qcloud-migration-ops 场景增强** | 迁移 skill 已存在，可补充更多迁移场景 | 0.5-1 天 |
+| 2 | **qcloud-migration-ops 场景增强** | 迁移 skill 已存在，可补充更多迁移场景 | ✅ 已完成（`32141e3`）— 新增 ModifyMigrationTaskStatus、ListMigrationProject、Cutover/Switchover、Migration Validation 4 个执行流，rubric 安全规则扩至 5 条，troubleshooting 补充割接失败模式 |
 | 3 | **跨 skill 编排测试** | 验证 aiops-diagnosis + monitor-ops + 产品 skill 的跨 skill 调用链路 | ✅ 已完成（`f92111b` + `c079df0`）— 16 个测试覆盖 handoff payload、mode selection、bundle structure |
 | 4 | **新技能：消息队列（TDMQ）** | 目前没有 TDMQ（RocketMQ/Pulsar）skill | 3 天 |
 | 5 | **新技能：API 网关** | 目前没有 API Gateway skill | 2 天 |
