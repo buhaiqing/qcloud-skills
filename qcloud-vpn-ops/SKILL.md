@@ -18,8 +18,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-07-03"
+  version: "1.4.0"
+  last_updated: "2026-07-09"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/215/30691"
@@ -191,325 +191,102 @@ tccli vpc CreateVpnGateway \
 |-----------|-------------|------------|------------|
 | CreateVpnGateway | Create a new VPN Gateway | Medium | Low |
 | DescribeVpnGateways | List / describe VPN Gateways | Low | None |
+| ModifyVpnGatewayAttribute | Modify VPN Gateway attributes | Low | Low |
 | DeleteVpnGateway | Delete a VPN Gateway | Medium | **High** — tears down hybrid cloud |
 | CreateVpnConnection | Create an IPSec tunnel | Medium | Medium — wrong IKE policy = tunnel down |
+| DescribeVpnConnections | List / describe VPN Connections | Low | None |
+| ModifyVpnConnectionAttribute | Modify VPN Connection attributes | Low | Medium — crypto policy change may disrupt tunnel |
 | DeleteVpnConnection | Delete an IPSec tunnel | Low | **High** — cuts hybrid cloud traffic |
 | CreateCustomerGateway | Register an on-prem / peer device | Low | Low |
+| DescribeCustomerGateways | List / describe Customer Gateways | Low | None |
 | DeleteCustomerGateway | Remove a Customer Gateway | Low | Medium — may break other tunnels referencing it |
 | CreateVpnGatewaySslServer | Create an SSL VPN server | Medium | Low |
+| DescribeVpnGatewaySslServers | List / describe SSL VPN Servers | Low | None |
+| DeleteVpnGatewaySslServers | Delete an SSL VPN server | Medium | **High** — disconnects all SSL clients |
 | CreateVpnGatewaySslClient | Provision an SSL VPN client cert | Low | Low |
+| DescribeVpnGatewaySslClients | List / describe SSL VPN Clients | Low | None |
 | DeleteVpnGatewaySslClient | Revoke an SSL VPN client cert | Low | Medium — revokes user access |
 
 ## Changelog
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.4.0 | 2026-07-09 | **Token Efficiency**: Compressed SKILL.md from 636→~400 lines by consolidating Execution Flows to operation list with key hints; moved detailed steps to execution-flows.md; removed duplicate Prerequisites section. |
+| 1.3.0 | 2026-07-09 | **P2 Token Efficiency**: Centralized crypto policy to core-concepts.md; simplified multi-branch pre-flight checks (cross-reference to SKILL.md); updated example-config.yaml with recommended values (SHA-256, GROUP14). |
+| 1.2.0 | 2026-07-09 | **P1 Enhancements**: Added ModifyVpnGatewayAttribute/ModifyVpnConnectionAttribute/DeleteVpnGatewaySslServers operations; rewrote aiops-best-practices.md with CLI/SDK commands and monitor integration; rewrote integration.md with CCN/DC hybrid patterns; fixed finops-cost-optimization.md state value (closed→DOWN); refactored multi-branch-topology.md to avoid duplication with execution-flows.md. |
+| 1.1.0 | 2026-07-09 | **P0 Security & Correctness Fixes**: Fixed CreateCustomerGateway CLI parameter names; removed PSK plaintext inline (now uses env var); fixed weak crypto example (3DES+MD5→AES-256+SHA-256); expanded api-sdk-usage.md with all 16 VPN APIs; added SDK fallback to execution-flows.md §6-§11; fixed broken reference to non-existent audit-rules.md; changed example-config.yaml exchange_mode from AGGRESSIVE to MAIN. |
 | 1.0.0 | 2026-07-03 | Initial VPN skill, dual-path execution. Scope: VPN Gateway + IPSec Connection + Customer Gateway + SSL VPN Server + SSL VPN Client. Hybrid cloud over encrypted tunnel is the primary differentiator from `qcloud-ccn-ops` (multi-region public backbone) and `qcloud-vpc-ops` (same-region same-account peering). |
 
 ---
 
 ## Execution Flows (Agent-Readable)
 
-Every operation: **Pre-flight → Execute (CLI and SDK) → Validate → Recover**. For multi-branch topology deployment, see Operation 12 below.
-
-### Operation: Create VPN Gateway
-
-#### Pre-flight Checks
-
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| CLI installed | `tccli version` | Exit code 0 | Install tccli |
-| Credentials | `test -n "$TENCENTCLOUD_SECRET_ID"` etc. | Non-empty | HALT; user configures env |
-| Region valid | `tccli vpc DescribeRegions` | Region exists | Suggest valid region |
-| VPC exists, AVAILABLE | `DescribeVpcs` | State `AVAILABLE` | HALT; create or recover VPC first |
-| Zone valid | `tccli vpc DescribeZones --Region <region>` | Zone in region | Suggest valid zone |
-| Quota | `DescribeVpnGateways` (count per VPC) | ≤ quota | HALT; raise quota |
-| Bandwidth supported | Spec allows 5/10/20/50/100/200/500/1000 Mbps | Match | HALT; ask user for valid value |
-
-#### Execution
-
-> **CLI and SDK commands:** See [execution-flows.md: Create VPN Gateway](../references/execution-flows.md#1-create-vpn-gateway)
-
-#### Post-execution Validation
-
-1. Capture `{{output.vpn_gateway_id}}` from `$.Response.VpnGateway.VpnGatewayId`.
-2. Capture the public IP from `$.Response.VpnGateway.PublicIpAddress` — share with peer (Customer Gateway) operator.
-3. Poll `DescribeVpnGateways` until `State = AVAILABLE` (see [execution-flows.md: Create VPN Gateway](../references/execution-flows.md#1-create-vpn-gateway) → Post-execution Validation).
-
-#### Failure Recovery
-
-| Error pattern | Recovery |
-|---|---|
-| `InvalidParameter.InvalidBandwidth` | Use one of the supported bandwidth values (5/10/20/50/100/200/500/1000) |
-| `InvalidVpc.NotFound` | Verify `{{user.vpc_id}}` |
-| `ResourceQuotaExceeded.VpnGateway` | HALT; raise per-VPC VPN gateway quota |
-| `InvalidSecretKey` | HALT; fix credentials |
-| `RequestLimitExceeded` | Backoff retry (2s,4s,8s) |
-
-### Operation: Describe VPN Gateways
-
-#### Execution
-
-> **CLI and SDK commands:** See [execution-flows.md: Describe VPN Gateways](../references/execution-flows.md#2-describe-vpn-gateways)
-
-#### Present to User
-
-| Field | Path |
-|-------|------|
-| VPN Gateway ID | `vgw.id` |
-| Name | `vgw.name` |
-| State | `vgw.state` |
-| Public IP | `vgw.public_ip` |
-| Bandwidth (Mbps) | `vgw.bandwidth` |
-| VPC | `$.Response.VpnGatewaySet[].VpcId` |
-
-### Operation: Create Customer Gateway (on-prem / peer device registration)
-
-> **Concept:** A Customer Gateway is the **logical** representation of the on-prem / peer device. It only needs the peer's public IP and a name. It does **not** create the actual tunnel.
-
-#### Pre-flight Checks
-
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| Peer IP format | Validate `{{user.peer_public_ip}}` is a valid IPv4 | Match | HALT; ask for a valid IP |
-| Name uniqueness | `DescribeCustomerGateways` | No duplicate name | Use different name |
-
-#### Execution
-
-> **CLI and SDK commands:** See [execution-flows.md: Create Customer Gateway](../references/execution-flows.md#3-create-customer-gateway)
-
-#### Post-execution Validation
-
-Poll `DescribeCustomerGateways` until the new entry is visible (max 30s).
-
-#### Failure Recovery
-
-| Error pattern | Recovery |
-|---|---|
-| `InvalidParameter.InvalidIp` | Fix the IP format |
-| `ResourceNotFound.CustomerGateway` | Verify customer gateway ID |
-
-### Operation: Create VPN Connection (IPSec Tunnel)
-
-> **Crypto policy reminder:** The IKE / IPSec policy (encryption algo, integrity, DH group, lifetime) must match the peer device. The two most common reasons a tunnel stays in `DOWN` state are: (a) IKE version mismatch, (b) PSK mismatch, (c) CIDR/local-proposal mismatch. The pre-flight below catches (c); (a) and (b) require peer coordination and are surfaced in [troubleshooting](references/troubleshooting.md).
-
-#### Pre-flight Checks
-
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| VPN Gateway AVAILABLE | `DescribeVpnGateways` | State `AVAILABLE` | HALT; wait for gateway |
-| Customer Gateway exists | `DescribeCustomerGateways` | Entry present | HALT; create customer gateway first |
-| VPC CIDR not overlapping with peer | Compare `{{user.local_cidr}}` (VPC) vs peer `{{user.peer_cidr}}` (on-prem) | Disjoint | HALT — overlap causes blackhole routes |
-| Pre-shared key length | `{{user.pre_shared_key}}` is 16–32 chars | Match | HALT; ask user for a strong key |
-
-#### Execution
-
-> **CLI and SDK commands:** See [execution-flows.md: Create VPN Connection](../references/execution-flows.md#4-create-vpn-connection-ipsec-tunnel)
->
-> **PSK handling note:** The `--PreShareKey` flag and the PSK inside `IKESettings` are the same value. The agent should construct the CLI in a way that the value is **never echoed back** to the user. Use a heredoc, env var, or pass it programmatically; do not paste it into a chat echo.
-
-#### Post-execution Validation
-
-1. Capture `{{output.vpn_connection_id}}` from `$.Response.VpnConnection.VpnConnectionId`.
-2. **Tell the user the public IP of the VPN Gateway** — the on-prem operator needs it to configure their side.
-3. Poll `DescribeVpnConnections` until `State = AVAILABLE` (see [execution-flows.md: Create VPN Connection](../references/execution-flows.md#4-create-vpn-connection-ipsec-tunnel) → Post-execution Validation).
-4. **Important:** The tunnel is `AVAILABLE` only when the **peer** is also configured. If state stays `PENDING`, the peer device is not configured or the crypto policy does not match — see [troubleshooting](references/troubleshooting.md).
-
-#### Failure Recovery
-
-| Error pattern | Recovery |
-|---|---|
-| `InvalidParameter.PreShareKeyFormat` | PSK must be 16–32 chars; ask user |
-| `InvalidParameter.CidrConflict` | Local and remote CIDR overlap; pick non-overlapping ranges |
-| `ResourceNotFound.VpnGateway` / `ResourceNotFound.CustomerGateway` | Verify IDs |
-| `ResourceQuotaExceeded.VpnConnection` | HALT; raise per-gateway connection quota |
-
-### Operation: Describe VPN Connections
-
-#### Execution
-
-> **CLI and SDK commands:** See [execution-flows.md: Describe VPN Connections](../references/execution-flows.md#5-describe-vpn-connections)
-
-#### Present to User
-
-| Field | Path |
-|-------|------|
-| VPN Connection ID | `vconn.id` |
-| State | `vconn.state` |
-| Negotiate type | `vconn.negotiate_type` |
-| Local CIDR | `$.Response.VpnConnectionSet[].LocalCidrBlocks` |
-| Remote CIDR | `$.Response.VpnConnectionSet[].RemoteCidrBlocks` |
-| Health check | `$.Response.VpnConnectionSet[].HealthCheck` |
-
-### Operation: Delete VPN Connection
-
-#### Pre-flight (Safety Gate)
-
-- **MUST** obtain explicit user confirmation with the connection ID and the on-prem peer device.
-- **MUST** warn: this cuts hybrid cloud traffic for every workload that uses this tunnel.
-- **MUST** check: no production workload depends solely on this connection (no in-flight fail-over partner).
-
-#### Execution
-
-> **CLI command:** See [execution-flows.md: Delete VPN Connection](../references/execution-flows.md#6-delete-vpn-connection)
-
-#### Post-execution Validation
-
-Poll `DescribeVpnConnections`; expect absent within 60s.
-
-### Operation: Delete VPN Gateway
-
-#### Pre-flight (Safety Gate)
-
-- **MUST** list all VPN Connections on the gateway (`DescribeVpnConnections` filtered by gateway) — none may remain.
-- **MUST** obtain explicit user confirmation with the gateway ID and a clear statement that **all** hybrid cloud tunnels on this gateway are torn down.
-
-#### Execution
-
-> **CLI command:** See [execution-flows.md: Delete VPN Gateway](../references/execution-flows.md#7-delete-vpn-gateway)
-
-#### Post-execution Validation
-
-Poll `DescribeVpnGateways`; expect absent within 120s.
-
-#### Failure Recovery
-
-| Error pattern | Recovery |
-|---|---|
-| `ResourceInUse.VpnGateway` | Connections still attached; delete them first |
-| `ResourceNotFound.VpnGateway` | Already deleted; treat as success |
-
-### Operation: Create SSL VPN Server
-
-> **Scope reminder:** SSL VPN is for **remote user access** (telecommuter, O&M engineer). For site-to-site hybrid cloud, use IPSec VPN above.
-
-#### Pre-flight Checks
-
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| VPN Gateway AVAILABLE | `DescribeVpnGateways` | State `AVAILABLE` | HALT; wait |
-| Gateway supports SSL | `Type` field in gateway response | `SSL` or `CC` (combined) | HALT; create an SSL-capable gateway |
-
-#### Execution
-
-> **CLI command:** See [execution-flows.md: Create SSL VPN Server](../references/execution-flows.md#8-create-ssl-vpn-server)
-
-#### Post-execution Validation
-
-Poll `DescribeVpnGatewaySslServers` until visible (max 30s).
-
-### Operation: Create SSL VPN Client
-
-> **Cert handling note:** The response contains a one-time downloadable client cert. Surface it to the user **once** with a clear "save this now" warning; the cert cannot be re-fetched in plaintext.
-
-#### Execution
-
-> **CLI command:** See [execution-flows.md: Create SSL VPN Client](../references/execution-flows.md#9-create-ssl-vpn-client)
-
-#### Post-execution Validation
-
-Capture the cert payload from the response; warn user it is shown only once.
-
-### Operation: Delete SSL VPN Client
-
-> **Use case:** Revoke a single client's access (e.g., a former employee or a compromised device).
-
-#### Pre-flight (Safety Gate)
-
-- **MUST** obtain explicit user confirmation with the client name; revocation is not reversible without re-issuing a new client.
-
-#### Execution
-
-> **CLI command:** See [execution-flows.md: Delete SSL VPN Client](../references/execution-flows.md#10-delete-ssl-vpn-client)
-
-#### Post-execution Validation
-
-Poll `DescribeVpnGatewaySslClients`; expect absent within 30s.
-
-### Operation: Delete Customer Gateway
-
-#### Pre-flight (Safety Gate)
-
-- **MUST** confirm no VPN Connection references this customer gateway.
-- **MUST** obtain explicit user confirmation.
-
-#### Execution
-
-> **CLI command:** See [execution-flows.md: Delete Customer Gateway](../references/execution-flows.md#11-delete-customer-gateway)
-
-#### Post-execution Validation
-
-Poll `DescribeCustomerGateways`; expect absent within 30s.
-
----
-
-## Prerequisites
-
-1. **Install `tccli` CLI:**
-
-```bash
-pip install tccli
-tccli version
-```
-
-2. **Configure Credentials:**
-
-```bash
-export TENCENTCLOUD_SECRET_ID="AKID..."
-export TENCENTCLOUD_SECRET_KEY="..."
-export TENCENTCLOUD_REGION="ap-guangzhou"
-```
-
-3. **Verify:**
-
-```bash
-tccli vpc DescribeVpnGateways --Region "{{env.TENCENTCLOUD_REGION}}"
-```
-
-## Reference Directory
-
-- [Core Concepts](references/core-concepts.md)
-- [API & SDK Usage](references/api-sdk-usage.md)
-- [CLI Usage](references/cli-usage.md)
-- [Troubleshooting](references/troubleshooting.md)
-- [Well-Architected Assessment](references/well-architected-assessment.md)
-- [Integration](references/integration.md)
-- [Multi-Branch Topology](references/multi-branch-topology.md) — Hub-Spoke拓扑、主备故障切换、混合方案
-- [FinOps Cost Optimization](references/finops-cost-optimization.md)
-- [SecOps Security Operations](references/secops-security-operations.md)
-- [AIOps Best Practices](references/aiops-best-practices.md)
-- [Rubric](references/rubric.md)
-- [Prompt Templates](references/prompt-templates.md)
-
-## Error Code Reference (VPN-Specific)
-
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `InvalidParameter.InvalidBandwidth` | Bandwidth not in supported set | Use 5/10/20/50/100/200/500/1000 Mbps |
-| `InvalidParameter.InvalidIp` | Customer Gateway IP is not a valid IPv4 | Fix the IP |
-| `InvalidParameter.PreShareKeyFormat` | PSK length out of range (16–32 chars) | Ask user for a strong key |
-| `InvalidParameter.CidrConflict` | Local and remote CIDR blocks overlap | Pick non-overlapping ranges |
-| `InvalidVpc.NotFound` | VPC ID not found | Verify `{{user.vpc_id}}` |
-| `ResourceNotFound.VpnGateway` | VPN Gateway ID not found | Verify `{{output.vpn_gateway_id}}` |
-| `ResourceNotFound.CustomerGateway` | Customer Gateway ID not found | Verify `{{output.customer_gateway_id}}` |
-| `ResourceQuotaExceeded.VpnGateway` | Per-VPC VPN gateway quota exceeded | HALT; raise quota |
-| `ResourceQuotaExceeded.VpnConnection` | Per-gateway connection quota exceeded | HALT; raise quota |
-| `ResourceInUse.VpnGateway` | Gateway still has connections | Delete connections first |
-| `InvalidStatus.VpnGatewayNotAvailable` | Gateway is in `PENDING` / `DELETING` | Wait for `AVAILABLE` |
-| `InvalidSecretKey` | Credential invalid | HALT; fix credentials |
-| `RequestLimitExceeded` | API rate limit | Exponential backoff (3x) |
-| `InternalError` | Server error | Retry with RequestId (3x) |
-
-## Safety Gates (Destructive Operations)
-
-Every **DeleteVpnGateway / DeleteVpnConnection / DeleteCustomerGateway / DeleteVpnGatewaySslClient** MUST have:
+> **Detailed CLI/SDK steps for all 15 operations**: See [execution-flows.md](references/execution-flows.md). This section provides operation-level hints and safety gates.
+
+### Operation Index
+
+| # | Operation | Key Hints |
+|---|-----------|-----------|
+| 1 | Create VPN Gateway | Verify VPC exists, zone in region, bandwidth in [5,10,20,50,100,200,500,1000] Mbps |
+| 2 | Describe VPN Gateways | Filter by VPC or gateway ID |
+| 3 | Create Customer Gateway | Validate peer public IP format; check name uniqueness |
+| 4 | Create VPN Connection | **PSK MUST be read from env var**; verify CIDR non-overlap; warn peer must be configured |
+| 5 | Describe VPN Connections | Filter by gateway or connection ID |
+| 6 | Delete VPN Connection | **Safety Gate**: Confirm connection ID + CIDR; warn hybrid cloud traffic cut |
+| 7 | Delete VPN Gateway | **Safety Gate**: Enumerate ALL connections/servers; confirm none remain; warn all tunnels torn down |
+| 8 | Create SSL VPN Server | Verify gateway supports SSL (Type=SSL or CC) |
+| 9 | Create SSL VPN Client | **Cert shown only once** — warn user to save immediately |
+| 10 | Delete SSL VPN Client | **Safety Gate**: Confirm client name; warn revocation irreversible |
+| 11 | Delete Customer Gateway | **Safety Gate**: Confirm no VPN Connection references it |
+| 12 | Multi-Branch Hub-Spoke | See [execution-flows.md §12](references/execution-flows.md#12-multi-branch-hub-spoke-topology-deployment) for batch deployment |
+| 13 | Modify VPN Gateway Attribute | Gateway must be AVAILABLE; bandwidth change requires polling |
+| 14 | Modify VPN Connection Attribute | Only name/health-check modifiable; crypto policy requires recreate |
+| 15 | Delete SSL VPN Server | **Safety Gate**: Enumerate ALL SSL clients; warn all lose access |
+
+### Safety Gates (Destructive Operations)
+
+Every **DeleteVpnGateway / DeleteVpnConnection / DeleteCustomerGateway / DeleteVpnGatewaySslServer / DeleteVpnGatewaySslClient** MUST have:
 
 1. Explicit user confirmation with resource ID
 2. Dependency check (tunnels on a gateway; connections referencing a customer gateway; SSL clients on a server)
 3. Pre-warning about reachability / access impact
 4. Post-delete verification (poll until 404 or absent)
 
+### PSK Security (Create VPN Connection)
+
+- **NEVER** inline PSK in CLI command visible in chat
+- **NEVER** echo PSK in output, logs, or error messages
+- **ALWAYS** read from env var: `export PSK='...' && tccli ... --PreShareKey "$PSK" && unset PSK`
+- See [cli-usage.md](references/cli-usage.md) for safe PSK handling pattern
+
 ---
+
+## Reference Directory
+
+- [Core Concepts](references/core-concepts.md) — IPSec vs SSL VPN, IKE/IPSec policy, PSK requirements
+- [API & SDK Usage](references/api-sdk-usage.md) — All 16 VPN APIs with SDK examples
+- [CLI Usage](references/cli-usage.md) — `tccli vpc` patterns and PSK safety
+- [Troubleshooting](references/troubleshooting.md) — Tunnel DOWN, PSK mismatch, firewall issues
+- [Well-Architected Assessment](references/well-architected-assessment.md) — Four-pillar evaluation
+- [Integration](references/integration.md) — VPN + CCN/DC hybrid, route priority
+- [Multi-Branch Topology](references/multi-branch-topology.md) — Hub-Spoke, active-standby, bandwidth planning
+- [FinOps Cost Optimization](references/finops-cost-optimization.md) — Right-sizing, idle detection
+- [SecOps Security Operations](references/secops-security-operations.md) — Security checklist, IKE policy
+- [AIOps Best Practices](references/aiops-best-practices.md) — Monitoring, anomaly detection, auto-healing
+- [Rubric](references/rubric.md) — GCL scoring dimensions
+- [Prompt Templates](references/prompt-templates.md) — Generator/Critic/Orchestrator prompts
+
+## Error Code Reference (VPN-Specific)
+
+> Full error taxonomy with recovery strategies: See [troubleshooting.md](references/troubleshooting.md).
+
+| Code | Meaning | Action |
+|------|---------|--------|
+| `InvalidParameter.InvalidBandwidth` | Bandwidth not in supported set | Use 5/10/20/50/100/200/500/1000 Mbps |
+| `InvalidParameter.PreShareKeyFormat` | PSK length out of range (16–32 chars) | Ask user for strong key |
+| `InvalidParameter.CidrConflict` | Local and remote CIDR overlap | Pick non-overlapping ranges |
+| `ResourceInUse.VpnGateway` | Gateway still has connections | Delete connections first |
+| `InvalidSecretKey` | Credential invalid | HALT; fix credentials |
 
 ## Quality Gate (GCL)
 
@@ -523,30 +300,15 @@ This skill participates in the **Generator-Critic-Loop (GCL)** pilot. VPN is a h
 | Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` |
 
-### When the loop runs
-
-| Op class | Loop runs? | Why |
-|---|---|---|
-| Destructive: `DeleteVpnGateway`, `DeleteVpnConnection`, `DeleteCustomerGateway`, `DeleteVpnGatewaySslServer`, `DeleteVpnGatewaySslClient` | **yes** | Hybrid cloud critical path; one bad call disconnects production |
-| Mutating: `CreateVpnGateway`, `CreateVpnConnection`, `CreateCustomerGateway`, `CreateVpnGatewaySslServer`, `CreateVpnGatewaySslClient` | **yes** | State / crypto-policy risk; PSK / CIDR / bandwidth validation all need scoring |
-| Read-only: `DescribeVpnGateways`, `DescribeVpnConnections`, `DescribeCustomerGateways`, `DescribeVpnGatewaySslServers`, `DescribeVpnGatewaySslClients` | optional (max_iter=1, no hard abort) | Polling tails are part of the parent op's trace |
-
-### Decision flow (first match wins)
-
-1. **Safety = 0** OR rule violation ⇒ **ABORT**
-2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
-3. **All thresholds met** ⇒ **PASS**
-4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected
-
 ### VPN-specific safety rules (rubric §4)
 
 | # | Operation(s) | Gate (summary) |
 |---:|---|---|
-| 1 | `DeleteVpnGateway` | Gateway ID + Name + VPC ID echoed; enumerate ALL VPN Connections on the gateway; confirm none remain; warn that all hybrid cloud traffic on this gateway is torn down |
-| 2 | `DeleteVpnConnection` | Connection ID + Name + Local/Remote CIDR echoed; warn that hybrid cloud traffic for every workload using this tunnel is cut |
-| 3 | `CreateVpnConnection` | PSK is **never** echoed; CIDR non-overlap confirmed; IKE / IPSec policy visible; user warned that the peer device must be configured before the tunnel reaches `AVAILABLE` |
+| 1 | `DeleteVpnGateway` | Gateway ID + Name + VPC ID echoed; enumerate ALL VPN Connections and SSL Servers; confirm none remain; warn all hybrid cloud traffic torn down |
+| 2 | `DeleteVpnConnection` | Connection ID + Name + Local/Remote CIDR echoed; warn hybrid cloud traffic for every workload using this tunnel is cut |
+| 3 | `CreateVpnConnection` | PSK is **never** echoed; CIDR non-overlap confirmed; IKE / IPSec policy visible; user warned peer must be configured before tunnel reaches `AVAILABLE` |
 | 4 | `DeleteCustomerGateway` | Confirm no VPN Connection still references this customer gateway |
-| 5 | `DeleteVpnGatewaySslClient` | Client name + associated user echoed; warn that revocation is not reversible without re-issuing |
+| 5 | `DeleteVpnGatewaySslClient` | Client name + associated user echoed; warn revocation not reversible without re-issuing |
 
 Missing any ⇒ **Safety = 0** ⇒ **ABORT**.
 

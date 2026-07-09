@@ -46,14 +46,35 @@ Tencent Cloud VPN provides encrypted hybrid cloud connectivity. Two flavors:
 
 The IKE / IPSec policy (encryption algo, integrity, DH group, lifetime) must match on both sides of the tunnel. The most common cause of a tunnel staying in `DOWN` state is policy mismatch — the cloud side and the on-prem device are configured with different IKE versions, different encryption algorithms, or different PSKs.
 
-| Field | Typical value |
-|---|---|
-| IKE version | IKEv2 (preferred) / IKEv1 |
-| Encryption | AES-256 / AES-128 |
-| Integrity | SHA1 / SHA-256 |
-| DH group | GROUP2 / GROUP14 / GROUP5 |
-| Lifetime | 86400 s (IKE) / 3600 s (IPSec) |
-| Pre-shared key | 16–32 chars, both sides must match |
+### IKE Policy Parameters
+
+| Parameter | Recommended | Acceptable | Legacy (avoid) |
+|-----------|-------------|------------|----------------|
+| IKE Version | IKEv2 | IKEv1 (interoperability) | — |
+| Encryption | AES-256 | AES-128 | 3DES |
+| Authentication | SHA-256 | SHA1 | MD5 |
+| DH Group | GROUP14 (2048-bit) | GROUP2, GROUP5 | GROUP1 |
+| Lifetime (IKE SA) | 86400s (24h) | 28800s–86400s | <28800s |
+
+### IPSec Policy Parameters
+
+| Parameter | Recommended | Acceptable | Notes |
+|-----------|-------------|------------|-------|
+| Encryption | AES-256 | AES-128 | Match IKE encryption |
+| Authentication | SHA-256 | SHA1 | Match IKE authentication |
+| PFS (Perfect Forward Secrecy) | Enabled (DH Group 14) | Disabled | Recommended for high-security |
+| Lifetime (IPSec SA) | 3600s (1h) | 1800s–3600s | Shorter = more re-key overhead |
+
+### Pre-Shared Key (PSK) Requirements
+
+| Requirement | Value |
+|-------------|-------|
+| Length | 16–32 characters |
+| Characters | Printable ASCII (letters, digits, `-_.`) |
+| Rotation | Every 90 days (recommended) |
+| Storage | NEVER log, echo, or commit to version control |
+
+> **Security best practices**: See [secops-security-operations.md](secops-security-operations.md) for the complete security checklist.
 
 ## Tunnel State Machine
 

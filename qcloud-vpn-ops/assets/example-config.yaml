@@ -26,15 +26,16 @@ vpn_connection:
   remote_cidr_blocks:
     - 192.168.0.0/16
   pre_shared_key: '<16-32 char secret, source from $PSK env var, never inline>'
+  # IKE/IPSec policy parameters — see core-concepts.md#crypto-policy for recommended values
   ike_settings:
-    ike_version: IKEV2
-    exchange_mode: AGGRESSIVE
-    lifetime_seconds: 86400
+    ike_version: IKEV2          # Recommended: IKEv2
+    exchange_mode: MAIN         # MAIN (recommended) or AGGRESSIVE
+    lifetime_seconds: 86400     # IKE SA lifetime (24h recommended)
     encryption_algorithm: AES-256
-    integrity_algorithm: SHA1
-    dh_group: GROUP2
+    integrity_algorithm: SHA-256
+    dh_group: GROUP14           # GROUP14 (2048-bit) recommended
   ipsec_settings:
-    sa_lifetime_seconds: 3600
+    sa_lifetime_seconds: 3600   # IPSec SA lifetime (1h recommended)
 
 # --- SSL VPN Server (optional) ---
 ssl_vpn_server:

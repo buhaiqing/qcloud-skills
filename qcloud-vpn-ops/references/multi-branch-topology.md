@@ -23,42 +23,20 @@
       └──────────────┘ └──────────────┘ └──────────────┘
 ```
 
-### 配置步骤
+### 配置要点
 
-1. **创建 VPN 网关** (Hub):
-   ```bash
-   tccli vpc CreateVpnGateway \
-     --VpcId "vpc-xxx" \
-     --VpnGatewayName "hub-vpn-gateway" \
-     --InternetMaxBandwidthOut 100 \
-     --Type IPSEC
-   ```
+1. **VPN 网关** (Hub): 创建单个 VPN Gateway，带宽需满足所有分支流量总和
+2. **对端网关**: 每个分支创建一个 Customer Gateway
+3. **VPN 隧道**: 每个分支一条 IPSec 隧道
+4. **路由配置**: VPC 路由表添加各分支网段路由，指向 VPN Gateway
 
-2. **创建对端网关** (每个分支):
-   ```bash
-   # 分支1
-   tccli vpc CreateCustomerGateway \
-     --VpnGatewayName "branch1-cgw" \
-     --PublicIp "203.0.113.1"
-   
-   # 分支2
-   tccli vpc CreateCustomerGateway \
-     --VpnGatewayName "branch2-cgw" \
-     --PublicIp "203.0.113.2"
-   ```
+> **详细 CLI/SDK 步骤**: 参见 [execution-flows.md §12](execution-flows.md#12-multi-branch-hub-spoke-topology-deployment)
 
-3. **创建 VPN 隧道**:
-   ```bash
-   tccli vpc CreateVpnConnection \
-     --VpnGatewayId "vpngw-xxx" \
-     --CustomerGatewayId "cgw-branch1" \
-     --VpnConnectionName "branch1-tunnel" \
-     --PreShareKey "YourSecureKey123"
-   ```
+### 最佳实践
 
-4. **配置路由**:
-   - 在 VPC 路由表中添加分支网段路由，指向 VPN 网关
-   - 在各分支路由器上配置到云端网段的静态路由
+- **带宽规划**: Gateway 带宽 ≥ 所有分支带宽之和
+- **CIDR 规划**: 各分支 CIDR 互不重叠，且与 VPC CIDR 不重叠
+- **监控告警**: 为每条隧道配置 DOWN 告警
 
 ## 场景二：故障切换（主备 VPN 隧道）
 
@@ -85,41 +63,39 @@
 
 ### 主备切换配置
 
-1. **主隧道配置** (优先级高):
-   ```bash
-   tccli vpc CreateVpnConnection \
-     --VpnGatewayId "vpngw-primary" \
-     --CustomerGatewayId "cgw-branch" \
-     --VpnConnectionName "branch-primary" \
-     --IKEOptionsSpecification '{"PropoAuthenAlgorithm":"MD5","PropoEncryAlgorithm":"3DES","ExchangeMode":"MAIN","LocalIdentity":"ADDRESS","RemoteIdentity":"ADDRESS","LocalAddress":"1.2.3.4","RemoteAddress":"5.6.7.8"}' \
-     --IPSECOptionsSpecification '{"EncryptAlgorithm":"3DES","IntegratAlgorithm":"MD5"}'
-   ```
+1. **主隧道**: 优先级高，路由优先级 100
+2. **备隧道**: 优先级低，路由优先级 200
+3. **故障检测**: 配置健康检查（BFD/NQA/ICMP），检测主隧道状态
+4. **自动切换**: 主隧道 DOWN 时，路由自动切换到备隧道
 
-2. **备隧道配置** (优先级低):
-   ```bash
-   tccli vpc CreateVpnConnection \
-     --VpnGatewayId "vpngw-backup" \
-     --CustomerGatewayId "cgw-branch" \
-     --VpnConnectionName "branch-backup" \
-     --IKEOptionsSpecification '{...}'
-   ```
-
-3. **路由优先级设置**:
-   - 主隧道路由: 优先级 100
-   - 备隧道路由: 优先级 200
-   - 监控检测: ICMP/HTTP 探测主隧道
-
-### 故障切换检测
+### 路由优先级示例
 
 ```bash
-# 检查 VPN 连接状态
-tccli vpc DescribeVpnConnections \
-  --Filters "Name=vpn-gateway-id,Values=vpngw-primary"
+# 主隧道路由 (优先级 100)
+tccli vpc CreateRoutes \
+  --RouteTableId "rtb-xxx" \
+  --Routes '[{
+    "DestinationCidrBlock": "172.16.1.0/24",
+    "GatewayType": "VPNGW",
+    "GatewayId": "vpngw-primary"
+  }]'
 
-# 预期输出检查
-# State = "AVAILABLE" 表示正常
-# State = "FAILED" 表示需要切换到备用
+# 备隧道路由 (优先级 200)
+tccli vpc CreateRoutes \
+  --RouteTableId "rtb-xxx" \
+  --Routes '[{
+    "DestinationCidrBlock": "172.16.1.0/24",
+    "GatewayType": "VPNGW",
+    "GatewayId": "vpngw-backup"
+  }]'
 ```
+
+### 最佳实践
+
+- **双 Gateway**: 主备隧道使用不同的 VPN Gateway，避免单点故障
+- **跨可用区**: 主备 Gateway 部署在不同可用区
+- **监控**: 监控两条隧道状态，主隧道 DOWN 时触发告警
+- **定期演练**: 定期验证备隧道可用性
 
 ## 场景三：分支上云带宽规划
 
@@ -169,8 +145,8 @@ tccli vpc DescribeVpnConnections \
 
 ### 配置要点
 
-1. **IPSec VPN**: 配置见场景一
-2. **SSL VPN**: 使用腾讯 SSL VPN 服务
+1. **IPSec VPN**: 用于固定站点互联
+2. **SSL VPN**: 用于移动用户接入
 3. **访问控制**: 使用不同网段区分 IPSec 和 SSL 接入用户
 4. **安全策略**: SSL VPN 用户限制访问范围（只访问必要资源）
 
@@ -179,4 +155,6 @@ tccli vpc DescribeVpnConnections \
 - VPN 核心概念: [core-concepts.md](core-concepts.md)
 - CLI 使用: [cli-usage.md](cli-usage.md)
 - 故障排查: [troubleshooting.md](troubleshooting.md)
+- 详细执行步骤: [execution-flows.md §12](execution-flows.md#12-multi-branch-hub-spoke-topology-deployment)
 - 专线备份: [qcloud-dc-ops](../qcloud-dc-ops/references/core-concepts.md)
+- 集成模式: [integration.md](integration.md)

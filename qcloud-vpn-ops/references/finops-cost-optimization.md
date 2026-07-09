@@ -22,7 +22,7 @@
 ## Idle Connection Detection
 
 ```bash
-tccli vpc DescribeVpnConnections --Output json | jq '.VpnConnectionSet[] | select(.State=="closed")'
+tccli vpc DescribeVpnConnections --Output json | jq '.VpnConnectionSet[] | select(.State=="DOWN")'
 ```
 
 ## See also

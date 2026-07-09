@@ -12,13 +12,16 @@
 | 3 | Create Customer Gateway | `tccli vpc CreateCustomerGateway` | `client.CreateCustomerGateway()` |
 | 4 | Create VPN Connection (IPSec) | `tccli vpc CreateVpnConnection` | `client.CreateVpnConnection()` |
 | 5 | Describe VPN Connections | `tccli vpc DescribeVpnConnections` | `client.DescribeVpnConnections()` |
-| 6 | Delete VPN Connection | `tccli vpc DeleteVpnConnection` | — |
-| 7 | Delete VPN Gateway | `tccli vpc DeleteVpnGateway` | — |
-| 8 | Create SSL VPN Server | `tccli vpc CreateVpnGatewaySslServer` | — |
-| 9 | Create SSL VPN Client | `tccli vpc CreateVpnGatewaySslClient` | — |
-| 10 | Delete SSL VPN Client | `tccli vpc DeleteVpnGatewaySslClient` | — |
-| 11 | Delete Customer Gateway | `tccli vpc DeleteCustomerGateway` | — |
+| 6 | Delete VPN Connection | `tccli vpc DeleteVpnConnection` | `client.DeleteVpnConnection()` |
+| 7 | Delete VPN Gateway | `tccli vpc DeleteVpnGateway` | `client.DeleteVpnGateway()` |
+| 8 | Create SSL VPN Server | `tccli vpc CreateVpnGatewaySslServer` | `client.CreateVpnGatewaySslServer()` |
+| 9 | Create SSL VPN Client | `tccli vpc CreateVpnGatewaySslClient` | `client.CreateVpnGatewaySslClient()` |
+| 10 | Delete SSL VPN Client | `tccli vpc DeleteVpnGatewaySslClient` | `client.DeleteVpnGatewaySslClient()` |
+| 11 | Delete Customer Gateway | `tccli vpc DeleteCustomerGateway` | `client.DeleteCustomerGateway()` |
 | 12 | Multi-Branch Hub-Spoke Deployment | See §12 | See §12 |
+| 13 | Modify VPN Gateway Attribute | `tccli vpc ModifyVpnGatewayAttribute` | `client.ModifyVpnGatewayAttribute()` |
+| 14 | Modify VPN Connection Attribute | `tccli vpc ModifyVpnConnectionAttribute` | `client.ModifyVpnConnectionAttribute()` |
+| 15 | Delete SSL VPN Server | `tccli vpc DeleteVpnGatewaySslServers` | `client.DeleteVpnGatewaySslServers()` |
 
 ---
 
@@ -229,6 +232,20 @@ tccli vpc DeleteVpnConnection \
   --VpnConnectionId "{{output.vpn_connection_id}}"
 ```
 
+### SDK
+
+```python
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+
+req = models.DeleteVpnConnectionRequest()
+req.VpnConnectionId = "{{output.vpn_connection_id}}"
+try:
+    client.DeleteVpnConnection(req)
+except TencentCloudSDKException as e:
+    if "ResourceNotFound" not in str(e):
+        raise  # Already deleted — treat as success
+```
+
 ### Post-execution Validation
 
 Poll `DescribeVpnConnections`; expect absent within 60s.
@@ -243,6 +260,20 @@ Poll `DescribeVpnConnections`; expect absent within 60s.
 tccli vpc DeleteVpnGateway \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
   --VpnGatewayId "{{output.vpn_gateway_id}}"
+```
+
+### SDK
+
+```python
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+
+req = models.DeleteVpnGatewayRequest()
+req.VpnGatewayId = "{{output.vpn_gateway_id}}"
+try:
+    client.DeleteVpnGateway(req)
+except TencentCloudSDKException as e:
+    if "ResourceNotFound" not in str(e):
+        raise
 ```
 
 ### Post-execution Validation
@@ -266,6 +297,20 @@ tccli vpc CreateVpnGatewaySslServer \
   --Port "{{user.ssl_port}}"
 ```
 
+### SDK
+
+```python
+req = models.CreateVpnGatewaySslServerRequest()
+req.VpnGatewayId = "{{output.vpn_gateway_id}}"
+req.SslVpnServerName = "{{user.ssl_vpn_server_name}}"
+req.LocalAddress = "{{user.ssl_local_cidr}}"
+req.RemoteAddress = "{{user.ssl_client_cidr}}"
+req.SslVpnProtocol = "UDP"
+req.Port = int("{{user.ssl_port}}")
+resp = client.CreateVpnGatewaySslServer(req)
+print(resp.to_json_string())
+```
+
 ### Post-execution Validation
 
 Poll `DescribeVpnGatewaySslServers` until visible (max 30s).
@@ -281,6 +326,16 @@ tccli vpc CreateVpnGatewaySslClient \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
   --SslVpnServerId "{{output.ssl_server_id}}" \
   --SslVpnClientName "{{user.ssl_client_name}}"
+```
+
+### SDK
+
+```python
+req = models.CreateVpnGatewaySslClientRequest()
+req.SslVpnServerId = "{{output.ssl_server_id}}"
+req.SslVpnClientName = "{{user.ssl_client_name}}"
+resp = client.CreateVpnGatewaySslClient(req)
+print(resp.to_json_string())
 ```
 
 ### Post-execution Validation
@@ -299,6 +354,14 @@ tccli vpc DeleteVpnGatewaySslClient \
   --SslVpnClientId "{{output.ssl_client_id}}"
 ```
 
+### SDK
+
+```python
+req = models.DeleteVpnGatewaySslClientRequest()
+req.SslVpnClientId = "{{output.ssl_client_id}}"
+client.DeleteVpnGatewaySslClient(req)
+```
+
 ### Post-execution Validation
 
 Poll `DescribeVpnGatewaySslClients`; expect absent within 30s.
@@ -315,6 +378,14 @@ tccli vpc DeleteCustomerGateway \
   --CustomerGatewayId "{{output.customer_gateway_id}}"
 ```
 
+### SDK
+
+```python
+req = models.DeleteCustomerGatewayRequest()
+req.CustomerGatewayId = "{{output.customer_gateway_id}}"
+client.DeleteCustomerGateway(req)
+```
+
 ### Post-execution Validation
 
 Poll `DescribeCustomerGateways`; expect absent within 30s.
@@ -327,10 +398,10 @@ Deploy a Hub-Spoke topology with a single VPN Gateway in the VPC (Hub) and multi
 
 ### Pre-flight Checks
 
+> **General checks**: See [SKILL.md §Create VPN Gateway](../SKILL.md#operation-create-vpn-gateway) and [SKILL.md §Create VPN Connection](../SKILL.md#operation-create-vpn-connection-ipsec-tunnel) for standard pre-flight validation.
+
 | Check | Method | Expected | On Failure |
 |-------|--------|----------|------------|
-| VPC exists | `tccli vpc DescribeVpcs --VpcIds "[\"{{user.vpc_id}}\"]"` | State `AVAILABLE` | HALT; create or recover VPC first |
-| VPN Gateway exists | `tccli vpc DescribeVpnGateways --VpnGatewayIds "[\"{{output.vpn_gateway_id}}\"]"` | State `AVAILABLE` | HALT; create VPN gateway first |
 | Branch CIDRs non-overlapping | Validate each `{{user.branch_n_cidr}}` against VPC CIDR and other branch CIDRs | No overlap | HALT; ask user to re-plan CIDR allocation |
 | Bandwidth adequate | Sum of branch bandwidth expectations ≤ gateway bandwidth | Sum ≤ gateway spec | HALT; upgrade gateway or reduce branches |
 
@@ -447,3 +518,83 @@ tccli vpc DescribeVpnConnections \
 | `LimitExceeded` | Quota exceeded (too many connections per gateway) | HALT; raise quota or use multiple gateways |
 | `ResourceInUse` | Customer Gateway already referenced | Use existing CGW or delete conflicting references |
 | `InvalidParameterValue.Duplicate` | Duplicate tunnel name | Use unique connection names per branch |
+
+---
+
+## 13. Modify VPN Gateway Attribute
+
+### CLI
+
+```bash
+tccli vpc ModifyVpnGatewayAttribute \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --VpnGatewayId "{{output.vpn_gateway_id}}" \
+  --VpnGatewayName "{{user.new_vpn_gateway_name}}" \
+  --Bandwidth {{user.new_bandwidth}}
+```
+
+### SDK
+
+```python
+req = models.ModifyVpnGatewayAttributeRequest()
+req.VpnGatewayId = "{{output.vpn_gateway_id}}"
+req.VpnGatewayName = "{{user.new_vpn_gateway_name}}"
+req.Bandwidth = int("{{user.new_bandwidth}}")
+client.ModifyVpnGatewayAttribute(req)
+```
+
+### Post-execution Validation
+
+```bash
+tccli vpc DescribeVpnGateways \
+  --VpnGatewayIds "[\"{{output.vpn_gateway_id}}\"]" | \
+  jq -r '.Response.VpnGatewaySet[0] | {Name: .VpnGatewayName, Bandwidth: .Bandwidth}'
+```
+
+---
+
+## 14. Modify VPN Connection Attribute
+
+### CLI
+
+```bash
+tccli vpc ModifyVpnConnectionAttribute \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --VpnConnectionId "{{output.vpn_connection_id}}" \
+  --VpnConnectionName "{{user.new_vpn_connection_name}}"
+```
+
+### SDK
+
+```python
+req = models.ModifyVpnConnectionAttributeRequest()
+req.VpnConnectionId = "{{output.vpn_connection_id}}"
+req.VpnConnectionName = "{{user.new_vpn_connection_name}}"
+client.ModifyVpnConnectionAttribute(req)
+```
+
+> **Warning:** Modifying IKE/IPSec crypto policy requires recreating the connection. This API only supports name and health check modifications.
+
+---
+
+## 15. Delete SSL VPN Server
+
+### CLI
+
+```bash
+tccli vpc DeleteVpnGatewaySslServers \
+  --Region "{{env.TENCENTCLOUD_REGION}}" \
+  --SslVpnServerIds "[\"{{output.ssl_server_id}}\"]"
+```
+
+### SDK
+
+```python
+req = models.DeleteVpnGatewaySslServersRequest()
+req.SslVpnServerIds = ["{{output.ssl_server_id}}"]
+client.DeleteVpnGatewaySslServers(req)
+```
+
+### Post-execution Validation
+
+Poll `DescribeVpnGatewaySslServers`; expect absent within 30s.
