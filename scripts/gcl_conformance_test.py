@@ -11,24 +11,30 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SkillListTests(unittest.TestCase):
-    def test_24_skills_from_agents_md(self) -> None:
-        """The conformance checker must enumerate the same 24 skills declared in AGENTS.md §8."""
+    def test_31_skills_from_agents_md(self) -> None:
+        """The conformance checker must enumerate the same 31 skills declared in AGENTS.md."""
         expected = {
+            # Product-scoped (27)
             "qcloud-cvm-ops", "qcloud-cdb-ops", "qcloud-clb-ops", "qcloud-cos-ops",
             "qcloud-es-ops", "qcloud-redis-ops", "qcloud-tke-ops", "qcloud-vpc-ops",
             "qcloud-cam-ops", "qcloud-cdn-ops", "qcloud-cbs-ops", "qcloud-cls-ops",
             "qcloud-ckafka-ops", "qcloud-scf-ops", "qcloud-mongodb-ops",
             "qcloud-postgres-ops", "qcloud-ssl-ops", "qcloud-agsx-ops",
-            "qcloud-finops-ops", "qcloud-monitor-ops", "qcloud-aiops-diagnosis",
-            "qcloud-proactive-inspection", "qcloud-well-architected-review",
+            "qcloud-finops-ops", "qcloud-monitor-ops", "qcloud-ccn-ops",
+            "qcloud-vpn-ops", "qcloud-dc-ops", "qcloud-cicd-ops",
+            "qcloud-service-mesh-ops", "qcloud-migration-ops", "qcloud-tcop-ops",
+            # Cross-product (3)
+            "qcloud-aiops-diagnosis", "qcloud-proactive-inspection",
+            "qcloud-well-architected-review",
+            # Meta-skill (1)
             "qcloud-skill-generator",
         }
         self.assertEqual(gclc.GCL_SKILLS, expected)
 
 
 class ConformanceTests(unittest.TestCase):
-    def test_all_24_pass(self) -> None:
-        """Once this plan completes, the conformance check passes on all 24 skills."""
+    def test_all_31_pass(self) -> None:
+        """All 31 skills must pass GCL Tier-A conformance."""
         result = gclc.check_all(ROOT)
         failing = [r for r in result if not r["ok"]]
         self.assertEqual(

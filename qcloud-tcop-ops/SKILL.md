@@ -17,8 +17,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.1.0"
-  last_updated: "2026-07-08"
+  version: "1.2.0"
+  last_updated: "2026-07-09"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "TCOP (Tencent Cloud Optimization Platform) — API version <!-- TBD: verify API version when publicly documented -->"
