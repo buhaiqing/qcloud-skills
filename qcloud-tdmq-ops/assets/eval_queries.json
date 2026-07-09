@@ -1,0 +1,55 @@
+{
+  "skill": "qcloud-tdmq-ops",
+  "test_cases": [
+    {
+      "query": "创建一个 TDMQ RocketMQ 集群",
+      "should_trigger": true,
+      "reason": "RocketMQ cluster creation is core TDMQ scope"
+    },
+    {
+      "query": "在命名空间 ns-prod 下新建一个 topic",
+      "should_trigger": true,
+      "reason": "Topic creation under namespace is TDMQ scope"
+    },
+    {
+      "query": "发送一条 RocketMQ 消息到 orders 主题",
+      "should_trigger": true,
+      "reason": "Message production is TDMQ scope"
+    },
+    {
+      "query": "重置 consumer group 的消费位点",
+      "should_trigger": true,
+      "reason": "Offset reset is TDMQ scope"
+    },
+    {
+      "query": "消息回溯 CMQ 队列到指定时间",
+      "should_trigger": true,
+      "reason": "CMQ rewind is TDMQ scope"
+    },
+    {
+      "query": "删除这个 RocketMQ 集群",
+      "should_trigger": true,
+      "reason": "Cluster deletion is destructive TDMQ op"
+    },
+    {
+      "query": "创建一个 Kafka topic",
+      "should_trigger": false,
+      "reason": "Kafka → qcloud-ckafka-ops"
+    },
+    {
+      "query": "帮我部署一个 CVM 实例",
+      "should_trigger": false,
+      "reason": "CVM → qcloud-cvm-ops"
+    },
+    {
+      "query": "配置 VPC 私有网络",
+      "should_trigger": false,
+      "reason": "VPC → qcloud-vpc-ops"
+    },
+    {
+      "query": "查看 RocketMQ 集群的消息堆积情况",
+      "should_trigger": true,
+      "reason": "Consumption/lag inspection is TDMQ scope"
+    }
+  ]
+}
