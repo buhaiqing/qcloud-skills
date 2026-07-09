@@ -30,14 +30,18 @@
 - Keep using `--structural-critic-only` so no real tccli call.
 **Verify:** `cd scripts && python3 -m unittest discover -p "*_test.py"` green.
 
-## Item 4 — Single masking boundary
+## Item 4 — Single masking boundary ✅ DONE
 **What:** ensure `format_for_injection` is the only place credentials get masked for injection output; remove redundant masking if any.
-**Verify:** existing `_mask_credentials` tests still pass.
+**Finding:** No redundant masking exists. Two separate functions serve distinct paths:
+- `_mask_credentials()` in `reflexion_retrieve.py` → masks pattern error/fix fields **before** injection into Generator prompt (via `format_for_injection` → `REFLEXION_PATTERNS` env var).
+- `mask_secrets()` in `gcl_runner.py` → masks Generator **stdout/stderr** for trace/logging output only. Neither function touches the other's data path.
+**Verify:** `reflexion_retrieve_test` 6/6 pass; `test_mask_credentials_function` covers the boundary.
 
 ## Execution order
-1. Item 3 (cheap, unblocks confidence in task-1 wiring) — can land on current branch.
-2. Items 1 & 2 in parallel worktrees (independent).
-3. Merge worktrees → re-run full `validate_local.py` → confirm only the 3 pre-existing failures remain.
+1. Item 3 (cheap, unblocks confidence in task-1 wiring) — ✅ landed on current branch.
+2. Items 1 & 2 in parallel worktrees — ✅ merged.
+3. Item 4 audit — ✅ no action needed, documented above.
+4. Final: re-run full `validate_local.py` → confirm only the 3 pre-existing failures remain.
 
 ## Evidence gate
 - Each item: `ruff check` clean + relevant unittest green before merge.
