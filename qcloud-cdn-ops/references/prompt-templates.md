@@ -31,6 +31,7 @@ Load rubric §4 before Execute; append gate results to trace `preflight`.
 
 > **TE-6 backbone:** [Orchestrator skeleton](../../qcloud-skill-generator/references/gcl-prompt-backbone.md#3-orchestrator-prompt-template).
 > `max_iterations`: **dynamic** (per-operation risk-based strategy from SKILL.md §Quality Gate).
+> **Early stop**: confidence (all dims ≥ 0.9), safety (all rules satisfied), convergence (Δ < 0.1 × 2 rounds), single-op (max_iter=1 passing gates) — see SKILL.md §Early stop mechanisms.
 
 ---
 
@@ -119,6 +120,7 @@ API flows: [SKILL.md](../SKILL.md) (Pre-flight → Execute → Verify → Recove
 | 1.1.0 | 2026-06-19 | Tier A conformance: flesh out to 7 sections (Generator / Critic / Orchestrator / Per-operation / Anti-patterns / Changelog / See also). Generator Pre-flight now mandates `DescribeDomainsConfig` BEFORE / AFTER every mutation, `dig <domain> CNAME` BEFORE `DeleteCdnDomain`, `DescribeCdnData --Type hit` BEFORE `/*` purge, `DescribePurgeQuota` / `DescribePushQuota` BEFORE purge / push, `DescribeCertificates` cross-check for HTTPS cert swap, and `aggregate_size_gb` cost gate for `PushUrlsCache` > 1 GB. Critic §2 adds DNS orphan detection (`dns_orphan_check`), `UpdateDomainConfig` field-set replacement audit (`update_domain_config_audit`), and `PushUrlsCache` cost-gate audit (`push_cost_gate`). Orchestrator §3 elevates ABORT triggers for DNS orphan, wildcard purge without hit ratio, HTTPS cert without overlap window, and `PushUrlsCache` over-quota retry. Anti-patterns §5 adds 11 CDN-specific entries: `/*` purge without recurse-confirm, root-path purge as normal path, HTTPS cert swap without overlap window, origin swap without content parity, `PushUrlsCache` over-quota retry, `UpdatePayType` silent flip, `InvalidParameter.DomainExists` blind retry, `UpdateDomainConfig` retry without re-read, `PushUrlsCache` retry without quota re-check, trusting `Status=configuring` as terminal, skipping the propagation-window validation read. Per-operation variants §4 adds `AddCdnDomain` rule 0 (pre-flight hygiene), HTTPS cert overlap window note, `UpdatePayType` confirmation, batch `--DryRun`. Read-Only Assessment variant (§4) added for `qcloud-well-architected-review` delegation; FinOpsAnalysis variant (§4) added for CDN-side FinOps read-only flow |
 | 1.3.0 | 2026-06-19 | TE-6 §4: defer per-op gates to rubric §4 only |
 | 1.2.0 | 2026-06-19 | TE-6: G/C/O → gcl-prompt-backbone |
+| 1.5.0 | 2026-07-10 | P1 GCL optimization: early stop triggers in Orchestrator template (confidence, safety, convergence, single-op); enhanced decision flow |
 | 1.4.0 | 2026-07-10 | P0 GCL optimization: dynamic `max_iterations` per operation risk in Generator/Orchestrator templates; early stop mechanisms |
 
 ---

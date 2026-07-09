@@ -16,7 +16,7 @@ compatibility: >-
   Tencent Cloud CDN endpoints.
 metadata:
   author: qcloud
-  version: "1.3.0"
+  version: "1.4.0"
   last_updated: "2026-07-10"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
@@ -116,6 +116,7 @@ CDN (Content Delivery Network) is Tencent Cloud's content delivery service provi
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial release — CDN domain management, cache purge, config update |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CDN-specific safety rules incl. domain-deletion CNAME break, wildcard `/*` purge mass flush, origin config change, preload origin cost), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
+| 1.4.0 | 2026-07-10 | P1 GCL optimization: early stop mechanisms (confidence early stop Δ ≥ 0.9, single-op early stop for max_iter=1 ops, irreversible abort for DeleteCdnDomain with score < 1.0); enhanced decision flow with 8 rules |
 | 1.3.0 | 2026-07-10 | P0 GCL optimization: dynamic `max_iterations` per operation risk (2 for destructive, 1 for cache mutations, 3 for sensitive config changes); early stop mechanisms (safety rule satisfaction, score convergence) |
 | 1.2.0 | 2026-06-13 | Rule P reverse delegation: `references/aiops-diagnosis.md`; Trigger & Scope aiops delegate for origin 5xx/cache/latency RCA |
 
@@ -168,14 +169,28 @@ self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-aft
 | Mutating: `AddCdnDomain`, `PushUrlsCache`, `UpdatePayType`, `EnableCdnDomain` | **yes** | Cost / config risk; needs scoring |
 | Read-only: `DescribeDomainsConfig`, `DescribeCdnData`, `DescribePurgeQuota` | optional (max_iter=1, no hard abort) | Pre-flight for parent mutations |
 
+### Early stop mechanisms
+
+P1 optimization: 提前终止不必要的迭代。
+
+| Trigger | Condition | Action | Rationale |
+|---|---|---|---|
+| **Safety early stop** | All CDN safety rules (rules 1–5) satisfied + other dimensions ≥ threshold | **PASS** | Safety is the primary concern; if all safety gates passed, no need to continue |
+| **Confidence early stop** | All dimensions ≥ 0.9 AND no rule violations | **PASS** | High confidence result; marginal improvements unlikely |
+| **Convergence early stop** | Δ < 0.1 for 2 consecutive rounds | **PASS** | Critic scores stabilized; further iteration yields diminishing returns |
+| **Single-op early stop** | `max_iter=1` ops (cache mutations, read-only) that pass safety gates | **PASS** after iter 1 | No benefit from iteration; safety gates sufficient |
+| **Irreversible abort** | `DeleteCdnDomain` with any safety concern (score < 1.0) | **ABORT** | Cannot undo; strictest iteration control |
+
 ### Decision flow (first match wins)
 
 1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (immediate stop, no partial result)
-2. **All CDN safety rules satisfied** AND other dimensions meet thresholds ⇒ **PASS** (early stop)
-3. **Consecutive Critic scores converge** (Δ < 0.1 for 2 rounds) ⇒ **PASS** (convergence stop)
-4. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
-5. **All dimension thresholds met** ⇒ **PASS**
-6. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
+2. **Confidence early stop**: All dimensions ≥ 0.9 AND no rule violations ⇒ **PASS** (high confidence)
+3. **Safety early stop**: All CDN safety rules satisfied + other dimensions meet thresholds ⇒ **PASS**
+4. **Single-op early stop**: `max_iter=1` ops (cache mutations, read-only) that pass safety gates ⇒ **PASS** after iter 1
+5. **Convergence early stop**: Δ < 0.1 for 2 consecutive rounds ⇒ **PASS** (convergence)
+6. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+7. **All dimension thresholds met** ⇒ **PASS**
+8. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
 
 ### CDN-specific safety rules (rubric §4)
 

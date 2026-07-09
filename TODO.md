@@ -42,3 +42,16 @@
 | 3 | **跨 skill 编排测试** | 验证 aiops-diagnosis + monitor-ops + 产品 skill 的跨 skill 调用链路 | ✅ 已完成（`f92111b` + `c079df0`）— 16 个测试覆盖 handoff payload、mode selection、bundle structure |
 | 4 | **新技能：消息队列（TDMQ）** | 目前没有 TDMQ（RocketMQ/Pulsar）skill | ✅ 已完成（`e839f05`）— 新增 `qcloud-tdmq-ops` skill，含 10 个执行流（RocketMQ/Pulsar/RabbitMQ/CMQ）、rubric 8 节、prompt 7 节，GCL conform 32/32 | 3 天 |
 | 5 | **新技能：API 网关** | 目前没有 API Gateway skill | ✅ 已完成（`4163c9c`）— 新增 `qcloud-apigw-ops` skill，含 10 个执行流（Service/API/Release/UsagePlan/SubDomain）、rubric 8 节、prompt 7 节，GCL conform 33/33 | 2 天 |
+
+## GCL Loop Engineering 优化（qcloud-cdn-ops P0-P5）
+
+> 基于 Loop Engineering 视角分析 CDN GCL 的优化机会。
+
+| # | 优化项 | 说明 | 状态 |
+|---|--------|------|------|
+| P0 | **动态 max_iterations** | 按操作风险等级动态调整迭代次数（破坏性=2, 缓存变更=1, 敏感配置=3） | ✅ 已完成（`f03fe9a`） |
+| P1 | **早期停止机制** | Safety 规则满足 + Critic 分数收敛（Δ < 0.1 for 2 rounds）时提前通过 | 🔄 进行中 |
+| P2 | **并行 Critic 专业化** | Data Quality Critic + Safety Rules Critic 并行评审，不同维度专门化 | ⏳ 待处理 |
+| P3 | **自适应退避策略** | 根据错误类型动态调整重试间隔（指数退避 vs 固定间隔） | ⏳ 待处理 |
+| P4 | **安全规则优先级分级** | CDN 操作按风险分级：高风险（DeleteCdnDomain）→ 立即中止，中风险（UpdateDomainConfig）→ 迭代，低风险（只读）→ 跳过 | ⏳ 待处理 |
+| P5 | **上下文感知 GCL** | 读取操作历史（reflexion memory）自动调整策略，新操作 vs 重复操作区别处理 | ⏳ 待处理 |
