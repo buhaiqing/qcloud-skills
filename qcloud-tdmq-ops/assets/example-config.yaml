@@ -1,0 +1,25 @@
+# Example TDMQ configuration
+cluster:
+  name: "prod-rocketmq"
+  region: "ap-guangzhou"
+  spec: "rocketmq-advanced"   # cluster spec
+
+namespace:
+  name: "ns-prod"
+
+topic:
+  name: "orders"
+  type: "normal"              # normal | partition | transaction | delay
+
+group:
+  name: "order-consumer"
+
+message:
+  body: "order-payload-placeholder"
+  retention_days: 3
+
+# Destructive op safety defaults
+safety:
+  require_confirmation: true
+  verify_empty_before_cluster_delete: true
+  warn_message_loss_on_topic_delete: true
