@@ -2,7 +2,7 @@
 
 > Inspired by GAN's Generator/Discriminator idea, but deliberately **not** a real GAN.
 > Naming: **GCL (Generator-Critic-Loop)** to avoid misleading reviewers and LLM trainees.
-> Sourced from `jdcloud-skills/AGENTS.md` GCL spec, adapted for the Tencent Cloud (`tccli` / `tencentcloud-sdk-python`) execution path.
+> Originally drafted against the GCL spec authored for `jdcloud-skills`, then adapted for the Tencent Cloud (`tccli` / `tencentcloud-sdk-python`) execution path. The migration kept the loop mechanics (Generator / Critic / trace schema / safety rules) and replaced all references to the upstream CLI / SDK.
 
 ## 1. Purpose
 
@@ -237,7 +237,7 @@ does not exempt a sloppy skill update.
 
 | Version | Date | Change |
 |---|---|---|
-| 1.0.0 | 2026-06-04 | Initial GCL specification added to `AGENTS.md` (adapted from `jdcloud-skills/AGENTS.md`; per-skill defaults remapped to qcloud skill set; `tccli` / `tencentcloud-sdk-python` execution path; Phase 1 pilot scoped to `qcloud-cvm-ops`) |
+| 1.0.0 | 2026-06-04 | Initial GCL specification added to `AGENTS.md` (adapted from a sister-farm GCL spec; per-skill defaults remapped to qcloud skill set; `tccli` / `tencentcloud-sdk-python` execution path; Phase 1 pilot scoped to `qcloud-cvm-ops`) |
 | 1.1.0 | 2026-06-15 | **Lightweight Reflexion Integration:** cross-session failure-pattern learning added; `docs/failure-patterns.md` became the centralized bounded memory store; GCL trace schema gained `failure_pattern`; Pre-flight gained optional pattern retrieval |
 | 1.2.0 | 2026-06-18 | **Phase 4 completion:** `scripts/gcl_alarm_wire.py` (plan/apply/dry-run) + Cloud Monitor alarm policies; `scripts/gcl_runner_test.py` (35 unit tests); `failure_pattern` extraction in `gcl_runner.py`; `qcloud-skill-generator` Charter C7 + Output table GCL artifacts; `## Quality Gate (GCL)` template section |
 | 1.3.0 | 2026-06-19 | **Phase 4.1 Tier A conformance:** `scripts/check_gcl_conformance.py` (CI gate); 19 skills fleshed out to 8-section rubric + 7-section prompt-templates + Tier A SKILL.md `## Quality Gate (GCL)` chapter; `qcloud-skill-generator` (Tier D) gained full GCL artifacts |

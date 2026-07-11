@@ -1,0 +1,49 @@
+{
+  "plan_id": "plan-with-ask-region",
+  "inspection_effective": "delivery",
+  "steps": [
+    {
+      "id": "ask-region-0",
+      "type": "ask_user",
+      "params": {},
+      "depends_on": [],
+      "parallel_group": 0,
+      "writes_to_blackboard": false,
+      "description": "客户「客户A」存在多个 Region，请选择巡检范围",
+      "ask_user_options": [
+        {"value": "ap-guangzhou", "label": "北京", "description": "命中 5 资源（vm, redis）"},
+        {"value": "cn-east-2", "label": "宿迁", "description": "命中 2 资源（rds）"}
+      ],
+      "ask_timeout_seconds": 30,
+      "ask_user_context_key": "region"
+    },
+    {
+      "id": "cruise-1",
+      "type": "cruise_run",
+      "skill": "qcloud-proactive-inspection",
+      "operation": "cruise",
+      "params": {"customer": "客户A", "region": "ap-guangzhou"},
+      "depends_on": ["ask-region-0"],
+      "parallel_group": 1,
+      "writes_to_blackboard": true,
+      "description": "Targeted cruise"
+    },
+    {
+      "id": "report-2",
+      "type": "synthesize_report",
+      "skill": "qcloud-copilot",
+      "operation": "synthesize-report",
+      "params": {"audience": "detailed"},
+      "depends_on": ["cruise-1"],
+      "parallel_group": 2,
+      "reads_from_blackboard": ["contributions.qcloud-proactive-inspection"],
+      "writes_to_blackboard": false,
+      "description": "Unified report"
+    }
+  ],
+  "dispatch_config": {
+    "max_parallel_groups": 1,
+    "stop_on_first_critical": true,
+    "human_review_on": ["verdict == CRITICAL"]
+  }
+}

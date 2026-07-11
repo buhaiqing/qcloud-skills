@@ -1,0 +1,32 @@
+[
+  {
+    "query": "帮我巡检一下示例客户的全部云资源",
+    "should_trigger": true,
+    "expected_skill": "qcloud-copilot"
+  },
+  {
+    "query": "示例客户 VPC 风险巡检和告警汇总报告",
+    "should_trigger": true,
+    "expected_skill": "qcloud-copilot"
+  },
+  {
+    "query": "那上海区域的呢",
+    "should_trigger": true,
+    "expected_skill": "qcloud-copilot"
+  },
+  {
+    "query": "列出所有 CVM 实例",
+    "should_trigger": false,
+    "expected_skill": "qcloud-cvm-ops"
+  },
+  {
+    "query": "帮我做一次主动巡检",
+    "should_trigger": false,
+    "expected_skill": "qcloud-proactive-inspection"
+  },
+  {
+    "query": "告警风暴根因分析",
+    "should_trigger": false,
+    "expected_skill": "qcloud-aiops-diagnosis"
+  }
+]
