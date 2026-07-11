@@ -105,7 +105,7 @@ def run_quality_score(root: Path, python: str = sys.executable) -> dict[str, Any
 
     try:
         report = json.loads(result.stdout)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, TypeError, ValueError):
         return {
             "quality_score": 0.0,
             "upgrade_signal": "critical",

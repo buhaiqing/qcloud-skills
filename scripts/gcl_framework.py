@@ -18,7 +18,7 @@ import yaml
 import json
 import fnmatch
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Tuple
 from datetime import datetime
 
 
@@ -123,7 +123,7 @@ class GCLFramework:
         # 执行配置的检查项
         for check_config in checks_config:
             check_name = check_config["name"]
-            required = check_config.get("required", True)
+            check_config.get("required", True)
             
             if check_name == "GCL 轨迹文件":
                 self._check_trace_files(result, check_config)
@@ -355,19 +355,19 @@ def main():
         result = framework.verify_execution(task_description, commit_hash)
         
         print(f"\n{'='*60}")
-        print(f"GCL 执行验证报告")
+        print("GCL 执行验证报告")
         print(f"{'='*60}")
         print(f"任务: {task_description}")
         print(f"时间: {result['timestamp']}")
         print(f"总体状态: {result['overall_status']}")
-        print(f"\n详细检查:")
+        print("\n详细检查:")
         
         for check in result["checks"]:
             status_icon = "✅" if check["status"] == "PASS" else "❌" if check["status"] == "FAIL" else "⚠️"
             print(f"  {status_icon} {check['name']}: {check['details']}")
         
         if result["issues"]:
-            print(f"\n发现的问题:")
+            print("\n发现的问题:")
             for issue in result["issues"]:
                 print(f"  - {issue}")
         

@@ -28,6 +28,7 @@ class BuildStepsTests(unittest.TestCase):
                 "Validate SKILL.md frontmatter",
                 "Validate Well-Architected worker JSON examples",
                 "Validate Markdown local links",
+                "Lint Python in Markdown",
                 "GCL runner smoke test",
                 "GCL trace aggregate",
                 "Script unit tests",
@@ -36,13 +37,13 @@ class BuildStepsTests(unittest.TestCase):
             ],
         )
         self.assertEqual(steps[0].argv, ("ruff", "check", "."))
-        self.assertEqual(steps[4].argv[-1], "--structural-critic-only")
+        self.assertEqual(steps[5].argv[-1], "--structural-critic-only")
         self.assertEqual(
-            steps[6].argv,
+            steps[7].argv,
             ("python3", "-m", "unittest", "discover", "-s", "scripts", "-p", "*_test.py", "-v"),
         )
         self.assertEqual(
-            steps[7].argv,
+            steps[8].argv,
             (
                 "python3",
                 "scripts/gcl_alarm_wire.py",
@@ -74,12 +75,13 @@ class MainTests(unittest.TestCase):
         self.assertEqual(run.call_count, 1)
 
     def test_runs_all_steps_when_successful(self) -> None:
-        completed = Mock(returncode=0)
+        # Empty skill report keeps quality_score at 100 with no critical signal.
+        completed = Mock(returncode=0, stdout='{"by_skill":{}}', stderr="")
         with tempfile.TemporaryDirectory() as tmp:
             with patch.object(validate_local.subprocess, "run", return_value=completed) as run:
                 with contextlib.redirect_stdout(io.StringIO()):
                     self.assertEqual(validate_local.main(["--root", tmp]), 0)
-        self.assertEqual(run.call_count, len(validate_local.build_steps()))
+        self.assertEqual(run.call_count, len(validate_local.build_steps()) + 1)
 
 
 if __name__ == "__main__":
