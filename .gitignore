@@ -229,7 +229,21 @@ __marimo__/
 
 # GCL / audit traces (runtime artifacts)
 audit-results/
+.runtime/
 .pi-subagents/*
+
+# Eval / profiler cache (deepeval, langfuse, etc.)
+.deepeval/
+.langfuse/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.qwen/
+
+# venv / tooling envs (project-local virtualenvs not committed)
+.venv/
+venv/
+.python-version
 
 # OS 系统文件（macOS Finder / Windows Explorer）
 .DS_Store
@@ -240,3 +254,6 @@ ehthumbs.db
 ehthumbs_vista.db
 Desktop.ini
 $RECYCLE.BIN/.pi-subagents/
+
+
+.codegraph/
