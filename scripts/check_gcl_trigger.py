@@ -7,7 +7,6 @@ GCL 触发检查脚本
 
 import sys
 import fnmatch
-from pathlib import Path
 
 
 def check_gcl_trigger(task_description: str, files_to_modify: list[str]) -> tuple[bool, str]:

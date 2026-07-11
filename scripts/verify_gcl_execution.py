@@ -10,7 +10,6 @@ GCL 执行验证脚本
 
 import sys
 import json
-import re
 from pathlib import Path
 from datetime import datetime
 
@@ -153,19 +152,19 @@ def main():
     
     # 输出结果
     print(f"\n{'='*60}")
-    print(f"GCL 执行验证报告")
+    print("GCL 执行验证报告")
     print(f"{'='*60}")
     print(f"任务: {task_description}")
     print(f"时间: {result['timestamp']}")
     print(f"总体状态: {result['overall_status']}")
-    print(f"\n详细检查:")
+    print("\n详细检查:")
     
     for check in result["checks"]:
         status_icon = "✅" if check["status"] == "PASS" else "❌" if check["status"] == "FAIL" else "⚠️"
         print(f"  {status_icon} {check['name']}: {check['details']}")
     
     if result["issues"]:
-        print(f"\n发现的问题:")
+        print("\n发现的问题:")
         for issue in result["issues"]:
             print(f"  - {issue}")
     

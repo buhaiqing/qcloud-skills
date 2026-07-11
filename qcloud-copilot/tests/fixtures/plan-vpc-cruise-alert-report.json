@@ -1,0 +1,61 @@
+{
+  "plan_id": "plan-fixture-001",
+  "steps": [
+    {
+      "id": "vpc-0",
+      "type": "skill_call",
+      "skill": "qcloud-vpc-ops",
+      "operation": "describe-vpcs",
+      "params": {"operation": "describe-vpcs", "region": "ap-guangzhou"},
+      "depends_on": [],
+      "parallel_group": 0,
+      "reads_from_blackboard": [],
+      "writes_to_blackboard": false,
+      "description": "List VPCs"
+    },
+    {
+      "id": "cruise-1",
+      "type": "cruise_run",
+      "skill": "qcloud-proactive-inspection",
+      "operation": "cruise",
+      "params": {"customer": "朔州天源", "region": "ap-guangzhou"},
+      "depends_on": ["vpc-0"],
+      "parallel_group": 1,
+      "reads_from_blackboard": [],
+      "writes_to_blackboard": true,
+      "description": "Targeted/full cruise"
+    },
+    {
+      "id": "alert-2",
+      "type": "alert_analyze",
+      "skill": "qcloud-monitor-ops",
+      "operation": "analyze",
+      "params": {"time_window": "最近24h", "severity_filter": "P0,P1"},
+      "depends_on": [],
+      "parallel_group": 1,
+      "reads_from_blackboard": [],
+      "writes_to_blackboard": true,
+      "description": "Alert intelligence"
+    },
+    {
+      "id": "report-3",
+      "type": "synthesize_report",
+      "skill": "qcloud-copilot",
+      "operation": "synthesize-report",
+      "params": {"audience": "detailed"},
+      "depends_on": ["cruise-1", "alert-2"],
+      "parallel_group": 2,
+      "reads_from_blackboard": [
+        "contributions.qcloud-proactive-inspection",
+        "contributions.qcloud-monitor-ops"
+      ],
+      "writes_to_blackboard": false,
+      "description": "Unified report from blackboard"
+    }
+  ],
+  "dispatch_config": {
+    "max_parallel_groups": 1,
+    "stop_on_first_critical": true,
+    "human_review_on": ["verdict == CRITICAL"]
+  }
+}

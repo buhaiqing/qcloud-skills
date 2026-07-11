@@ -13,7 +13,7 @@
 |---|---|
 | skill | `qcloud-cdn-ops` |
 | CLI | `tccli cdn help` |
-| max_iterations | 3 |
+| max_iterations | dynamic (per-operation risk-based) |
 
 
 Load rubric §4 before Execute; append gate results to trace `preflight`.
@@ -25,12 +25,107 @@ Load rubric §4 before Execute; append gate results to trace `preflight`.
 > **TE-6 backbone:** [Critic skeleton](../../qcloud-skill-generator/references/gcl-prompt-backbone.md#2-critic-prompt-template) — no `{{user.request}}`.
 > Score [`references/rubric.md`](rubric.md) §3 + §4 (CDN).
 
+### P2: Parallel Critic specialization
+
+P2 optimization: Two specialized Critics run in parallel for efficiency.
+
+| Critic | Focus dimensions | CDN-specific checks |
+|---|---|---|
+| **Data Quality Critic** | Correctness, Spec Compliance, Idempotency | API fidelity, JSON path accuracy, state transitions |
+| **Safety Rules Critic** | Safety (highest priority), Traceability | CDN safety rules 1–5, credential masking, anti-patterns |
+
+Both Critics score independently in parallel; Orchestrator aggregates scores.
+
+**P4 Priority Grading**: See [`rubric.md`](rubric.md) §2.3 for risk levels (CRITICAL/HIGH/MEDIUM/LOW/MINIMAL). Operations graded by risk determine GCL strictness.
+
+**P5 Context-Aware**: See [`rubric.md`](rubric.md) §2.4 for operation classification (first-time/repeat/failure-recovery) and context-adaptive thresholds.
+
+#### Data Quality Critic prompt
+
+```
+You are the Data Quality Critic for qcloud-cdn-ops GCL.
+
+Evaluate the Generator's output on these dimensions ONLY:
+- Correctness: Did the API call achieve the intended state?
+- Spec Compliance: Are parameters and API calls correct per tccli cdn help?
+- Idempotency: Can retries safely re-run without side effects?
+
+For CDN specifically:
+- Verify FlushId/PushTaskId returned for async operations
+- Verify DescribeDomainsConfig state reached terminal (online/offline/deleted)
+- Check UpdateDomainConfig field-set replacement model (not merge)
+- Verify PurgeUrlsCache/PushUrlsCache quota deducted once
+
+Return JSON:
+{
+  "critic_type": "data_quality",
+  "scores": {
+    "correctness": 0|0.5|1,
+    "spec_compliance": 0|0.5|1,
+    "idempotency": 0|0.5|1
+  },
+  "suggestions": ["≤ 2 concrete improvements"],
+  "blocking": true|false
+}
+```
+
+#### Safety Rules Critic prompt
+
+```
+You are the Safety Rules Critic for qcloud-cdn-ops GCL.
+
+Evaluate the Generator's output on these dimensions ONLY:
+- Safety: Are all CDN safety rules (1–5) satisfied?
+- Traceability: Is the trace complete with RequestId, FlushId, before/after state?
+
+CDN Safety Rules (score 0 on ANY violation):
+1. DeleteCdnDomain: Domain name + CNAME check + "CONFIRM DELETE DOMAIN <name>" required
+2. PurgeUrlsCache /*: Domain + URL pattern + cache hit ratio + "yes, purge ALL" required
+3. PurgePathCache: Domain + path + "yes, purge <path>" required
+4. UpdateDomainConfig: BEFORE/AFTER diff + per-field confirmation required
+5. PushUrlsCache: URL list + aggregate size + cost warning for > 1GB
+
+Also check:
+- TENCENTCLOUD_SECRET_KEY never in trace (only <masked>)
+- No DNS orphan after DeleteCdnDomain
+- No wildcard purge without hit ratio context
+- No HTTPS cert swap without overlap window
+
+Return JSON:
+{
+  "critic_type": "safety_rules",
+  "scores": {
+    "safety": 0|1,
+    "traceability": 0|0.5|1
+  },
+  "rule_violations": [{"rule": 1-5, "operation": "...", "rationale": "..."}],
+  "suggestions": ["≤ 2 concrete improvements"],
+  "blocking": true|false
+}
+```
+
 ---
 
 ## 3. Orchestrator prompt template
 
 > **TE-6 backbone:** [Orchestrator skeleton](../../qcloud-skill-generator/references/gcl-prompt-backbone.md#3-orchestrator-prompt-template).
-> `max_iterations`: **3**.
+> `max_iterations`: **dynamic** (per-operation risk-based strategy from SKILL.md §Quality Gate).
+> **Early stop**: confidence (all dims ≥ 0.9), safety (all rules satisfied), convergence (Δ < 0.1 × 2 rounds), single-op (max_iter=1 passing gates) — see SKILL.md §Early stop mechanisms.
+> **P2 Parallel Critics**: Data Quality Critic + Safety Rules Critic run in parallel; aggregate scores (safety score takes precedence).
+
+### Parallel Critic aggregation
+
+When both Critics return scores:
+
+1. **Safety precedence**: If either Critic reports `safety = 0` → **ABORT** immediately
+2. **Score aggregation**:
+   - Correctness: max(DataQuality.correctness, SafetyRules — fallback only)
+   - Safety: **SafetyRules Critic is authoritative** (never fallback)
+   - Idempotency: DataQuality.idempotency
+   - Traceability: SafetyRules.traceability
+   - Spec Compliance: DataQuality.spec_compliance
+3. **Suggestions merge**: ≤ 4 total (2 from each Critic)
+4. **blocking**: true if either Critic reports blocking = true
 
 ---
 
@@ -45,6 +140,38 @@ Load rubric §4 before Execute; append gate results to trace `preflight`.
 | Orchestrator | Safety=0 on §4 violation (destructive) → ABORT; advisory/read-only: rubric §2 |
 
 API flows: [SKILL.md](../SKILL.md) (Pre-flight → Execute → Verify → Recover).
+
+### P3: Adaptive backoff strategy
+
+P3 optimization: Dynamic retry interval adjustment based on error type.
+
+| Error Category | Examples | Backoff Strategy |
+|---|---|---|
+| **Transient** | `InternalError`, `RequestLimitExceeded`, `OperationDenied.DomainInDeploy` | **Exponential backoff**: 2s → 4s → 8s → 16s (max 60s) |
+| **Quota exhausted** | `LimitExceeded.PurgeUrlsRateLimit`, `LimitExceeded.CdnDomainQuota` | **Fixed interval**: Wait exact quota refill time (check via DescribePurgeQuota) |
+| **Config propagation** | `UpdateDomainConfig` async deploy | **Progressive polling**: 2s → 5s → 10s → 30s until Status = online |
+| **Permanent** | `InvalidParameter`, `ResourceNotFound`, `AuthFailure.*` | **No retry**: HALT and surface error immediately |
+
+CDN-specific backoff rules:
+- `PurgeUrlsCache`: Rate limit 100 URLs/min — backoff 600ms per URL over limit
+- `PushUrlsCache`: Daily quota 1000 — no retry on quota exceeded, wait for reset
+- `AddCdnDomain` / `UpdateDomainConfig`: Config deploy takes 30-120s — progressive polling
+- `DeleteCdnDomain`: DNS TTL propagation ~300s — warn user before retry
+
+Orchestrator retry decision:
+```
+IF error.category == "permanent":
+    ABORT with error
+ELIF error.category == "transient" AND retry_count < 3:
+    sleep(exponential_backoff(retry_count))
+    RETRY
+ELIF error.category == "quota":
+    sleep(quota_refill_time OR fixed_interval(30s))
+    RETRY
+ELIF error.category == "propagation":
+    poll DescribeDomainsConfig until Status == target OR timeout(120s)
+    RETRY
+```
 
 ---
 
@@ -119,6 +246,12 @@ API flows: [SKILL.md](../SKILL.md) (Pre-flight → Execute → Verify → Recove
 | 1.1.0 | 2026-06-19 | Tier A conformance: flesh out to 7 sections (Generator / Critic / Orchestrator / Per-operation / Anti-patterns / Changelog / See also). Generator Pre-flight now mandates `DescribeDomainsConfig` BEFORE / AFTER every mutation, `dig <domain> CNAME` BEFORE `DeleteCdnDomain`, `DescribeCdnData --Type hit` BEFORE `/*` purge, `DescribePurgeQuota` / `DescribePushQuota` BEFORE purge / push, `DescribeCertificates` cross-check for HTTPS cert swap, and `aggregate_size_gb` cost gate for `PushUrlsCache` > 1 GB. Critic §2 adds DNS orphan detection (`dns_orphan_check`), `UpdateDomainConfig` field-set replacement audit (`update_domain_config_audit`), and `PushUrlsCache` cost-gate audit (`push_cost_gate`). Orchestrator §3 elevates ABORT triggers for DNS orphan, wildcard purge without hit ratio, HTTPS cert without overlap window, and `PushUrlsCache` over-quota retry. Anti-patterns §5 adds 11 CDN-specific entries: `/*` purge without recurse-confirm, root-path purge as normal path, HTTPS cert swap without overlap window, origin swap without content parity, `PushUrlsCache` over-quota retry, `UpdatePayType` silent flip, `InvalidParameter.DomainExists` blind retry, `UpdateDomainConfig` retry without re-read, `PushUrlsCache` retry without quota re-check, trusting `Status=configuring` as terminal, skipping the propagation-window validation read. Per-operation variants §4 adds `AddCdnDomain` rule 0 (pre-flight hygiene), HTTPS cert overlap window note, `UpdatePayType` confirmation, batch `--DryRun`. Read-Only Assessment variant (§4) added for `qcloud-well-architected-review` delegation; FinOpsAnalysis variant (§4) added for CDN-side FinOps read-only flow |
 | 1.3.0 | 2026-06-19 | TE-6 §4: defer per-op gates to rubric §4 only |
 | 1.2.0 | 2026-06-19 | TE-6: G/C/O → gcl-prompt-backbone |
+| 1.9.0 | 2026-07-10 | P5 GCL optimization: context-aware GCL (first-time/repeat/failure-recovery); P5 reference in parallel Critics |
+| 1.8.0 | 2026-07-10 | P4 GCL optimization: safety rule priority grading (CRITICAL/HIGH/MEDIUM/LOW/MINIMAL); P4 reference in parallel Critics |
+| 1.7.0 | 2026-07-10 | P3 GCL optimization: adaptive backoff strategy (transient exponential, quota fixed, propagation polling); CDN-specific backoff rules |
+| 1.6.0 | 2026-07-10 | P2 GCL optimization: parallel Critic specialization (Data Quality Critic + Safety Rules Critic); score aggregation with safety precedence |
+| 1.5.0 | 2026-07-10 | P1 GCL optimization: early stop triggers in Orchestrator template (confidence, safety, convergence, single-op); enhanced decision flow |
+| 1.4.0 | 2026-07-10 | P0 GCL optimization: dynamic `max_iterations` per operation risk in Generator/Orchestrator templates; early stop mechanisms |
 
 ---
 

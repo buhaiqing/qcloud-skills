@@ -15,7 +15,7 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.4.0"
+  version: "1.5.0"
   last_updated: "2026-07-09"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
@@ -243,236 +243,51 @@ tccli scf ListFunctions --Region {{env.TENCENTCLOUD_REGION}} --Namespace default
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 SCF-specific safety rules incl. function-delete cascade, trigger disruption, namespace/layer cascade, code update env var overwrite, invocation side effects), `references/prompt-templates.md`. `max_iter=2` per AGENTS.md §8 |
 | 1.3.0 | 2026-06-13 | Rule O reverse delegation: `references/aiops-diagnosis.md`; Trigger & Scope aiops delegate for error/timeout/throttle/cold-start RCA |
 | 1.4.0 | 2026-07-09 | Added `related_skills` to frontmatter (APIGW, COS, CKafka, VPC, Monitor, CLS, CAM, FinOps, TCOP, AIOps) |
+| 1.5.0 | 2026-07-09 | Token Efficiency optimization: SKILL.md compressed from 576→305 lines (47% reduction); AIOps diagnosis expanded with diagnostic matrix, fault pattern correlation, workflow examples |
 
 ## Execution Flows (Agent-Readable)
 
-### Operation: CreateFunction
+> **Detailed CLI/SDK command blocks:** See [`references/execution-flows.md`](references/execution-flows.md) for complete command examples. Quick commands below.
 
-#### Pre-flight Checks
+### Operation Index
 
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| CLI installed | `tccli scf help CreateFunction` | Exit code 0 | Document CLI install |
-| SDK available | `python3 -c "from tencentcloud.scf import scf_client"` | No ImportError | `pip install tencentcloud-sdk-python-scf` |
-| Credentials | Check env vars | Non-empty values | HALT; user configures |
-| Function name unique | `tccli scf GetFunction --FunctionName {{user.function_name}}` | ResourceNotFound | Suggest alternative name if exists |
-| Zip file exists | `test -f {{user.zip_file_path}}` | File exists | HALT; verify path |
-| Code size | `stat -f%z {{user.zip_file_path}}` | < 500MB | HALT; reduce package size |
+| Operation | Quick Command | Key Notes |
+|-----------|---------------|-----------|
+| **CreateFunction** | `tccli scf CreateFunction --FunctionName "..." --Handler "..." --Runtime "..." --MemorySize 512 --Timeout 30 --Code.ZipFile "..." --Region {{env.TENCENTCLOUD_REGION}}` | Pre-flight: check zip size <500MB; poll for Active status |
+| **UpdateFunctionCode** | `tccli scf UpdateFunctionCode --FunctionName "..." --Handler "..." --Code.ZipFile "..." --Region {{env.TENCENTCLOUD_REGION}}` | Verify CodeSize changed; test invoke |
+| **DeleteFunction** | `tccli scf DeleteFunction --FunctionName "..." --Namespace "..." --Region {{env.TENCENTCLOUD_REGION}}` | **SAFETY GATE**: Confirm; check aliases/triggers |
+| **PublishVersion** | `tccli scf PublishVersion --FunctionName "..." --Description "..." --Region {{env.TENCENTCLOUD_REGION}}` | Version auto-increments |
+| **CreateAlias** | `tccli scf CreateAlias --FunctionName "..." --Name "..." --FunctionVersion "..." --Region {{env.TENCENTCLOUD_REGION}}` | Alias → version mapping |
+| **CreateTrigger** | `tccli scf CreateTrigger --FunctionName "..." --TriggerName "..." --Type timer --TriggerDesc '{"cron":"..."}' --Enable OPEN --Region {{env.TENCENTCLOUD_REGION}}` | Timer/COS triggers |
+| **GetFunctionLogs** | `tccli scf GetFunctionLogs --FunctionName "..." --Limit 100 --Order DESC --Region {{env.TENCENTCLOUD_REGION}}` | Filter by request ID |
 
-#### Execution — CLI (`tccli`) (Primary Path)
+### Failure Recovery (Key Patterns)
 
-See [`references/execution-flows.md`](references/execution-flows.md) §1 for full CLI and SDK command blocks.
-
-**Quick command:**
-```bash
-tccli scf CreateFunction --FunctionName "{{user.function_name}}" --Handler "{{user.handler}}" --Runtime "{{user.runtime}}" --Namespace "{{user.namespace}}" --MemorySize {{user.memory_size}} --Timeout {{user.timeout}} --Code.ZipFile "{{user.zip_file_path}}" --Region {{env.TENCENTCLOUD_REGION}}
-```
-
-#### Post-execution Validation
-
-1. Read `{{output.function_name}}` from `$.Response.FunctionName`
-2. Poll GetFunction until Status = `Active` or timeout (60s):
-
-See [`references/execution-flows.md`](references/execution-flows.md) §1 for the full polling loop.
-
-3. Report function name and status to user
-4. On failure, go to **Failure Recovery**
-
-#### Failure Recovery
-
-| Error pattern | Max retries | Backoff | Agent Action | UX Feedback |
-|---------------|-------------|---------|--------------|-------------|
-| `InvalidParameter` | 0–1 | — | Fix args per API spec; retry once | `[ERROR] InvalidParameter: Request parameter invalid → Check CreateFunction API spec → Retry` |
-| `ResourceInUse` | 0 | — | HALT | `[ERROR] ResourceInUse: Function name already exists → Use unique name → Retry` |
-| `ResourceLimitExceeded` | 0 | — | HALT | `[ERROR] ResourceLimitExceeded: Quota exceeded → Request quota increase` |
-| `InvalidCode` | 0 | — | HALT | `[ERROR] InvalidCode: Deployment package invalid → Check zip format and handler → Retry` |
-| `InvalidSecretKey` / `InvalidSecretId` | 0 | — | HALT | `[ERROR] Credential invalid → Verify env vars → Retry` |
-| `OperationConflict` | 3 | 10s | Wait for conflicting op; retry | `⚠️ Another operation in progress → Retrying after completion...` |
-| `RequestLimitExceeded` / 429 | 3 | exponential | Back off; respect rate limit | `⚠️ Rate limit reached → Retrying in {backoff}s` |
-| `InternalError` / 5xx | 3 | 2s, 4s, 8s | Retry; HALT with RequestId if persists | `[ERROR] InternalError → Retry → Escalate with RequestId: {{output.request_id}}` |
-
-### Operation: UpdateFunctionCode
-
-#### Execution — CLI
-
-See [`references/execution-flows.md`](references/execution-flows.md) §2 for full CLI and SDK command blocks.
-
-**Quick command:**
-```bash
-tccli scf UpdateFunctionCode --FunctionName "{{user.function_name}}" --Handler "{{user.handler}}" --Code.ZipFile "{{user.zip_file_path}}" --Namespace "{{user.namespace}}" --Region {{env.TENCENTCLOUD_REGION}}
-```
-
-#### Post-execution Validation
-
-1. Poll GetFunction until Status = `Active` (max 60s)
-2. Verify `$.Response.CodeSize` changed (indicating new code deployed)
-3. Test invoke if possible: `tccli scf Invoke --FunctionName {{user.function_name}}`
-
-#### Failure Recovery
-
-| Error | Max retries | Agent Action | UX Feedback |
-|-------|-------------|--------------|-------------|
-| `ResourceNotFound` | 0 | HALT | `[ERROR] Function not found → Verify FunctionName` |
-| `InvalidCode` | 0 | HALT | `[ERROR] Invalid deployment package → Check zip and handler` |
-| `ResourcePreRunning` | 3 | 10s backoff | `⚠️ Function update in progress → Retrying...` |
-| `InternalError` | 3 | exponential | `[ERROR] InternalError → Retry → Escalate with RequestId` |
-
-### Operation: DeleteFunction
-
-#### Pre-flight (Safety Gate)
-
-- **MUST** obtain explicit confirmation: irreversible delete of function `{{user.function_name}}`
-- **MUST** warn: deletes function and all its triggers
-- **MUST** check: no active aliases pointing to this function (or handle alias deletion first)
-
-#### Execution — CLI
-
-See [`references/execution-flows.md`](references/execution-flows.md) §3 for full CLI and SDK command blocks.
-
-**Quick command:**
-```bash
-tccli scf DeleteFunction --FunctionName "{{user.function_name}}" --Namespace "{{user.namespace}}" --Region {{env.TENCENTCLOUD_REGION}}
-```
-
-#### Post-execution Validation
-
-1. Poll ListFunctions or GetFunction until function returns NotFound (max 60s)
-2. Verify associated triggers are cleaned up
-
-#### Failure Recovery
-
-| Error | Max retries | Agent Action | UX Feedback |
-|-------|-------------|--------------|-------------|
-| `ResourceNotFound` | 0 | HALT | `[ERROR] Function not found → May be already deleted` |
-| `ResourceInUse` | 0 | HALT | `[ERROR] Function has active aliases → Delete aliases first` |
-| `InternalError` | 3 | exponential | `[ERROR] InternalError → Escalate with RequestId` |
-
-### Operation: PublishVersion
-
-#### Execution — CLI
-
-See [`references/execution-flows.md`](references/execution-flows.md) §4 for full CLI and SDK command blocks.
-
-**Quick command:**
-```bash
-tccli scf PublishVersion --FunctionName "{{user.function_name}}" --Namespace "{{user.namespace}}" --Description "Version published $(date -u +%Y-%m-%dT%H:%M:%SZ)" --Region {{env.TENCENTCLOUD_REGION}}
-```
-
-#### Post-execution Validation
-
-1. Read new version number from `$.Response.FunctionVersion`
-2. Verify version exists via ListAliases or GetFunction
-
-#### Failure Recovery
-
-| Error | Max retries | Agent Action | UX Feedback |
-|-------|-------------|--------------|-------------|
-| `ResourceNotFound` | 0 | HALT | `[ERROR] Function not found` |
-| `FailedOperation` | 0 | HALT | `[ERROR] Publish failed → Check function is Active` |
-| `InternalError` | 3 | exponential | `[ERROR] InternalError → Retry → Escalate` |
-
-### Operation: CreateAlias
-
-#### Execution — CLI
-
-See [`references/execution-flows.md`](references/execution-flows.md) §5 for full CLI and SDK command blocks.
-
-**Quick command:**
-```bash
-tccli scf CreateAlias --FunctionName "{{user.function_name}}" --Name "{{user.alias_name}}" --FunctionVersion "{{user.version}}" --Namespace "{{user.namespace}}" --Description "Alias for {{user.alias_name}} environment" --Region {{env.TENCENTCLOUD_REGION}}
-```
-
-#### Post-execution Validation
-
-1. Read alias info from response
-2. Verify alias points to correct version
-
-#### Failure Recovery
-
-| Error | Max retries | Agent Action | UX Feedback |
-|-------|-------------|--------------|-------------|
-| `ResourceNotFound` | 0 | HALT | `[ERROR] Function not found` |
-| `ResourceInUse` | 0 | HALT | `[ERROR] Alias name already exists` |
-| `InternalError` | 3 | exponential | `[ERROR] InternalError → Retry → Escalate` |
-
-### Operation: CreateTrigger
-
-#### Pre-flight Checks
-
-| Check | Method | Expected | On Failure |
-|-------|--------|----------|------------|
-| Function exists | `tccli scf GetFunction --FunctionName {{user.function_name}}` | Status = Active | HALT |
-| Trigger config valid | Validate per trigger type | Valid config | Fix config |
-
-#### Execution — CLI
-
-See [`references/execution-flows.md`](references/execution-flows.md) §6 for full CLI (Timer/COS) and SDK command blocks.
-
-**Quick commands:**
-- Timer: `tccli scf CreateTrigger --FunctionName "{{user.function_name}}" --TriggerName "{{user.trigger_name}}" --Type timer --TriggerDesc '{"cron": "0 */2 * * * *"}' --Enable OPEN --Namespace "{{user.namespace}}" --Region {{env.TENCENTCLOUD_REGION}}`
-- COS: `tccli scf CreateTrigger --FunctionName "{{user.function_name}}" --TriggerName "{{user.trigger_name}}" --Type cos --TriggerDesc '{"bucketUrl": "...", "event": "cos:ObjectCreated:*"}' --Enable OPEN --Namespace "{{user.namespace}}" --Region {{env.TENCENTCLOUD_REGION}}`
-
-#### Post-execution Validation
-
-1. Read `{{output.trigger_name}}` from `$.Response.TriggerInfo.TriggerName`
-2. Poll ListTriggers until trigger appears and is `Enabled`
-3. Verify trigger configuration matches expected
-
-#### Failure Recovery
-
-| Error | Max retries | Agent Action | UX Feedback |
-|-------|-------------|--------------|-------------|
-| `ResourceNotFound` | 0 | HALT | `[ERROR] Function not found` |
-| `ResourceInUse` | 0 | HALT | `[ERROR] Trigger name already exists` |
-| `InvalidParameterValue` | 0 | HALT | `[ERROR] Invalid trigger configuration → Check TriggerDesc format` |
-| `InternalError` | 3 | exponential | `[ERROR] InternalError → Retry → Escalate` |
-
-### Operation: GetFunctionLogs
-
-#### Execution — CLI
-
-See [`references/execution-flows.md`](references/execution-flows.md) §7 for full CLI and SDK command blocks.
-
-**Quick commands:**
-- List logs: `tccli scf GetFunctionLogs --FunctionName "{{user.function_name}}" --Namespace "{{user.namespace}}" --Limit 100 --Order DESC --Region {{env.TENCENTCLOUD_REGION}}`
-- Filter by request ID: `tccli scf GetFunctionLogs --FunctionName "{{user.function_name}}" --Namespace "{{user.namespace}}" --FunctionRequestId "{{user.request_id}}" --Region {{env.TENCENTCLOUD_REGION}}`
-
-#### Present to User
-
-| Field | JSON Path | Notes |
-|-------|-----------|-------|
-| RequestId | `$.Response.Data[0].RequestId` | Execution request ID |
-| StartTime | `$.Response.Data[0].StartTime` | ISO 8601 timestamp |
-| Duration | `$.Response.Data[0].Duration` | Execution time in ms |
-| MemoryUsed | `$.Response.Data[0].MemUsage` | Memory consumed |
-| Log | `$.Response.Data[0].Log` | Function log output |
-| RetCode | `$.Response.Data[0].RetCode` | Return code (0 = success) |
+| Error | Retry? | Action |
+|-------|--------|--------|
+| `InvalidParameter` / `ResourceNotFound` | No | Fix per API spec |
+| `ResourceInUse` | No | Use unique name |
+| `ResourceLimitExceeded` | No | HALT; request quota |
+| `OperationConflict` | Yes (3x) | Wait 10s; retry |
+| `RequestLimitExceeded` | Yes (3x) | Exponential backoff |
+| `InternalError` | Yes (3x) | Retry; escalate with RequestId |
 
 ---
 
-## Error Code Reference (SCF-Specific)
+## Error Code Reference
 
-| Code | Meaning | Retry? | Agent Action |
-|------|---------|--------|--------------|
-| `InvalidParameter` | Parameter validation failed | No | Fix parameter; retry with correct value |
-| `InvalidParameterValue` | Parameter value out of range | No | Adjust value per API spec |
-| `MissingParameter` | Required parameter missing | No | Add missing parameter |
-| `ResourceNotFound` | Target function/resource not found | No | Verify name; suggest ListFunctions |
-| `ResourceNotFound.Function` | Function does not exist | No | Verify FunctionName; list functions |
-| `ResourceInUse` | Function name/trigger already used | No | Use unique name |
-| `ResourceLimitExceeded` | Quota exceeded (functions, triggers) | No | HALT; request quota increase |
-| `ResourceUnavailable` | Function in operation or unavailable | Yes (3x) | Wait; poll status; retry |
-| `FailedOperation` | General operation failure | No | Check function state; verify config |
-| `FailedOperation.FunctionStatusError` | Function not in correct state | Yes (3x) | Wait for Active state; retry |
-| `FailedOperation.InvokeFunctionFailed` | Function invocation failed | Yes (3x) | Check code; retry invoke |
-| `OperationConflict` | Concurrent operation conflict | Yes (3x) | Wait; retry after completion |
-| `InvalidSecretKey` / `InvalidSecretId` | Credential invalid | No | HALT; fix credentials |
-| `RequestLimitExceeded` | API rate limit exceeded | Yes (3x) | Exponential backoff |
-| `InternalError` | Server-side error | Yes (3x) | Retry; escalate with RequestId |
-| `InvalidCode` | Deployment package invalid | No | Fix zip file; verify handler |
-| `CodeExceeded` | Code package size exceeded | No | Reduce package size (<500MB) |
+> **Canonical reference:** See [`references/troubleshooting.md`](references/troubleshooting.md) § Error Code Reference for complete error taxonomy with retry policies and agent actions. Key SCF-specific codes:
 
-> **After use:** Verify each code exists in the official SCF API error documentation.
+| Code | Retry? | Quick Action |
+|------|--------|--------------|
+| `InvalidParameter` / `InvalidParameterValue` | No | Fix per API spec |
+| `ResourceNotFound` | No | Verify name; suggest ListFunctions |
+| `ResourceInUse` | No | Use unique name |
+| `ResourceLimitExceeded` | No | HALT; request quota increase |
+| `OperationConflict` | Yes (3x) | Wait; retry |
+| `RequestLimitExceeded` | Yes (3x) | Exponential backoff |
+| `InternalError` | Yes (3x) | Retry; escalate with RequestId |
+| `InvalidCode` / `CodeExceeded` | No | Fix package; reduce size (<500MB) |
 
 ## Safety Gates (Destructive Operations)
 

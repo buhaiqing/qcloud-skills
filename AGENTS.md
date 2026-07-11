@@ -21,10 +21,10 @@ qcloud-skills/
 
 All schemas, handoff contracts, and skill-specific config live under the owning skill's `assets/` (or `references/` for Markdown-only contracts).
 
-## Skills inventory (33)
+## Skills inventory (34)
 
 - Product-scoped (29): `cvm`, `cdb`, `clb`, `cos`, `es`, `redis`, `monitor`, `tke`, `vpc`, `cam`, `cdn`, `cbs`, `cls`, `ckafka`, `scf`, `mongodb`, `postgres`, `ssl`, `agsx`, `finops`, `ccn`, `vpn`, `dc`, `cicd`, `service-mesh`, `migration`, `tcop`, `tdmq`, `apigw`
-- Cross-product (3): `qcloud-aiops-diagnosis`, `qcloud-proactive-inspection`, `qcloud-well-architected-review`
+- Cross-product (4): `qcloud-aiops-diagnosis`, `qcloud-proactive-inspection`, `qcloud-well-architected-review`, `qcloud-copilot`
 - Meta-skill (1): `qcloud-skill-generator` (scaffolds/updates other skills)
 
 Run `ls qcloud-*-ops/` for canonical list.
@@ -107,7 +107,14 @@ export TENCENTCLOUD_SECRET_KEY=your_secret_key
 export TENCENTCLOUD_REGION=ap-guangzhou
 ```
 
-Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` additionally needs `TENCENTCLOUD_FINOPS_CONFIG`.
+Requires `tccli` (pip-installable) and Python 3.8+. Copy `.env.example` to `.env` for local credentials.
+
+```bash
+cp .env.example .env
+# edit TENCENTCLOUD_SECRET_ID / TENCENTCLOUD_SECRET_KEY / TENCENTCLOUD_REGION
+```
+
+`qcloud-finops-ops` additionally needs `TENCENTCLOUD_FINOPS_CONFIG` (see `.env.example`).
 
 ## SKILL.md frontmatter — required fields
 

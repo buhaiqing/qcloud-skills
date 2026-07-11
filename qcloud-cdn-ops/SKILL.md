@@ -16,8 +16,8 @@ compatibility: >-
   Tencent Cloud CDN endpoints.
 metadata:
   author: qcloud
-  version: "1.2.0"
-  last_updated: "2026-07-08"
+  version: "1.8.0"
+  last_updated: "2026-07-10"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/228"
@@ -116,6 +116,12 @@ CDN (Content Delivery Network) is Tencent Cloud's content delivery service provi
 |---------|------|---------|
 | 1.0.0 | 2026-05-21 | Initial release — CDN domain management, cache purge, config update |
 | 1.1.0 | 2026-06-04 | Phase 1 GCL rollout: added `## Quality Gate (GCL)` chapter, `references/rubric.md` (5 dimensions + 5 CDN-specific safety rules incl. domain-deletion CNAME break, wildcard `/*` purge mass flush, origin config change, preload origin cost), `references/prompt-templates.md`. `max_iter=3` per AGENTS.md §8 |
+| 1.8.0 | 2026-07-10 | P5 GCL optimization: context-aware GCL (first-time/repeat/failure-recovery classification); reflexion memory integration; context-adaptive thresholds |
+| 1.7.0 | 2026-07-10 | P4 GCL optimization: safety rule priority grading (CRITICAL/HIGH/MEDIUM/LOW/MINIMAL); strictness adapts to operation risk level |
+| 1.6.0 | 2026-07-10 | P3 GCL optimization: adaptive backoff strategy (transient exponential, quota fixed, propagation polling); CDN-specific backoff rules for purge/push/config deploy |
+| 1.5.0 | 2026-07-10 | P2 GCL optimization: parallel Critic specialization (Data Quality Critic + Safety Rules Critic); score aggregation with safety precedence; enhanced Quality Gate table |
+| 1.4.0 | 2026-07-10 | P1 GCL optimization: early stop mechanisms (confidence early stop Δ ≥ 0.9, single-op early stop for max_iter=1 ops, irreversible abort for DeleteCdnDomain with score < 1.0); enhanced decision flow with 8 rules |
+| 1.3.0 | 2026-07-10 | P0 GCL optimization: dynamic `max_iterations` per operation risk (2 for destructive, 1 for cache mutations, 3 for sensitive config changes); early stop mechanisms (safety rule satisfaction, score convergence) |
 | 1.2.0 | 2026-06-13 | Rule P reverse delegation: `references/aiops-diagnosis.md`; Trigger & Scope aiops delegate for origin 5xx/cache/latency RCA |
 
 ## Safety Gates
@@ -142,10 +148,21 @@ self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-aft
 | Property | Value | Source |
 |---|---|---|
 | GCL applicability | **recommended** | [AGENTS.md §8](../AGENTS.md#8-per-skill-defaults-qcloud) |
-| `max_iterations` | **3** | per-skill override (AGENTS.md §8 default for `qcloud-cdn-ops`) |
+| `max_iterations` | **dynamic** | per-operation risk-based strategy (see below) |
 | Rubric instance | [`references/rubric.md`](references/rubric.md) | 5 dimensions, 5 CDN-specific safety rules |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + Critic + Orchestrator, isolated-context |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) | Generator + **2 parallel Critics** + Orchestrator, isolated-context |
+| **Parallel Critics** | **Data Quality Critic** + **Safety Rules Critic** | See [`prompt-templates.md`](references/prompt-templates.md) §2 P2 |
 | Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` | [AGENTS.md §6](../AGENTS.md#6-trace--audit-mandatory) |
+
+### Dynamic max_iterations strategy
+
+| Operation class | `max_iterations` | Rationale |
+|---|---|---|
+| Destructive: `DeleteCdnDomain` | **2** | Irreversible; stricter iteration with early abort on safety violations |
+| Cache mutation: `PurgeUrlsCache` / `PurgePathCache` with `/*` or `/` | **1** | Recoverable from origin; single iteration sufficient for safety gates |
+| Sensitive mutating: `UpdateDomainConfig` (origin / HTTPS cert swap), `StopCdnDomain` | **3** | Complex config propagation; needs iterative verification |
+| Mutating: `AddCdnDomain`, `PushUrlsCache`, `UpdatePayType`, `EnableCdnDomain` | **2** | Cost/config risk; moderate iteration |
+| Read-only: `DescribeDomainsConfig`, `DescribeCdnData`, `DescribePurgeQuota` | **1** | Pre-flight only; no hard abort |
 
 ### When the loop runs
 
@@ -157,12 +174,39 @@ self-review** in [AGENTS.md](../AGENTS.md#mandatory-rule-2-round-self-review-aft
 | Mutating: `AddCdnDomain`, `PushUrlsCache`, `UpdatePayType`, `EnableCdnDomain` | **yes** | Cost / config risk; needs scoring |
 | Read-only: `DescribeDomainsConfig`, `DescribeCdnData`, `DescribePurgeQuota` | optional (max_iter=1, no hard abort) | Pre-flight for parent mutations |
 
+### Early stop mechanisms
+
+P1 optimization: 提前终止不必要的迭代。
+
+| Trigger | Condition | Action | Rationale |
+|---|---|---|---|
+| **Safety early stop** | All CDN safety rules (rules 1–5) satisfied + other dimensions ≥ threshold | **PASS** | Safety is the primary concern; if all safety gates passed, no need to continue |
+| **Confidence early stop** | All dimensions ≥ 0.9 AND no rule violations | **PASS** | High confidence result; marginal improvements unlikely |
+| **Convergence early stop** | Δ < 0.1 for 2 consecutive rounds | **PASS** | Critic scores stabilized; further iteration yields diminishing returns |
+| **Single-op early stop** | `max_iter=1` ops (cache mutations, read-only) that pass safety gates | **PASS** after iter 1 | No benefit from iteration; safety gates sufficient |
+| **Irreversible abort** | `DeleteCdnDomain` with any safety concern (score < 1.0) | **ABORT** | Cannot undo; strictest iteration control |
+
 ### Decision flow (first match wins)
 
-1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (no partial result)
-2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
-3. **All thresholds met** ⇒ **PASS**
-4. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
+1. **Safety = 0** OR rule violation in `{1, 2, 3, 4, 5}` ⇒ **ABORT** (immediate stop, no partial result)
+2. **Confidence early stop**: All dimensions ≥ 0.9 AND no rule violations ⇒ **PASS** (high confidence)
+3. **Safety early stop**: All CDN safety rules satisfied + other dimensions meet thresholds ⇒ **PASS**
+4. **Single-op early stop**: `max_iter=1` ops (cache mutations, read-only) that pass safety gates ⇒ **PASS** after iter 1
+5. **Convergence early stop**: Δ < 0.1 for 2 consecutive rounds ⇒ **PASS** (convergence)
+6. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved rubric items
+7. **All dimension thresholds met** ⇒ **PASS**
+8. **Otherwise** ⇒ **RETRY** with Critic's suggestions injected into next Generator run
+
+### P3: Adaptive backoff on retry
+
+P3 optimization: Retry intervals adapt to error type (see [`prompt-templates.md`](references/prompt-templates.md) §4).
+
+| Error class | Strategy | CDN examples |
+|---|---|---|
+| Transient (`InternalError`, `RequestLimitExceeded`) | Exponential backoff: 2s → 4s → 8s → 16s (max 60s) | API overload, rate limiting |
+| Quota exhausted (`LimitExceeded.*`) | Fixed interval: check quota refill time via DescribePurgeQuota | Purge/push rate limits |
+| Config propagation (`UpdateDomainConfig`) | Progressive polling: 2s → 5s → 10s → 30s until Status = target | Async deploy |
+| Permanent (`InvalidParameter`, `ResourceNotFound`) | No retry — HALT immediately | User error, missing resource |
 
 ### CDN-specific safety rules (rubric §4)
 

@@ -1,7 +1,7 @@
 # CDN Quality-Gate Rubric (GCL)
 
 > Runtime scoring rubric for the **Generator-Critic-Loop (GCL)** of `qcloud-cdn-ops`.
-> Source-of-truth: [AGENTS.md §3 Rubric](../../AGENTS.md#3-rubric-mandatory-per-skill) and §8 Per-Skill Defaults (`qcloud-cdn-ops` → **recommended**, `max_iterations = 3`).
+> Source-of-truth: [AGENTS.md §3 Rubric](../../AGENTS.md#3-rubric-mandatory-per-skill) and §8 Per-Skill Defaults (`qcloud-cdn-ops` → **recommended**, dynamic `max_iterations` per operation risk).
 >
 > This rubric is the **runtime** counterpart to the **build-time** 2-round self-review
 > in [AGENTS.md](../../AGENTS.md#mandatory-rule-2-round-self-review-after-every-skill-update) and to the **Safety Gates** chapter
@@ -15,7 +15,8 @@
 > is recoverable, domain delete is not), (b) global edge surface (CDN serves from many
 > POPs, so configuration changes propagate asynchronously and DNS switching is the
 > hidden cost of `DeleteCdnDomain`), (c) `recommended` GCL posture (not `required`)
-> with `max_iter=3` per AGENTS.md §8, and (d) cost-side blind spot on
+> with dynamic `max_iterations` per operation risk (2 for destructive, 1 for cache mutations,
+> 3 for sensitive config changes), and (d) cost-side blind spot on
 > `PushUrlsCache` (prefetch bypasses CDN cache and bills the origin).
 
 ---
@@ -40,8 +41,13 @@ CDN-specific scope notes:
   cert swap (transient TLS handshake failures are not "recoverable in seconds"
   when the origin also has the cert wrong).
 - **`recommended`, not `required`.** Per AGENTS.md §8, `qcloud-cdn-ops` is
-  `recommended` GCL with `max_iter=3`. The rubric still requires
-  `Safety = 1` (because `DeleteCdnDomain` with active DNS is catastrophic and
+  `recommended` GCL with dynamic `max_iterations` per operation risk:
+  - `DeleteCdnDomain`: `max_iter=2` (irreversible, stricter iteration)
+  - `PurgeUrlsCache` / `PurgePathCache`: `max_iter=1` (recoverable from origin)
+  - `UpdateDomainConfig` (HTTPS/origin swap): `max_iter=3` (complex config propagation)
+  - Other mutations: `max_iter=2`
+  - Read-only: `max_iter=1`
+  The rubric still requires `Safety = 1` (because `DeleteCdnDomain` with active DNS is catastrophic and
   `UpdateDomainConfig` can silently break TLS for paying users), but the
   threshold for blocking retries is `correctness < 0.5` rather than
   `correctness < 1.0` for non-destructive ops.
@@ -67,6 +73,75 @@ irreversible operations listed in the per-operation table below.
 
 **Safety = 0 → ABORT immediately**, regardless of total score. See
 [AGENTS.md §5](../../AGENTS.md#5-termination-first-match-wins) → `SAFETY_FAIL`.
+
+### P2: Parallel Critic assignment
+
+Per SKILL.md §Quality Gate, two specialized Critics run in parallel:
+
+| Critic | Scopes | Authoritative for |
+|---|---|---|
+| **Data Quality Critic** | Correctness, Spec Compliance, Idempotency | Quality metrics |
+| **Safety Rules Critic** | Safety (primary), Traceability | Safety gate decisions |
+
+**Aggregation rule**: Safety score is **never** fallback — Safety Rules Critic is authoritative.
+If Safety = 0 from either Critic → immediate ABORT.
+
+### P3: Adaptive backoff strategy
+
+Per [`prompt-templates.md`](prompt-templates.md) §4 P3, retry intervals adapt to error type:
+
+| Error type | Strategy | CDN examples |
+|---|---|---|
+| Transient | Exponential backoff (2s→4s→8s→16s, max 60s) | `InternalError`, `RequestLimitExceeded` |
+| Quota exhausted | Fixed interval (quota refill time) | `LimitExceeded.PurgeUrlsRateLimit` |
+| Config propagation | Progressive polling (2s→5s→10s→30s) | `UpdateDomainConfig` deploy |
+| Permanent | No retry (HALT) | `InvalidParameter`, `ResourceNotFound` |
+
+### P4: Safety rule priority grading
+
+P4 optimization: CDN operations are graded by risk level; GCL strictness adapts accordingly.
+
+| Risk level | Operations | GCL strictness | Safety threshold |
+|---|---|---|---|
+| **CRITICAL** | `DeleteCdnDomain` | Strictest: Safety = 1.0 required, no fallback, immediate abort on any concern | Safety = 1.0 (mandatory) |
+| **HIGH** | `UpdateDomainConfig` (origin/HTTPS cert swap), `StopCdnDomain`, wildcard purge (`/*`, `/`) | High: iterative verification, propagation polling, overlap window check | Safety = 1.0 (mandatory) |
+| **MEDIUM** | `AddCdnDomain`, `PushUrlsCache`, `UpdatePayType`, `EnableCdnDomain` | Medium: standard iteration (max_iter=2), cost warning for large preloads | Safety ≥ 0.5 |
+| **LOW** | `PurgeUrlsCache` (specific URLs), `PurgePathCache` (non-root paths), `StartCdnDomain` | Low: reduced iteration, safety gates sufficient | Safety ≥ 0.5 |
+| **MINIMAL** | Read-only: `DescribeDomainsConfig`, `DescribeCdnData`, `DescribePurgeQuota` | Minimal: max_iter=1, optional GCL, no hard abort | N/A |
+
+**Priority override**: Any CRITICAL or HIGH operation with `correctness < 0.5` triggers immediate ABORT regardless of iteration count.
+
+### P5: Context-aware GCL
+
+P5 optimization: GCL adapts based on operation history from reflexion memory.
+
+**Operation classification**:
+| Type | Definition | GCL behavior |
+|---|---|---|
+| **First-time** | No prior execution in reflexion memory | Full iteration, conservative thresholds |
+| **Repeat** | Same op + same target (e.g., `PurgeUrlsCache` on `cdn.example.com`) within 7 days | Reduced iteration if prior execution passed all gates |
+| **Failure-recovery** | Same op + same error pattern (e.g., `InvalidParameter.DomainExists`) | Heightened scrutiny, check failure pattern |
+
+**Reflexion memory lookup**:
+```
+1. Check docs/failure-patterns.md for skill = "qcloud-cdn-ops" + command pattern
+2. If found and count > 3: apply anti-pattern warning to Generator
+3. If same operation succeeded in last 3 runs with score > 0.9: enable confidence early stop
+4. If same operation failed in last run: require explicit user re-confirmation
+```
+
+**Context-aware thresholds**:
+| Context | Correctness threshold | Safety threshold | max_iter adjustment |
+|---|---|---|---|
+| First-time op | ≥ 0.5 (standard) | = 1 (strict) | +1 if CRITICAL/HIGH |
+| Repeat op (prior success) | ≥ 0.5 (standard) | ≥ 0.5 (relaxed) | -1 (faster) |
+| Repeat op (prior failure) | ≥ 0.7 (elevated) | = 1 (strict) | +1 |
+| High-frequency pattern | Apply anti-pattern gate | — | — |
+
+**CDN-specific context rules**:
+- `DeleteCdnDomain` on same domain: Always require fresh CNAME check (never skip)
+- `UpdateDomainConfig` retry: Always re-read full config (never trust cache)
+- `PushUrlsCache` after quota error: Check `DescribePushQuota` before retry
 
 ---
 
@@ -201,13 +276,29 @@ in §2 — `DeleteCdnDomain` and `UpdateDomainConfig` HTTPS / origin swap. For c
 mutations (`PurgeUrlsCache` / `PurgePathCache` / `PushUrlsCache`) and `StopCdnDomain` /
 `StartCdnDomain`, `correctness = 0.5` is acceptable (state is recoverable from the
 origin / a re-`StartCdnDomain`), per the `recommended` GCL posture in AGENTS.md §8
-(`max_iter=3`, not 2).
+(dynamic `max_iterations` per operation risk).
 
 `rule_violations` is **CDN-specific** (rules 1–5 in §4) and is the audit trail the
 Operations team reads to track which safety rules fire most often. Rule 1
 (`DeleteCdnDomain`) violations are the highest-priority signal because the underlying
 DNS break is **invisible to Tencent Cloud API audit** — CDN only sees the API call, not
 the user-facing DNS resolution failure.
+
+### P1: Early stop criteria
+
+Per SKILL.md §Quality Gate, the following early stop triggers apply:
+
+| Trigger | Condition | Orchestrator Action |
+|---|---|---|
+| Safety early stop | All §4 rules satisfied + dimensions ≥ threshold | **PASS** immediately |
+| Confidence early stop | All dimensions ≥ 0.9 + no rule violations | **PASS** immediately |
+| Convergence early stop | Δ < 0.1 for 2 consecutive rounds | **PASS** immediately |
+| Single-op early stop | `max_iter=1` ops passing safety gates | **PASS** after iter 1 |
+| Irreversible abort | `DeleteCdnDomain` with score < 1.0 | **ABORT** immediately |
+
+The Critic's `blocking` flag signals whether iteration should continue. When all early stop
+conditions are false but `blocking` is also false, the Orchestrator may accept the result
+if all thresholds are met.
 
 ---
 
@@ -294,13 +385,19 @@ spiked.
 |---|---|---|
 | 1.0.0 | 2026-06-04 | Phase 1 CDN rollout: rubric (5 rules: domain-deletion CNAME break, wildcard `/*` purge mass flush, path purge broad impact, origin/SSL config change, preload origin cost) |
 | 1.1.0 | 2026-06-19 | Tier A flesh-out: added §1 Scope (CDN mutation operations + irrecoverability scoping + `recommended` GCL posture), §2 Five dimensions (5-dim backbone with CDN thresholds: correctness = 1.0 scoped to `DeleteCdnDomain` + HTTPS cert swap only; cache mutations / `StopCdnDomain` are recoverable), §3 Per-dimension checklist (5 sub-sections, ~35 rows, CDN-specific checks: `DescribeCdnData` hit ratio, `DescribeDomainsConfig` BEFORE/AFTER diff, `PurgeUrlsCache` quota, `PushUrlsCache` aggregate-size cost gate, `UpdatePayType` billing-mode confirmation, wildcard recurse-confirm), §5 Output schema with `rule_violations` CDN-specific extension and threshold scoping note, §6 Worked examples (PASS on `PurgeUrlsCache` specific URLs / SAFETY_FAIL on `DeleteCdnDomain` with active DNS / RETRY on `UpdateDomainConfig` HTTPS cert swap with transient TLS failures / RETRY on `PushUrlsCache` quota over-draw), §8 See also. Customised to CDN-specific safety surface: cache-as-state (origin is source of truth, purge is recoverable), global edge propagation async, `recommended` GCL posture with `max_iter=3`, DNS-CNAME-hidden break on `DeleteCdnDomain`, prefetch bypasses cache and bills origin |
+| 1.7.0 | 2026-07-10 | P5 GCL optimization: context-aware GCL (first-time vs repeat vs failure-recovery); reflexion memory lookup; context-adaptive thresholds |
+| 1.6.0 | 2026-07-10 | P4 GCL optimization: safety rule priority grading (CRITICAL/HIGH/MEDIUM/LOW/MINIMAL); immediate abort for correctness < 0.5 on high-risk ops |
+| 1.5.0 | 2026-07-10 | P3 GCL optimization: adaptive backoff strategy (transient exponential, quota fixed, propagation polling); added §2.2 P3 backoff strategy |
+| 1.4.0 | 2026-07-10 | P2 GCL optimization: parallel Critic specialization (Data Quality Critic + Safety Rules Critic); score aggregation with safety precedence |
+| 1.3.0 | 2026-07-10 | P1 GCL optimization: early stop mechanisms (confidence early stop Δ ≥ 0.9, single-op early stop for max_iter=1 ops, irreversible abort for DeleteCdnDomain with score < 1.0); added §5.1 Early stop criteria table |
+| 1.2.0 | 2026-07-10 | P0 GCL optimization: dynamic `max_iterations` per operation risk (2 for destructive, 1 for cache mutations, 3 for sensitive config changes); early stop mechanisms (safety rule satisfaction, score convergence); updated §1 Scope, §2 CDN-specific notes, §5 Output schema threshold note, §8 See also |
 
 ## 8. See also
 
 - [AGENTS.md §3 Rubric](../../AGENTS.md#3-rubric-mandatory-per-skill) — generic rubric spec
 - [AGENTS.md §5 Termination](../../AGENTS.md#5-termination-first-match-wins) — `PASS` / `MAX_ITER` / `SAFETY_FAIL` semantics
 - [AGENTS.md §7 Prompt Templates](../../AGENTS.md#7-prompt-templates-mandatory-per-skill) — Generator / Critic / Orchestrator skeletons
-- [AGENTS.md §8 Per-Skill Defaults](../../AGENTS.md#8-per-skill-defaults-qcloud) — `qcloud-cdn-ops` is `recommended`, `max_iter=3`
+- [AGENTS.md §8 Per-Skill Defaults](../../AGENTS.md#8-per-skill-defaults-qcloud) — `qcloud-cdn-ops` is `recommended`, dynamic `max_iterations` per operation risk
 - [AGENTS.md §14 Reflexion Integration](../../AGENTS.md#14-reflexion-integration-lightweight-reflexion) — failure pattern memory for cross-session learning
 - [`prompt-templates.md`](prompt-templates.md) — G/C/O prompt skeletons (CDN-specific per-op variants)
 - [SKILL.md §Safety Gates](../SKILL.md#safety-gates-destructive-operations) — build-time sibling (DeleteCdnDomain / PurgeUrlsCache `/*` / PurgePathCache)

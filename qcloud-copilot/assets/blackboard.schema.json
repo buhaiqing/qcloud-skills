@@ -1,0 +1,289 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://qcloud-skills/schema/blackboard/v1.json",
+  "title": "qcloud-skills blackboard",
+  "description": "Cross-skill session context bus (Level 3). Blackboard schema_version 1.0/1.1/1.2; 1.2 adds pending_action.action=ask_user_response + 5 ask_user fields; inspection strategy additive 1.2 in evidence_chain.strategy.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "session_id",
+    "user_request",
+    "created_at",
+    "updated_at",
+    "status",
+    "shared_context"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0", "1.1", "1.2"]
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "plan_id": {
+      "type": ["string", "null"]
+    },
+    "user_request": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "completed", "failed", "awaiting_confirmation"]
+    },
+    "shared_context": {
+      "$ref": "#/definitions/shared_context"
+    },
+    "plan": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/definitions/plan" }
+      ]
+    }
+  },
+  "definitions": {
+    "shared_context": {
+      "type": "object",
+      "required": ["contributions", "pending_actions"],
+      "additionalProperties": false,
+      "properties": {
+        "contributions": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/contribution"
+          }
+        },
+        "pending_actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pending_action"
+          }
+        },
+        "evidence_chain": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/definitions/evidence_chain" }
+          ]
+        }
+      }
+    },
+    "evidence_chain": {
+      "type": "object",
+      "required": ["schema_version", "strategy", "plan", "process", "results"],
+      "additionalProperties": true,
+      "properties": {
+        "schema_version": { "type": "string" },
+        "built_at": { "type": "string" },
+        "strategy": { "$ref": "#/definitions/inspection_strategy" },
+        "plan": { "type": "object" },
+        "process": { "type": "array" },
+        "results": { "type": "object" }
+      }
+    },
+    "inspection_strategy": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "strategy_schema": {
+          "type": "string",
+          "enum": ["1.0", "1.1", "1.2"]
+        },
+        "mode": { "type": "string" },
+        "execution_path": { "type": "string" },
+        "decision_maker": {
+          "type": "string",
+          "enum": ["topology_reasoner_v1", "agent_session_v1", "llm_reasoner_v1"]
+        },
+        "llm_native_target": { "type": "boolean" },
+        "llm_native_note": { "type": "string" },
+        "customer": { "type": "string" },
+        "region": { "type": "string" },
+        "user_request": { "type": "string" },
+        "topology_summary": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "resources_analyzed": { "type": "integer", "minimum": 0 },
+        "agent_rationale": { "type": "string", "maxLength": 2000 },
+        "selected_analyzers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "skipped_analyzers": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/skipped_analyzer" }
+        },
+        "analysis_depth": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["deep", "normal", "quick", "skip"]
+          }
+        },
+        "early_stop": { "type": "boolean" },
+        "priority_chain": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/priority_chain_item" }
+        }
+      }
+    },
+    "skipped_analyzer": {
+      "type": "object",
+      "required": ["service", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "service": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "priority_chain_item": {
+      "type": "object",
+      "required": ["layer", "resource_count", "analysis_depth", "rationale"],
+      "additionalProperties": true,
+      "properties": {
+        "layer": { "type": "string" },
+        "resource_count": { "type": "integer", "minimum": 0 },
+        "analysis_depth": {
+          "type": "string",
+          "enum": ["deep", "normal", "quick", "skip"]
+        },
+        "rationale": { "type": "string" },
+        "sample_resource_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "contribution": {
+      "type": "object",
+      "required": ["version", "verdict", "findings", "topology_hints", "metadata"],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "verdict": {
+          "type": "string",
+          "enum": ["PASS", "WARNING", "CRITICAL"]
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/finding"
+          }
+        },
+        "topology_hints": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "metadata": {
+          "type": "object"
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "required": ["id", "severity", "summary"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["P0", "P1", "P2", "P3", "INFO"]
+        },
+        "summary": {
+          "type": "string"
+        },
+        "resource_id": {
+          "type": "string"
+        },
+        "service_code": {
+          "type": "string"
+        },
+        "metric_name": {
+          "type": "string"
+        }
+      }
+    },
+    "pending_action": {
+      "type": "object",
+      "required": ["action", "skill", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["invoke_skill", "ask_user_response"]
+        },
+        "skill": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "question_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selected_option": {
+          "type": "string"
+        },
+        "selected_label": {
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "responded_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "plan": {
+      "type": "object",
+      "required": ["plan_id", "steps", "current_step", "step_results"],
+      "additionalProperties": false,
+      "properties": {
+        "plan_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "steps": {
+          "type": "array"
+        },
+        "current_step": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "step_results": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

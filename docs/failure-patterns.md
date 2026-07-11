@@ -82,6 +82,8 @@
 | `qcloud-clb-ops` | `RegisterTargets` | Backend health check fails | Target ECS security group blocks CLB | Verify SG rules before add |
 | `qcloud-cos-ops` | `PutObject` | Bucket does not exist | Bucket deleted or wrong region | Verify bucket exists and region matches |
 | `qcloud-tke-ops` | `CreateCluster` | Insufficient VPC subnet IPs | Subnet CIDR too small | Plan CIDR before cluster creation |
+| `qcloud-cdn-ops` | `DeleteCdnDomain` | Fixed max_iter=3 too conservative for destructive ops | Irreversible operations need stricter iteration control | Implement dynamic max_iterations per operation risk: destructive=2, cache mutation=1, sensitive config=3 |
+| `qcloud-proactive-inspection` | analyzer `_add_finding(..., name)` | Findings emitted with empty `resource` / `resource_id`; reports cannot locate the offending instance | Position args shifted: `name` landed in `action` slot, `resource` defaulted to `""` | Always call `_add_finding(..., resource=..., action=...)` as kwargs; never pass positionally after action |
 
 ---
 
