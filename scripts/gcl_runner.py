@@ -187,6 +187,47 @@ def validate_critic_payload(critic: dict[str, Any]) -> list[str]:
     return errs
 
 
+def derive_rule_hits(
+    critic: dict[str, Any], generator: dict[str, Any], structural: bool
+) -> dict[str, list[str]]:
+    """Explain each rubric dimension score via structured rule names (fixes L6/S-B).
+
+    Returns ``{dim: [rule_hit, ...]}`` so a trace answers "safety=0 because
+    which rule". Hits are structured rule identifiers, not free-text suggestions.
+
+    - Structural mode: derived purely from score signals (credential leak,
+      non-zero exit code, sub-threshold markers).
+    - External-critic mode: map dimension-prefixed ``suggestions`` (e.g.
+      ``"safety: ..."``) into their dim; sub-threshold dims without a hit get
+      ``below_rubric_threshold``. Unprefixed free-text suggestions stay out of
+      this field (they already live in ``critic.suggestions``).
+    """
+    scores = critic.get("scores", {})
+    dims = list(RUBRIC_THRESHOLDS.keys())
+    hits: dict[str, list[str]] = {dim: [] for dim in dims}
+
+    leak = has_credential_leak(generator.get("result_excerpt", "")) or has_credential_leak(
+        generator.get("command", "")
+    )
+    if scores.get("safety", 1.0) == 0.0:
+        hits["safety"].append("credential_leak_detected" if leak else "critic_safety_zero")
+    if scores.get("correctness", 1.0) == 0.0:
+        hits["correctness"].append("generator_exit_code_nonzero")
+
+    if not structural:
+        for s in critic.get("suggestions", []):
+            lowered = s.lower()
+            for dim in dims:
+                if lowered.startswith(dim) or f"{dim}:" in lowered:
+                    hits[dim].append(s)
+                    break
+
+    for dim in dims:
+        if scores.get(dim, 1.0) < RUBRIC_THRESHOLDS.get(dim, 1.0) and not hits[dim]:
+            hits[dim].append("below_rubric_threshold")
+    return hits
+
+
 def decide(scores: dict[str, float]) -> str:
     if scores.get("safety", 1) == 0:
         return "SAFETY_FAIL"
@@ -339,6 +380,9 @@ def cmd_run(args: argparse.Namespace) -> int:
                     "scores": critic["scores"],
                     "suggestions": critic.get("suggestions", []),
                     "blocking": critic.get("blocking", False),
+                    "rubric_rule_hits": derive_rule_hits(
+                        critic, generator, args.structural_critic_only
+                    ),
                 },
                 "decision": decision,
             }
