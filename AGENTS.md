@@ -44,6 +44,15 @@ Run `ls qcloud-*-ops/` for canonical list.
   - Default: One commit per logical unit.
   - **Hard stops (MUST pause)**: Credentials/secrets in diff, irreversible destructive ops without confirmation, bypassed safety gates, wrong remote/branch/protected branch, sensitive info in commit, mass destructive changes.
 - **Python lint gate**: After `*.py` changes, run `ruff check <changed-files>`. After Python SDK code blocks in Markdown, run `python3 scripts/check_markdown_python.py --root .`.
+- **Spec-Plan-Code Alignment Gate (硬性约束)**: 每次任务开发必须经过三阶段闭环：
+  1. **SPEC**：在 `docs/superpowers/specs/` 下编写设计文档（背景、架构、Schema、算法、文件清单）
+  2. **PLAN**：在同一文档中编写 Phase 清单（每个 Phase 含具体步骤，checkbox 格式）
+  3. **Code vs Spec+Plan 核对**：代码完成后逐条对照 SPEC/PHAN，每条注明 ✅/⚠️/❌；发现不一致必须修复再继续
+  - **适用场景**：新增功能模块（`scripts/*.py`）、新数据结构、新算法、新子系统
+  - **不适用**：单文件 typo 修复、纯粹格式化调整（<5行无逻辑变更）
+  - **Spec 位置**：`docs/superpowers/specs/<short-name>-design.md`
+  - **自验证**：SPEC 中必须包含 self-check / self-verify 逻辑（如 `assert not errors`）
+  - **后续任务**：同一子系统的后续迭代应追加到已有 SPEC/PROD 文件，而非新建
 - **UX spec mandatory**: `qcloud-skill-generator/references/user-experience-spec.md`.
 - **Asset & schema placement (mandatory)**:
   | Location | Allowed contents |

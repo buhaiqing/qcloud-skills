@@ -222,7 +222,7 @@ class TestFormatForInjectionIntegration(unittest.TestCase):
         self.assertIn("qcloud-cvm-ops", result)
         self.assertIn("error=", result)
         self.assertIn("-> fix=", result)
-        self.assertIn("(count=5)", result)
+        self.assertIn("(count=5", result)  # P0-C: format includes last_seen
         self.assertIn("`MissingParameter`", result)
         self.assertIn("`Use JSON array format`", result)
 

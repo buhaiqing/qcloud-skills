@@ -123,7 +123,7 @@ Every GCL run MUST persist a JSON trace:
     "status": "PASS",
     "iter": 2,
     "output": "...",
-    "failure_pattern": null
+    "failure_pattern": null  // P0-C: {"severity": "critical"|"major"|"minor"}
   }
 }
 ```

@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any
 
 from reflexion_retrieve import load_failure_patterns, format_for_injection
+from success_pattern_mine import write_pending_with_lock
 
 # Per AGENTS.md §8 defaults (override via --max-iter)
 SKILL_MAX_ITER: dict[str, int] = {
@@ -209,6 +210,21 @@ _FAILURE_SIGNATURES: list[tuple[str, re.Pattern[str]]] = [
 ]
 
 
+def _derive_severity(scores: dict[str, float]) -> str:
+    """P0-C: Derive severity from critic scores.
+
+    critical: Safety=0 (credential leak, destructive without confirm)
+    major:   Correctness=0 or Idempotency=0
+    minor:   all other rubric failures
+    """
+    s = scores or {}
+    if s.get("safety", 1) == 0:
+        return "critical"
+    if s.get("correctness", 1) == 0 or s.get("idempotency", 1) == 0:
+        return "major"
+    return "minor"
+
+
 def extract_failure_pattern(
     skill: str,
     command: str,
@@ -227,6 +243,8 @@ def extract_failure_pattern(
         *(critic.get("suggestions") or []),
     ]
     corpus = "\n".join(corpus_parts)
+    scores = critic.get("scores") or {}
+    severity = _derive_severity(scores)
     for category, pattern in _FAILURE_SIGNATURES:
         match = pattern.search(corpus)
         if not match:
@@ -240,6 +258,7 @@ def extract_failure_pattern(
             "fix": fix[:200],
             "count": 1,
             "reusable": category in {"cli_parameter", "runtime"},
+            "severity": severity,  # P0-C
         }
     return None
 
@@ -333,6 +352,21 @@ def cmd_run(args: argparse.Namespace) -> int:
                 "output": generator.get("result_excerpt", ""),
             }
             path = persist_trace(root, trace)
+            # P0-A: write success pattern to pending log
+            try:
+                scores = critic.get("scores") or {}
+                op_match = re.search(r"tccli\s+\w+\s+(\w+)", command or "")
+                operation = op_match.group(1) if op_match else ""
+                write_pending_with_lock({
+                    "skill": args.skill,
+                    "operation": operation,
+                    "command": command or "",
+                    "iter": iteration,
+                    "scores": scores,
+                    "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+                })
+            except Exception:
+                pass  # non-blocking: success logging must not break the main return path
             print(f"PASS (iter {iteration}) — trace: {path}")
             return 0
 
