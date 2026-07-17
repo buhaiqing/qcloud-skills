@@ -235,6 +235,23 @@ If any YES, trigger GCL Multi sub-Agent architecture.
 5. Execute GCL loop (max_iter per skill defaults — see `docs/gcl-spec.md` §8): Generator code → Critics parallel review → Generator fix → Critics re-review
 6. Main Agent makes PASS/RETRY/ABORT decision, merges, deletes worktree
 
+### Hard Rule: Worktree Lifecycle (applies to ALL worktree tasks)
+
+Every feature developed in a git worktree MUST be merged back to `main` and the
+worktree cleaned up once the task is complete. This is mandatory for **every**
+worktree — not only GCL-triggered ones.
+
+1. **Merge back**: From the `main` checkout, `git merge --no-ff feature/<feature>` (or
+   fast-forward if linear) so the work lands on `main`.
+2. **Clean up**: `git worktree remove ../<repo>-<feature> --force` then
+   `git branch -d feature/<feature>` to delete the stale branch.
+3. **Verify**: `git worktree list` shows only the `main` checkout; no orphaned
+   worktree directories remain on disk.
+
+Do NOT leave feature branches or worktree directories around after the task is
+done. A completed worktree that is not merged+removed is considered an incomplete
+handoff.
+
 ### Exceptions
 
 - <5-line typo/comment fixes
