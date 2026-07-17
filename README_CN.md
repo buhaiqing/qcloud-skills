@@ -133,6 +133,7 @@ export TENCENTCLOUD_REGION=ap-guangzhou
 | `docs/reflexion-memory.md` | Reflexion 失败模式记忆规则 |
 | `docs/failure-patterns.md` | 可复用失败模式存储 |
 | `qcloud-skill-generator/SKILL.md` | 元技能工作流、生成规则与自检要求 |
+| `manual/trajectory-evaluation-metrics.md` | 轨迹评测指标体系 — 10 大维度 57 个指标（输出质量、收敛性、安全合规、自进化、异常检测、多智能体协作、可观测性、资源成本、鲁棒性、可解释性），含覆盖度地图与优先级路线图 |
 
 ## 许可证
 

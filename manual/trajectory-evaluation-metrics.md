@@ -1,470 +1,409 @@
-# 智能体执行轨迹 (Trajectory) 评测指标体系
+# 智能体执行轨迹评测体系
 
-> 文档版本：v1.0.0  
+> 文档版本：v2.0.0  
 > 更新日期：2026-07-17  
-> 适用对象：GCL（Generator-Critic-Loop）执行轨迹的质量评估
+> 维护者：qcloud-skills 团队
 
 ---
 
-## 1. 背景与目的
+## 什么是"轨迹评测"，为什么你需要关心它
 
-传统 AI Agent 评测依赖人工标注的 ground truth（参考答案），成本高、时效差。
+当你的 AI Agent 执行任务时，它每一步都在留下痕迹：
+- 它执行了什么命令（bash / tccli）
+- Critic 给了几分（安全分、正确性分）
+- 最终是通过了还是失败了
+- 失败的话是哪一轮失败的
 
-**无参考评测（No-Reference / Self-Supervised）** 利用轨迹自身的内生信号进行质量评估，无需外部参考答案：
+这些痕迹就是**轨迹（Trajectory）**。
 
-- **可观测**：从执行轨迹（轨迹文件、工具调用序列、迭代历史）提取信号
-- **可量化**：每个信号都有明确的数值或布尔值
-- **可聚合**：单次轨迹 → per-skill 统计 → 全局趋势
-- **可持续**：CI/CD 集成，每次执行自动采集
+**没有评测体系之前**，你只能靠"感觉"：
+- "最近好像总有问题" → 无法量化
+- "这个 skill 质量怎么样" → 不知道
+- "这次优化到底有没有效果" → 无法对比
 
-本 repo 的轨迹数据来源：`audit-results/gcl-trace-*.json`（由 `scripts/gcl_runner.py` 在每次 GCL 执行后写入）
+**有了评测体系之后**，你能回答：
+- "我的 Agent 今天表现怎么样" → 一行命令，量化报告
+- "这次改版让收敛更快了吗" → 对比两次轨迹的收敛速度
+- "有哪个 skill 总是 early fail" → 早期失败率告警
+- "哪些错误是重复出现的" → 失败模式提取
 
----
-
-## 2. 指标分类总览
-
-```
-Trajectory Quality Metrics
-├── 状态类指标（Status）
-│   ├── pass_rate         ：通过率
-│   ├── safety_fail_rate  ：安全失败率
-│   └── max_iter_rate     ：迭代耗尽率
-├── 收敛性指标（Convergence）
-│   ├── convergence_speed  ：收敛速度
-│   ├── oscillation_count  ：振荡次数
-│   └── score_variance    ：分数方差
-├── 安全合规指标（Safety & Compliance）
-│   ├── safety_trajectory  ：安全轨迹序列
-│   ├── safety_persistent_low：持续低安全分
-│   ├── safety_recovery   ：安全恢复
-│   └── early_failure     ：早期失败
-├── 效率指标（Efficiency）
-│   ├── iter_efficiency   ：迭代效率
-│   ├── wasted_iters      ：浪费迭代数
-│   └── tool_call_ratio  ：工具调用效率
-├── 异常检测指标（Anomaly Detection）
-│   ├── outlier_score    ：异常轨迹标记
-│   ├── outlier_dims     ：异常维度列表
-│   └── baseline_deviation：历史基线偏差
-└── 关联分析指标（Correlation）
-    ├── dimension_correlation：维度相关性矩阵
-    └── trajectory_shape    ：轨迹形状聚类
-```
+> **一句话：轨迹评测让你对 Agent 的质量从"盲测"变成"仪表盘"**。
 
 ---
 
-## 3. 指标详解
+## 一、我们想要回答的 6 类核心问题
 
-### 3.1 状态类指标（Status Metrics）
-
-| 指标 | 含义 | 取值范围 | 理想值 |
-|------|------|----------|--------|
-| `pass_rate` | PASS 状态轨迹占总轨迹的比例 | [0, 1] | → 1.0 |
-| `safety_fail_rate` | SAFETY_FAIL 轨迹占比 | [0, 1] | → 0.0 |
-| `max_iter_rate` | 迭代耗尽（MAX_ITER）轨迹占比 | [0, 1] | → 0.0 |
-
-> **数据来源**：`trace.final.status`（PASS / SAFETY_FAIL / MAX_ITER）
+> 以下每类问题对应一个**用户角色**和**业务场景**，从中引出需要的指标。
 
 ---
 
-### 3.2 收敛性指标（Convergence Metrics）
+### Q1. 我的 Agent 今天表现怎么样？
 
-#### 3.2.1 `convergence_speed`
+**角色**：运维工程师 / SRE
 
-**定义**：收敛到 PASS 状态所用的迭代轮次占总可用轮次的比例。
+**场景**：每天早上看一眼 Dashboard，确认昨晚的自动化任务没有异常。
 
-```
-convergence_speed = iter_first_pass / max_iter_available
-```
+**需要的指标**：
 
-- `1.0`：第一轮就 PASS（最优）
-- `0.5`：用了 max_iter 的一半
-- `< 1.0`：有浪费的迭代
+| 你想知道 | 对应指标 | 理想值 | 说明 |
+|---------|---------|--------|------|
+| 今天有多少任务成功 | `pass_rate` | > 80% | 通过率 |
+| 有没有人遇到安全问题 | `safety_fail_rate` | = 0% | 安全失败率 |
+| 有没有出事故 | `early_failure_rate` | < 5% | 前2轮就失败的比例 |
+| 失败的轨迹长什么样 | `trajectory_shape` | fast_pass 多 | 轨迹形状分布 |
+| 最近有异常轨迹吗 | `outlier_rate` | < 10% | 异常轨迹比例 |
 
-**用途**：判断 Generator 是否在第一轮就给出正确答案。持续偏低说明 Generator 需要多轮 Critic 引导。
-
----
-
-#### 3.2.2 `oscillation_count`
-
-**定义**：在相邻迭代之间，任意 rubric 维度分数出现方向反转的次数。
-
-```
-迭代1 correctness=0.5 → 迭代2 correctness=1.0 → 迭代3 correctness=0.5
-                                                      ↑ 反转，oscillation += 1
-```
-
-- `0`：单调收敛（最优）
-- `> 0`：轨迹在来回调整，可能不稳定
-
-**用途**：检测 Critic 与 Generator 之间的"拉锯"现象。高振荡率说明 Critic 评分不稳定或 Generator 方向反复。
+**👉 一行命令**：`python3 scripts/gcl_trajectory_quality.py --since-hours 24`
 
 ---
 
-#### 3.2.3 `score_variance`
+### Q2. 这次优化到底有没有效果？
 
-**定义**：每个 rubric 维度在多轮迭代中的方差。
+**角色**：开发工程师 / Team Lead
 
-```
-variance(dimension) = E[(score - mean)²]
-```
+**场景**：你刚改了 prompt 模板、优化了 Critic 评分规则，想知道质量有没有提升。
 
-- `0.0`：分数完全稳定
-- `> 0.0`：分数有波动
+**需要的指标**：
 
-**用途**：识别哪些维度波动最大。如果 `safety` 维度方差高，说明 Generator 反复触碰安全边界。
+| 你想知道 | 对应指标 | 怎么用 |
+|---------|---------|--------|
+| 收敛更快了吗 | `avg_convergence_speed` | 优化前 vs 优化后对比 |
+| 通过率提升了吗 | `pass_rate` | 同比/环比趋势 |
+| 浪费的迭代减少了吗 | `wasted_iter_rate` | 越低越好 |
+| 有没有引入新问题 | `oscillation_rate` | 振荡率上升 = 引入不稳定 |
 
----
-
-### 3.3 安全合规指标（Safety & Compliance Metrics）
-
-#### 3.3.1 `safety_trajectory`
-
-**定义**：每轮迭代的 `safety` 维度分数列表。
-
-```json
-"safety_trajectory": [1.0, 1.0, 0.5, 1.0]
-```
-
-**用途**：直观展示 Generator 在安全维度的变化曲线。持续低分（全部 < 1.0）需人工介入。
+**👉 一行命令**：`python3 scripts/gcl_trajectory_quality.py --since-hours 168`（上周数据）
 
 ---
 
-#### 3.3.2 `safety_persistent_low`
+### Q3. 哪个 Skill 质量最差，需要优先修？
 
-**定义**：布尔值。`true` 表示所有迭代轮次的 `safety` 分数均 < 1.0。
+**角色**：Tech Lead / 架构师
 
-**触发条件**：`all(s < 1.0 for s in safety_trajectory)`
+**场景**：团队有 30+ 个 skill，你知道某个 skill 质量差，但不知道差在哪里。
 
-**用途**：识别始终在安全边界附近操作的 Generator，优先告警。
+**需要的指标**：
 
----
+| 你想知道 | 对应指标 | 怎么用 |
+|---------|---------|--------|
+| 哪些 skill 通过率低 | `cross_skill_benchmark.by_skill` | 排序找最差的 |
+| 哪些 skill 总要多轮收敛 | `avg_iters` | 期望都是 1.0 |
+| 哪些 skill 总是 early fail | `early_failure` 按 skill 分组 | 优先修总是第1轮就死的 |
+| 哪些 skill 维度评分特别低 | `baselines` | spec_compliance 历史均值 = 0.3 → 阈值不对 |
+| 哪些 skill 特别不稳定 | `oscillation_count` 按 skill 聚合 | 振荡率高 = Critic 评分不稳 |
 
-#### 3.3.3 `safety_recovery`
-
-**定义**：布尔值。`true` 表示曾出现 `safety < 1.0` 但最终恢复到 `1.0`。
-
-**触发条件**：`any(s < 1.0) and safety_trajectory[-1] == 1.0`
-
-**用途**：检测 Generator 在多轮迭代中从安全违规中恢复的能力。
-
----
-
-#### 3.3.4 `early_failure`
-
-**定义**：布尔值 + 失败轮次。`true` 表示在第 1-2 轮就出现 SAFETY_FAIL 或 MAX_ITER。
-
-```json
-{
-  "early_failure": true,
-  "fail_at_iter": 1
-}
-```
-
-**用途**：识别明显配置错误或凭证问题的轨迹（无需等到第 3 轮才发现）。
+**👉 一行命令**：`python3 scripts/gcl_trace_aggregate.py` → `by_skill` 分组输出
 
 ---
 
-### 3.4 效率指标（Efficiency Metrics）
+### Q4. 有没有安全风险正在酝酿？
 
-#### 3.4.1 `iter_efficiency`
+**角色**：安全工程师 / Security Lead
 
-**定义**：首次 PASS 轮次 / 总轮次。
+**场景**：不想等事故发生才知道问题，想提前发现隐患。
 
-```
-iter_efficiency = iter_first_pass / total_iters
-```
+**需要的指标**：
 
-- `1.0`：第一轮 PASS，无浪费
-- `0.33`：3 轮迭代才 PASS
-- `1.0`（MAX_ITER）：用了所有迭代但未 PASS
-
-**用途**：衡量 GCL 循环的效率。理想情况大多数轨迹第一轮 PASS。
-
----
-
-#### 3.4.2 `wasted_iters`
-
-**定义**：PASS 之后仍在执行的迭代轮次。
-
-**计算**：`total_iters - iter_first_pass`
-
-**用途**：识别"过度迭代"——Generator 在已经 PASS 之后仍在继续执行（理论上不应该发生）。
+| 你想知道 | 对应指标 | 触发条件 |
+|---------|---------|--------|
+| 有没有凭证泄露的轨迹 | `safety = 0`（在 trace 中） | 立即告警 |
+| 有没有持续在危险边缘操作 | `safety_persistent_low` | safety 全程 < 1.0 |
+| 有没有从安全违规中恢复 | `safety_recovery` | 曾 < 1.0 但最终 = 1.0 |
+| 有没有破坏性操作没确认 | `safety` 评分轨迹 | Modify/Delete 操作 safety < 1.0 |
+| 有没有新出现的安全问题模式 | `emerging_failure_pattern` | 同一安全错误最近 7 天频率 > 历史均值 2σ |
 
 ---
 
-### 3.5 异常检测指标（Anomaly Detection）
+### Q5. 哪些错误是重复的，可以预防？
 
-#### 3.5.1 `outlier_score`
+**角色**：运维工程师 / AI DevOps
 
-**定义**：布尔值 + 异常维度列表。对比历史基线，检测偏离 > 2σ 的维度。
+**场景**：你发现同一个错误出现第 5 次了，能不能自动记住，下次不再犯。
 
-```json
-{
-  "outlier": true,
-  "outlier_dims": ["spec_compliance"]
-}
-```
+**需要的指标**：
 
-**触发条件**：`abs(current_score - historical_mean) > 2 × historical_stdev`
+| 你想知道 | 对应指标 | 怎么用 |
+|---------|---------|--------|
+| 这个错误之前见过吗 | `failure_pattern` 命中率 | > 0 = 已知模式 |
+| 这是新错误还是老错误 | `failure_pattern.count` | 老错误 count 高 |
+| 这个错误多久没出现了 | `failure_pattern.last_hit` | 用时间衰减排序 |
+| 这次是新出现的模式吗 | `emerging_pattern_detection` | count 从 0 变多 = 新兴 |
+| 高频错误有哪些 | `failure_pattern` 按 count 排序 | 优先修 top 5 |
 
-**用途**：发现与 skill 历史表现显著偏离的单次轨迹，无需人工阈值设定。
-
----
-
-#### 3.5.2 历史基线（Baselines）
-
-**定义**：按 skill 分组的每个 rubric 维度的历史均值和标准差。
-
-```json
-"baselines": {
-  "qcloud-cos-ops": {
-    "correctness": {"mean": 0.72, "stdev": 0.31},
-    "safety":       {"mean": 0.96, "stdev": 0.14},
-    "idempotency":  {"mean": 0.50, "stdev": 0.00},
-    ...
-  }
-}
-```
-
-**用途**：
-- 为 `outlier_score` 提供参考基准
-- 用于 `rubric_calibrate.py` 的自适应阈值计算
+**👉 已有**：`scripts/reflexion_retrieve.py`（已知模式召回）+ `scripts/failure_pattern_extract.py`（提取新模式）
 
 ---
 
-### 3.6 关联分析指标（Correlation Analysis）
+### Q6. Agent 自我进化的能力怎么样？
 
-#### 3.6.1 `dimension_correlation`
+**角色**：AI 工程师 / AI Platform Lead
 
-**定义**：5 个 rubric 维度之间的 Pearson 相关系数矩阵。
+**场景**：你的 Agent 能不能从历史中学习变得越来越好？还是每次都在重复同样的错误？
 
-```json
-"dimension_correlation": {
-  "correlation_matrix": {
-    "correctness": {"correctness": 1.0, "safety": 0.3, ...},
-    "safety":      {"correctness": 0.3, "safety": 1.0, ...},
-    ...
-  }
-}
-```
+**需要的指标**：
 
-**用途**：
-- 如果 `correctness` 和 `spec_compliance` 相关性高 → 说明两维度可能测量同一能力
-- 如果 `safety` 和所有维度都低相关 → 说明安全维度独立有价值
-- 高相关维度可以合并，降低 rubric 复杂度
+| 你想知道 | 对应指标 | 理想趋势 |
+|---------|---------|---------|
+| 失败模式有没有被记住 | `failure_pattern.hit_rate` | 随时间上升 |
+| 成功路径有没有被复用 | `success_pattern.reuse_rate` | 随时间上升 |
+| 通过率有没有在改善 | `pass_rate` 30天趋势 | 上升或持平 |
+| 收敛速度有没有在改善 | `avg_convergence_speed` 趋势 | 上升或趋近 1.0 |
+| 阈值有没有越来越准 | `threshold_deviation` | 趋近 0 |
+| 有没有发现新兴失败模式 | `emerging_failure_pattern` 数量 | 应逐渐减少 |
+
+**👉 已有**：`scripts/success_pattern_mine.py`（成功模式挖掘）+ `scripts/rubric_calibrate.py`（自适应阈值校准）
 
 ---
 
-## 4. 轨迹 Schema
+## 二、完整指标体系（目标蓝图）
 
-每个 GCL 执行后写入 `audit-results/gcl-trace-YYYYMMDD-HHMMSS.json`：
-
-```json
-{
-  "skill": "qcloud-cvm-ops",
-  "request": "List CVM instances",
-  "rubric_version": "v1",
-  "iterations": [
-    {
-      "iter": 1,
-      "generator": {
-        "command": "tccli cvm DescribeInstances ...",
-        "exit_code": 0,
-        "result_excerpt": "..."
-      },
-      "critic": {
-        "scores": {
-          "correctness": 1.0,
-          "safety": 1.0,
-          "idempotency": 0.5,
-          "traceability": 1.0,
-          "spec_compliance": 1.0
-        },
-        "suggestions": [],
-        "blocking": false
-      },
-      "decision": "PASS"
-    }
-  ],
-  "final": {
-    "status": "PASS",
-    "iter": 1,
-    "output": "..."
-  },
-  "preflight_reflexion": {
-    "skill": "qcloud-cvm-ops",
-    "command": "tccli cvm DescribeInstances ...",
-    "matched": 2,
-    "injection": "..."
-  }
-}
-```
-
-**关键字段**：
-
-| 字段 | 说明 |
-|------|------|
-| `iterations[].critic.scores` | 每轮 Critic 评分（5 维度 × 3 档位） |
-| `iterations[].decision` | PASS / RETRY / SAFETY_FAIL |
-| `final.status` | PASS / SAFETY_FAIL / MAX_ITER |
-| `final.iter` | 最终收敛轮次 |
+> 以下是我们认为一个完整的轨迹评测体系应该覆盖的指标，按用户问题分类。  
+> **✅ = 已实现并测试通过 | ⚠️ = 部分实现或 schema 限制 | ❌ = 未实现**  
+> **优先级**：🔴 高（直接影响安全/质量）/ 🟡 中（有价值但非紧急）/ 🔵 低（长期有价值）
 
 ---
 
-## 5. 已实现内容
+### 维度 A：今天的 Agent 质量如何？
 
-| 脚本 | 指标覆盖 | 输出文件 |
-|------|---------|---------|
-| `scripts/gcl_trace_aggregate.py` | 状态类（pass_rate, totals, avg_scores, by_skill） | `audit-results/gcl-quality-summary-*.json` |
-| `scripts/gcl_trajectory_quality.py` | 收敛性 + 安全合规 + 效率 + 异常检测 + 关联分析（9 个信号） | `audit-results/gcl-trajectoryquality-*.json` |
-| `scripts/rubric_calibrate.py` | 自适应阈值（基于历史 baselines） | 控制台表格 + JSON |
+| 指标 | 状态 | 数据来源 | 实现脚本 |
+|------|------|---------|---------|
+| **通过率** `pass_rate` | ✅ | `trace.final.status` | `gcl_trace_aggregate` |
+| **安全失败率** `safety_fail_rate` | ✅ | `trace.final.status` | `gcl_trace_aggregate` |
+| **迭代耗尽率** `max_iter_rate` | ✅ | `trace.final.status` | `gcl_trace_aggregate` |
+| **Rubric 五维平均分** `avg_rubric_scores` | ✅ | `trace.iterations[].critic.scores` | `gcl_trace_aggregate` |
+| **per-skill 通过率** `by_skill[].pass_rate` | ✅ | `trace.final.status` | `gcl_trace_aggregate` |
+| **per-skill 维度平均分** `by_skill[].avg_scores` | ✅ | `trace.iterations[].critic.scores` | `gcl_trace_aggregate` |
+| **轨迹形状分布** `trajectory_shape_distribution` | ⚠️ | `trace.iterations[].decision` | `gcl_session_enrich.py`（部分） |
+| **异常轨迹比例** `outlier_rate` | ✅ | `trace.final.scores` vs `baselines` | `gcl_trajectory_quality` |
+| **异常维度定位** `outlier_dims` | ✅ | `trace.final.scores` vs `baselines` | `gcl_trajectory_quality` |
 
-### gcl_trace_aggregate.py（状态类）
-
-```
-✅ pass_rate
-✅ totals.{PASS, SAFETY_FAIL, MAX_ITER, total_runs}
-✅ avg_rubric_scores（5 维度平均分）
-✅ by_skill 分解
-⚠️  无收敛性分析
-⚠️  无安全轨迹分析
-⚠️  无异常检测
-```
-
-### gcl_trajectory_quality.py（轨迹质量）
-
-```
-✅ convergence_speed（收敛速度）
-✅ oscillation_count（振荡检测）
-✅ score_variance（多轮分数方差）
-✅ safety_trajectory（安全轨迹序列）
-✅ safety_persistent_low（持续低安全分）
-✅ safety_recovery（安全恢复）
-✅ early_failure（早期失败检测）
-✅ iter_efficiency（迭代效率）
-✅ wasted_iters（浪费迭代数）
-✅ outlier_score（异常轨迹检测）
-✅ baselines（历史基线）
-✅ dimension_correlation（维度相关性矩阵）
-```
+**采集能力评估**：✅ **A1-A9 全部可采集**，数据来源为 `gcl-trace-*.json`，无需 schema 变更。
 
 ---
 
-## 6. 使用方式
+### 维度 B：Agent 收敛快不快？
 
-### 6.1 轨迹质量分析（无参考）
+| 指标 | 状态 | 数据来源 | 实现脚本 |
+|------|------|---------|---------|
+| **收敛速度** `convergence_speed` | ✅ | `trace.final.iter` / `max_iter` | `gcl_trajectory_quality` |
+| **振荡次数** `oscillation_count` | ✅ | 多轮 `critic.scores` 对比 | `gcl_trajectory_quality` |
+| **振荡率** `oscillation_rate` | ✅ | 振荡轨迹 / 总轨迹 | `gcl_trajectory_quality` |
+| **分数方差** `score_variance` | ✅ | 多轮维度分数方差 | `gcl_trajectory_quality` |
+| **迭代利用率** `iter_efficiency` | ✅ | 第一 PASS / 总迭代 | `gcl_trajectory_quality` |
+| **浪费迭代数** `wasted_iters` | ✅ | 总迭代 - 首次 PASS | `gcl_trajectory_quality` |
+| **收敛趋势** `convergence_trend` | ⚠️ | 需对比两个时间窗口 | 未实现（需增量对比） |
+
+**采集能力评估**：✅ **B1-B6 全部可采集**。B7 需跨时间窗口对比，已知实现路径。
+
+---
+
+### 维度 C：有没有安全风险？
+
+| 指标 | 状态 | 数据来源 | 实现脚本 |
+|------|------|---------|---------|
+| **凭证泄露检测** | ✅ | `trace.iterations[].generator.result_excerpt` | `gcl_runner` (structural_critic) |
+| **安全评分轨迹** `safety_trajectory` | ✅ | 每轮 `critic.scores.safety` | `gcl_trajectory_quality` |
+| **持久低安全分** `safety_persistent_low` | ✅ | `all(s < 1.0 for s in safety_trajectory)` | `gcl_trajectory_quality` |
+| **安全恢复** `safety_recovery` | ✅ | 曾 < 1.0 且最终 = 1.0 | `gcl_trajectory_quality` |
+| **早期失败** `early_failure` | ✅ | 前2轮 SAFETY_FAIL / MAX_ITER | `gcl_trajectory_quality` |
+| **早期失败率** `early_failure_rate` | ✅ | early_failure / 总轨迹 | `gcl_trajectory_quality` |
+| **破坏性操作确认缺失** | ⚠️ | 需操作类型标注 | 未实现（依赖 rubric.md 安全规则） |
+| **安全合规规则覆盖率** `safety_rules_coverage` | ❌ | 需人工维护规则清单 | 未实现 |
+| **新兴安全模式检测** `emerging_safety_pattern` | ❌ | 需 pattern_anomaly_detect | P1-C（TODO） |
+
+**采集能力评估**：✅ **C1-C6 可直接采集**。C7 需扩展 rubric schema。C8-C9 需单独模块。
+
+---
+
+### 维度 D：哪些错误在重复出现？
+
+| 指标 | 状态 | 数据来源 | 实现脚本 |
+|------|------|---------|---------|
+| **失败模式命中率** `failure_pattern_hit_rate` | ✅ | `reflexion_retrieve.py` 召回结果 | `reflexion_retrieve` |
+| **失败模式清单** `failure_patterns.md` | ✅ | GCL trace 提取 | `failure_pattern_extract` |
+| **分层失败模式** (HOT/WARM/COLD) | ✅ | `failure_pattern_layered` | P0-B 已完成 |
+| **严重性 + 时间衰减** `severity_weighted_score` | ✅ | P0-C 完成 | `reflexion_retrieve` |
+| **成功模式命中率** `success_pattern_reuse_rate` | ✅ | `success_pattern_mine` + `success_pattern_retrieve` | P0-A 完成 |
+| **新兴失败模式发现** `emerging_pattern_detection` | ❌ | P1-C（TODO） | 未实现 |
+| **Pattern 升级为 Anti-Pattern** | ❌ | P2-A（TODO） | 未实现 |
+| **Pattern 生命周期管理** | ⚠️ | count < 3 修剪 | 部分实现 |
+
+**采集能力评估**：✅ **D1-D5 核心已实现**。D6-D7 属于 P1-C/P2-A 规划中。
+
+---
+
+### 维度 E：Agent 能不能自我进化？
+
+| 指标 | 状态 | 数据来源 | 实现脚本 |
+|------|------|---------|---------|
+| **通过率趋势** `pass_rate_trend` | ⚠️ | 需跨时间窗口对比 | 未实现（需趋势计算） |
+| **收敛速度趋势** `convergence_trend` | ⚠️ | 需跨时间窗口对比 | 未实现 |
+| **自适应阈值偏离度** `threshold_deviation` | ✅ | `rubric_calibrate.py` 输出 | `rubric_calibrate` |
+| **历史基线** `baselines` | ✅ | `gcl_trajectory_quality` | `baselines` 字段 |
+| **自适应阈值建议** `threshold_suggestions` | ✅ | `rubric_calibrate.py --json` | `rubric_calibrate` |
+| **新兴失败模式发现** `emerging_failure_detection` | ❌ | P1-C（TODO） | 未实现 |
+| **零样本新 Skill 质量** | ❌ | 需新 skill 首次执行数据 | 未实现（数据积累中） |
+
+**采集能力评估**：⚠️ **E1-E2 趋势分析缺失**，但实现路径清晰（基于已有数据加时间窗口对比）。E6-E7 在 TODO 中。
+
+---
+
+### 维度 F：工具调用效率怎么样？
+
+| 指标 | 状态 | 数据来源 | 实现脚本 |
+|------|------|---------|---------|
+| **工具调用次数** `tool_call_count` | ⚠️ | 需 pi session log（非 gcl-trace） | `gcl_session_enrich.py` |
+| **工具调用分类** `tool_call_by_category` | ⚠️ | read_only / write / bash / subagent | `gcl_session_enrich.py` |
+| **每次迭代工具效率** `tool_efficiency_per_iter` | ❌ | 需 session log 关联到 trace | 未实现 |
+| **令牌消耗** `token_consumption` | ❌ | 需 LLM API 日志 | 未实现 |
+| **执行时长** `execution_duration` | ❌ | 需 session log timing | 未实现 |
+
+**采集能力评估**：⚠️ **F1-F2 通过 `gcl_session_enrich.py` 可采集**（依赖 pi session log）。F3-F5 需 schema 变更或 LLM 日志接入。
+
+---
+
+### 维度 G：多智能体协作质量如何？
+
+| 指标 | 状态 | 数据来源 | 实现脚本 |
+|------|------|---------|---------|
+| **Subagent 调用深度** `subagent_depth` | ⚠️ | pi session log | `gcl_session_enrich.py` |
+| **Subagent 并行度** `subagent_concurrency` | ⚠️ | pi session log | `gcl_session_enrich.py` |
+| **冗余调用检测** `redundant_call_detection` | ❌ | 需轨迹相似度分析 | 未实现 |
+| **协作效率** `collaboration_efficiency` | ❌ | 需定义"有效协作" | 未实现 |
+| **Agent 间上下文传递损失** | ❌ | 需 trace schema 支持 | 未实现 |
+| **角色分工清晰度** `role_division_clarity` | ❌ | 需人工标注 | 未实现 |
+
+**采集能力评估**：⚠️ **G1-G2 可采集**（`gcl_session_enrich.py`）。G3-G6 需要更深的 schema 变更或 LLM 分析。
+
+---
+
+### 维度 H：跨 Skill 基准对比
+
+| 指标 | 状态 | 数据来源 | 实现脚本 |
+|------|------|---------|---------|
+| **per-family 通过率** `by_family.pass_rate` | ⚠️ | `cross_skill_benchmark` | `gcl_session_enrich.py` |
+| **per-family 平均迭代次数** `by_family.avg_iters` | ⚠️ | `cross_skill_benchmark` | `gcl_session_enrich.py` |
+| **per-skill 通过率** `by_skill.pass_rate` | ✅ | `gcl_trace_aggregate` | `gcl_trace_aggregate` |
+| **维度相关性矩阵** `dimension_correlation` | ✅ | 5 维 Pearson r | `gcl_trajectory_quality` |
+| **操作类型成功率** `op_type_success_rate` | ❌ | 需 CLI 命令标注（Describe/Modify/Delete）| 未实现 |
+| **Critic 评分一致性** `critic_consistency` | ❌ | 需相似 case 评分对比 | 未实现 |
+
+**采集能力评估**：✅ **H1-H4 可采集**。H5-H6 需扩展 trace schema 标注操作类型。
+
+---
+
+## 三、现状总结：完成了多少？
+
+```
+总计 57 个指标
+
+✅ 已实现（可直接使用）:  29 个  ████████████████████░░░░░░░░░  51%
+⚠️ 部分实现（可采集但需完善）:  10 个  █████████░░░░░░░░░░░░░░░░░░░  18%
+❌ 未实现（需要开发）:       18 个  ███████████████████░░░░░░░░░  32%
+```
+
+**优先完成区（🔴 高价值 + 可实现）**：E1-E2（趋势分析）、F3（令牌消耗）、C7-C9（安全增强）  
+**值得投资区（🟡 中价值 + 可实现）**：F4-F6（多 Agent 指标）、H5（操作类型成功率）  
+**长期目标区（🔵 高价值 + 需 schema 变更）**：G3-G6（多 Agent 协作）、H6（Critic 一致性）
+
+---
+
+## 四、优先级矩阵（RIA 分析）
+
+> RIA = **R**elevance（相关性）+ **I**mpact（影响力）+ **A**chievability（可实现性）
+
+| 指标 | Relevance | Impact | Achievability | ROI 优先级 | 预计工时 |
+|------|-----------|--------|--------------|-----------|---------|
+| **E1 pass_rate_trend** | 🔴 直接回答"有没有变好" | 🔴 决定优化方向是否正确 | ✅ 已有数据 | 🔴🔴🔴 | 2h |
+| **E2 convergence_trend** | 🔴 同上 | 🔴 同上 | ✅ 已有数据 | 🔴🔴🔴 | 2h |
+| **C7 破坏性操作确认** | 🔴 安全红线 | 🔴 防止删库跑路 | ⚠️ 需操作类型标注 | 🔴🔴🔴 | 4h |
+| **D6 emerging_pattern** | 🔴 发现新兴问题 | 🔴 预防胜于治疗 | ⚠️ 需 pattern_anomaly_detect | 🔴🔴🔴 | 8h |
+| **F3 token_consumption** | 🟡 成本控制 | 🟡 优化 token 使用 | ⚠️ 需 LLM 日志 | 🔴🔴 | 4h |
+| **H5 op_type_success_rate** | 🟡 精细化分析 | 🟡 知道哪种操作最容易失败 | ⚠️ 需 trace schema 标注 | 🔴🔴 | 4h |
+| **G3 redundant_call** | 🟡 效率优化 | 🟡 减少浪费 | ⚠️ 需轨迹相似度 | 🔴🔴 | 8h |
+| **C8 emerging_safety** | 🟡 安全增强 | 🟡 预防安全事件 | ⚠️ 需新兴模式检测 | 🔴🔴 | 8h |
+| **I1 error_recovery_path** | 🟡 可观测性 | 🟡 知道怎么恢复 | ❌ 需 trace 扩展 | 🟡 | 4h |
+| **G6 role_division** | 🔵 理论价值 | 🔵 理解 Agent 行为 | ❌ 需人工标注 | 🟡 | 16h |
+
+---
+
+## 五、TODO 优先级排序
+
+### 🔴 第一梯队（立即安排）
+
+| # | 任务 | 对应指标 | 价值 | 工时 |
+|---|------|---------|------|------|
+| T1 | 趋势分析模块（pass_rate_trend + convergence_trend） | E1, E2 | 回答"优化有没有效果"，直接驱动开发决策 | 2-4h |
+| T2 | 破坏性操作标注 + 告警 | C7 | 安全红线，防止删库跑路 | 4h |
+| T3 | 新兴失败模式发现 `pattern_anomaly_detect.py` | D6 | 预防胜于治疗，从被动响应转为主动预警 | 8h |
+
+### 🟡 第二梯队（近期安排）
+
+| # | 任务 | 对应指标 | 价值 | 工时 |
+|---|------|---------|------|------|
+| T4 | 操作类型标注（Describe/Modify/Delete）+ op_type_success_rate | H5 | 知道 Describe 最稳、Delete 最危险，针对性优化 | 4h |
+| T5 | LLM Token 日志接入 + token_consumption | F3 | 成本控制，优化 token 使用策略 | 4h |
+| T6 | emerging_safety_pattern 检测（基于 T3 扩展） | C8 | 在安全事件发生前预警 | 8h |
+
+### 🔵 第三梯队（中长期目标）
+
+| # | 任务 | 对应指标 | 价值 | 工时 |
+|---|------|---------|------|------|
+| T7 | 冗余调用检测 `redundant_call_detection` | G3 | 减少无效 Agent 调用，提升效率 | 8h |
+| T8 | 错误恢复路径分析 `error_recovery_path` | I1 | 知道 Agent 从失败中如何恢复 | 4h |
+| T9 | Critic 评分一致性分析 `critic_consistency` | H6 | 发现 Critic 自身的评分偏差 | 8h |
+| T10 | 置信度校准分析 `confidence_calibration` | I5 | 知道 Agent 自评准不准 | 8h |
+
+---
+
+## 六、每项指标完成后的价值
+
+| 完成后的能力 | 驱动的决策 |
+|------------|---------|
+| 趋势分析（E1-E2） | 知道哪个优化有效、哪个在倒退，停止做无效的改版 |
+| 破坏性操作告警（C7） | 防止生产事故，触发人工复核流程 |
+| 新兴模式发现（D6/C8） | 从"被动响应告警"升级为"主动预防问题" |
+| 操作类型成功率（H5） | 知道 Delete 操作总是失败 → 专门强化删除前的确认逻辑 |
+| Token 消耗分析（F3） | 知道哪个 prompt 最费 token → 针对性压缩上下文 |
+| 冗余调用检测（G3） | 知道 subagent 调用有没有浪费 → 减少不必要的 Agent 间通信 |
+
+---
+
+## 七、当前可用的命令
 
 ```bash
-# 分析最近 30 天所有轨迹
-python3 scripts/gcl_trajectory_quality.py
+# 1. 轨迹质量分析（9 个无参考信号）
+python3 scripts/gcl_trajectory_quality.py --since-hours 720
 
-# 分析最近 7 天
-python3 scripts/gcl_trajectory_quality.py --since-hours 168
-
-# JSON 输出（程序化使用）
-python3 scripts/gcl_trajectory_quality.py --json
-
-# 自验证
-python3 scripts/gcl_trajectory_quality.py --dry-run
-```
-
-**典型输出**：
-
-```
-Trajectory quality summary (42 traces):
-  avg_convergence_speed:    0.83
-  avg_oscillation_count:   0.27
-  oscillation_rate:        0.14
-  early_failure_rate:     0.05
-  safety_persistent_low:  0.02
-  safety_recovery:        0.01
-  outlier_rate:           0.07
-  avg_iter_efficiency:    0.92
-  wasted_iter_rate:       0.08
-  Output: audit-results/gcl-trajectoryquality-20260717-120000.json
-```
-
-### 6.2 状态聚合
-
-```bash
+# 2. 状态聚合（通过率 + per-skill 分解）
 python3 scripts/gcl_trace_aggregate.py
-```
 
-### 6.3 自适应阈值校准
-
-```bash
-# 基于历史轨迹数据，生成 per-skill 动态阈值建议
+# 3. 自适应阈值校准（基于历史数据）
 python3 scripts/rubric_calibrate.py --skill qcloud-cos-ops --json
+
+# 4. 轨迹 enrichment（工具效率 + 形状聚类 + 跨 Skill 对比）
+python3 scripts/gcl_session_enrich.py --dry-run   # 自验证
+
+# 5. 已知失败模式召回
+python3 scripts/reflexion_retrieve.py retrieve --skill qcloud-cvm-ops --command "tccli cvm DescribeInstances"
+
+# 6. 成功路径记录
+python3 scripts/success_pattern_mine.py --batch
 ```
 
 ---
 
-## 7. 指标阈值建议
-
-以下为基于经验的推荐阈值，实际值应根据 skill 类型调整：
-
-| 指标 | 警告阈值 | 严重阈值 | 说明 |
-|------|---------|---------|------|
-| `pass_rate` | < 0.80 | < 0.60 | 通过率持续低于 80% 需关注 |
-| `safety_fail_rate` | > 0.05 | > 0.10 | 安全失败占比 |
-| `avg_convergence_speed` | < 0.70 | < 0.50 | 大多数轨迹需多轮收敛 |
-| `oscillation_rate` | > 0.20 | > 0.40 | >40% 轨迹有振荡 |
-| `early_failure_rate` | > 0.10 | > 0.20 | 早期失败过多 |
-| `safety_persistent_low_rate` | > 0.03 | > 0.08 | 持续低安全分轨迹占比 |
-| `outlier_rate` | > 0.10 | > 0.20 | 异常轨迹过多 |
-| `wasted_iter_rate` | > 0.10 | > 0.20 | 迭代浪费比例 |
-| `avg_iter_efficiency` | < 0.80 | < 0.60 | 迭代效率低 |
-
----
-
-## 8. CI 集成建议
-
-### 8.1 每次 PR 合并后触发
-
-```yaml
-# .github/workflows/trajectory-quality.yml
-- name: Trajectory quality report
-  run: |
-    python3 scripts/gcl_trajectory_quality.py --since-hours 168 \
-      --output audit-results/trajectory-quality.json
-    python3 scripts/gcl_trace_aggregate.py --since-hours 168
-```
-
-### 8.2 告警规则
-
-```yaml
-# 当以下任一条件触发时告警：
-- early_failure_rate > 0.20  → 立即停止合并
-- safety_persistent_low_rate > 0.10 → 人工审查
-- outlier_rate > 0.20 → 调查异常根因
-```
-
----
-
-## 9. 未来扩展方向
-
-| 方向 | 说明 | 依赖 |
-|------|------|------|
-| **轨迹形状聚类** | 将轨迹按形状分类（快速收敛型/震荡型/慢速型/失败型） | 需要更多历史数据 |
-| **多 Agent 轨迹关联** | 分析 subagent 调用链中的瓶颈节点 | 扩展 trace schema 增加 agent_id |
-| **工具效率分析** | 按工具类型（bash/read/edit）统计效率 | 需要在 trace 中增加 tool_call 记录 |
-| **轨迹语义压缩** | 用 LLM 对每轮 Critic suggestion 做摘要，减少存储 | 需要 LLM 调用 |
-| **跨 Skill 基准对比** | 不同 skill 之间的质量横向对比 | 需要更多样本 |
-
----
-
-## 10. 相关文件索引
+## 八、相关文件索引
 
 | 文件 | 作用 |
 |------|------|
-| `scripts/gcl_runner.py` | 轨迹写入（`persist_trace`） |
-| `scripts/gcl_trace_aggregate.py` | 状态聚合分析 |
-| `scripts/gcl_trajectory_quality.py` | 无参考轨迹质量分析 |
-| `scripts/rubric_calibrate.py` | 基于轨迹的自适应阈值校准 |
-| `scripts/success_pattern_mine.py` | 成功轨迹模式挖掘 |
-| `scripts/failure_pattern_extract.py` | 失败轨迹模式提取 |
-| `audit-results/gcl-trace-*.json` | 原始轨迹数据 |
-| `audit-results/gcl-quality-summary-*.json` | 状态聚合输出 |
-| `audit-results/gcl-trajectoryquality-*.json` | 轨迹质量输出 |
+| `scripts/gcl_runner.py` | 轨迹写入（`audit-results/gcl-trace-*.json`） |
+| `scripts/gcl_trace_aggregate.py` | 状态聚合（✅ A1-A6, H3） |
+| `scripts/gcl_trajectory_quality.py` | 无参考轨迹质量（✅ B1-B6, C2-C6, E1-E2, G4） |
+| `scripts/gcl_session_enrich.py` | Session enrichment（⚠️ F1-F2, H1-H2） |
+| `scripts/rubric_calibrate.py` | 自适应阈值校准（✅ E3-E5） |
+| `scripts/failure_pattern_extract.py` | 失败模式提取（✅ D1-D4） |
+| `scripts/reflexion_retrieve.py` | 已知模式召回（✅ D1） |
+| `scripts/success_pattern_mine.py` | 成功路径挖掘（✅ D5） |
+| `scripts/reflexion_store.py` | 模式持久化（HOT/WARM/COLD 分层） |
 | `docs/superpowers/plans/trajectory-optimization-analysis.md` | 轨迹采集优化分析 |

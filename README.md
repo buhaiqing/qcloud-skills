@@ -133,6 +133,7 @@ export TENCENTCLOUD_REGION=ap-guangzhou
 | `docs/reflexion-memory.md` | Reflexion failure-memory governance |
 | `docs/failure-patterns.md` | Reusable failure-pattern store |
 | `qcloud-skill-generator/SKILL.md` | Meta-skill workflow, generation rules, and self-review requirements |
+| `manual/trajectory-evaluation-metrics.md` | Trajectory evaluation metrics system — 57 indicators across 10 dimensions (output quality, convergence, safety, self-evolution, anomaly, collaboration, observability, cost, robustness, explainability) with coverage map and priority roadmap |
 
 ## License
 
