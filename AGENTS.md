@@ -297,3 +297,59 @@ Every task must produce at least one reusable asset:
 - Fixing pitfalls without recording to failure-patterns.md
 - Not building systematic safeguards for repeated issues
 - Only thinking "next time" without formal record
+
+## CodeGraph — code intelligence (MANDATORY)
+
+`.codegraph/` (SQLite KG + file watcher) pre-indexes every symbol, edge, and call
+path in THIS repo. `codegraph_explore` is the Read-equivalent: one capped call
+returns verbatim source PLUS caller/callee blast-radius and test-coverage flags —
+faster and more accurate than any grep+read loop or sub-agent code-mapping.
+
+**This repo already enforces the sync half of this discipline in
+`qcloud-copilot/SKILL.md` ("改 `.py` 后 `codegraph sync`") and in the two
+`agent-inspection-prompt.md` checklists. The query-first half was missing and is
+added here as a hard rule.**
+
+### Rule 1 — Query-first, never grep/read first (MANDATORY)
+
+Before ANY code-understanding work, call `codegraph_explore` with symbol/file
+names or a natural-language question. ONE call usually answers the whole question
+and returns source you can `Edit` from directly.
+
+- "how does X work" / architecture / a bug / "where is X" → `codegraph_explore`
+- Reading/editing a named symbol → put its name in the query; treat returned
+  source as already Read.
+- Need a flow across symbols → name the endpoints; it rides dynamic-dispatch
+  hops grep can't follow and returns the path.
+
+### Rule 2 — Sync after edits (MANDATORY)
+
+After editing `.py` / `.ts` / `.go` / `.rs` / etc., the index lags writes by
+~1s via the file watcher. Before the NEXT `codegraph_explore` that depends on the
+edit, confirm sync (the daemon auto-syncs on file change; if a query returns a
+staleness banner for a file you just wrote, `Read` that specific file).
+
+### Rule 3 — anti-pattern (from a real failure)
+
+Do NOT fire `explore` / `librarian` sub-agents or run grep+read loops to map
+code THIS repo already indexes. In one session, 5 delegated `explore` agents for
+code-mapping hung 16–22 min and returned nothing; the same `codegraph_explore`
+call answered in one round-trip WITH blast-radius + "⚠️ no tests" coverage flags.
+Delegated agents are for UNINDEXED targets (other repos, web, docs), never for
+re-deriving the local KG.
+
+### Rule 4 — scope guard
+
+- CodeGraph covers THIS repo only. For an unindexed project, run `codegraph init`
+  first (don't run it yourself unprompted — it's the user's decision).
+- It does NOT index configs/docs as code; use Read/Grep for those.
+- It is read-only intelligence. Correctness is still the compiler/tests' job —
+  trust the returned source, but verify with LSP/tests before claiming done.
+
+### What to extract from each result
+
+- **Source blocks**: safe to Edit from; do not re-Read.
+- **Blast radius** ("N callers", "⚠️ no tests found"): scope your change and
+  know what needs new tests BEFORE editing.
+- **Staleness banner**: only the listed files are pending re-index — Read those,
+  trust the rest.

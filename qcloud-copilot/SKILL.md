@@ -251,7 +251,10 @@ Related runtime artifacts (not the Copilot summary `.md`):
 | 策略 | 拓扑 + 意图 → JSON 1.2 | 未读 sniff 全量 analyzer |
 | 编排 | 触发 Copilot plan / ask | 直接变更资源 |
 | 证据 | 确保 Blackboard evidence_chain 四段齐全 | 仅自然语言无 JSON |
+| 定位 | 代码理解前先 `codegraph_explore`（查询优先） | 对本仓库已索引代码起 `explore` 子 agent / grep-read 循环做地图 |
 | 同步 | 改 `.py` 后 `codegraph sync` | 用过时索引定位代码 |
+
+> 查询优先 + 改后同步 的硬规则见根 `AGENTS.md §CodeGraph — code intelligence (MANDATORY)`。
 
 ## Quality Gate (GCL)
 

@@ -185,10 +185,10 @@ copilot dispatcher 在 L2 通过/拒绝时，写一条 `audit_trace` 的 `rule: 
 
 | 优化点 | 状态 | 合并 commit | 说明 |
 |--------|------|------------|------|
-| **P1** 统一 trace_id | ⬜ 未做 | — | 最高优先级，待后续 worktree |
+| **P1** 统一 trace_id | ✅ 已完成 | `3afada6` | `run_gcl` 透传 `session_id` 为 `--trace-id`；dispatcher `_emit_trace` 非 L2 步默认 `exec.step` provenance（`eval_id=<session_id>:<step_id>:exec.step`）；`record_health(trace_id=self._session_id)` 已正确；补 `test_p1_trace_id.py`（4 测试全过） |
 | **P2** audit_trace 补 provenance | ✅ 已随 P6 落地 | `06bf695` | `safety.l2_confirm` provenance 块已写入 |
-| **P3** critic 分数加 rule_hits | ⬜ 未做 | — | 待后续 |
-| **P4** 失败模式单一 sink | ⬜ 未做 | — | 待后续 |
+| **P3** critic 分数加 rule_hits | ✅ 已完成 | `7284685` | `gcl_runner.py:385` critic 块含 `rubric_rule_hits: derive_rule_hits(...)`；`derive_rule_hits`(L194) 实现 `safety=0 → credential_leak_detected/critic_safety_zero` |
+| **P4** 失败模式单一 sink | ✅ 已完成 | `bc77e0f` | `reflexion_store.py` 与 `quality/reflexion.py` 共用 `normalize_reflexion_key` 4-tuple；copilot 写 scratch→`aggregate_scratch` 合并到 `docs/failure-patterns.md`（同 GCL sink），双写已解 |
 | **P5** op_type 结构化落库 | ✅ 已完成 | `b4799fc` | `gcl_runner.run_command` 返回 dict 加 `op_type`（复用 `classify_op`，read/write/delete 三态）；`gcl_trajectory_quality.operation_type_analysis` 优先读落库字段、回退 `classify_op` 兼容老 trace；H5 `op_type_success_rate` 现消费 first-class 字段 |
 | **P6** L2 确认进 trace | ✅ 已完成 | `06bf695` | engine plan 级（check_l2 pass/fail 都写）+ dispatcher step 级（destructive `skill_call` step 写 `rule: safety.l2_confirm` provenance）；`run_plan`/`execute` 新增 `l2_confirmed` kwarg 透传；补 C7 安全盲点；新增 `test_p6_l2_trace.py`（5 测试全过） |
 
