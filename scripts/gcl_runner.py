@@ -263,11 +263,23 @@ def extract_failure_pattern(
     return None
 
 
-def persist_trace(root: Path, trace: dict[str, Any]) -> Path:
+def persist_trace(root: Path, trace: dict[str, Any], trace_id: str | None = None) -> Path:
+    """Persist a GCL trace.
+
+    `trace_id` is the cross-system join key: when provided it names the file
+    (gcl-trace-<trace_id>.json) so copilot session traces and GCL traces share
+    one identifier namespace (fixes data-lineage break L3). Falls back to a
+    UTC timestamp to stay backward-compatible with existing timestamp-based
+    queries and the structural smoke tests.
+    """
     out_dir = root / "audit-results"
     out_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    path = out_dir / f"gcl-trace-{ts}.json"
+    if trace_id:
+        trace = {**trace, "trace_id": trace_id}
+        path = out_dir / f"gcl-trace-{trace_id}.json"
+    else:
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        path = out_dir / f"gcl-trace-{ts}.json"
     path.write_text(json.dumps(trace, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return path
 
@@ -341,7 +353,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     args.skill, command, generator, critic
                 ),
             }
-            path = persist_trace(root, trace)
+            path = persist_trace(root, trace, trace_id=args.trace_id)
             print(f"SAFETY_FAIL — trace: {path}", file=sys.stderr)
             return 3
 
@@ -351,7 +363,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                 "iter": iteration,
                 "output": generator.get("result_excerpt", ""),
             }
-            path = persist_trace(root, trace)
+            path = persist_trace(root, trace, trace_id=args.trace_id)
             # P0-A: write success pattern to pending log
             try:
                 scores = critic.get("scores") or {}
@@ -411,6 +423,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--structural-critic-only",
         action="store_true",
         help="Use rule-based structural critic (CI/dry-run; not for production mutations)",
+    )
+    run.add_argument(
+        "--trace-id",
+        default=None,
+        help="Cross-system join key (e.g. copilot session_id). Names the trace file "
+        "gcl-trace-<trace_id>.json so copilot and GCL traces share one identifier namespace.",
     )
     run.set_defaults(func=cmd_run)
     return p
