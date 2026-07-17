@@ -53,7 +53,7 @@ class TestRecencyDecay(unittest.TestCase):
 class TestComputeComposite(unittest.TestCase):
 
     def test_iter1_skill_match_max_score(self):
-        """iter=1 + skill match = 3.0 * 3.0 * 1.0 = 9.0 (today = decay=1.0)"""
+        """iter=1 + skill+op match = 3.0 * 3.0 * 1.0 = 9.0 (today = decay=1.0)"""
         from datetime import date
         today = date.today().strftime("%Y-%m-%d")
         entry = SuccessEntry(
@@ -62,11 +62,11 @@ class TestComputeComposite(unittest.TestCase):
             first_hit=today, last_hit=today,
             scores={}, avg_iter=1.0,
         )
-        score = compute_composite(entry, "cvm", None)
+        score = compute_composite(entry, "cvm", "Run")  # operation specified → base=3.0
         self.assertAlmostEqual(score, 9.0)
 
     def test_iter3_skill_match_lower_score(self):
-        """iter=3 → severity=1.0 → 3.0 * 1.0 * 1.0 = 3.0"""
+        """iter=3 → severity=1.0, op specified → 3.0 * 1.0 * 1.0 = 3.0"""
         from datetime import date
         today = date.today().strftime("%Y-%m-%d")
         entry = SuccessEntry(
@@ -75,7 +75,7 @@ class TestComputeComposite(unittest.TestCase):
             first_hit=today, last_hit=today,
             scores={}, avg_iter=3.0,
         )
-        score = compute_composite(entry, "cvm", None)
+        score = compute_composite(entry, "cvm", "Run")  # operation specified → base=3.0
         self.assertAlmostEqual(score, 3.0)
 
     def test_operation_match_boosts_base(self):

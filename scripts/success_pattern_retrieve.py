@@ -186,10 +186,13 @@ def recency_decay(last_hit: str | None) -> float:
 
 
 def compute_composite(entry: SuccessEntry, skill: str, operation: str | None) -> float:
-    base = 3.0 if (entry.skill == skill and
-                   (operation is None or entry.operation == operation)) else 2.0 if entry.skill == skill else 0.0
-    if base == 0.0:
+    if entry.skill != skill:
         return 0.0
+    # skill match: op constraint only counts when operation is specified
+    if operation is None or entry.operation == operation:
+        base = 3.0 if operation is not None else 2.0
+    else:
+        base = 2.0  # skill match but operation mismatch → still useful
     sev = _severity_weight(entry.iter)
     decay = recency_decay(entry.last_hit)
     return base * sev * decay
@@ -217,8 +220,6 @@ def retrieve_success_patterns(
     results: list[tuple[float, dict[str, Any]]] = []
 
     for layer_name, layer in [("hot", hot), ("warm", warm), ("cold", cold)]:
-        if len(results) >= top_n:
-            break
         for key, entry in layer.items():
             if key in seen_keys:
                 continue
