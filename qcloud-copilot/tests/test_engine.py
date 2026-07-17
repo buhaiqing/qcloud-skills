@@ -21,7 +21,7 @@ def test_engine_ask_cruise_writes_aggregated_report(tmp_path, monkeypatch):
     )
 
     class FakeDispatcher:
-        def execute(self, plan, blackboard, session_id, parallel=True):
+        def execute(self, plan, blackboard, session_id, parallel=True, **kwargs):
             from copilot.models import StepResult
             from copilot.report_gen import synthesize_from_blackboard
 
