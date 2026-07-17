@@ -31,6 +31,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from gcl_trajectory_quality import classify_op
 from reflexion_retrieve import load_failure_patterns, format_for_injection
 from success_pattern_mine import write_pending_with_lock
 
@@ -115,6 +116,7 @@ def run_command(
             "result_excerpt": excerpt,
             "stdout_len": len(proc.stdout or ""),
             "stderr_len": len(proc.stderr or ""),
+            "op_type": classify_op(command),
         }
     except subprocess.TimeoutExpired:
         return {
@@ -123,6 +125,7 @@ def run_command(
             "result_excerpt": f"TIMEOUT after {timeout}s",
             "stdout_len": 0,
             "stderr_len": 0,
+            "op_type": classify_op(command),
         }
 
 

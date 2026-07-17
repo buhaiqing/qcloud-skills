@@ -311,9 +311,10 @@ def operation_type_analysis(traces: list[dict[str, Any]]) -> dict[str, Any]:
         skill = t.get("skill", "unknown")
         status = (t.get("final") or {}).get("status", "UNKNOWN")
         n = len(t.get("iterations", []))
-        # Get command from first iteration
-        cmd = (t.get("iterations", [{}])[0].get("generator") or {}).get("command", "")
-        op_type = classify_op(cmd)
+        # Get op_type from first iteration's generator; fall back to classifying
+        # the raw command for pre-P5 traces that lack the persisted op_type field.
+        first_gen = (t.get("iterations", [{}])[0].get("generator") or {})
+        op_type = first_gen.get("op_type") or classify_op(first_gen.get("command", ""))
 
         by_skill_op.setdefault(skill, {op: {"total": 0, "PASS": 0, "SAFETY_FAIL": 0, "MAX_ITER": 0, "total_iters": 0} for op in OP_TYPES})
         by_skill_op[skill][op_type]["total"] += 1
