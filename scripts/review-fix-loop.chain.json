@@ -1,0 +1,87 @@
+{
+  "meta": {
+    "name": "review-fix-loop",
+    "description": "Optimized GCL review-fix: parallel reviewers → synthesis → fork worker → parallel validation",
+    "optimizations": [
+      "parallel-3-reviewers + wait-all (省 ~45s 串行)",
+      "R1-first synthesis before R2/R3 (省 ~60s + 减少重复发现)",
+      "worker read-all → plan → edit-once (14 edits → 3)",
+      "reviewer output capped at 3KB (省 ~90KB 总输出)",
+      "shared file pre-loading in reviewer context (省 3x I/O)"
+    ]
+  },
+  "phases": [
+    { "title": "Parallel Review (R1-R3)" },
+    { "title": "Synthesis & Decision" },
+    { "title": "Fix Worker" },
+    { "title": "Validation Round" }
+  ],
+  "steps": [
+    {
+      "parallel": [
+        {
+          "agent": "reviewer",
+          "phase": "Parallel Review",
+          "label": "R1-correctness",
+          "output": "review/r1-correctness.md",
+          "outputMode": "file-only",
+          "task": "You are a correctness & regression reviewer.\n\n## Scope\nReview ONLY these files for the current diff/work:\n{files}\n\n## Constraints\n1. Fresh context ONLY — read files directly from disk. Do NOT rely on parent conversation history.\n2. Output MUST be under 3KB total. Structure:\n```\nBLOCKERS: (list or 'none')\nWARNINGS: (list or 'none')\nPRAISE: (brief or 'none')\n```\n3. Focus: algorithm correctness, edge cases, data flow, integration risks.\n4. Do NOT edit files. Return findings only.\n\n## Files\n{files}"
+        },
+        {
+          "agent": "reviewer",
+          "phase": "Parallel Review",
+          "label": "R2-test-lint",
+          "output": "review/r2-test-lint.md",
+          "outputMode": "file-only",
+          "task": "You are a testing & validation reviewer.\n\n## Scope\nReview ONLY these files for the current diff/work:\n{files}\n\n## Constraints\n1. Fresh context ONLY — read files directly from disk. Do NOT rely on parent conversation history.\n2. Output MUST be under 3KB total. Structure:\n```\nBLOCKERS: (list or 'none')\nWARNINGS: (list or 'none')\nPRAISE: (brief or 'none')\n```\n3. Focus: test coverage gaps, lint gate evidence, missing test cases.\n4. Run validation commands and report actual results (ruff, tests, --dry-run).\n5. Do NOT edit files. Return findings only.\n\n## Files\n{files}"
+        },
+        {
+          "agent": "reviewer",
+          "phase": "Parallel Review",
+          "label": "R3-ponytail",
+          "output": "review/r3-ponytail.md",
+          "outputMode": "file-only",
+          "task": "You are a ponytail simplicity reviewer.\n\n## Scope\nReview ONLY these files for the current diff/work:\n{files}\n\n## Constraints\n1. Fresh context ONLY — read files directly from disk. Do NOT rely on parent conversation history.\n2. Output MUST be under 3KB total. Structure:\n```\nBLOCKERS: (list or 'none')\nDELETIONS: (specific code to cut)\nSIMPLIFICATIONS: (specific code to simplify)\nSPEC GAPS/EXTRAS: (list or 'none')\nPRAISE: (brief or 'none')\n```\n3. Focus: dead code, over-abstraction, token waste, YAGNI.\n4. Do NOT edit files. Return findings only.\n\n## Files\n{files}"
+        }
+      ],
+      "concurrency": 3
+    },
+    {
+      "agent": "reviewer",
+      "phase": "Synthesis & Decision",
+      "label": "synthesize",
+      "task": "You are the parent orchestrator. Synthesize findings from 3 reviewers into actionable decisions.\n\n## Inputs\nR1 findings: {r1}\nR2 findings: {r2}\nR3 findings: {r3}\n\n## Task\n1. Merge all BLOCKERS → must-fix list (deduped)\n2. Merge all WARNINGS/DELETIONS/SIMPLIFICATIONS → optional list\n3. Determine: is a fix-worker needed?\n   - YES if: any BLOCKER exists, or ≥2 WARNINGS point to same issue\n   - NO if: no BLOCKER and <2 WARNINGS\n4. If YES: write fix plan in <500 chars (which files, which fixes)\n5. If NO: list remaining DEFERRED items\n6. Output structure (under 2KB):\n```\nFIX NEEDED: yes/no\nBLOCKERS TO FIX: (list)\nFIX PLAN: (if needed, <500 chars)\nDEFERRED: (remaining optional items)\n```"
+    },
+    {
+      "agent": "worker",
+      "phase": "Fix Worker",
+      "label": "apply-fixes",
+      "context": "fork",
+      "task": "You are the sole writer for this fix pass.\n\n## Reviewer Findings (approved scope)\n{blockers}\n\n## Fix Plan\n{fix_plan}\n\n## Critical Constraints\n1. **Read ALL relevant files BEFORE any edit** — no edit without reading the full file first.\n2. **Plan all changes** — list exactly which files and which lines before editing.\n3. **Edit ONCE per file** — batch all changes to the same file into a single edit call.\n4. **DO NOT touch files not in the fix plan** (especially not TODO.md, spec files, or unrelated files).\n5. **After all edits**: run ruff, tests, and any relevant self-verify.\n6. **Report**: changed files, command exit codes, test count, remaining issues.\n\n## Validation Required\nAfter edits, run and report:\n- ruff check on changed files\n- relevant tests\n- any --dry-run or smoke tests\n\nReport format:\n```\nCHANGED: (file list)\nVALIDATION: (pass/fail with evidence)\nISSUES: (remaining problems)\n```",
+      "output": "worker/fix-result.md",
+      "outputMode": "file-only",
+      "progress": true
+    },
+    {
+      "parallel": [
+        {
+          "agent": "reviewer",
+          "phase": "Validation",
+          "label": "V1-correctness",
+          "output": "validation/v1.md",
+          "outputMode": "file-only",
+          "task": "Validate the post-worker diff for correctness.\n\n## What changed\n{worker_result}\n\n## Task\n1. Read the actual changed files from disk.\n2. Verify all BLOCKERS from R1-R3 are resolved.\n3. Verify no new correctness issues were introduced.\n4. Run: ruff check, tests, --dry-run if applicable.\n5. Output under 2KB:\n```\nSTATUS: pass/fail\nRESOLVED: (which blockers are fixed)\nNEW_ISSUES: (any new problems)\nREMAINING: (optional items not addressed)\n```"
+        },
+        {
+          "agent": "reviewer",
+          "phase": "Validation",
+          "label": "V2-simplicity",
+          "output": "validation/v2.md",
+          "outputMode": "file-only",
+          "task": "Validate the post-worker diff for simplicity.\n\n## What changed\n{worker_result}\n\n## Task\n1. Read the actual changed files from disk.\n2. Verify no over-engineering was introduced.\n3. Verify dead code / token waste was cleaned up.\n4. Output under 2KB:\n```\nSTATUS: pass/fail\nIMPROVEMENTS: (confirmed)\nREGRESSION: (any new complexity introduced)\nREMAINING: (optional items)\n```"
+        }
+      ],
+      "concurrency": 2
+    }
+  ]
+}
