@@ -4,6 +4,8 @@
 Computes trajectory-quality signals from audit-results/gcl-trace-*.json
 without ground truth. All metrics are derived from trace structure.
 
+Operation-type classification via op_type_classifier.
+
 Usage:
   python3 scripts/gcl_trajectory_quality.py [--since-hours 720]
   python3 scripts/gcl_trajectory_quality.py --json
@@ -15,11 +17,44 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import statistics
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+# Minimal inline op_type classifier — avoids circular import
+_DELETES = frozenset({"delete", "destroy", "release", "remove",
+                        "cancel", "drop", "terminate", "purge"})
+_WRITES = frozenset({"create", "modify", "update", "set", "resize",
+                      "add", "start", "stop", "restart", "reboot",
+                      "open", "close", "associate", "disassociate",
+                      "attach", "detach", "put", "upload", "register"})
+_READS = frozenset({"describe", "query", "list", "search",
+                     "get", "check", "inspect", "detail"})
+
+
+def classify_op(command: str) -> str:
+    """Classify tccli command into read/write/delete using CamelCase word split."""
+    if not command:
+        return "read"
+    tokens = command.strip().split()
+    # Split CamelCase BEFORE lowercasing: DescribeInstances → ['Describe','Instances']
+    action_raw = tokens[2] if len(tokens) > 2 else ""
+    words = set(w.lower() for w in re.findall(r'[A-Z][a-z]*', action_raw))
+    # Also check full lowercase for compound words like DescribeEx
+    action_lower = action_raw.lower()
+    if words & _READS or action_lower in _READS:
+        return "read"
+    if words & _DELETES or action_lower in _DELETES:
+        return "delete"
+    if words & _WRITES or action_lower in _WRITES:
+        return "write"
+    return "read"
+
+
+
 
 RUBRIC_DIMS = ("correctness", "safety", "idempotency", "traceability", "spec_compliance")
 
@@ -262,6 +297,72 @@ def dimension_correlation(traces: list[dict[str, Any]]) -> dict[str, Any]:
     return {"correlation_matrix": corr, "sample_counts": {d: len(dim_vals[d]) for d in RUBRIC_DIMS}}
 
 
+def operation_type_analysis(traces: list[dict[str, Any]]) -> dict[str, Any]:
+    """Analyze pass rate and efficiency by operation type (read/write/delete)."""
+    OP_TYPES = ("read", "write", "delete")
+
+    # by_skill → by_op_type
+    by_skill_op: dict[str, dict[str, dict[str, Any]]] = {}
+    # global by op_type
+    by_op: dict[str, dict[str, Any]] = {op: {"total": 0, "PASS": 0, "SAFETY_FAIL": 0, "MAX_ITER": 0, "total_iters": 0} for op in OP_TYPES}
+    alerts: list[dict[str, Any]] = []
+
+    for t in traces:
+        skill = t.get("skill", "unknown")
+        status = (t.get("final") or {}).get("status", "UNKNOWN")
+        n = len(t.get("iterations", []))
+        # Get command from first iteration
+        cmd = (t.get("iterations", [{}])[0].get("generator") or {}).get("command", "")
+        op_type = classify_op(cmd)
+
+        by_skill_op.setdefault(skill, {op: {"total": 0, "PASS": 0, "SAFETY_FAIL": 0, "MAX_ITER": 0, "total_iters": 0} for op in OP_TYPES})
+        by_skill_op[skill][op_type]["total"] += 1
+        by_skill_op[skill][op_type]["total_iters"] += n
+        if status in by_skill_op[skill][op_type]:
+            by_skill_op[skill][op_type][status] += 1
+        by_op[op_type]["total"] += 1
+        by_op[op_type]["total_iters"] += n
+        if status in by_op[op_type]:
+            by_op[op_type][status] += 1
+        else:
+            by_op[op_type].setdefault(status, 0)
+            by_op[op_type][status] += 1
+
+    # Build summary per skill × op_type
+    skill_summary: dict[str, dict[str, dict[str, Any]]] = {}
+    for skill, ops in by_skill_op.items():
+        skill_summary[skill] = {}
+        for op in OP_TYPES:
+            s = ops[op]
+            total = s["total"]
+            skill_summary[skill][op] = {
+                "total": total,
+                "pass_rate": round(s["PASS"] / total, 4) if total else 0.0,
+                "safety_fail_rate": round(s["SAFETY_FAIL"] / total, 4) if total else 0.0,
+                "avg_iters": round(s["total_iters"] / total, 2) if total else 0.0,
+            }
+            # Alert: low pass rate
+            pr = skill_summary[skill][op]["pass_rate"]
+            if total >= 2 and pr < 0.5:
+                alerts.append({"skill": skill, "op_type": op, "pass_rate": pr, "total": total, "severity": "high"})
+            elif total >= 3 and pr < 0.8:
+                alerts.append({"skill": skill, "op_type": op, "pass_rate": pr, "total": total, "severity": "medium"})
+
+    # Global op_type summary
+    op_summary: dict[str, dict[str, Any]] = {}
+    for op in OP_TYPES:
+        s = by_op[op]
+        total = s["total"]
+        op_summary[op] = {
+            "total": total,
+            "pass_rate": round(s["PASS"] / total, 4) if total else 0.0,
+            "safety_fail_rate": round(s["SAFETY_FAIL"] / total, 4) if total else 0.0,
+            "avg_iters": round(s["total_iters"] / total, 2) if total else 0.0,
+        }
+
+    return {"by_skill": skill_summary, "by_op_type": op_summary, "alerts": alerts}
+
+
 def analyze_traces(traces: list[dict[str, Any]], baselines: dict[str, dict[str, tuple[float, float]]]) -> dict[str, Any]:
     """Compute all trajectory quality metrics for a set of traces."""
     results = []
@@ -309,9 +410,10 @@ def analyze_traces(traces: list[dict[str, Any]], baselines: dict[str, dict[str, 
 
     n = len(traces)
     dim_corr = dimension_correlation(traces)
+    op_analysis = operation_type_analysis(traces)
 
     return {
-        "version": "1.0",
+        "version": "1.1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "window": {"trace_count": n},
         "summary": {
@@ -327,6 +429,7 @@ def analyze_traces(traces: list[dict[str, Any]], baselines: dict[str, dict[str, 
         },
         "traces": results,
         "dimension_correlation": dim_corr,
+        "operation_type_analysis": op_analysis,
         "baselines": {
             skill: {dim: {"mean": round(m, 4), "stdev": round(s, 4)}
                     for dim, (m, s) in dim_stats.items()}
@@ -420,6 +523,60 @@ def self_verify() -> bool:
     corr = dimension_correlation(traces)
     assert "correlation_matrix" in corr
 
+    # Test operation_type_analysis (needs commands in traces)
+    traces_with_cmd = [
+        {
+            "skill": "qcloud-test",
+            "iterations": [
+                {"iter": 1, "decision": "PASS",
+                 "generator": {"command": "tccli cvm DescribeInstances"},
+                 "critic": {"scores": {"correctness": 1.0, "safety": 1.0, "idempotency": 0.5, "traceability": 1.0, "spec_compliance": 1.0}}},
+            ],
+            "final": {"status": "PASS", "iter": 1},
+        },
+        {
+            "skill": "qcloud-test",
+            "iterations": [
+                {"iter": 1, "decision": "SAFETY_FAIL",
+                 "generator": {"command": "tccli cdb DeleteAccounts"},
+                 "critic": {"scores": {"correctness": 0.0, "safety": 0.0, "idempotency": 0.5, "traceability": 1.0, "spec_compliance": 0.0}}},
+            ],
+            "final": {"status": "SAFETY_FAIL", "iter": 1},
+        },
+        {
+            "skill": "qcloud-test",
+            "iterations": [
+                {"iter": 1, "decision": "SAFETY_FAIL",
+                 "generator": {"command": "tccli vpc DeleteVpc"},
+                 "critic": {"scores": {"correctness": 0.0, "safety": 0.0, "idempotency": 0.5, "traceability": 1.0, "spec_compliance": 0.0}}},
+            ],
+            "final": {"status": "SAFETY_FAIL", "iter": 1},
+        },
+        {
+            "skill": "qcloud-test",
+            "iterations": [
+                {"iter": 1, "decision": "PASS",
+                 "generator": {"command": "tccli cos PutObject"},
+                 "critic": {"scores": {"correctness": 1.0, "safety": 1.0, "idempotency": 0.5, "traceability": 1.0, "spec_compliance": 1.0}}},
+            ],
+            "final": {"status": "PASS", "iter": 1},
+        },
+    ]
+    op_result = operation_type_analysis(traces_with_cmd)
+    assert op_result["by_op_type"]["read"]["pass_rate"] == 1.0
+    assert op_result["by_op_type"]["read"]["total"] == 1
+    assert op_result["by_op_type"]["delete"]["total"] == 2
+    assert op_result["by_op_type"]["delete"]["safety_fail_rate"] == 1.0
+    assert op_result["by_op_type"]["write"]["pass_rate"] == 1.0
+    # Alert: delete total=2, pass_rate=0.0 < 0.5 → high alert
+    assert any(a["severity"] == "high" and a["op_type"] == "delete" for a in op_result["alerts"])
+
+    # Test classify_op inline
+    assert classify_op("tccli cvm DescribeInstances") == "read"
+    assert classify_op("tccli cdb DeleteAccounts") == "delete"
+    assert classify_op("tccli cos PutObject") == "write"
+    assert classify_op("") == "read"
+
     print("Self-verify: all assertions passed ✓")
     return True
 
@@ -456,7 +613,24 @@ def main() -> int:
     print(f"  outlier_rate:           {summary['outlier_rate']}")
     print(f"  avg_iter_efficiency:    {summary['avg_iter_efficiency']}")
     print(f"  wasted_iter_rate:       {summary['wasted_iter_rate']}")
-    print(f"  Output: {out_path}")
+
+    # op_type section
+    op = result.get("operation_type_analysis", {})
+    by_op = op.get("by_op_type", {})
+    if by_op and any(v["total"] > 0 for v in by_op.values()):
+        print("\n  Operation type success rate:")
+        for op_type in ("read", "write", "delete"):
+            m = by_op.get(op_type, {})
+            if m.get("total", 0) > 0:
+                print(f"    {op_type:8s}: {m['total']:3d} traces, pass_rate={m['pass_rate']:.0%}, "
+                      f"safety_fail={m['safety_fail_rate']:.0%}, avg_iters={m['avg_iters']:.2f}")
+        alerts = op.get("alerts", [])
+        if alerts:
+            print("\n  Op-type alerts (⚠ low pass_rate):")
+            for a in alerts:
+                print(f"    ⚠  {a['skill']}/{a['op_type']}: pass_rate={a['pass_rate']:.0%} ({a['total']} traces)")
+
+    print(f"\n  Output: {out_path}")
 
     if args.json:
         print(json.dumps(result, indent=2))
