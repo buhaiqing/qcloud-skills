@@ -42,6 +42,7 @@ class PlanDispatcher:
         session_id: str,
         *,
         parallel: bool | None = None,
+        l2_confirmed: bool = False,
     ) -> list[StepResult]:
         if plan.plan_id:
             blackboard.write_plan_snapshot(session_id, plan)
@@ -84,6 +85,7 @@ class PlanDispatcher:
                 session_id,
                 completed,
                 parallel=use_parallel,
+                l2_confirmed=l2_confirmed,
             )
             batch_outcomes.sort(key=lambda item: step_index[item[0].id])
 
@@ -115,9 +117,10 @@ class PlanDispatcher:
         plan: ExecutionPlan,
         blackboard: BlackboardClient,
         session_id: str,
-        completed: dict[str, StepResult],
+        completed: dict[StepResult],
         *,
         parallel: bool,
+        l2_confirmed: bool = False,
     ) -> list[tuple[PlanStep, StepResult]]:
         outcomes: list[tuple[PlanStep, StepResult]] = []
 
@@ -135,7 +138,9 @@ class PlanDispatcher:
                         f"Depends on failed/skipped step(s): {[f.step_id for f in dep_failures]}"
                     ),
                 )
-            return step, self._execute_step(step, plan, blackboard, session_id)
+            return step, self._execute_step(
+                step, plan, blackboard, session_id, l2_confirmed=l2_confirmed
+            )
 
         runnable = list(batch)
         if parallel and len(runnable) > 1:
@@ -168,6 +173,8 @@ class PlanDispatcher:
         plan: ExecutionPlan,
         blackboard: BlackboardClient,
         session_id: str,
+        *,
+        l2_confirmed: bool = False,
     ) -> StepResult:
         start = time.time()
         context = dict(plan.context)
@@ -178,6 +185,31 @@ class PlanDispatcher:
             context.update(resolve_blackboard_paths(board, step.reads_from_blackboard))
 
         if step.type == "skill_call":
+            # Emit a per-step L2 confirmation trace for destructive operations so
+            # the trajectory-evaluation layer can see whether the destructive
+            # op was confirmed (fixes C7 safety blind spot at step granularity).
+            if step.destructive:
+                with suppress(Exception):
+                    audit_trace(
+                        session_id=session_id,
+                        step_id=f"{step.id}.l2",
+                        trace_data={
+                            "step_type": "safety_gate",
+                            "status": "pass" if l2_confirmed else "unconfirmed",
+                            "destructive": True,
+                            "skill": step.skill,
+                            "operation": step.operation,
+                        },
+                        provenance={
+                            "eval_id": f"{session_id}:{step.id}.l2:safety.l2_confirm",
+                            "rule": "safety.l2_confirm",
+                            "input_ref": f"step.skill={step.skill}, step.operation={step.operation}",
+                            "decision": "pass" if l2_confirmed else "fail",
+                            "reason": "destructive op confirmed via L2 gate"
+                            if l2_confirmed
+                            else "destructive op executed without L2 confirmation",
+                        },
+                    )
             h_result = check_h(step)
             if not h_result["passed"]:
                 result = StepResult(

@@ -115,6 +115,12 @@ class CopilotEngine:
             )
 
         l2_result = check_l2(plan, confirmed=l2_confirmed)
+        self._emit_l2_trace(
+            session_id,
+            plan,
+            passed=l2_result["passed"],
+            issues=l2_result["issues"],
+        )
         if not l2_result["passed"]:
             return self._deliver_report(
                 self._error_report(
@@ -126,7 +132,9 @@ class CopilotEngine:
                 )
             )
 
-        exec_result = self._run_execution(plan, audience=audience, l3_reviewed=l3_reviewed)
+        exec_result = self._run_execution(
+            plan, audience=audience, l3_reviewed=l3_reviewed, l2_confirmed=l2_confirmed
+        )
         exec_result.final_report.duration_ms = int((time.time() - start) * 1000)
 
         if exec_result.status == "aborted":
@@ -169,6 +177,7 @@ class CopilotEngine:
         audience: str = "detailed",
         dry_run: bool = False,
         l3_reviewed: bool = False,
+        l2_confirmed: bool = False,
     ) -> Report | dict:
         if isinstance(plan, str):
             plan = load_plan_file(plan)
@@ -180,7 +189,9 @@ class CopilotEngine:
         sm = SessionManager()
         sm.init_blackboard(session_id, plan.context.get("user_request", "plan execution"))
         self._plan_context = plan.context
-        exec_result = self._run_execution(plan, audience=audience, l3_reviewed=l3_reviewed)
+        exec_result = self._run_execution(
+            plan, audience=audience, l3_reviewed=l3_reviewed, l2_confirmed=l2_confirmed
+        )
         return self._deliver_report(exec_result.final_report)
 
     def _dry_run_plan(self, plan: ExecutionPlan, session_id: str) -> dict:
@@ -195,12 +206,51 @@ class CopilotEngine:
             "writes_to_blackboard": writes,
         }
 
+    def _emit_l2_trace(
+        self,
+        session_id: str | None,
+        plan: ExecutionPlan,
+        *,
+        passed: bool,
+        issues: list[str],
+    ) -> None:
+        """Persist the L2 destructive-confirmation gate result as a trace.
+
+        Records rule=safety.l2_confirm so the trajectory-evaluation layer has a
+        signal for whether destructive operations were confirmed (fixes the
+        C7 safety blind spot — destructive ops previously left no trace).
+        """
+        if not session_id:
+            return
+        destructive_steps = [s.id for s in plan.steps if s.destructive]
+        with suppress(Exception):
+            audit_trace(
+                session_id=session_id,
+                step_id="l2-gate",
+                trace_data={
+                    "step_type": "safety_gate",
+                    "status": "pass" if passed else "fail",
+                    "destructive_steps": destructive_steps,
+                    "issues": issues,
+                },
+                provenance={
+                    "eval_id": f"{session_id}:l2-gate:safety.l2_confirm",
+                    "rule": "safety.l2_confirm",
+                    "input_ref": f"plan={plan.plan_id}, destructive_steps={destructive_steps}",
+                    "decision": "pass" if passed else "fail",
+                    "reason": "destructive operations confirmed via --confirm"
+                    if passed
+                    else "; ".join(issues),
+                },
+            )
+
     def _run_execution(
         self,
         plan: ExecutionPlan,
         *,
         audience: str,
         l3_reviewed: bool,
+        l2_confirmed: bool = False,
     ) -> ExecutionResult:
         session_id = getattr(self, "_session_id", "inline")
         self._plan_context = plan.context
@@ -210,6 +260,7 @@ class CopilotEngine:
             plan,
             bb_client,
             session_id,
+            l2_confirmed=l2_confirmed,
         )
 
         status, report = self._build_final_report(
