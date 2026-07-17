@@ -21,21 +21,47 @@ DEFAULT_STORE_PATH = ROOT / "docs" / "failure-patterns.md"
 MAX_LINES = 200
 
 
+def normalize_reflexion_key(
+    category: str, skill: str, command: str, error: str
+) -> tuple[str, str, str, str]:
+    """Normalize a failure pattern into the cross-system dedup key (fixes L5).
+
+    Shared shape with ``qcloud-copilot/copilot/quality/reflexion.py`` so the
+    same failure converging from copilot scratch and GCL trace dedups instead
+    of double-writing. Command is normalized to its verb/operation token
+    (args dropped) and lowercased; error is lowercased and whitespace-collapsed.
+    """
+    norm_cmd = command.strip().lower().split("\n")[0].split(" ")[0]
+    norm_err = " ".join(error.strip().lower().split())
+    return (category.strip().lower(), skill.strip().lower(), norm_cmd, norm_err)
+
+
 def parse_existing_safe(path: Path) -> dict[str, dict[str, Any]]:
-    """Safely parse existing patterns, returning empty dict on any error."""
+    """Safely parse existing patterns with 4-tuple keys, returning {} on error.
+
+    Re-keys the 3-tuple (skill, command, error) dict from the shared store
+    layer into the 4-tuple (category, skill, command_norm, error) shape used
+    by ``_make_key`` so same-pattern reads/writes dedup identically.
+    """
     try:
-        patterns = parse_existing(path)
-        for key, p in patterns.items():
+        raw = parse_existing(path)
+        patterns: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+        for p in raw.values():
             p["command"] = p.get("command", "") or p.get("operation", "")
             p["operation"] = p.get("operation", "") or p.get("command", "")
+            category = p.get("category", "runtime")
+            key = normalize_reflexion_key(category, p["skill"], p["command"], p["error"])
+            patterns[key] = p
         return patterns
     except Exception:
         return {}
 
 
-def _make_key(skill: str, command: str, error: str) -> tuple[str, str, str]:
-    """Create a unique key for deduplication."""
-    return (skill.strip(), command.strip(), error.strip())
+def _make_key(
+    category: str, skill: str, command: str, error: str
+) -> tuple[str, str, str, str]:
+    """Create a unique key for deduplication (4-tuple, matches copilot side)."""
+    return normalize_reflexion_key(category, skill, command, error)
 
 
 def _prune_by_count(patterns: dict[str, dict[str, Any]], max_patterns: int) -> None:
@@ -95,8 +121,8 @@ def store_failure_pattern(
     # Load existing patterns
     patterns = parse_existing_safe(store_path)
 
-    # Create key for dedup
-    key = _make_key(skill, command, error)
+    # Create key for dedup (4-tuple so copilot/GCL sinks dedup identically)
+    key = _make_key(category, skill, command, error)
 
     now = datetime.now().strftime("%Y-%m")
 

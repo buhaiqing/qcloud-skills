@@ -8,6 +8,22 @@ DOCS_FAILURE_PATTERNS = Path("docs/failure-patterns.md")
 SCRATCH_DIR = Path.cwd() / ".runtime" / "reflexion"
 
 
+def normalize_reflexion_key(
+    category: str, skill: str, command: str, error: str
+) -> tuple[str, str, str, str]:
+    """Normalize a failure pattern into a cross-system dedup key (fixes L5).
+
+    Same shape ``(category, skill, command_normalized, error)`` the analysis
+    recommends for unifying copilot scratch with GCL ``failure_pattern``.
+    Command is normalized to its verb/operation token (args dropped) and
+    lowercased; error is lowercased and whitespace-collapsed so the same
+    failure converging from two sinks dedups instead of double-writing.
+    """
+    norm_cmd = command.strip().lower().split("\n")[0].split(" ")[0]
+    norm_err = " ".join(error.strip().lower().split())
+    return (category.strip().lower(), skill.strip().lower(), norm_cmd, norm_err)
+
+
 def write_reflexion(
     category: str,
     skill: str,
@@ -31,8 +47,9 @@ def write_reflexion(
     safe_cmd = command[:50].replace("|", "/")
     safe_error = error[:80].replace("|", "/")
     safe_fix = fix[:80].replace("|", "/")
+    dedup_key = ":".join(normalize_reflexion_key(category, skill, command, error))
 
-    entry = f"\n| {category} | {skill} | {safe_cmd} | {safe_error} | {safe_fix} | 1 | true |"
+    entry = f"\n| {category} | {skill} | {safe_cmd} | {safe_error} | {safe_fix} | 1 | true | {dedup_key} |"
     scratch_file.open("a").write(entry)
 
 
@@ -67,8 +84,9 @@ def aggregate_scratch(date: str | None = None) -> int:
     existing = DOCS_FAILURE_PATTERNS.read_text()
     lines = existing.splitlines(keepends=True)
 
-    # Build (category, skill, error) -> line index from scratch-format rows
-    existing_rows: dict[tuple[str, str, str], int] = {}
+    # Build 4-tuple (category, skill, command_norm, error) -> line index so
+    # dedup matches the GCL sink's normalize_reflexion_key shape (fixes L5).
+    existing_rows: dict[tuple[str, str, str, str], int] = {}
     for i, line in enumerate(lines):
         stripped = line.strip()
         if (
@@ -80,10 +98,10 @@ def aggregate_scratch(date: str | None = None) -> int:
             continue
         parts = [p.strip() for p in stripped.split("|") if p.strip()]
         if len(parts) >= 6:
-            # (category, skill, error) is fields 0, 1, 3
-            existing_rows[(parts[0], parts[1], parts[3])] = i
+            # (category, skill, command, error) are fields 0, 1, 2, 3
+            existing_rows[normalize_reflexion_key(parts[0], parts[1], parts[2], parts[3])] = i
 
-    known_keys: set[tuple[str, str, str]] = set(existing_rows.keys())
+    known_keys: set[tuple[str, str, str, str]] = set(existing_rows.keys())
     merged = 0
     rows_to_append: list[str] = []
 
@@ -102,7 +120,7 @@ def aggregate_scratch(date: str | None = None) -> int:
                 parts[3],
                 parts[4],
             )
-            key = (category, skill, error)
+            key = normalize_reflexion_key(category, skill, command, error)
             if key in known_keys:
                 # Duplicate — increment count in the existing row (once per key)
                 line_idx = existing_rows.get(key)

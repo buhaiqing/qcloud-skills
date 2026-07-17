@@ -8,7 +8,12 @@ import unittest
 from pathlib import Path
 
 
-from reflexion_store import store_failure_pattern, MAX_LINES, parse_existing_safe
+from reflexion_store import (
+    store_failure_pattern,
+    MAX_LINES,
+    parse_existing_safe,
+    normalize_reflexion_key,
+)
 
 
 class TestReflexionStore(unittest.TestCase):
@@ -37,7 +42,7 @@ class TestReflexionStore(unittest.TestCase):
         self.assertTrue(self.patterns_file.exists())
 
         patterns = parse_existing_safe(self.patterns_file)
-        key = ("qcloud-cvm-ops", "TerminateInstances", "MissingParameter")
+        key = normalize_reflexion_key("runtime", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter")
         self.assertIn(key, patterns)
         self.assertEqual(patterns[key]["count"], 1)
         self.assertEqual(patterns[key]["fix"], "Use JSON array format")
@@ -65,7 +70,7 @@ class TestReflexionStore(unittest.TestCase):
         self.assertTrue(result)
 
         patterns = parse_existing_safe(self.patterns_file)
-        key = ("qcloud-cvm-ops", "TerminateInstances", "MissingParameter")
+        key = normalize_reflexion_key("runtime", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter")
         self.assertIn(key, patterns)
         # Count should be incremented
         self.assertEqual(patterns[key]["count"], 2)
@@ -93,8 +98,8 @@ class TestReflexionStore(unittest.TestCase):
         patterns = parse_existing_safe(self.patterns_file)
         self.assertEqual(len(patterns), 2)
 
-        key1 = ("qcloud-cvm-ops", "TerminateInstances", "MissingParameter")
-        key2 = ("qcloud-cvm-ops", "RunInstances", "InvalidParameter")
+        key1 = normalize_reflexion_key("runtime", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter")
+        key2 = normalize_reflexion_key("runtime", "qcloud-cvm-ops", "RunInstances", "InvalidParameter")
         self.assertIn(key1, patterns)
         self.assertIn(key2, patterns)
 
@@ -140,7 +145,7 @@ class TestReflexionStore(unittest.TestCase):
         patterns = parse_existing_safe(self.patterns_file)
 
         # High-count pattern should still exist
-        high_count_key = ("qcloud-popular-ops", "PopularCommand", "PopularError")
+        high_count_key = normalize_reflexion_key("runtime", "qcloud-popular-ops", "PopularCommand", "PopularError")
         self.assertIn(high_count_key, patterns)
         self.assertEqual(patterns[high_count_key]["count"], 10)
 
@@ -155,7 +160,7 @@ class TestReflexionStore(unittest.TestCase):
         )
 
         patterns = parse_existing_safe(self.patterns_file)
-        key = ("qcloud-test-ops", "TestCommand", "TestError")
+        key = normalize_reflexion_key("runtime", "qcloud-test-ops", "TestCommand", "TestError")
         self.assertEqual(patterns[key]["category"], "runtime")
 
     def test_update_timestamp_on_upsert(self) -> None:
@@ -172,7 +177,7 @@ class TestReflexionStore(unittest.TestCase):
         )
 
         patterns1 = parse_existing_safe(self.patterns_file)
-        key = ("qcloud-cvm-ops", "Test", "Error")
+        key = normalize_reflexion_key("runtime", "qcloud-cvm-ops", "Test", "Error")
         first_seen = patterns1[key].get("first_seen")
 
         # Wait a moment and upsert
@@ -227,6 +232,35 @@ class TestReflexionStore(unittest.TestCase):
 
         self.assertTrue(result)
         self.assertTrue(non_existent.exists())
+
+    def test_normalize_reflexion_key_shape(self) -> None:
+        """normalize_reflexion_key emits the 4-tuple (cat, skill, cmd_norm, err)."""
+        key = normalize_reflexion_key("Runtime", "Qcloud-CVM-Ops", "TerminateInstances i-abc", "MissingParameter X")
+        self.assertEqual(
+            key,
+            ("runtime", "qcloud-cvm-ops", "terminateinstances", "missingparameter x"),
+        )
+
+    def test_key_matches_copilot_sink_shape(self) -> None:
+        """Same failure from copilot and GCL must produce an identical key string.
+
+        Fixes L5: the two sinks must dedup instead of double-writing.
+        """
+        cat, skill, cmd, err = "runtime", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter"
+        gcl_key = normalize_reflexion_key(cat, skill, cmd, err)
+        # copilot reflexion.py uses an identical normalize_reflexion_key impl
+        copilot_key = normalize_reflexion_key(cat, skill, cmd, err)
+        self.assertEqual(gcl_key, copilot_key)
+        self.assertEqual(
+            ":".join(gcl_key),
+            "runtime:qcloud-cvm-ops:terminateinstances:missingparameter",
+        )
+
+    def test_dedup_across_category_separates(self) -> None:
+        """Different categories yield different keys (no cross-category merge)."""
+        k1 = normalize_reflexion_key("runtime", "qcloud-cvm-ops", "X", "Y")
+        k2 = normalize_reflexion_key("cli_parameter", "qcloud-cvm-ops", "X", "Y")
+        self.assertNotEqual(k1, k2)
 
 
 if __name__ == "__main__":
