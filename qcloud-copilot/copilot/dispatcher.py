@@ -409,6 +409,17 @@ class PlanDispatcher:
         result: StepResult,
         provenance: dict | None = None,
     ) -> None:
+        # P1: generic step path gets a default exec.step provenance so every
+        # audit trace carries eval_id == <session_id>:<step_id>:exec.step,
+        # matching the L2 gate's safety.l2_confirm shape. Caller-supplied
+        # provenance (e.g. L2) is preserved untouched.
+        if provenance is None:
+            provenance = {
+                "eval_id": f"{session_id}:{step.id}:exec.step",
+                "rule": "exec.step",
+                "input_ref": "step.result",
+                "decision": result.status,
+            }
         with suppress(Exception):
             audit_trace(
                 session_id=session_id,
