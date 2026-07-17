@@ -171,6 +171,7 @@ class PlanDispatcher:
     ) -> StepResult:
         start = time.time()
         context = dict(plan.context)
+        h_result: dict | None = None
 
         if step.reads_from_blackboard:
             board = blackboard.load(session_id) or {}
@@ -268,7 +269,24 @@ class PlanDispatcher:
             self._write_step_contribution(blackboard, session_id, step, result)
 
         result.duration_ms = int((time.time() - start) * 1000)
-        self._emit_trace(session_id, step, result)
+
+        provenance: dict | None = None
+        if step.type == "skill_call" and h_result is not None:
+            op = step.params.get("operation", "") if step.params else ""
+            h_passed = h_result["passed"]
+            provenance = {
+                "eval_id": f"{session_id}:{step.id}:check_h",
+                "rule": "hallucination.KNOWN_OPERATIONS",
+                "input_ref": f"step.skill={step.skill}, step.params.operation={op}",
+                "decision": "pass" if h_passed else "fail",
+                "reason": (
+                    "operation in whitelist"
+                    if h_passed
+                    else "; ".join(h_result.get("issues", []))
+                ),
+            }
+
+        self._emit_trace(session_id, step, result, provenance=provenance)
         self._emit_health(step, result, session_id)
 
         if result.status == "failure":
@@ -352,7 +370,13 @@ class PlanDispatcher:
                 error=f"Step timed out after {STEP_TIMEOUT}s",
             )
 
-    def _emit_trace(self, session_id: str, step: PlanStep, result: StepResult) -> None:
+    def _emit_trace(
+        self,
+        session_id: str,
+        step: PlanStep,
+        result: StepResult,
+        provenance: dict | None = None,
+    ) -> None:
         with suppress(Exception):
             audit_trace(
                 session_id=session_id,
@@ -364,6 +388,7 @@ class PlanDispatcher:
                     "error": result.error,
                     "output": result.output,
                 },
+                provenance=provenance,
             )
 
     def _emit_health(self, step: PlanStep, result: StepResult, session_id: str) -> None:
