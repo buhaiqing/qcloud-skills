@@ -145,7 +145,7 @@ cp .env.example .env
   | well-architected-assessment.md JSON | `python3 scripts/validate_product_assessment.py` |
   | GCL rubric/prompt/Quality Gate | `python3 scripts/check_gcl_conformance.py` |
   | gcl_runner.py/gcl_trace_aggregate.py | GCL smoke command + `python3 scripts/gcl_trace_aggregate.py --since-hours 168` |
-  | Skill quality score / upgrade signal | `python3 scripts/skill_quality_score.py --json` |
+  | Skill quality score / upgrade signal | `python3 scripts/skill_quality_score.py --json` (optional; skipped by `validate_local.py` if absent) |
   | Reflexion retrieval (self-evolution) | `python3 scripts/reflexion_retrieve.py retrieve --skill <skill>` |
   | Python files | `ruff check <changed-files>` |
   | Script tests | `cd scripts && python3 -m unittest discover -p "*_test.py" -v` |

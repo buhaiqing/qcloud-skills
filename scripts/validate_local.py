@@ -89,7 +89,16 @@ def _generate_recommendations(report: dict[str, Any]) -> list[str]:
 
 
 def run_quality_score(root: Path, python: str = sys.executable) -> dict[str, Any]:
-    """Run skill_quality_score.py and return transformed output."""
+    """Run skill_quality_score.py; returns neutral result if script is absent."""
+    script = root / "scripts" / "skill_quality_score.py"
+    if not script.exists():
+        print(f"$ scripts/skill_quality_score.py — SKIPPED (not found at {script})")
+        return {
+            "quality_score": 0.0,
+            "upgrade_signal": "ok",
+            "recommendations": ["skill_quality_score.py not present — step skipped"],
+        }
+
     argv = (python, "scripts/skill_quality_score.py", "score", "--json")
     print(f"$ {shlex.join(argv)}")
 

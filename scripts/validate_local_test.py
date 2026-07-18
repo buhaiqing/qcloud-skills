@@ -75,13 +75,12 @@ class MainTests(unittest.TestCase):
         self.assertEqual(run.call_count, 1)
 
     def test_runs_all_steps_when_successful(self) -> None:
-        # Empty skill report keeps quality_score at 100 with no critical signal.
         completed = Mock(returncode=0, stdout='{"by_skill":{}}', stderr="")
         with tempfile.TemporaryDirectory() as tmp:
             with patch.object(validate_local.subprocess, "run", return_value=completed) as run:
                 with contextlib.redirect_stdout(io.StringIO()):
                     self.assertEqual(validate_local.main(["--root", tmp]), 0)
-        self.assertEqual(run.call_count, len(validate_local.build_steps()) + 1)
+        self.assertEqual(run.call_count, len(validate_local.build_steps()))
 
 
 if __name__ == "__main__":
