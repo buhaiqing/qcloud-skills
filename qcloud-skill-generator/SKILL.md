@@ -182,6 +182,13 @@ Every generated skill MUST satisfy these five standards. Reference them througho
 - Cross-product delegation: document in Trigger & Scope, do NOT duplicate full flows
 - Naming: `qcloud-[product]-ops` (lowercase, hyphenated)
 
+### Standard 6: Asset Distillation Hook (复利资产沉淀钩子)
+- When generating/updating any skill, the Generator MUST append the following line as the **last line** of the generated `SKILL.md` (after the `## Output Schema` section):
+  `> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。`
+- This makes the skill self-aware of the Compound-Asset Distillation Loop (CADL) defined in root `AGENTS.md`, so any agent calling the skill sees the trigger signal after task completion.
+- Generator itself MUST also follow CADL after each generation run (distill generator-specific patterns into root or user-level `AGENTS.md` per the landing-point rule in CADL step 2).
+- The canonical injection point lives in `references/qcloud-skill-template.md` (end of `## Output Schema`); this Standard is the enforcement contract.
+
 ---
 
 ## Post-Generation Self-Check (生成后自检 — 宪章执行)
