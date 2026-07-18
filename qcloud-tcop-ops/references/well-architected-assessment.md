@@ -32,44 +32,119 @@ return output matching the schema in
 | **Cost** | `DescribeCostAnalysis` + `DescribeWasteAnalysis` + `DescribeSavingsPlanCoverage` + `DescribeRightSizingRecommendations` + `DescribeIdleResources` | Waste level, RI coverage, right-sizing opportunities |
 | **Efficiency** | `DescribeRightSizingRecommendations` + `DescribeIdleResources` | Utilization rates, right-sizing needs |
 
-### Sample Output
+### Example `{{output.product_assessment}}`
 
 ```json
 {
+  "skill_id": "qcloud-tcop-ops",
   "product": "tcop",
-  "assessments": {
+  "region": "ap-guangzhou",
+  "scope": "account-wide",
+  "assessment_date": "2026-07-10T10:00:00+08:00",
+  "status": "OK",
+  "partial": false,
+  "resource_count": 6,
+  "pillars": {
     "reliability": {
       "score": 72,
-      "risks": [
-        {"id": "REL-001", "description": "Primary workload in single AZ", "severity": "high"},
-        {"id": "REL-002", "description": "No cross-region DR plan found", "severity": "medium"}
+      "status": "assessed",
+      "findings": [
+        {
+          "id": "tcop-rel-001",
+          "severity": "High",
+          "confidence": "MEDIUM",
+          "title": "Primary workload in single AZ",
+          "evidence": "DescribeArchitectureAssessment shows no cross-region DR plan",
+          "recommendation": "Establish cross-region DR plan for primary workload",
+          "effort": "major"
+        }
       ]
     },
     "security": {
       "score": 68,
-      "risks": [
-        {"id": "SEC-001", "description": "Storage buckets not encrypted by default", "severity": "high"}
+      "status": "assessed",
+      "findings": [
+        {
+          "id": "tcop-sec-001",
+          "severity": "High",
+          "confidence": "MEDIUM",
+          "title": "Storage buckets not encrypted by default",
+          "evidence": "DescribeArchitectureAssessment security score 68 with encryption gaps",
+          "recommendation": "Enable default encryption on storage buckets",
+          "effort": "medium"
+        }
       ]
     },
     "cost": {
       "score": 55,
-      "risks": [
-        {"id": "CST-001", "description": "25% of compute resources idle or underutilized", "severity": "high", "estimated_monthly_waste": "1234.50"},
-        {"id": "CST-002", "description": "Savings plan coverage at 30% — below 60% target", "severity": "medium", "estimated_monthly_savings": "800.00"}
-      ],
-      "waste_summary": {
-        "total_monthly_waste": "2034.00",
-        "idle_resources_count": 12,
-        "right_sizing_candidates_count": 8
-      }
+      "status": "assessed",
+      "findings": [
+        {
+          "id": "tcop-cost-001",
+          "severity": "High",
+          "confidence": "HIGH",
+          "title": "25% of compute resources idle or underutilized",
+          "evidence": "DescribeIdleResources + DescribeRightSizingRecommendations",
+          "recommendation": "Reclaim idle resources; right-size underutilized instances",
+          "effort": "medium"
+        },
+        {
+          "id": "tcop-cost-002",
+          "severity": "Medium",
+          "confidence": "HIGH",
+          "title": "Savings plan coverage at 30% — below 60% target",
+          "evidence": "DescribeSavingsPlanCoverage",
+          "recommendation": "Increase savings plan coverage toward 60% target",
+          "effort": "medium"
+        }
+      ]
     },
     "efficiency": {
       "score": 70,
-      "risks": [
-        {"id": "EFF-001", "description": "Average CPU utilization below 20% across 15 instances", "severity": "medium"}
+      "status": "assessed",
+      "findings": [
+        {
+          "id": "tcop-eff-001",
+          "severity": "Medium",
+          "confidence": "HIGH",
+          "title": "Average CPU utilization below 20% across 15 instances",
+          "evidence": "DescribeRightSizingRecommendations",
+          "recommendation": "Right-size instances with low utilization",
+          "effort": "medium"
+        }
       ]
     }
   },
-  "overall_score": 66
+  "recommendations": [
+    {
+      "priority": "High",
+      "pillar": "cost",
+      "action": "Reclaim idle resources; right-size underutilized instances",
+      "effort": "medium"
+    },
+    {
+      "priority": "High",
+      "pillar": "security",
+      "action": "Enable default encryption on storage buckets",
+      "effort": "medium"
+    },
+    {
+      "priority": "Medium",
+      "pillar": "efficiency",
+      "action": "Right-size instances with low utilization",
+      "effort": "medium"
+    }
+  ],
+  "trace": {
+    "commands": [
+      "tccli tcop DescribeCostAnalysis (SecretKey=<masked>)",
+      "tccli tcop DescribeIdleResources (SecretKey=<masked>)",
+      "tccli tcop DescribeArchitectureAssessment (SecretKey=<masked>)"
+    ],
+    "request_ids": [
+      "c3d4e5f6-a7b8-9012-cdef-0123456789ab"
+    ]
+  },
+  "errors": []
 }
 ```
