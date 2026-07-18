@@ -309,7 +309,7 @@ After task completion, run: `python3 scripts/verify_gcl_execution.py "<task_desc
 - **源头**：`qcloud-skill-generator` 在生成每个 skill 时，须在 `SKILL.md` 末尾注入一行（见 Standard 6）：
   `> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。`
   未来所有 `qcloud-*-ops` 自动继承此意识。
-- **现存 skill**：逐批在 `SKILL.md` 末尾补同一行提示，使大模型调用任何 skill 后都看到触发信号。
+- **现存 skill（渐进迁移，pending）**：后续迭代中逐批在 SKILL.md 末尾补同一行提示，使大模型调用任何 skill 后都看到触发信号。本次合并仅落地机制定义 + qcloud-skill-template.md 注入点 + qcloud-skill-generator Standard 6 强制约束；存量 qcloud-*-ops 的逐批补行不在本次 scope，按最小改动原则不在此时批量改写 34 个 skill 文件。
 - **大模型侧**：Agent 在任意 skill 调用结束前，主动检查 CADL 触发条件，而非等用户提醒。
 
 ### 反模式（违反 CADL）
