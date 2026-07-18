@@ -165,8 +165,8 @@ cp .env.example .env
 
 - No repo-root `assets/` directory.
 - No `package.json`, `Makefile`, non-stdlib test runner (except listed scripts in `scripts/` and `.github/workflows/validate-skills.yml`).
-- No `CLAUDE.md`, `opencode.json`, `.cursorrules`.
-- `.omc/`, `.omo/`, `.codebuddy/`, `.omc/project-memory.json` are gitignored.
+- No agent-specific config files (e.g. `CLAUDE.md`, `opencode.json`, `.cursorrules`, and similar per-agent artifacts).
+- Agent runtime state dirs (e.g. `.omc/`, `.omo/`, `.codebuddy/`, and similar) are gitignored.
 - `docs/superpowers/plans/` contains historical notes, not runtime source.
 
 ## Key References
@@ -271,7 +271,7 @@ After task completion, run: `python3 scripts/verify_gcl_execution.py "<task_desc
 
 单条规则（如"记得写 AGENTS.md"）会被忽略，因为无触发、无闭环。CADL 把沉淀变成工作流的**必经出口**：任务不做沉淀 = 任务未完成。Agent 调用任何 Skill 后都走到这一步，Skill 本身也通过 `qcloud-skill-generator` 的「资产沉淀钩子」（见 `qcloud-skill-generator/SKILL.md` Standard 6）提示大模型。
 
-### 触发条件（满足任一即必须走 CADL，不局限 CodeGraph）
+### 触发条件（满足任一即必须走 CADL，不局限某特定代码智能工具）
 
 - 多步 / 跨文件任务完成
 - 跨 Skill 协作（用了 delegation matrix 或并行 agent）
@@ -286,7 +286,7 @@ After task completion, run: `python3 scripts/verify_gcl_execution.py "<task_desc
 1. 提取   → 从刚完成的任务中抽象出可复用模式：
             踩坑避免 / 评审维度 / 协作模式 / 验证命令 / 复用 helper
             格式："问题 → 反模式 → 正确做法（含代码示例）"
-2. 落点判定 → 离开本仓库还有用？ → 用户级 ~/.config/opencode/AGENTS.md
+2. 落点判定 → 离开本仓库还有用？ → 用户级 agent 指引文件（路径随所用 coding agent 而定，如各 agent 的 AGENTS/CLAUDE/CURSOR 类指引文件，不绑定任一特定产品）
             仅本仓库适用？     → 项目级 AGENTS.md（本文件）
             是某 skill 专属可调用的能力？ → 独立 Skill 文件（经 qcloud-skill-generator）
 3. 写入   → 可执行、有示例、有边界、先 grep 现有 AGENTS.md 确认未覆盖（不重复）
@@ -319,9 +319,26 @@ After task completion, run: `python3 scripts/verify_gcl_execution.py "<task_desc
 | 任务做完就结束，不沉淀 | 走完 CADL 闭环再交付 |
 | 把一次性上下文当资产写进 AGENTS.md | 只沉淀跨任务可复用的模式 |
 | 重复已有条目 | 写入前 grep 确认未覆盖 |
-| 只在 CodeGraph / GCL 相关任务才沉淀 | 评审/修复/协作/验证都触发 |
+| 只在某特定代码智能工具 / GCL 相关任务才沉淀 | 评审/修复/协作/验证都触发 |
 
-## CodeGraph — code intelligence (MANDATORY)
+## Agent-Agnostic Principle (P0)
+
+**本仓库的全部规则、规范、质量门与沉淀机制，均不绑定任何特定的 coding agent 或其运行时检测机制（所谓"扣点检测"）。规则在任何 OpenSpec 兼容 agent 下都应可被落实。**
+
+- **不依赖特定 agent 的目录 / 文件制品**：如 `.codegraph/`、`.omc/`、`.omo/`、`.codebuddy/` 等属各 agent 自身运行时状态，本仓库规则不得将其作为触发或判定条件；它们仅被 gitignore，不参与规则落实。
+- **不硬编码特定 agent 的指引文件路径**：用户级 / 项目级指引文件（AGENTS / CLAUDE / CURSOR 等）的路径随所用 agent 而变，规则只描述"落到哪一层（用户级 / 项目级 / 独立 Skill）"，不写死具体产品路径。
+- **工具可选，提供等价 fallback**：当某规则推荐具体工具（如代码智能、KG 索引）时，必须同时给出不依赖该工具的等价做法（如 Read / Grep），使规则在缺失该工具的环境下依然成立。
+- **规则以行为结果为导向**：每条规则以"期望的可验证结果"定义（如"任务结束前完成资产沉淀""破坏性操作前确认"），而非"调用某 agent 的某命令"。这样无论底层 agent 是 OpenCode / Cursor / Claude Code / 其他，行为一致。
+
+> 本原则是本文件的最高约束之一：任何新增规则若隐含对特定 coding agent 的依赖，视为违反 P0，须在合并前解耦。
+
+## CodeGraph — code intelligence (recommended when available)
+
+> **Agent-Agnostic note:** CodeGraph is an optional local tool. If the current agent
+> environment provides it (`.codegraph/` + `codegraph_explore`), follow the rules below.
+> If not, the equivalent behavior is: use Read / Grep directly on the source — the
+> *expected result* (accurate, blast-radius-aware code understanding) is unchanged.
+> This rule never blocks work on environments without CodeGraph.
 
 `.codegraph/` (SQLite KG + file watcher) pre-indexes every symbol, edge, and call
 path in THIS repo. `codegraph_explore` is the Read-equivalent: one capped call
@@ -331,13 +348,13 @@ faster and more accurate than any grep+read loop or sub-agent code-mapping.
 **This repo already enforces the sync half of this discipline in
 `qcloud-copilot/SKILL.md` ("改 `.py` 后 `codegraph sync`") and in the two
 `agent-inspection-prompt.md` checklists. The query-first half was missing and is
-added here as a hard rule.**
+added here as a recommended rule (mandatory only where CodeGraph is present).**
 
-### Rule 1 — Query-first, never grep/read first (MANDATORY)
+### Rule 1 — Query-first, never grep/read first (when CodeGraph available)
 
-Before ANY code-understanding work, call `codegraph_explore` with symbol/file
+Before ANY code-understanding work in THIS repo, prefer `codegraph_explore` with symbol/file
 names or a natural-language question. ONE call usually answers the whole question
-and returns source you can `Edit` from directly.
+and returns source you can `Edit` from directly. (If CodeGraph is unavailable, Read / Grep the source directly — same expected outcome.)
 
 - "how does X work" / architecture / a bug / "where is X" → `codegraph_explore`
 - Reading/editing a named symbol → put its name in the query; treat returned
@@ -345,26 +362,26 @@ and returns source you can `Edit` from directly.
 - Need a flow across symbols → name the endpoints; it rides dynamic-dispatch
   hops grep can't follow and returns the path.
 
-### Rule 2 — Sync after edits (MANDATORY)
+### Rule 2 — Sync after edits (when CodeGraph available)
 
-After editing `.py` / `.ts` / `.go` / `.rs` / etc., the index lags writes by
+After editing `.py` / `.ts` / `.go` / `.rs` / etc. in a CodeGraph-enabled environment, the index lags writes by
 ~1s via the file watcher. Before the NEXT `codegraph_explore` that depends on the
 edit, confirm sync (the daemon auto-syncs on file change; if a query returns a
 staleness banner for a file you just wrote, `Read` that specific file).
 
-### Rule 3 — anti-pattern (from a real failure)
+### Rule 3 — anti-pattern (from a real failure, CodeGraph environments)
 
 Do NOT fire `explore` / `librarian` sub-agents or run grep+read loops to map
 code THIS repo already indexes. In one session, 5 delegated `explore` agents for
 code-mapping hung 16–22 min and returned nothing; the same `codegraph_explore`
 call answered in one round-trip WITH blast-radius + "⚠️ no tests" coverage flags.
 Delegated agents are for UNINDEXED targets (other repos, web, docs), never for
-re-deriving the local KG.
+re-deriving the local KG. (In non-CodeGraph environments this rule is moot — just Read / Grep directly.)
 
 ### Rule 4 — scope guard
 
 - CodeGraph covers THIS repo only. For an unindexed project, run `codegraph init`
-  first (don't run it yourself unprompted — it's the user's decision).
+  first (don't run it yourself unprompted — it's the user's decision; only relevant where CodeGraph is present).
 - It does NOT index configs/docs as code; use Read/Grep for those.
 - It is read-only intelligence. Correctness is still the compiler/tests' job —
   trust the returned source, but verify with LSP/tests before claiming done.
