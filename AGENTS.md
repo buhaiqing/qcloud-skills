@@ -261,42 +261,65 @@ handoff.
 
 After task completion, run: `python3 scripts/verify_gcl_execution.py "<task_description>" <commit_hash>`
 
-## Reflection & Retrospective (P0)
+## 复利资产沉淀机制（Compound-Asset Distillation Loop, CADL, P0）
 
-### Core Concept
+**这不是一条规范，而是一套工作闭环——任何实质任务完成后，Agent 必须走完「提取 → 落点判定 → 写入 → 门禁 → 复用」才能结束。** 目的是让每次踩坑、每次评审、每次跨 skill 协作都变成下一次的可复用资产，形成复利。
 
-Every task must produce at least one reusable asset:
-- `docs/failure-patterns.md` entry
-- Check list/rule
-- Script/utility function
+> 本机制升级自原 `Reflection & Retrospective` 段。原资产类型清单（failure-patterns 条目 / checklist / 脚本 / 模板 / 决策记录 / 排查流）继续有效，下文将其纳入闭环的「写入」步骤。
+
+### 为什么是机制而非规范
+
+单条规则（如"记得写 AGENTS.md"）会被忽略，因为无触发、无闭环。CADL 把沉淀变成工作流的**必经出口**：任务不做沉淀 = 任务未完成。Agent 调用任何 Skill 后都走到这一步，Skill 本身也通过 `qcloud-skill-generator` 的「资产沉淀钩子」（见 `qcloud-skill-generator/SKILL.md` Standard 6）提示大模型。
+
+### 触发条件（满足任一即必须走 CADL，不局限 CodeGraph）
+
+- 多步 / 跨文件任务完成
+- 跨 Skill 协作（用了 delegation matrix 或并行 agent）
+- 评审 / 修复循环（如 GCL、2-round self-review、adversarial review）
+- 发现 repo 缺陷 / 坑（即使不在本次 scope，也记）
+- 验证中发现预存 FAIL 并归因
+- 用户给出可复用的工作流偏好（如"用双写子命令绕过 tccli bug"）
+
+### 闭环步骤
+
+```
+1. 提取   → 从刚完成的任务中抽象出可复用模式：
+            踩坑避免 / 评审维度 / 协作模式 / 验证命令 / 复用 helper
+            格式："问题 → 反模式 → 正确做法（含代码示例）"
+2. 落点判定 → 离开本仓库还有用？ → 用户级 ~/.config/opencode/AGENTS.md
+            仅本仓库适用？     → 项目级 AGENTS.md（本文件）
+            是某 skill 专属可调用的能力？ → 独立 Skill 文件（经 qcloud-skill-generator）
+3. 写入   → 可执行、有示例、有边界、先 grep 现有 AGENTS.md 确认未覆盖（不重复）
+4. 门禁   → 写入前查 wc -l，本文件 ≥500 行先精简再写（见 AGENTS.md 行数门禁）
+            写入 failure-patterns.md 时遵守 ≤200 行约束与 skill+command+error 去重（见 Reflexion hard constraints）
+5. 复用   → 下次同类任务，Agent 读 AGENTS.md 即获得该资产 → 复利生效
+```
+
+### 资产类型（写入步骤的可选落点）
+
+- `docs/failure-patterns.md` entry（踩坑 / 失败模式，受 Reflexion 约束）
+- Check list / rule
+- Script / utility function（`scripts/` 共享可执行文件）
 - Template
 - Decision record
 - Troubleshooting flow
 
-### Trigger Points
+### Skill 侧钩子（让每个 Skill 自带沉淀意识）
 
-- After completing a SKILL.md change
-- After GCL Critic finds new issues
-- After optimizing 3+ skills
-- After fixing repeated bugs
-- After complex tradeoff decisions
+- **源头**：`qcloud-skill-generator` 在生成每个 skill 时，须在 `SKILL.md` 末尾注入一行（见 Standard 6）：
+  `> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。`
+  未来所有 `qcloud-*-ops` 自动继承此意识。
+- **现存 skill**：逐批在 `SKILL.md` 末尾补同一行提示，使大模型调用任何 skill 后都看到触发信号。
+- **大模型侧**：Agent 在任意 skill 调用结束前，主动检查 CADL 触发条件，而非等用户提醒。
 
-### Execution Flow
+### 反模式（违反 CADL）
 
-1. After task complete, ask:
-   - What pitfalls were encountered? → failure-patterns.md
-   - What code/pattern is reusable? → template/script
-   - What experience should be documented? → update references/AGENTS.md
-2. Produce at least one asset
-3. Place asset per Asset placement rules
-4. Complete and record
-
-### Prohibited Behaviors
-
-- Leaving no docs/records after task
-- Fixing pitfalls without recording to failure-patterns.md
-- Not building systematic safeguards for repeated issues
-- Only thinking "next time" without formal record
+| 反模式 | 正确做法 |
+|---|---|
+| 任务做完就结束，不沉淀 | 走完 CADL 闭环再交付 |
+| 把一次性上下文当资产写进 AGENTS.md | 只沉淀跨任务可复用的模式 |
+| 重复已有条目 | 写入前 grep 确认未覆盖 |
+| 只在 CodeGraph / GCL 相关任务才沉淀 | 评审/修复/协作/验证都触发 |
 
 ## CodeGraph — code intelligence (MANDATORY)
 
