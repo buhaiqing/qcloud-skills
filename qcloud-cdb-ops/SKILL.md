@@ -57,7 +57,7 @@ TencentDB for MySQL (CDB) on Tencent Cloud provides a stable, reliable, and elas
 
 ## Five Core Standards
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates).
 
 ### Well-Architected Framework Integration (卓越架构)
 
@@ -188,10 +188,10 @@ See [Core Concepts](references/core-concepts.md) → [Execution Flows](#executio
 
 | Scenario | Symptoms | Diagnosis TTR | Recovery TTR | Reference |
 |----------|----------|--------------|-------------|-----------|
-| **Long-running Queries** | QueryTime > 10s | ≤ 2 min | ≤ 5 min | [Decision Tree §4.1](references/cdb-slow-query-diagnosis-optimized.md#41-type-a-超长查询诊断) |
-| **Resource Bottleneck** | CPU > 80% | ≤ 3 min | ≤ 15 min | [Decision Tree §4.2](references/cdb-slow-query-diagnosis-optimized.md#42-type-b-资源瓶颈诊断) |
-| **Lock Wait** | LockTime/QueryTime > 50% | ≤ 2 min | ≤ 5 min | [Decision Tree §4.3](references/cdb-slow-query-diagnosis-optimized.md#43-type-c-锁等待诊断) |
-| **Query Optimization** | QueryTime 1-10s | ≤ 3 min | ≤ 10 min | [Decision Tree §4.4](references/cdb-slow-query-diagnosis-optimized.md#44-type-d-查询优化诊断) |
+| **Long-running Queries** | QueryTime > 10s | ≤ 2 min | ≤ 5 min | [Decision Tree §4.1](references/cdb-slow-query-diagnosis-optimized.md#2a-type-a) |
+| **Resource Bottleneck** | CPU > 80% | ≤ 3 min | ≤ 15 min | [Decision Tree §4.2](references/cdb-slow-query-diagnosis-optimized.md#2b-type-b) |
+| **Lock Wait** | LockTime/QueryTime > 50% | ≤ 2 min | ≤ 5 min | [Decision Tree §4.3](references/cdb-slow-query-diagnosis-optimized.md#2c-type-c) |
+| **Query Optimization** | QueryTime 1-10s | ≤ 3 min | ≤ 10 min | [Decision Tree §4.4](references/cdb-slow-query-diagnosis-optimized.md#2d-type-d) |
 
 ### Auto-Recovery Priority
 
@@ -246,7 +246,7 @@ Every operation: **Pre-flight → Execute (SDK/API and tccli) → Validate → R
 | `InternalError.DBError` | 3 | Retry; escalate if persists |
 | `LimitExceeded.ExceedMaxInstanceCount` | 0 | HALT; raise quota |
 
-**Commands:** [`references/execution-flows.md#1-createdbinstance`](references/execution-flows.md#1-createdbinstance)
+**Commands:** [`references/execution-flows.md#1-createdbinstance-create-mysql-instance-prepaid`](references/execution-flows.md#1-createdbinstance-create-mysql-instance-prepaid)
 
 ---
 
@@ -254,7 +254,7 @@ Every operation: **Pre-flight → Execute (SDK/API and tccli) → Validate → R
 
 **What:** List CDB instances with optional filters (instance ID, status, project). Returns instance metadata including status, resource specs, and network info.
 
-**Commands:** [`references/execution-flows.md#2-describedbinstances`](references/execution-flows.md#2-describedbinstances)
+**Commands:** [`references/execution-flows.md#2-describedbinstances-list-instances`](references/execution-flows.md#2-describedbinstances-list-instances)
 
 **Key Response Fields:**
 
@@ -273,7 +273,7 @@ Every operation: **Pre-flight → Execute (SDK/API and tccli) → Validate → R
 
 **Pre-flight:** Instance exists (status=1)? New spec price available?
 
-**Commands:** [`references/execution-flows.md#3-upgradedbinstance`](references/execution-flows.md#3-upgradedbinstance)
+**Commands:** [`references/execution-flows.md#3-upgradedbinstance-scale-instance`](references/execution-flows.md#3-upgradedbinstance-scale-instance)
 
 ---
 
@@ -289,7 +289,7 @@ Every operation: **Pre-flight → Execute (SDK/API and tccli) → Validate → R
 
 **What:** Isolate instance (makes it inaccessible). **Safety Gates apply — MUST have explicit user confirmation + pre-backup reminder + retention warning.**
 
-**Commands:** [`references/execution-flows.md#5-isolatedbinstance`](references/execution-flows.md#5-isolatedbinstance)
+**Commands:** [`references/execution-flows.md#5-isolatedbinstance-destructive`](references/execution-flows.md#5-isolatedbinstance-destructive)
 
 ---
 
@@ -301,7 +301,7 @@ Every operation: **Pre-flight → Execute (SDK/API and tccli) → Validate → R
 
 **Validate:** Poll `DescribeBackups` until `Status=SUCCESS`.
 
-**Commands:** [`references/execution-flows.md#6-createbackup`](references/execution-flows.md#6-createbackup)
+**Commands:** [`references/execution-flows.md#6-createbackup-manual-backup`](references/execution-flows.md#6-createbackup-manual-backup)
 
 ---
 
@@ -311,7 +311,7 @@ Every operation: **Pre-flight → Execute (SDK/API and tccli) → Validate → R
 
 **Validate:** `DescribeInstanceParams` confirms values applied. Some params require restart (`WaitSwitch=0`).
 
-**Commands:** [`references/execution-flows.md#7-modifyinstanceparam`](references/execution-flows.md#7-modifyinstanceparam)
+**Commands:** [`references/execution-flows.md#7-modifyinstanceparam-parameter-change`](references/execution-flows.md#7-modifyinstanceparam-parameter-change)
 
 ---
 
@@ -330,7 +330,7 @@ Every operation: **Pre-flight → Execute (SDK/API and tccli) → Validate → R
 
 **What:** Query slow log data for diagnosis. See also § Slow Query Quick Diagnosis for automated triage.
 
-**Commands:** [`references/execution-flows.md#11-describeslowlogdata`](references/execution-flows.md#11-describeslowlogdata)
+**Commands:** [`references/execution-flows.md#11-describeslowlogdata-slow-query-log`](references/execution-flows.md#11-describeslowlogdata-slow-query-log)
 
 ## Error Code Reference (≥ 12 Product-Specific Codes)
 

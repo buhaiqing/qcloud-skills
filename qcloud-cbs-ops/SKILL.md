@@ -48,7 +48,7 @@ CBS (Cloud Block Storage) is Tencent Cloud's persistent block storage service fo
 
 ## Five Core Standards
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates).
 
 ### Well-Architected Framework Integration (卓越架构)
 

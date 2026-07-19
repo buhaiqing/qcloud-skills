@@ -54,7 +54,7 @@ This skill is an **operational runbook** for agents: explicit scope, credential 
 
 ## Five Core Standards (Quality Gates)
 
-> See [shared-skills-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
+> See [shared-skills-boilerplate.md](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates).
 
 ### Well-Architected Framework Integration
 

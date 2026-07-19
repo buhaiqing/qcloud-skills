@@ -48,7 +48,7 @@ CLB (Cloud Load Balancer, 负载均衡) distributes access traffic across multip
 
 ### Five Core Standards
 
-See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
+See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates).
 
 ### Well-Architected Framework Integration (卓越架构)
 
@@ -147,7 +147,7 @@ See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-b
 
 Every operation: **Pre-flight → Execute (CLI + SDK) → Validate → Recover**. Do not skip phases. Detailed CLI/SDK commands live in [references/execution-flows.md](references/execution-flows.md).
 
-> **Anchor note:** Links below use `#N-<slug>` anchors that map to `## N. <Title>` headings in `references/execution-flows.md` (e.g. `#1-create-loadbalancer`). If you rename a heading there, update the matching anchor here to avoid a silent broken link.
+> **Anchor note:** Links below use `#N-<slug>` anchors that map to `## N. <Title>` headings in `references/execution-flows.md` (e.g. `#create-loadbalancer`). If you rename a heading there, update the matching anchor here to avoid a silent broken link.
 
 ### Quick Triage (diagnostic entry points)
 
@@ -170,24 +170,24 @@ Every operation: **Pre-flight → Execute (CLI + SDK) → Validate → Recover**
 ### Create LoadBalancer
 
 **Pre-flight:** SDK present (`pip show tencentcloud-sdk-python-clb`); CLI present (`tccli version`); credentials set; region valid; **VPC exists** (`tccli vpc DescribeVpcs`) else HALT → `qcloud-vpc-ops`.
-**Execute:** [execution-flows.md §1](references/execution-flows.md#1-create-loadbalancer).
+**Execute:** [execution-flows.md §1](references/execution-flows.md#create-loadbalancer).
 **Validate:** read `{{output.loadbalancer_id}}` from `$.Response.LoadBalancerIds[0]`; poll `DescribeLoadBalancers` until `Status=2`.
 
 ### Create Listener
 
 **Pre-flight:** LB running (DescribeLoadBalancers); port not conflicting.
-**Execute:** [execution-flows.md §3](references/execution-flows.md#3-create-listener).
+**Execute:** [execution-flows.md §3](references/execution-flows.md#create-listener).
 **Validate:** capture `{{output.listener_id}}`; verify via `DescribeListeners`.
 
 ### Register Targets (Bind Backend Servers)
 
 **Pre-flight:** Listener active; **CVM exists & RUNNING** (delegate `qcloud-cvm-ops`); CVM in same VPC as LB.
-**Execute:** [execution-flows.md §4](references/execution-flows.md#4-register-targets).
+**Execute:** [execution-flows.md §4](references/execution-flows.md#register-targets-bind-backend-servers).
 **Validate:** `DescribeTargets` + `DescribeTargetHealth`.
 
 ### Describe LoadBalancers / Describe Target Health
 
-**Execute:** [execution-flows.md §2](references/execution-flows.md#2-describe-loadbalancers) / [§5](references/execution-flows.md#5-describe-target-health).
+**Execute:** [execution-flows.md §2](references/execution-flows.md#describe-loadbalancers) / [§5](references/execution-flows.md#describe-target-health).
 **Present:** ID/Name/VIP/Status/Type (LB) and InstanceId/Port/HealthStatus (targets) — see JSON Path Reference.
 
 ### Delete LoadBalancer (Safety Gate)
@@ -195,7 +195,7 @@ Every operation: **Pre-flight → Execute (CLI + SDK) → Validate → Recover**
 - **MUST** obtain explicit confirmation: irreversible delete of `{{user.loadbalancer_name}}` (`{{user.loadbalancer_id}}`)
 - **MUST** warn: all listeners and backend bindings will be removed
 - **MUST NOT** proceed without clear user assent
-- **Execute:** [execution-flows.md §6](references/execution-flows.md#6-delete-loadbalancer). **Validate:** poll until empty/404.
+- **Execute:** [execution-flows.md §6](references/execution-flows.md#delete-loadbalancer). **Validate:** poll until empty/404.
 
 ### Idempotency Guidance
 
