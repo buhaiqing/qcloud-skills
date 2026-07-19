@@ -137,6 +137,7 @@ def structural_critic(generator: dict[str, Any]) -> dict[str, Any]:
     exit_code = generator.get("exit_code", -1)
     excerpt = generator.get("result_excerpt", "")
     cmd = generator.get("command", "")
+    raw_output = generator.get("raw_output", "")
 
     scores["correctness"] = 1.0 if exit_code == 0 else 0.0
     if exit_code != 0:
@@ -147,14 +148,50 @@ def structural_critic(generator: dict[str, Any]) -> dict[str, Any]:
     if leak:
         suggestions.append("Credential leak in trace — mask SecretKey and re-run")
 
-    scores["idempotency"] = 0.5
-    scores["traceability"] = 1.0 if cmd and excerpt else 0.5
-    if not excerpt:
-        suggestions.append("Empty generator output — capture stdout/stderr in trace")
+    # P1-B: Check Response has RequestId
+    has_request_id = False
+    if raw_output:
+        try:
+            out_dict = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
+            has_request_id = "RequestId" in out_dict.get("Response", {})
+        except Exception:
+            pass
+    scores["traceability"] = 1.0 if has_request_id else 0.5
+    if not has_request_id and (exit_code == 0 or excerpt):
+        suggestions.append("Response missing RequestId — traceability degraded")
+
+    # P1-B: Check ClientToken (idempotency key)
+    has_client_token = False
+    if raw_output:
+        try:
+            out_dict = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
+            has_client_token = "ClientToken" in out_dict.get("Response", {})
+        except Exception:
+            pass
+    scores["idempotency"] = 1.0 if has_client_token else 0.5
+    if not has_client_token and exit_code == 0:
+        suggestions.append("Response missing ClientToken — idempotency cannot be verified")
 
     scores["spec_compliance"] = 1.0 if exit_code == 0 else 0.0
     if exit_code == 0 and "tccli" not in cmd and "python" not in cmd.lower():
         scores["spec_compliance"] = 0.5  # structural smoke: command succeeded
+
+    # P1-B: Check required fields based on operation type
+    cmd_lower = cmd.lower()
+    is_delete = any(k in cmd_lower for k in ["delete", "destroy", "release", "terminate", "drop"])
+    if is_delete and exit_code == 0:
+        # For delete operations, absence of error in Response is the required field
+        has_error_field = False
+        if raw_output:
+            try:
+                out_dict = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
+                has_error_field = "Error" in out_dict.get("Response", {})
+            except Exception:
+                pass
+        # Delete success should have Error: null or absent
+        if has_error_field:
+            suggestions.append("Delete operation returned Error field — operation may have failed")
+            scores["spec_compliance"] = 0.0
 
     blocking = scores["safety"] == 0.0 or scores["correctness"] == 0.0
     return {
