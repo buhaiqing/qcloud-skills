@@ -32,8 +32,12 @@ from pathlib import Path
 from typing import Any
 
 from gcl_trajectory_quality import classify_op
-from reflexion_retrieve import load_failure_patterns, format_for_injection
+from reflexion_retrieve import load_failure_patterns, format_for_injection as ff_fail
 from success_pattern_mine import write_pending_with_lock
+from success_pattern_retrieve import retrieve_success_patterns
+from hallucination_detection import detect_hallucinations
+from distribution_drift import load_traces as _load_traces_dd, compute_drift
+
 
 # Per AGENTS.md §8 defaults (override via --max-iter)
 SKILL_MAX_ITER: dict[str, int] = {
@@ -364,16 +368,104 @@ def persist_trace(root: Path, trace: dict[str, Any], trace_id: str | None = None
     path.write_text(json.dumps(trace, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return path
 
+def _format_success_injection(entries: list[dict[str, Any]]) -> str:
+    """Format success patterns for Generator context injection.
+
+    Mirrors success_pattern_retrieve.format_for_injection but emits
+    REUSE guidance instead of failure warnings — guiding Generator toward
+    proven single-shot paths.
+
+    Returns empty string when entries is empty.
+    """
+    if not entries:
+        return ""
+    lines = []
+    for e in entries:
+        skill = e.get("skill", "—")
+        op = e.get("operation", "—")
+        sig = (e.get("command_signature", "") or "")[:60]
+        count = e.get("count", 0)
+        iter_v = e.get("iter", 1)
+        last_hit = e.get("last_hit", "—")
+        layer = e.get("_layer", "?")
+        layer_tag = f"[{layer.upper()}]" if layer != "hot" else ""
+        lines.append(
+            f"- {layer_tag}[{skill}] op=`{op}` sig=`{sig}...` "
+            f"(count={count}, iter={iter_v}, last_hit={last_hit})"
+        )
+    return "Known success paths (consider reusing):\n" + "\n".join(lines)
+
+def post_process(trace_path: Path, root: Path) -> None:
+    """Run hallucination detection and distribution drift on the new trace.
+
+    Called after PASS and MAX_ITER paths. Alerts go to stderr so they don't
+    interfere with structured JSON output.
+    """
+    try:
+        trace_data = json.loads(trace_path.read_text(encoding="utf-8"))
+    except Exception:
+        return
+    # Hallucination detection
+    suspects = detect_hallucinations([trace_data])
+    if suspects:
+        print(
+            f"HALLUCINATION_ALERT: {len(suspects)} suspect(s) in {trace_path.name}",
+            file=sys.stderr,
+        )
+        for s in suspects:
+            print(
+                f"  [{s['skill']}] iter={s['iter']} types={s['types']} "
+                f"cmd={s['command'][:60]}",
+                file=sys.stderr,
+            )
+    # Distribution drift
+    try:
+        all_traces = _load_traces_dd(root / "audit-results", since_days=30)
+        if len(all_traces) >= 6:
+            mid = len(all_traces) // 2
+            w2 = all_traces[mid:]   # newer half
+            w1 = all_traces[:mid]   # older half
+            drifts = compute_drift(w1, w2)
+            if drifts:
+                print(
+                    f"DISTRIBUTION_DRIFT: {len(drifts)} dimension(s) drifting",
+                    file=sys.stderr,
+                )
+                for d in drifts:
+                    print(
+                        f"  [{d['skill']}/{d['dimension']}] "
+                        f"w1_mean={d['window1_mean']:.3f} "
+                        f"w2_mean={d['window2_mean']:.3f} "
+                        f"delta={d['delta']:.3f} [{d['alert']}]",
+                        file=sys.stderr,
+                    )
+    except Exception:
+        pass  # non-blocking
+
+
 
 def cmd_run(args: argparse.Namespace) -> int:
     root = args.root
     max_iter = args.max_iter or SKILL_MAX_ITER.get(args.skill, 3)
+    # Load failure patterns (prevention hints)
     try:
-        prior_patterns = load_failure_patterns(args.skill, args.command)
+        prior_fail = load_failure_patterns(args.skill, args.command)
     except Exception:
-        prior_patterns = []
-    prior_block = format_for_injection(prior_patterns)
+        prior_fail = []
+    fail_block = ff_fail(prior_fail)
 
+    # Load success patterns (convergence guidance — single-shot wins first)
+    op_match = re.search(r"tccli\s+\w+\s+(\w+)", args.command or "")
+    operation = op_match.group(1) if op_match else None
+    try:
+        prior_success = retrieve_success_patterns(args.skill, operation=operation, top_n=3)
+    except Exception:
+        prior_success = []
+    succ_block = _format_success_injection(prior_success)
+
+    # Combine: success hints guide Generator toward fast convergence;
+    # failure hints prevent known mistakes
+    reflexion_block = "\n".join(filter(None, [succ_block, fail_block]))
     trace: dict[str, Any] = {
         "skill": args.skill,
         "request": args.request,
@@ -382,11 +474,12 @@ def cmd_run(args: argparse.Namespace) -> int:
         "preflight_reflexion": {
             "skill": args.skill,
             "command": args.command,
-            "matched": len(prior_patterns),
-            "injection": prior_block,
+            "matched_failures": len(prior_fail),
+            "matched_successes": len(prior_success),
+            "injection": reflexion_block,
         },
     }
-    gen_env = {"REFLEXION_PATTERNS": prior_block} if prior_block else None
+    gen_env = {"REFLEXION_PATTERNS": reflexion_block} if reflexion_block else None
 
     critic_feedback = ""
     command = args.command
@@ -464,6 +557,8 @@ def cmd_run(args: argparse.Namespace) -> int:
             except Exception:
                 pass  # non-blocking: success logging must not break the main return path
             print(f"PASS (iter {iteration}) — trace: {path}")
+            if args.enable_post_process:
+                post_process(path, root)
             return 0
 
         critic_feedback = "; ".join(critic.get("suggestions", [])[:3])
@@ -482,6 +577,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     }
     path = persist_trace(root, trace)
     print(f"MAX_ITER — trace: {path}", file=sys.stderr)
+    if args.enable_post_process:
+        post_process(path, root)
     return 1
 
 
@@ -513,6 +610,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Cross-system join key (e.g. copilot session_id). Names the trace file "
         "gcl-trace-<trace_id>.json so copilot and GCL traces share one identifier namespace.",
+    )
+    run.add_argument(
+        "--enable-post-process",
+        action="store_true",
+        default=False,
+        help="Enable post-processing: hallucination detection + distribution drift",
     )
     run.set_defaults(func=cmd_run)
     return p

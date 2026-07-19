@@ -1,7 +1,35 @@
 # 剩余优化任务计划
 
 > 生成时间: 2026-07-04
+> 更新时间: 2026-07-19
 > 基于全面扫描结果，按优先级排列。
+
+---
+
+## 状态总览
+
+| Batch | 优先级 | 任务数 | 状态 | 完成时间 |
+|-------|--------|--------|------|----------|
+| **AIOps 优化** | **P0/P1** | **6** | **✅ 全部完成 (6/6)** | **2026-07-19** |
+| Batch 1 | P0 | 4 | ⏳ 未开始 | — |
+| Batch 2 | P1 | 8 | ⏳ 未开始 | — |
+| Batch 3 | P1 | 1 (20 个 SKILL) | ⏳ 未开始 | — |
+| Batch 4 | P1 | 6 | ⏳ 未开始 | — |
+| Batch 5 | P2 | 8 | ⏳ 未开始 | — |
+
+### Batch AIOps 完成项（2026-07-19）
+
+| 任务 | 优先级 | 文件 | 状态 |
+|------|--------|------|------|
+| Success Pattern Retrieve 集成 | P0 | `scripts/gcl_runner.py` (pre-flight) | ✅ |
+| Prediction Engine | P0 | `scripts/predictive_analyzer.py` | ✅ |
+| Hallucination/Drift 检测集成 | P1 | `scripts/gcl_runner.py` (post-process) | ✅ |
+| Cross-Skill Impact Analysis | P1 | `scripts/cross_skill_impact.py` | ✅ |
+| Incident Timeline Aggregator | P1 | `scripts/incident_timeline_aggregator.py` | ✅ |
+
+---
+
+
 
 ---
 
