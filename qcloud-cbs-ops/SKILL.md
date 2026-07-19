@@ -422,7 +422,7 @@ See [`references/error-reference.md`](references/error-reference.md) §2. Common
 ### SecOps Security Operations
 
 - [Audit Rules](references/audit-rules.md) — Audit rules for disk encryption, snapshot access, backup compliance
-- [SecOps Checklist](references/secops-checklist.md) — Security audit logs, encryption verification, compliance checklist
+- [SecOps Checklist](references/secops-security-operations.md) — Security audit logs, encryption verification, compliance checklist
 
 ### AIOps Intelligent Operations
 

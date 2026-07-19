@@ -173,6 +173,7 @@ def build_steps(python: str = sys.executable, github_output: bool = False) -> li
             ),
         ),
         Step("GCL Tier-A conformance", (python, "scripts/check_gcl_conformance.py")),
+        Step("SecOps filename completeness", (python, "scripts/check_secops_completeness.py")),
     ]
 
 

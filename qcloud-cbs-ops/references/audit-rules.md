@@ -21,5 +21,5 @@
 For compliance requirements, refer to Tencent Cloud Security whitepaper and your organization's data retention policy.
 
 ## See also
-- [SecOps Checklist](secops-checklist.md)
+- [SecOps Checklist](secops-security-operations.md)
 - [Core Concepts](core-concepts.md)

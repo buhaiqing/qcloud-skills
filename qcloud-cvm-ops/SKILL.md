@@ -592,7 +592,7 @@ Poll DescribeDisks until disk `NOT_ATTACHED` state and `InstanceId` is absent.
 > See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#reference-directory).
 
 Core: `references/core-concepts.md`, `references/api-sdk-usage.md`, `references/cli-usage.md`, `references/sdk-templates.md`, `references/troubleshooting.md`, `references/well-architected-assessment.md`, `references/rubric.md`, `references/prompt-templates.md`.
-Optional: `references/monitoring.md`, `references/finops-analysis.md`, `references/secops-checklist.md`, `references/audit-rules.md`, `references/proactive-inspection.md`, `references/aiops-diagnosis.md`.
+Optional: `references/monitoring.md`, `references/finops-analysis.md`, `references/secops-security-operations.md`, `references/audit-rules.md`, `references/proactive-inspection.md`, `references/aiops-diagnosis.md`.
 
 ## Error Code Reference (CVM-Specific)
 
