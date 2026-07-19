@@ -7,19 +7,34 @@
 
 | 维度 | 状态 |
 |------|------|
-| 33 个 skill 目录 | ✅ 全部就位（29 product + 3 cross-product + 1 meta） |
+| 34 个 SKILL.md 文件 | ✅ 全部就位（29 product + 3 cross-product + 1 meta + 1 skill-generator） |
 | GCL 覆盖率 | ✅ `check_gcl_conformance.py` 已覆盖全部 33 个 skill |
 | GCL 通过率 | ✅ 33/33 通过，全部符合 Tier-A conformance |
-| 硬编码区域修复 | ✅ Batch 2 完成（`b8d1a10`） |
-| AGENTS.md 路径修正 | ✅ Batch 3 完成（`b636cce`） |
-| 幽灵链接修复 | ✅ Batch 4 完成（`c3bc268`） |
-| Token 效率压缩 | ✅ Batch 5 完成（`62b4251`） |
-| SLB 5xx MTTR 优化 | ✅ 完成（`81bded5` + `ec1d8aa`） |
-| RDS MySQL 诊断优化 | ✅ 完成（`18d3c20`） |
-| AIOps 预测分析/知识图谱 | ✅ 完成（`ae77b8d`） |
-| vpn-ops 多分支拓扑模板 | ✅ 完成（`dd06849`，刚提交） |
-| service-mesh-ops GCL 对齐 | ✅ 完成（`058978f`，刚提交） |
-| 验证脚本 | ✅ frontmatter 30/30, GCL 29/31, Python-in-Markdown OK |
+| 硬编码区域修复 | ✅ Batch 2 完成（[`b8d1a10`](https://github.com/buhaiqing/qcloud-skills/commit/b8d1a10)） |
+| AGENTS.md 路径修正 | ✅ Batch 3 完成（[`b636cce`](https://github.com/buhaiqing/qcloud-skills/commit/b636cce)） |
+| 幽灵链接修复 | ✅ Batch 4 完成（[`c3bc268`](https://github.com/buhaiqing/qcloud-skills/commit/c3bc268)） |
+| Token 效率压缩 | ✅ Batch 5 完成（[`62b4251`](https://github.com/buhaiqing/qcloud-skills/commit/62b4251)） |
+| SLB 5xx MTTR 优化 | ✅ 完成（[`81bded5`](https://github.com/buhaiqing/qcloud-skills/commit/81bded5) + [`ec1d8aa`](https://github.com/buhaiqing/qcloud-skills/commit/ec1d8aa)） |
+| RDS MySQL 诊断优化 | ✅ 完成（[`18d3c20`](https://github.com/buhaiqing/qcloud-skills/commit/18d3c20)） |
+| AIOps 预测分析/知识图谱 | ✅ 完成（[`ae77b8d`](https://github.com/buhaiqing/qcloud-skills/commit/ae77b8d)） |
+| vpn-ops 多分支拓扑模板 | ✅ 完成（[`dd06849`](https://github.com/buhaiqing/qcloud-skills/commit/dd06849)，刚提交） |
+| service-mesh-ops GCL 对齐 | ✅ 完成（[`058978f`](https://github.com/buhaiqing/qcloud-skills/commit/058978f)，刚提交） |
+| 验证脚本 | ✅ frontmatter 34/34, GCL 33/33, Python-in-Markdown OK |
+
+## Harness Engineering 对齐（待补充）
+
+> 以下维度是Harness AI Agent工程标准的核心要求，当前TODO.md完全缺失。
+
+| 维度 | 标准来源 | 当前状态 | 建议行动 |
+|------|---------|---------|---------|
+| Agent执行可靠性 | Harness AI Agent SLA (uptime/p99 latency) | 仅GCL trace，缺SLA指标 | 补充agent执行SLA dashboard和告警SLO |
+| 多Agent协作安全 | Harness Multi-Agent Protocol / HITL | 缺human-in-the-loop checkpoint | 补充高风险操作的HITL审批节点 |
+| Prompt注入防护 | OWASP LLM Top 10 / Harness Security | 缺prompt注入检测和防御 | 补充reflexion的adversarial pattern覆盖 |
+| Skill版本漂移 | Harness Skill Registry / Semantic Versioning | 缺skill版本兼容性追踪 | 补充skill版本matrix和breaking change检测 |
+| Agent成本治理 | Harness FinOps / token预算控制 | 无cost tracking | 补充per-skill/token消耗的计量表 |
+| 跨Agent上下文隔离 | Harness Agent Mesh / 租户隔离 | GCL C/G隔离已有，缺Agent Mesh层 | 补充多租户/多环境context隔离规范 |
+
+> 注：以上补充内容不影响当前GCL/Reflexion技术实现的正确性，属Harness工程语境对齐。
 
 ## 待修复 Backlog（GCL 预存不符合）
 
@@ -29,7 +44,7 @@
 | # | Skill | 失败项 | 现象 | 修复方向 | 预估工作量 |
 |---|-------|--------|------|----------|-----------|
 | B1 | `qcloud-cam-ops` | rubric 节数 9/8 | rubric.md 含 9 个 `## N.` 编号节，超出模板预期的 8 节 | ✅ 已修复 — rubric.md 已重编号为 8 节，通过 Tier-A conformance | 0.5h |
-| B2 | `qcloud-tcop-ops` | rubric 0/8, prompt 0/7 | rubric.md / prompt-templates.md 使用非标准格式（表格 + 无编号节标题），不符合 `qcloud-skill-template.md` 的 `## N.` 编号节要求 | ✅ 已修复 (`5610fdc`) — rubric.md 含 8 节、prompt-templates.md 含 7 节，通过 Tier-A conformance | 1-2h |
+| B2 | `qcloud-tcop-ops` | rubric 0/8, prompt 0/7 | rubric.md / prompt-templates.md 使用非标准格式（表格 + 无编号节标题），不符合 `qcloud-skill-template.md` 的 `## N.` 编号节要求 | ✅ 已修复 ([`5610fdc`](https://github.com/buhaiqing/qcloud-skills/commit/5610fdc)) — rubric.md 含 8 节、prompt-templates.md 含 7 节，通过 Tier-A conformance | 1-2h |
 
 ## 可考虑的新方向
 
@@ -37,11 +52,11 @@
 
 | # | 方向 | 说明 | 预估工作量 |
 |---|------|------|-----------|
-| 1 | **qcloud-dc-ops 场景增强** | DC skill 已存在但场景较基础，可补充专线故障切换、多云接入等 | ✅ 已完成（`d920158`）— 新增冗余通道/故障切换（BFD/NQA 健康检查、FailoverSwitch 手动切换）、多云多地域接入（CreateCloudAttachService→CCN）；rubric 安全规则扩至 5 条；修复 Prerequisites 凭证泄露 | 0.5-1 天 |
-| 2 | **qcloud-migration-ops 场景增强** | 迁移 skill 已存在，可补充更多迁移场景 | ✅ 已完成（`32141e3`）— 新增 ModifyMigrationTaskStatus、ListMigrationProject、Cutover/Switchover、Migration Validation 4 个执行流，rubric 安全规则扩至 5 条，troubleshooting 补充割接失败模式 |
-| 3 | **跨 skill 编排测试** | 验证 aiops-diagnosis + monitor-ops + 产品 skill 的跨 skill 调用链路 | ✅ 已完成（`f92111b` + `c079df0`）— 16 个测试覆盖 handoff payload、mode selection、bundle structure |
-| 4 | **新技能：消息队列（TDMQ）** | 目前没有 TDMQ（RocketMQ/Pulsar）skill | ✅ 已完成（`e839f05`）— 新增 `qcloud-tdmq-ops` skill，含 10 个执行流（RocketMQ/Pulsar/RabbitMQ/CMQ）、rubric 8 节、prompt 7 节，GCL conform 32/32 | 3 天 |
-| 5 | **新技能：API 网关** | 目前没有 API Gateway skill | ✅ 已完成（`4163c9c`）— 新增 `qcloud-apigw-ops` skill，含 10 个执行流（Service/API/Release/UsagePlan/SubDomain）、rubric 8 节、prompt 7 节，GCL conform 33/33 | 2 天 |
+| 1 | **qcloud-dc-ops 场景增强** | DC skill 已存在但场景较基础，可补充专线故障切换、多云接入等 | ✅ 已完成（[`d920158`](https://github.com/buhaiqing/qcloud-skills/commit/d920158)）— 新增冗余通道/故障切换（BFD/NQA 健康检查、FailoverSwitch 手动切换）、多云多地域接入（CreateCloudAttachService→CCN）；rubric 安全规则扩至 5 条；修复 Prerequisites 凭证泄露 | 0.5-1 天 |
+| 2 | **qcloud-migration-ops 场景增强** | 迁移 skill 已存在，可补充更多迁移场景 | ✅ 已完成（[`32141e3`](https://github.com/buhaiqing/qcloud-skills/commit/32141e3)）— 新增 ModifyMigrationTaskStatus、ListMigrationProject、Cutover/Switchover、Migration Validation 4 个执行流，rubric 安全规则扩至 5 条，troubleshooting 补充割接失败模式 |
+| 3 | **跨 skill 编排测试** | 验证 aiops-diagnosis + monitor-ops + 产品 skill 的跨 skill 调用链路 | ✅ 已完成（[`f92111b`](https://github.com/buhaiqing/qcloud-skills/commit/f92111b) + [`c079df0`](https://github.com/buhaiqing/qcloud-skills/commit/c079df0)）— 16 个测试覆盖 handoff payload、mode selection、bundle structure |
+| 4 | **新技能：消息队列（TDMQ）** | 目前没有 TDMQ（RocketMQ/Pulsar）skill | ✅ 已完成（[`e839f05`](https://github.com/buhaiqing/qcloud-skills/commit/e839f05)）— 新增 `qcloud-tdmq-ops` skill，含 10 个执行流（RocketMQ/Pulsar/RabbitMQ/CMQ）、rubric 8 节、prompt 7 节，GCL conform 32/32 | 3 天 |
+| 5 | **新技能：API 网关** | 目前没有 API Gateway skill | ✅ 已完成（[`4163c9c`](https://github.com/buhaiqing/qcloud-skills/commit/4163c9c)）— 新增 `qcloud-apigw-ops` skill，含 10 个执行流（Service/API/Release/UsagePlan/SubDomain）、rubric 8 节、prompt 7 节，GCL conform 33/33 | 2 天 |
 
 ## GCL Loop Engineering 优化（qcloud-cdn-ops P0-P5）
 
@@ -49,12 +64,36 @@
 
 | # | 优化项 | 说明 | 状态 |
 |---|--------|------|------|
-| P0 | **动态 max_iterations** | 按操作风险等级动态调整迭代次数（破坏性=2, 缓存变更=1, 敏感配置=3） | ✅ 已完成（`f03fe9a`） |
-| P1 | **早期停止机制** | Safety 规则满足 + Critic 分数收敛（Δ < 0.1 for 2 rounds）时提前通过 | ✅ 已完成（`50d6a7f`） |
-| P2 | **并行 Critic 专业化** | Data Quality Critic + Safety Rules Critic 并行评审，不同维度专门化 | ✅ 已完成（`ccedfd1`） |
-| P3 | **自适应退避策略** | 根据错误类型动态调整重试间隔（指数退避 vs 固定间隔） | ✅ 已完成（`bfe7a5f`） |
-| P4 | **安全规则优先级分级** | CDN 操作按风险分级：高风险（DeleteCdnDomain）→ 立即中止，中风险（UpdateDomainConfig）→ 迭代，低风险（只读）→ 跳过 | ✅ 已完成（`69a2547`） |
-| P5 | **上下文感知 GCL** | 读取操作历史（reflexion memory）自动调整策略，新操作 vs 重复操作区别处理 | ✅ 已完成（`1fcf258`） |
+| P0 | **动态 max_iterations** | 按操作风险等级动态调整迭代次数（破坏性=2, 缓存变更=1, 敏感配置=3） | ✅ 已完成（[`f03fe9a`](https://github.com/buhaiqing/qcloud-skills/commit/f03fe9a)） |
+| P1 | **早期停止机制** | Safety 规则满足 + Critic 分数收敛（Δ < 0.1 for 2 rounds）时提前通过 | ✅ 已完成（[`50d6a7f`](https://github.com/buhaiqing/qcloud-skills/commit/50d6a7f)） |
+| P2 | **并行 Critic 专业化** | Data Quality Critic + Safety Rules Critic 并行评审，不同维度专门化 | ✅ 已完成（[`ccedfd1`](https://github.com/buhaiqing/qcloud-skills/commit/ccedfd1)） |
+| P3 | **自适应退避策略** | 根据错误类型动态调整重试间隔（指数退避 vs 固定间隔） | ✅ 已完成（[`bfe7a5f`](https://github.com/buhaiqing/qcloud-skills/commit/bfe7a5f)） |
+| P4 | **安全规则优先级分级** | CDN 操作按风险分级：高风险（DeleteCdnDomain）→ 立即中止，中风险（UpdateDomainConfig）→ 迭代，低风险（只读）→ 跳过 | ✅ 已完成（[`69a2547`](https://github.com/buhaiqing/qcloud-skills/commit/69a2547)） |
+| P5 | **上下文感知 GCL** | 读取操作历史（reflexion memory）自动调整策略，新操作 vs 重复操作区别处理 | ✅ 已完成（[`1fcf258`](https://github.com/buhaiqing/qcloud-skills/commit/1fcf258)） |
+
+## L4 接入项（2026-07-19 完成）
+
+> P0/P1 规划的基础设施已就位，但接入点存在缺口。以下为 L4 就绪所需的最后一公里。
+
+| # | 接入项 | 文件 | 状态 |
+|---|--------|------|------|
+| L4-1 | Rubric校准结果接入 gcl_runner | `scripts/gcl_runner.py` | ✅ 上下文管理器 `_rubric_calibration` 注入 |
+| L4-2 | `pattern_anomaly_detect.py` 定时触发 | `.github/workflows/pattern-anomaly-cron.yml` + CI hook | ✅ 每日cron + CI non-blocking step |
+| L4-3 | `--post-process` 默认启用（生产模式）/CI模式关闭 | `scripts/gcl_runner.py` | ✅ `--structural-critic-only` 时自动关闭 |
+| L4-4 | L4指标追踪 dashboard | `scripts/l4_metrics_tracker.py` | ✅ 5指标实时写入 `audit-results/l4-metrics.json` |
+| L4-5 | 腾讯云错误码注入 Critic | `scripts/gcl_runner.py` + `scripts/tcloud_error_codes.py` | ✅ `load_tcloud_error_hints()` + structural_critic 增强 |
+
+### L4 指标快照（`python3 scripts/l4_metrics_tracker.py`）
+
+```json
+{
+  "avg_iterations":          {"current": 1.0,  "target": 1.8,  "status": "✅"},
+  "failure_pattern_hit_rate":{"current": 0.0,  "target": 0.6,  "status": "❌ 尚未启用"},
+  "success_path_reuse_rate": {"current": 0.0,  "target": 0.9,  "status": "❌ 尚未启用"},
+  "rubric_threshold_deviation": {"current": 0.22, "target": 0.1, "status": "❌"},
+  "emerging_pattern_latency":{"current": null, "target": 7,   "status": "❌"}
+}
+```
 
 ## Agentic AI 成熟度升级：自纠正能力 & 上下文适应 → L4
 
@@ -164,7 +203,7 @@
 | **文件** | `scripts/rubric_calibrate.py`（新增，22 tests pass） |
 | **输入** | `audit-results/gcl-trace-*.json` 历史数据 |
 | **输出** | per-skill 动态阈值建议 |
-| **状态** | ✅ 已完成（`d0fec4c` + `04c7569`）— 22 tests pass |
+| **状态** | ✅ 已完成（[`d0fec4c`](https://github.com/buhaiqing/qcloud-skills/commit/d0fec4c) + [`04c7569`](https://github.com/buhaiqing/qcloud-skills/commit/04c7569)）— 22 tests pass |
 
 #### P1-B: Self-Critique 补强
 
@@ -172,7 +211,7 @@
 |------|------|
 | **文件** | `scripts/gcl_runner.py`（修改 `structural_critic`） |
 | **补强项** | correctness：检查响应是否含预期 JSON path / idempotency：检查是否含 ClientToken / traceability：检查是否含 RequestId / spec_compliance：检查 command 是否匹配 skill 的 cli-usage.md |
-| **状态** | ✅ 已完成（`46695ab`）— 35 tests pass |
+| **状态** | ✅ 已完成（[`46695ab`](https://github.com/buhaiqing/qcloud-skills/commit/46695ab)）— 35 tests pass |
 
 #### P1-C: 主动模式发现
 
@@ -181,7 +220,7 @@
 | **文件** | `scripts/pattern_anomaly_detect.py`（新增） |
 | **检测逻辑** | 同一 error 最近7天频率 vs 历史均值（>2σ=emerging）/ 新 skill+operation 组合首次出现（novel） |
 | **输出** | `audit-results/pattern-anomaly-YYYYMMDD.json` + `docs/failure-patterns.md` 顶部 `## Emerging Alerts` 区块 |
-| **状态** | ✅ 已完成（`97b0d93`）— ruff clean |
+| **状态** | ✅ 已完成（[`97b0d93`](https://github.com/buhaiqing/qcloud-skills/commit/97b0d93)）— ruff clean |
 
 
 ---
@@ -200,7 +239,7 @@
 |------|------|
 | **文件** | `scripts/distribution_drift.py`（新增） |
 | **检测方法** | 近期 7 天 vs 历史 30 天：均值对比 |
-| **状态** | ✅ 已完成（`dfb2782`）— ruff clean |
+| **状态** | ✅ 已完成（[`dfb2782`](https://github.com/buhaiqing/qcloud-skills/commit/dfb2782)）— ruff clean |
 
 #### P1-F: 幻觉检测 `hallucination_detection`
 
@@ -208,7 +247,7 @@
 |------|------|
 | **文件** | `scripts/hallucination_detection.py`（新增） |
 | **检测方法** | Schema 验证 + 边界检测（Describe 应有结果却返回空）+ 幂等性自洽 |
-| **状态** | ✅ 已完成（`dfb2782`）— ruff clean |
+| **状态** | ✅ 已完成（[`dfb2782`](https://github.com/buhaiqing/qcloud-skills/commit/dfb2782)）— ruff clean |
 
 ### P2 改进项
 
@@ -218,7 +257,7 @@
 |------|------|
 | **文件** | `scripts/failure_pattern_extract.py`（新增 `--promote` flag） |
 | **触发条件** | pattern count≥10 |
-| **状态** | ✅ 已完成（`46695ab`）— 17 tests pass |
+| **状态** | ✅ 已完成（[`46695ab`](https://github.com/buhaiqing/qcloud-skills/commit/46695ab)）— 17 tests pass |
 
 ### P3 改进项
 
@@ -228,17 +267,16 @@
 |------|------|
 | **文件** | `scripts/tcloud_error_codes.py`（新增） |
 | **内容** | 腾讯云 API 错误码表（9 个核心错误码 + severity/category/fix） |
-| **状态** | ✅ 已完成（`46695ab`）— ruff clean |
+| **状态** | ✅ 已完成（[`46695ab`](https://github.com/buhaiqing/qcloud-skills/commit/46695ab)）— ruff clean |
 
 
 ### L4 验收标准
 
 完成 P0 + P1 后，以下指标应达成：
-
-| 指标 | 目标 | 测量方式 |
-|------|------|---------|
-| GCL 平均迭代次数 | 下降 20%（从当前均值向 1 次收敛） | `gcl_trace_aggregate.py` 统计 |
-| failure-patterns 命中率 | 新 trace 命中历史 pattern 比例 ≥ 60% | `reflexion_retrieve.py` 查询统计 |
-| emerging pattern 发现延迟 | 从首次出现到预警 < 7 天 | `pattern_anomaly_detect.py` 日志 |
-| 成功路径复用率 | 含 success pattern 的 Generator 执行 PASS 率 > 90% | 对比有/无 success pattern 的 trace |
-| Rubric 阈值偏离度 | 动态阈值与实际评分均值的偏差 < 0.1 | `rubric_calibrate.py` 输出报告 |
+| 指标 | 当前基线 | 目标 | 测量方式 |
+|------|---------|------|---------|
+| GCL 平均迭代次数 | 1.0 ✅ | ≤1.8次（下降20%） | `gcl_trace_aggregate.py` 统计 |
+| failure-patterns 命中率 | 0%（尚未启用） | ≥ 60% | `reflexion_retrieve.py` 查询统计 |
+| emerging pattern 发现延迟 | N/A（无触发数据） | < 7 天 | `pattern_anomaly_detect.py` 日志 |
+| 成功路径复用率 | 0%（尚未启用） | > 90% | 对比有/无 success pattern 的 trace |
+| Rubric 阈值偏离度 | 0.22 | < 0.1 | `rubric_calibrate.py` 输出报告 |

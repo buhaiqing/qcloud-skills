@@ -123,7 +123,7 @@ class TestLoadFailurePatternsIntegration(unittest.TestCase):
 class TestFormatForInjectionIntegration(unittest.TestCase):
     """Test (2): format_for_injection() formats patterns correctly for GCL prompt injection."""
 
-    @patch("gcl_runner.format_for_injection")
+    @patch("gcl_runner.ff_fail")
     def test_format_for_injection_with_patterns(self, mock_format: MagicMock) -> None:
         """Verify format_for_injection returns properly formatted string for injection."""
         patterns: list[dict[str, Any]] = [
@@ -144,23 +144,23 @@ class TestFormatForInjectionIntegration(unittest.TestCase):
 """
         mock_format.return_value = expected_block
 
-        result = gcl_runner.format_for_injection(patterns)
+        result = gcl_runner.ff_fail(patterns)
 
         self.assertIsInstance(result, str)
         self.assertIn("Reflexion Failure Patterns", result)
         self.assertIn("cli_parameter", result)
         self.assertIn("MissingParameter", result)
 
-    @patch("gcl_runner.format_for_injection")
+    @patch("gcl_runner.ff_fail")
     def test_format_for_injection_empty_list(self, mock_format: MagicMock) -> None:
         """Verify format_for_injection returns empty string for empty list."""
         mock_format.return_value = ""
 
-        result = gcl_runner.format_for_injection([])
+        result = gcl_runner.ff_fail([])
 
         self.assertEqual(result, "")
 
-    @patch("gcl_runner.format_for_injection")
+    @patch("gcl_runner.ff_fail")
     def test_format_for_injection_multiple_patterns(self, mock_format: MagicMock) -> None:
         """Verify format_for_injection handles multiple patterns correctly."""
         patterns: list[dict[str, Any]] = [
@@ -192,7 +192,7 @@ class TestFormatForInjectionIntegration(unittest.TestCase):
 """
         mock_format.return_value = expected_block
 
-        result = gcl_runner.format_for_injection(patterns)
+        result = gcl_runner.ff_fail(patterns)
 
         self.assertIsInstance(result, str)
         self.assertIn("cli_parameter", result)
@@ -244,7 +244,7 @@ class TestReflexionPatternsEnvVar(unittest.TestCase):
     """Test (3): REFLEXION_PATTERNS env var is set when patterns exist."""
 
     @patch("gcl_runner.load_failure_patterns")
-    @patch("gcl_runner.format_for_injection")
+    @patch("gcl_runner.ff_fail")
     def test_env_var_set_when_patterns_exist(
         self, mock_format: MagicMock, mock_load: MagicMock
     ) -> None:
@@ -294,7 +294,7 @@ class TestReflexionPatternsEnvVar(unittest.TestCase):
             self.assertIn("Reflexion Patterns", captured_env["REFLEXION_PATTERNS"])
 
     @patch("gcl_runner.load_failure_patterns")
-    @patch("gcl_runner.format_for_injection")
+    @patch("gcl_runner.ff_fail")
     def test_env_var_not_set_when_no_patterns(
         self, mock_format: MagicMock, mock_load: MagicMock
     ) -> None:
@@ -341,7 +341,7 @@ class TestReflexionPatternsEnvVar(unittest.TestCase):
                 self.assertNotIn("REFLEXION_PATTERNS", captured_env)
 
     @patch("gcl_runner.load_failure_patterns")
-    @patch("gcl_runner.format_for_injection")
+    @patch("gcl_runner.ff_fail")
     def test_env_var_contains_formatted_patterns(
         self, mock_format: MagicMock, mock_load: MagicMock
     ) -> None:
@@ -397,7 +397,7 @@ class TestPreflightReflexionLogging(unittest.TestCase):
     """Test (4): preflight_reflexion.matched count is logged in trace."""
 
     @patch("gcl_runner.load_failure_patterns")
-    @patch("gcl_runner.format_for_injection")
+    @patch("gcl_runner.ff_fail")
     def test_matched_count_logged_in_trace(
         self, mock_format: MagicMock, mock_load: MagicMock
     ) -> None:
@@ -439,15 +439,15 @@ class TestPreflightReflexionLogging(unittest.TestCase):
             # Verify preflight_reflexion exists and has matched count
             self.assertIn("preflight_reflexion", trace_data)
             preflight = trace_data["preflight_reflexion"]
-            self.assertIn("matched", preflight)
-            self.assertEqual(preflight["matched"], 3)  # Should match number of patterns
+            self.assertIn("matched_failures", preflight)
+            self.assertEqual(preflight["matched_failures"], 3)  # Should match number of patterns
 
     @patch("gcl_runner.load_failure_patterns")
-    @patch("gcl_runner.format_for_injection")
+    @patch("gcl_runner.ff_fail")
     def test_matched_count_zero_when_no_patterns(
         self, mock_format: MagicMock, mock_load: MagicMock
     ) -> None:
-        """Verify preflight_reflexion.matched is 0 when no patterns found."""
+        """Verify preflight_reflexion.matched_failures is 0 when no patterns found."""
         mock_load.return_value = []
         mock_format.return_value = ""
 
@@ -478,11 +478,11 @@ class TestPreflightReflexionLogging(unittest.TestCase):
 
             self.assertIn("preflight_reflexion", trace_data)
             preflight = trace_data["preflight_reflexion"]
-            self.assertIn("matched", preflight)
-            self.assertEqual(preflight["matched"], 0)
+            self.assertIn("matched_failures", preflight)
+            self.assertEqual(preflight["matched_failures"], 0)
 
     @patch("gcl_runner.load_failure_patterns")
-    @patch("gcl_runner.format_for_injection")
+    @patch("gcl_runner.ff_fail")
     def test_preflight_reflexion_includes_all_fields(
         self, mock_format: MagicMock, mock_load: MagicMock
     ) -> None:
@@ -520,12 +520,12 @@ class TestPreflightReflexionLogging(unittest.TestCase):
             # Verify all expected fields
             self.assertIn("skill", preflight)
             self.assertIn("command", preflight)
-            self.assertIn("matched", preflight)
+            self.assertIn("matched_failures", preflight)
             self.assertIn("injection", preflight)
 
             self.assertEqual(preflight["skill"], "qcloud-cvm-ops")
             self.assertEqual(preflight["command"], "tccli cvm DescribeInstances")
-            self.assertEqual(preflight["matched"], 1)
+            self.assertEqual(preflight["matched_failures"], 1)
             self.assertEqual(preflight["injection"], formatted_block)
 
 
@@ -533,7 +533,7 @@ class TestReflexionEndToEnd(unittest.TestCase):
     """End-to-end tests for reflexion wiring."""
 
     @patch("gcl_runner.load_failure_patterns")
-    @patch("gcl_runner.format_for_injection")
+    @patch("gcl_runner.ff_fail")
     def test_full_reflexion_flow_with_patterns(
         self, mock_format: MagicMock, mock_load: MagicMock
     ) -> None:
@@ -605,9 +605,85 @@ class TestReflexionEndToEnd(unittest.TestCase):
 
             trace_data = json.loads(trace_files[0].read_text())
             self.assertIn("preflight_reflexion", trace_data)
-            self.assertEqual(trace_data["preflight_reflexion"]["matched"], 1)
+            self.assertEqual(trace_data["preflight_reflexion"]["matched_failures"], 1)
             self.assertEqual(trace_data["preflight_reflexion"]["injection"], formatted_block)
 
 
+class TestRubricCalibrationOverride(unittest.TestCase):
+    """Test: calibrated rubric thresholds override defaults inside cmd_run context."""
+
+    def test_rubric_calibration_overrides_thresholds(self) -> None:
+        """Context manager _rubric_calibration overrides and restores RUBRIC_THRESHOLDS."""
+        orig = dict(gcl_runner.RUBRIC_THRESHOLDS)
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "audit-results").mkdir()
+            calib_file = tmp_path / "audit-results" / "rubric-calibration-test.json"
+            calib_file.write_text(
+                json.dumps({
+                    "skills": {
+                        "qcloud-cvm-ops": {
+                            "correctness": 0.6,
+                            "safety": 1.0,
+                            "idempotency": 0.4,
+                            "traceability": 0.5,
+                            "spec_compliance": 0.5,
+                        }
+                    }
+                })
+            )
+
+            # Inside context manager: thresholds should be overridden
+            with gcl_runner._rubric_calibration(tmp_path, "qcloud-cvm-ops"):
+                self.assertEqual(gcl_runner.RUBRIC_THRESHOLDS["correctness"], 0.6)
+                self.assertEqual(gcl_runner.RUBRIC_THRESHOLDS["idempotency"], 0.4)
+                # Unchanged dimensions
+                self.assertEqual(gcl_runner.RUBRIC_THRESHOLDS["safety"], 1.0)
+                self.assertEqual(gcl_runner.RUBRIC_THRESHOLDS["traceability"], 0.5)
+                self.assertEqual(gcl_runner.RUBRIC_THRESHOLDS["spec_compliance"], 0.5)
+
+            # After exit: original thresholds restored
+            self.assertEqual(gcl_runner.RUBRIC_THRESHOLDS, orig)
+
+    def test_rubric_calibration_no_file_keeps_defaults(self) -> None:
+        """When no calibration file exists, RUBRIC_THRESHOLDS are unchanged."""
+        orig = dict(gcl_runner.RUBRIC_THRESHOLDS)
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            with gcl_runner._rubric_calibration(tmp_path, "qcloud-cvm-ops"):
+                self.assertEqual(gcl_runner.RUBRIC_THRESHOLDS, orig)
+
+        self.assertEqual(gcl_runner.RUBRIC_THRESHOLDS, orig)
+
+    def test_rubric_calibration_unknown_skill_keeps_defaults(self) -> None:
+        """When calibration file exists but skill has no entry, defaults unchanged."""
+        orig = dict(gcl_runner.RUBRIC_THRESHOLDS)
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "audit-results").mkdir()
+            calib_file = tmp_path / "audit-results" / "rubric-calibration-test.json"
+            calib_file.write_text(
+                json.dumps({"skills": {"another-skill": {"correctness": 0.9}}})
+            )
+            with gcl_runner._rubric_calibration(tmp_path, "qcloud-cvm-ops"):
+                self.assertEqual(gcl_runner.RUBRIC_THRESHOLDS, orig)
+
+        self.assertEqual(gcl_runner.RUBRIC_THRESHOLDS, orig)
+
+    def test_rubric_calibration_exception_during_load_restores_thresholds(self) -> None:
+        """If loading raises an exception, thresholds are still restored."""
+        orig = dict(gcl_runner.RUBRIC_THRESHOLDS)
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "audit-results").mkdir()
+            # Malformed JSON — will raise during load
+            calib_file = tmp_path / "audit-results" / "rubric-calibration-bad.json"
+            calib_file.write_text("{ this is not json")
+
+            with gcl_runner._rubric_calibration(tmp_path, "qcloud-cvm-ops"):
+                # Should still be unchanged because load failed
+                self.assertEqual(gcl_runner.RUBRIC_THRESHOLDS, orig)
+
+        self.assertEqual(gcl_runner.RUBRIC_THRESHOLDS, orig)
 if __name__ == "__main__":
     unittest.main()

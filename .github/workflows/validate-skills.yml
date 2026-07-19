@@ -55,3 +55,9 @@ jobs:
       - name: GCL Tier-A conformance (Charter C7)
         run: |
           python3 scripts/check_gcl_conformance.py
+
+      - name: Pattern anomaly detection (non-blocking alerts)
+        run: |
+          python3 scripts/pattern_anomaly_detect.py | tee audit-results/pattern-anomaly-$(date +%Y%m%d).json || true
+        continue-on-error: true
+        # NOTE: script outputs to stdout/stderr only; does not block merges

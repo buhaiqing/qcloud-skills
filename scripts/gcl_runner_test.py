@@ -17,6 +17,7 @@ Covers:
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import io
 import json
@@ -325,6 +326,127 @@ class CmdRunEndToEndTests(unittest.TestCase):
         }
         rc, root = self._run(critic_payload=critic)
         self.assertEqual(rc, 2)
+
+
+
+class TCloudErrorHintsTests(unittest.TestCase):
+    """Tests for load_tcloud_error_hints and load_error_code_map."""
+
+    def test_load_error_code_map_returns_dict(self) -> None:
+        result = gcl_runner.load_error_code_map()
+        self.assertIsInstance(result, dict)
+
+    def test_load_error_code_map_contains_expected_keys(self) -> None:
+        result = gcl_runner.load_error_code_map()
+        # Should contain the known error codes from tcloud_error_codes
+        self.assertIn("AuthFailure", result)
+        self.assertIn("InvalidParameter", result)
+        self.assertIn("RequestLimitExceeded", result)
+
+    def test_load_error_code_map_has_required_fields(self) -> None:
+        result = gcl_runner.load_error_code_map()
+        if result:  # only test if module loaded
+            for code, info in result.items():
+                self.assertIn("category", info)
+                self.assertIn("fix", info)
+
+    def test_load_tcloud_error_hints_returns_string(self) -> None:
+        result = gcl_runner.load_tcloud_error_hints()
+        self.assertIsInstance(result, str)
+
+    def test_load_tcloud_error_hints_contains_header(self) -> None:
+        result = gcl_runner.load_tcloud_error_hints()
+        self.assertIn("Tencent Cloud Error Code Reference", result)
+
+    def test_load_tcloud_error_hints_contains_authfailure(self) -> None:
+        result = gcl_runner.load_tcloud_error_hints()
+        self.assertIn("AuthFailure", result)
+
+    def test_load_tcloud_error_hints_contains_markdown_format(self) -> None:
+        result = gcl_runner.load_tcloud_error_hints()
+        # Should be markdown-formatted with backtick code spans and category/fix
+        self.assertIn("`", result)  # backtick code span is in the output
+
+
+class StructuralCriticErrorCodeTests(unittest.TestCase):
+    """Tests for structural_critic error-code awareness."""
+
+    def test_nonzero_exit_with_known_error_code_suggests_specific_fix(self) -> None:
+        # When the error code is present in the excerpt, structural_critic
+        # should use the specific fix from _error_code_map
+        gen = {
+            "exit_code": 1,
+            "result_excerpt": '{"Response":{"Error":{"Code":"AuthFailure","Message":"Invalid credential"}}}',
+            "command": "tccli cvm DescribeInstances",
+            "_error_code_map": {
+                "AuthFailure": {"severity": "major", "category": "auth", "fix": "Check SecretId/Key and CAM policy"},
+            },
+        }
+        c = gcl_runner.structural_critic(gen)
+        self.assertEqual(c["scores"]["correctness"], 0.0)
+        # Should contain specific AuthFailure guidance, not generic message
+        suggestions_text = " ".join(c["suggestions"])
+        self.assertIn("AuthFailure", suggestions_text)
+        self.assertIn("auth", suggestions_text)
+
+    def test_nonzero_exit_with_unknown_code_falls_back_to_generic(self) -> None:
+        gen = {
+            "exit_code": 1,
+            "result_excerpt": "some completely unknown error",
+            "command": "tccli cvm DescribeInstances",
+            "_error_code_map": {
+                "AuthFailure": {"severity": "major", "category": "auth", "fix": "Check SecretId/Key"},
+            },
+        }
+        c = gcl_runner.structural_critic(gen)
+        suggestions_text = " ".join(c["suggestions"])
+        # Should fall back to generic message
+        self.assertIn("fix command or credentials", suggestions_text)
+
+    def test_nonzero_exit_code_in_cmd_matches_error_code(self) -> None:
+        # Error code can appear in the command string too
+        gen = {
+            "exit_code": 1,
+            "result_excerpt": "Operation failed",
+            "command": "tccli cvm DescribeInstances  # RequestLimitExceeded triggered",
+            "_error_code_map": {
+                "RequestLimitExceeded": {"severity": "major", "category": "rate_limit", "fix": "Reduce request frequency"},
+            },
+        }
+        c = gcl_runner.structural_critic(gen)
+        suggestions_text = " ".join(c["suggestions"])
+        self.assertIn("RequestLimitExceeded", suggestions_text)
+        self.assertIn("rate_limit", suggestions_text)
+
+    def test_generator_dict_gets_error_hints_in_cmd_run(self) -> None:
+        # End-to-end: generator dict should carry error_code_hints and _error_code_map
+        # after run_command in cmd_run
+        ns = argparse.Namespace(
+            skill="qcloud-cvm-ops",
+            request="test",
+            command="echo ok",
+            root=Path(tempfile.gettempdir()),
+            max_iter=1,
+            timeout=10,
+            critic_json=None,
+            critic_stdin=False,
+            structural_critic_only=True,
+            trace_id=None,
+            enable_post_process=False,
+            no_post_process=True,
+        )
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            gcl_runner.cmd_run(ns)
+        # Read the trace and verify generator has error hints
+        trace_files = list((ns.root / "audit-results").glob("gcl-trace-*.json"))
+        self.assertTrue(len(trace_files) >= 1)
+        trace_data = json.loads(trace_files[-1].read_text())
+        gen = trace_data["iterations"][0]["generator"]
+        self.assertIn("error_code_hints", gen)
+        self.assertIsInstance(gen["error_code_hints"], str)
+        self.assertIn("_error_code_map", gen)
+        self.assertIsInstance(gen["_error_code_map"], dict)
+
 
 
 if __name__ == "__main__":

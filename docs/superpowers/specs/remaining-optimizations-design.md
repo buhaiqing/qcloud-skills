@@ -172,3 +172,21 @@ def self_verify():
 | `qcloud-cls-ops/SKILL.md` | 修改（如有可提取内容） |
 | `scripts/validate_local.py` | 验证通过 |
 | `TODO.md` | 更新状态 |
+
+---
+
+## 9. Cron 任务：Pattern Anomaly Detection
+
+`.github/workflows/pattern-anomaly-cron.yml` 已配置每日 02:00 UTC 定时执行：
+
+```yaml
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 02:00 UTC
+  workflow_dispatch:
+```
+
+`scripts/pattern_anomaly_detect.py` 分析最近 7 天与历史 30 天的 GCL trace，
+检测 emerging failure patterns（z-score > 2.0），结果上传为 `pattern-anomaly-YYYYMMDD.json` artifact。
+
+> CI hook（`validate-skills.yml`）中亦集成同脚本，`continue-on-error: true`，非阻塞，仅记录告警。
