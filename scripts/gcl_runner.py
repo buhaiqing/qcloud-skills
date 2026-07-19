@@ -22,6 +22,7 @@ Trace output: ``audit-results/gcl-trace-YYYYMMDD-HHMMSS.json``
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import re
 import os
@@ -38,6 +39,30 @@ from success_pattern_retrieve import retrieve_success_patterns
 from hallucination_detection import detect_hallucinations
 from distribution_drift import load_traces as _load_traces_dd, compute_drift
 
+
+
+
+def load_tcloud_error_hints() -> str:
+    """Load Tencent Cloud API error code hints for Critic prompt injection."""
+    try:
+        from tcloud_error_codes import TCLOUD_ERROR_CODES
+
+        lines = ["## Tencent Cloud Error Code Reference"]
+        for code, info in TCLOUD_ERROR_CODES.items():
+            lines.append(f"- `{code}`: {info['category']} — {info['fix']}")
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
+def load_error_code_map() -> dict[str, dict[str, str]]:
+    """Load the raw Tencent Cloud error-code→info mapping for structural_critic use."""
+    try:
+        from tcloud_error_codes import TCLOUD_ERROR_CODES
+
+        return TCLOUD_ERROR_CODES
+    except Exception:
+        return {}
 
 # Per AGENTS.md §8 defaults (override via --max-iter)
 SKILL_MAX_ITER: dict[str, int] = {
@@ -66,6 +91,41 @@ SKILL_MAX_ITER: dict[str, int] = {
     "qcloud-aiops-diagnosis": 5,
     "qcloud-skill-generator": 3,
 }
+
+
+@contextlib.contextmanager
+def _rubric_calibration(root: Path, skill: str):
+    """Apply calibrated rubric thresholds for skill; restore on exit.
+
+    Looks for ``audit-results/rubric-calibration-*.json`` and, if a matching
+    skill entry exists, overrides ``RUBRIC_THRESHOLDS`` for the duration of the
+    block.  The module-global is always restored, even on exception.
+    """
+    _saved = dict(RUBRIC_THRESHOLDS)
+    try:
+        CAL_DIR = root / "audit-results"
+        files = sorted(CAL_DIR.glob("rubric-calibration-*.json"))
+        if files:
+            latest = files[-1]
+            with open(latest) as fh:
+                data = json.load(fh)
+            skill_calib = data.get("skills", {}).get(skill, {})
+            if skill_calib:
+                for dim, val in skill_calib.items():
+                    if dim in RUBRIC_THRESHOLDS:
+                        RUBRIC_THRESHOLDS[dim] = val
+                print(
+                    f"[rubric_calibrate] Using calibrated thresholds for {skill}",
+                    file=sys.stderr,
+                )
+    except Exception:
+        pass  # non-blocking
+    try:
+        yield
+    finally:
+        RUBRIC_THRESHOLDS.clear()
+        RUBRIC_THRESHOLDS.update(_saved)
+
 
 RUBRIC_THRESHOLDS: dict[str, float] = {
     "correctness": 0.5,
@@ -145,7 +205,17 @@ def structural_critic(generator: dict[str, Any]) -> dict[str, Any]:
 
     scores["correctness"] = 1.0 if exit_code == 0 else 0.0
     if exit_code != 0:
-        suggestions.append(f"Generator exit_code={exit_code}; fix command or credentials")
+        # Use _error_code_map for specific guidance; fall back to generic message
+        error_map = generator.get("_error_code_map", {})
+        specific = ""
+        for code, info in error_map.items():
+            if code in excerpt or code in cmd:
+                specific = f"`{code}`: {info['category']} — {info['fix']}"
+                break
+        if specific:
+            suggestions.append(f"Generator exit_code={exit_code}; {specific}")
+        else:
+            suggestions.append(f"Generator exit_code={exit_code}; fix command or credentials")
 
     leak = has_credential_leak(excerpt) or has_credential_leak(cmd)
     scores["safety"] = 0.0 if leak else 1.0
@@ -447,139 +517,143 @@ def post_process(trace_path: Path, root: Path) -> None:
 def cmd_run(args: argparse.Namespace) -> int:
     root = args.root
     max_iter = args.max_iter or SKILL_MAX_ITER.get(args.skill, 3)
-    # Load failure patterns (prevention hints)
-    try:
-        prior_fail = load_failure_patterns(args.skill, args.command)
-    except Exception:
-        prior_fail = []
-    fail_block = ff_fail(prior_fail)
+    with _rubric_calibration(root, args.skill):
 
-    # Load success patterns (convergence guidance — single-shot wins first)
-    op_match = re.search(r"tccli\s+\w+\s+(\w+)", args.command or "")
-    operation = op_match.group(1) if op_match else None
-    try:
-        prior_success = retrieve_success_patterns(args.skill, operation=operation, top_n=3)
-    except Exception:
-        prior_success = []
-    succ_block = _format_success_injection(prior_success)
-
-    # Combine: success hints guide Generator toward fast convergence;
-    # failure hints prevent known mistakes
-    reflexion_block = "\n".join(filter(None, [succ_block, fail_block]))
-    trace: dict[str, Any] = {
-        "skill": args.skill,
-        "request": args.request,
-        "rubric_version": "v1",
-        "iterations": [],
-        "preflight_reflexion": {
+        # Load failure patterns (prevention hints)
+        try:
+            prior_fail = load_failure_patterns(args.skill, args.command)
+        except Exception:
+            prior_fail = []
+        fail_block = ff_fail(prior_fail)
+    
+        # Load success patterns (convergence guidance — single-shot wins first)
+        op_match = re.search(r"tccli\s+\w+\s+(\w+)", args.command or "")
+        operation = op_match.group(1) if op_match else None
+        try:
+            prior_success = retrieve_success_patterns(args.skill, operation=operation, top_n=3)
+        except Exception:
+            prior_success = []
+        succ_block = _format_success_injection(prior_success)
+    
+        # Combine: success hints guide Generator toward fast convergence;
+        # failure hints prevent known mistakes
+        reflexion_block = "\n".join(filter(None, [succ_block, fail_block]))
+        trace: dict[str, Any] = {
             "skill": args.skill,
-            "command": args.command,
-            "matched_failures": len(prior_fail),
-            "matched_successes": len(prior_success),
-            "injection": reflexion_block,
-        },
-    }
-    gen_env = {"REFLEXION_PATTERNS": reflexion_block} if reflexion_block else None
-
-    critic_feedback = ""
-    command = args.command
-
-    for iteration in range(1, max_iter + 1):
-        generator = run_command(command, timeout=args.timeout, env=gen_env)
-        generator["args"] = {"iter": iteration, "critic_feedback": critic_feedback or None}
-
-        if args.structural_critic_only:
-            critic = structural_critic(generator)
-        else:
-            critic = load_critic(args.critic_json, args.critic_stdin)
-            if critic is None:
-                print(
-                    "ERROR: No Critic payload. Pass --critic-json, pipe JSON to stdin, "
-                    "or use --structural-critic-only for rule-based audit.",
-                    file=sys.stderr,
-                )
-                return 2
-            errs = validate_critic_payload(critic)
-            if errs:
-                print("ERROR: Invalid critic JSON:", "; ".join(errs), file=sys.stderr)
-                return 2
-
-        decision = decide(critic["scores"])
-        trace["iterations"].append(
-            {
-                "iter": iteration,
-                "generator": generator,
-                "critic": {
-                    "scores": critic["scores"],
-                    "suggestions": critic.get("suggestions", []),
-                    "blocking": critic.get("blocking", False),
-                    "rubric_rule_hits": derive_rule_hits(
-                        critic, generator, args.structural_critic_only
-                    ),
-                },
-                "decision": decision,
-            }
-        )
-
-        if decision == "SAFETY_FAIL":
-            trace["final"] = {
-                "status": "SAFETY_FAIL",
-                "iter": iteration,
-                "output": None,
-                "failure_pattern": extract_failure_pattern(
-                    args.skill, command, generator, critic
-                ),
-            }
-            path = persist_trace(root, trace, trace_id=args.trace_id)
-            print(f"SAFETY_FAIL — trace: {path}", file=sys.stderr)
-            return 3
-
-        if decision == "PASS":
-            trace["final"] = {
-                "status": "PASS",
-                "iter": iteration,
-                "output": generator.get("result_excerpt", ""),
-            }
-            path = persist_trace(root, trace, trace_id=args.trace_id)
-            # P0-A: write success pattern to pending log
-            try:
-                scores = critic.get("scores") or {}
-                op_match = re.search(r"tccli\s+\w+\s+(\w+)", command or "")
-                operation = op_match.group(1) if op_match else ""
-                write_pending_with_lock({
-                    "skill": args.skill,
-                    "operation": operation,
-                    "command": command or "",
+            "request": args.request,
+            "rubric_version": "v1",
+            "iterations": [],
+            "preflight_reflexion": {
+                "skill": args.skill,
+                "command": args.command,
+                "matched_failures": len(prior_fail),
+                "matched_successes": len(prior_success),
+                "injection": reflexion_block,
+            },
+        }
+        gen_env = {"REFLEXION_PATTERNS": reflexion_block} if reflexion_block else None
+    
+        critic_feedback = ""
+        command = args.command
+    
+        for iteration in range(1, max_iter + 1):
+            generator = run_command(command, timeout=args.timeout, env=gen_env)
+            generator["args"] = {"iter": iteration, "critic_feedback": critic_feedback or None}
+            generator["error_code_hints"] = load_tcloud_error_hints()
+            generator["_error_code_map"] = load_error_code_map()
+    
+            if args.structural_critic_only:
+                critic = structural_critic(generator)
+            else:
+                critic = load_critic(args.critic_json, args.critic_stdin)
+                if critic is None:
+                    print(
+                        "ERROR: No Critic payload. Pass --critic-json, pipe JSON to stdin, "
+                        "or use --structural-critic-only for rule-based audit.",
+                        file=sys.stderr,
+                    )
+                    return 2
+                errs = validate_critic_payload(critic)
+                if errs:
+                    print("ERROR: Invalid critic JSON:", "; ".join(errs), file=sys.stderr)
+                    return 2
+    
+            decision = decide(critic["scores"])
+            trace["iterations"].append(
+                {
                     "iter": iteration,
-                    "scores": scores,
-                    "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
-                })
-            except Exception:
-                pass  # non-blocking: success logging must not break the main return path
-            print(f"PASS (iter {iteration}) — trace: {path}")
-            if args.enable_post_process:
-                post_process(path, root)
-            return 0
-
-        critic_feedback = "; ".join(critic.get("suggestions", [])[:3])
-
-    trace["final"] = {
-        "status": "MAX_ITER",
-        "iter": max_iter,
-        "output": trace["iterations"][-1]["generator"].get("result_excerpt", "") if trace["iterations"] else None,
-        "unresolved": [
-            d for d, t in RUBRIC_THRESHOLDS.items()
-            if trace["iterations"][-1]["critic"]["scores"].get(d, 0) < t
-        ],
-        "failure_pattern": extract_failure_pattern(
-            args.skill, command, trace["iterations"][-1]["generator"], trace["iterations"][-1]["critic"]
-        ),
-    }
-    path = persist_trace(root, trace)
-    print(f"MAX_ITER — trace: {path}", file=sys.stderr)
-    if args.enable_post_process:
-        post_process(path, root)
-    return 1
+                    "generator": generator,
+                    "critic": {
+                        "scores": critic["scores"],
+                        "suggestions": critic.get("suggestions", []),
+                        "blocking": critic.get("blocking", False),
+                        "rubric_rule_hits": derive_rule_hits(
+                            critic, generator, args.structural_critic_only
+                        ),
+                    },
+                    "decision": decision,
+                }
+            )
+    
+            if decision == "SAFETY_FAIL":
+                trace["final"] = {
+                    "status": "SAFETY_FAIL",
+                    "iter": iteration,
+                    "output": None,
+                    "failure_pattern": extract_failure_pattern(
+                        args.skill, command, generator, critic
+                    ),
+                }
+                path = persist_trace(root, trace, trace_id=args.trace_id)
+                print(f"SAFETY_FAIL — trace: {path}", file=sys.stderr)
+                return 3
+    
+            if decision == "PASS":
+                trace["final"] = {
+                    "status": "PASS",
+                    "iter": iteration,
+                    "output": generator.get("result_excerpt", ""),
+                }
+                path = persist_trace(root, trace, trace_id=args.trace_id)
+                # P0-A: write success pattern to pending log
+                try:
+                    scores = critic.get("scores") or {}
+                    op_match = re.search(r"tccli\s+\w+\s+(\w+)", command or "")
+                    operation = op_match.group(1) if op_match else ""
+                    write_pending_with_lock({
+                        "skill": args.skill,
+                        "operation": operation,
+                        "command": command or "",
+                        "iter": iteration,
+                        "scores": scores,
+                        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+                    })
+                except Exception:
+                    pass  # non-blocking: success logging must not break the main return path
+                print(f"PASS (iter {iteration}) — trace: {path}")
+                if args.enable_post_process:
+                    post_process(path, root)
+                return 0
+    
+            critic_feedback = "; ".join(critic.get("suggestions", [])[:3])
+    
+        trace["final"] = {
+            "status": "MAX_ITER",
+            "iter": max_iter,
+            "output": trace["iterations"][-1]["generator"].get("result_excerpt", "") if trace["iterations"] else None,
+            "unresolved": [
+                d for d, t in RUBRIC_THRESHOLDS.items()
+                if trace["iterations"][-1]["critic"]["scores"].get(d, 0) < t
+            ],
+            "failure_pattern": extract_failure_pattern(
+                args.skill, command, trace["iterations"][-1]["generator"], trace["iterations"][-1]["critic"]
+            ),
+        }
+        path = persist_trace(root, trace)
+        print(f"MAX_ITER — trace: {path}", file=sys.stderr)
+        if args.enable_post_process:
+            post_process(path, root)
+        return 1
 
 
 def build_parser() -> argparse.ArgumentParser:
