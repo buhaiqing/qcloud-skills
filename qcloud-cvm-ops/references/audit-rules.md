@@ -13,7 +13,7 @@ This document covers **54 audit rules** across 8 categories, plus automated audi
 - **Post-incident forensics** (Section 11)
 - **Automated audit pipelines** (Section 12)
 
-Each rule is identified by a unique ID (e.g., `SEC-001`) for cross-referencing with SKILL.md execution flows, secops-checklist.md, and finops-analysis.md.
+Each rule is identified by a unique ID (e.g., `SEC-001`) for cross-referencing with SKILL.md execution flows, secops-security-operations.md, and finops-analysis.md.
 
 ---
 
@@ -587,7 +587,7 @@ def run_audit(rules_results: Dict[str, bool]) -> AuditResult:
 
 | This File | Reference | Integration Point |
 |-----------|-----------|-------------------|
-| Audit Rules | [SecOps Checklist](secops-checklist.md) | Section 8: CVM Audit Rules Integration |
+| Audit Rules | [SecOps Checklist](secops-security-operations.md) | Section 8: CVM Audit Rules Integration |
 | Audit Rules | [FinOps Analysis](finops-analysis.md) | Cost rules align with `COST-001` to `COST-008` |
 | Audit Rules | [Proactive Inspection](proactive-inspection.md) | Inspection triggers map to audit rule IDs |
 | Audit Rules | [SKILL.md](../SKILL.md) | Execution flows reference audit rules via safety gates |
