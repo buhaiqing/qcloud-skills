@@ -518,6 +518,7 @@ Error responses:
 - [Monitoring & Alerts](references/monitoring.md) — Redis metrics, alert patterns
 - [Integration](references/integration.md) — SDK setup, cross-skill delegation, CI/CD
 - [Well-Architected Assessment](references/well-architected-assessment.md) — Four-pillar assessment
+- [SecOps Security Operations](references/secops-security-operations.md) — Credential rotation, high-risk operations, compliance checklist
 - [Enhanced Self-Healing Framework](references/enhanced-self-healing-framework.md) — Installation recovery
 - [Execution Environment Setup](../qcloud-skill-generator/references/execution-environment.md)
 

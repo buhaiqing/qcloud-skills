@@ -644,6 +644,7 @@ Error responses:
 
 Core: `references/core-concepts.md`, `references/api-sdk-usage.md`, `references/cli-usage.md`, `references/troubleshooting.md`, `references/well-architected-assessment.md`, `references/rubric.md`, `references/prompt-templates.md`.
 Optional: `references/monitoring.md`, `references/aiops-self-healing.md`, `references/finops-cost-optimization.md`.
+- [SecOps Security Operations](references/secops-security-operations.md) — Credential rotation, high-risk operations, compliance checklist
 
 ## Changelog
 

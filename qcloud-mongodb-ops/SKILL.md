@@ -369,6 +369,7 @@ Error responses:
 - [Monitoring & Alerts](references/monitoring.md) — Metrics, alarms, anomaly patterns
 - [Integration](references/integration.md) — SDK setup, env vars, cross-skill delegation
 - [Well-Architected Assessment](references/well-architected-assessment.md) — 4-pillar assessment
+- [SecOps Security Operations](references/secops-security-operations.md) — Credential rotation, high-risk operations, compliance checklist
 - [Idempotency Checklist](references/idempotency-checklist.md) — Retry-safe automation patterns
 
 ## Operational Best Practices

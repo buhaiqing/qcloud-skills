@@ -552,7 +552,30 @@ def main() -> int:
         "--layered", action="store_true",
         help="Use three-layer hot/warm/cold storage instead of single-file"
     )
+    parser.add_argument(
+        "--promote", action="store_true",
+        help="P2-A: Suggest pattern promotion to skill Anti-Pattern section when count >= 10"
+    )
     args = parser.parse_args()
+
+    # P2-A: promote check
+    if args.promote:
+        hot, warm, cold = load_all_layers()
+        suggestions = []
+        for name, layer in [("Hot", hot), ("Warm", warm), ("Cold", cold)]:
+            for key, pat in layer.items():
+                if pat.get("count", 0) >= 10:
+                    suggestions.append(
+                        f"  [{name}] `{key}` — consider adding to skill SKILL.md Anti-Pattern section "
+                        f"(count={pat['count']}, category={pat.get('category', '?')})"
+                    )
+        if suggestions:
+            print("PROMOTION CANDIDATES (count >= 10):", file=sys.stderr)
+            for s in suggestions:
+                print(s, file=sys.stderr)
+        else:
+            print("No promotion candidates (no patterns with count >= 10).", file=sys.stderr)
+        return 0
 
     # Load existing
     existing = parse_existing(PATTERNS_FILE)

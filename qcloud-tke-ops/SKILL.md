@@ -441,6 +441,7 @@ Error responses:
 - [Monitoring & Alerts](references/monitoring.md) — TKE metrics, health checks, alerting patterns
 - [Integration](references/integration.md) — SDK setup, cross-skill delegation, CI/CD patterns
 - [Well-Architected Assessment](references/well-architected-assessment.md) — Four-pillar TKE assessment
+- [SecOps Security Operations](references/secops-security-operations.md) — Credential rotation, RBAC security, high-risk operations, compliance checklist
 - [Enhanced Self-Healing Framework](references/enhanced-self-healing-framework.md) — Installation recovery patterns
 - [Execution Environment Setup](../qcloud-skill-generator/references/execution-environment.md)
 
