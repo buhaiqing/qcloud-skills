@@ -567,6 +567,7 @@ See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PA
 - [Core Concepts](references/core-concepts.md) — CKafka architecture and concepts
 - [Troubleshooting](references/troubleshooting.md) — Common issues and fixes
 - [Well-Architected Assessment](references/well-architected-assessment.md) — Architecture review
+- [SecOps Security Operations](references/secops-security-operations.md) — ACL security, SASL users, high-risk operations, compliance checklist
 
 ### API References
 

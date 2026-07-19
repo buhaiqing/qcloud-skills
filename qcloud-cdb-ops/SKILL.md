@@ -447,6 +447,7 @@ contrast.
 - [Monitoring & Alerts](references/monitoring.md) — Metrics, dashboards, Cloud Monitor integration
 - [Integration](references/integration.md) — SDK setup, env config, cross-skill delegation
 - [Well-Architected Assessment](references/well-architected-assessment.md) — Four-pillar assessment
+- [SecOps Security Operations](references/secops-security-operations.md) — Credential rotation, high-risk operations, compliance checklist
 
 ## Operational Best Practices
 
