@@ -50,7 +50,7 @@ CKafka (Cloud Kafka) is Tencent Cloud's fully managed, distributed message queue
 
 ## Five Core Standards
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates).
 
 ### Well-Architected Framework Integration (卓越架构)
 
@@ -244,9 +244,9 @@ Detailed CLI/SDK command blocks for each operation are in [execution-flows.md](r
 
 #### Execution
 
-**CLI** (`tccli ckafka CreateInstance`): See [execution-flows.md §1](references/execution-flows.md#1-createinstance)
+**CLI** (`tccli ckafka CreateInstance`): See [execution-flows.md §1](references/execution-flows.md#createinstance)
 
-**SDK** (Python): See [execution-flows.md §1](references/execution-flows.md#1-createinstance)
+**SDK** (Python): See [execution-flows.md §1](references/execution-flows.md#createinstance)
 
 #### Post-execution Validation
 
@@ -306,9 +306,9 @@ fi
 
 #### Execution
 
-**CLI** (`tccli ckafka CreateTopic`): See [execution-flows.md §2](references/execution-flows.md#2-createtopic)
+**CLI** (`tccli ckafka CreateTopic`): See [execution-flows.md §2](references/execution-flows.md#createtopic)
 
-**SDK** (Python): See [execution-flows.md §2](references/execution-flows.md#2-createtopic)
+**SDK** (Python): See [execution-flows.md §2](references/execution-flows.md#createtopic)
 
 #### Post-execution Validation
 
@@ -346,9 +346,9 @@ tccli ckafka DescribeTopic \
 
 #### Execution
 
-**CLI** (`tccli ckafka DescribeConsumerGroup`): See [execution-flows.md §3](references/execution-flows.md#3-describecomposergroup)
+**CLI** (`tccli ckafka DescribeConsumerGroup`): See [execution-flows.md §3](references/execution-flows.md#describeconsumergroup)
 
-**SDK** (Python): See [execution-flows.md §3](references/execution-flows.md#3-describecomposergroup)
+**SDK** (Python): See [execution-flows.md §3](references/execution-flows.md#describeconsumergroup)
 
 #### Key Response Fields
 
@@ -381,9 +381,9 @@ tccli ckafka DescribeGroupInfo \
 
 #### Execution
 
-**CLI** (`tccli ckafka CreateAcl`): See [execution-flows.md §4](references/execution-flows.md#4-createacl)
+**CLI** (`tccli ckafka CreateAcl`): See [execution-flows.md §4](references/execution-flows.md#createacl)
 
-**SDK** (Python): See [execution-flows.md §4](references/execution-flows.md#4-createacl)
+**SDK** (Python): See [execution-flows.md §4](references/execution-flows.md#createacl)
 
 #### Post-execution Validation
 
@@ -416,9 +416,9 @@ tccli ckafka DescribeACL \
 
 #### Execution
 
-**CLI** (`tccli ckafka SendMessages`): See [execution-flows.md §5](references/execution-flows.md#5-sendmessage)
+**CLI** (`tccli ckafka SendMessages`): See [execution-flows.md §5](references/execution-flows.md#sendmessage)
 
-**SDK** (Python): See [execution-flows.md §5](references/execution-flows.md#5-sendmessage)
+**SDK** (Python): See [execution-flows.md §5](references/execution-flows.md#sendmessage)
 
 #### Post-execution Validation
 
@@ -578,9 +578,9 @@ See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PA
 
 ### Related Skills
 
-- [qcloud-vpc-ops](../qcloud-vpc-ops/) — VPC network configuration
-- [qcloud-monitor-ops](../qcloud-monitor-ops/) — Cloud monitoring
-- [qcloud-cam-ops](../qcloud-cam-ops/) — Access management
+- [qcloud-vpc-ops](../qcloud-vpc-ops/SKILL.md) — VPC network configuration
+- [qcloud-monitor-ops](../qcloud-monitor-ops/SKILL.md) — Cloud monitoring
+- [qcloud-cam-ops](../qcloud-cam-ops/SKILL.md) — Access management
 
 ---
 

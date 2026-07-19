@@ -282,7 +282,7 @@ For complex diagnostics:
 
 ### Proactive Inspection
 
-Five-step flow per [Proactive Inspection Template](../qcloud-skill-generator/templates/proactive-inspection.md):
+Five-step flow per [Proactive Inspection Template](../qcloud-proactive-inspection/SKILL.md):
 
 1. Discovery → 2. Collection → 3. Detection → 4. Diagnosis → 5. Report
 

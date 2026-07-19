@@ -56,7 +56,7 @@ VPC (Virtual Private Cloud) on Tencent Cloud provides isolated network environme
 
 ## Five Core Standards
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates).
 
 > Well-Architected pillars (Reliability, Security, Cost, Efficiency): see `references/well-architected-assessment.md`.
 
@@ -237,7 +237,7 @@ Every **DeleteVpc / DeleteSubnet / DeleteRouteTable / DeleteVpcPeeringConnection
 
 ## Reference Directory
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#reference-directory).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#reference-directory).
 - [FinOps Cost Optimization](references/finops-cost-optimization.md)
 - [SecOps Security Operations](references/secops-security-operations.md)
 - [AIOps Best Practices](references/aiops-best-practices.md)
@@ -265,7 +265,7 @@ Every **DeleteVpc / DeleteSubnet / DeleteRouteTable / DeleteVpcPeeringConnection
 
 ## Quality Gate (GCL)
 
-> Boilerplate: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#quality-gate-gcl).
+> Boilerplate: see [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#quality-gate-gcl).
 
 ### When the VPC loop runs
 
@@ -296,11 +296,11 @@ Recovery: migrate ENI to another subnet or restore the subnet.
 
 See [`references/rubric.md`](references/rubric.md) §6 for full examples (PASS on `DeleteVpc` + RETRY on `ReleaseAddresses`).
 
-> Decision flow: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#decision-flow-first-match-wins).
+> Decision flow: see [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#quality-gate-gcl).
 
 ## Output Schema
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#output-schema-api-response).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#quality-gate-gcl).
 
 ```json
 { "Response": { "RequestId": "...", "Vpc": { "VpcId": "vpc-xxx", "VpcName": "...", "CidrBlock": "10.0.0.0/16", "State": "AVAILABLE" } } }

@@ -50,7 +50,7 @@ TencentDB for MongoDB on Tencent Cloud provides fully managed MongoDB database s
 
 ## Five Core Standards
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates).
 
 ### Token Efficiency (TE)
 

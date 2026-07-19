@@ -238,7 +238,7 @@ tccli vpc CreateVpnGateway \
 | 9 | Create SSL VPN Client | **Cert shown only once** — warn user to save immediately |
 | 10 | Delete SSL VPN Client | **Safety Gate**: Confirm client name; warn revocation irreversible |
 | 11 | Delete Customer Gateway | **Safety Gate**: Confirm no VPN Connection references it |
-| 12 | Multi-Branch Hub-Spoke | See [execution-flows.md §12](references/execution-flows.md#12-multi-branch-hub-spoke-topology-deployment) for batch deployment |
+| 12 | Multi-Branch Hub-Spoke | See [execution-flows.md §12](references/execution-flows.md#multi-branch-hub-spoke-topology-deployment) for batch deployment |
 | 13 | Modify VPN Gateway Attribute | Gateway must be AVAILABLE; bandwidth change requires polling |
 | 14 | Modify VPN Connection Attribute | Only name/health-check modifiable; crypto policy requires recreate |
 | 15 | Delete SSL VPN Server | **Safety Gate**: Enumerate ALL SSL clients; warn all lose access |

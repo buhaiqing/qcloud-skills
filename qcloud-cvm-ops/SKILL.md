@@ -43,7 +43,7 @@ CVM operational runbook: dual-path (`tccli` + Python SDK), explicit pre-flight/v
 
 ## Five Core Standards
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates).
 
 > Well-Architected pillars: see `references/well-architected-assessment.md`.
 
@@ -589,7 +589,7 @@ Poll DescribeDisks until disk `NOT_ATTACHED` state and `InstanceId` is absent.
 
 ## Reference Directory
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#reference-directory).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#reference-directory).
 
 Core: `references/core-concepts.md`, `references/api-sdk-usage.md`, `references/cli-usage.md`, `references/sdk-templates.md`, `references/troubleshooting.md`, `references/well-architected-assessment.md`, `references/rubric.md`, `references/prompt-templates.md`.
 Optional: `references/monitoring.md`, `references/finops-analysis.md`, `references/secops-security-operations.md`, `references/audit-rules.md`, `references/proactive-inspection.md`, `references/aiops-diagnosis.md`.
@@ -607,7 +607,7 @@ Optional: `references/monitoring.md`, `references/finops-analysis.md`, `referenc
 
 ## Quality Gate (GCL)
 
-> Boilerplate: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#quality-gate-gcl).
+> Boilerplate: see [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#quality-gate-gcl).
 
 ### GCL Properties
 
@@ -647,11 +647,11 @@ Recovery: `StartInstances` to power back on; re-run with `StopType=SOFT` or expl
 
 See [`references/rubric.md`](references/rubric.md) §6 for full examples (PASS on `TerminateInstances` + RETRY on `RunInstances`).
 
-> Decision flow: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#decision-flow-first-match-wins).
+> Decision flow: see [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#quality-gate-gcl).
 
 ## Output Schema
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#output-schema-api-response).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#quality-gate-gcl).
 
 ```json
 { "Response": { "RequestId": "...", "InstanceIdSet": ["ins-xxx"], "Error": { "Code": "...", "Message": "..." } } }

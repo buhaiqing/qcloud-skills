@@ -47,7 +47,7 @@ SSL Certificate Service (SSL 证书服务) on Tencent Cloud provides certificate
 
 ## Five Core Standards
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates).
 
 > Well-Architected pillars (Reliability, Security, Cost, Efficiency): see `references/well-architected-assessment.md`.
 
@@ -182,7 +182,7 @@ tccli ssl DescribeCertificates --Limit 20
 
 Every operation: **Pre-flight → Execute (CLI primary, SDK fallback) → Validate → Recover**. Do not skip phases.
 
-> **SDK Templates:** Init/poll/error boilerplate → [references/sdk-templates.md](references/sdk-templates.md); Code examples → [references/sdk-code-examples.md](references/sdk-code-examples.md)
+> **SDK Templates:** Code examples → [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ### Operation: Upload Certificate
 
@@ -420,7 +420,7 @@ tccli ssl DescribeCertificates --Limit 100 | \
 
 ## Quality Gate (GCL)
 
-> Boilerplate: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#quality-gate-gcl).
+> Boilerplate: see [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#quality-gate-gcl).
 
 ### When the SSL loop runs
 
@@ -452,11 +452,11 @@ Recovery: Re-upload cert or deploy replacement via `DeployCertificateInstance` b
 
 See [`references/rubric.md`](references/rubric.md) §6 for full examples (PASS on `DescribeCertificates` + RETRY on `ReplaceCertificate` domain mismatch).
 
-> Decision flow: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#decision-flow-first-match-wins).
+> Decision flow: see [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#quality-gate-gcl).
 
 ## Output Schema
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#output-schema-api-response).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#quality-gate-gcl).
 
 ## Changelog
 
@@ -464,9 +464,9 @@ See [`references/rubric.md`](references/rubric.md) §6 for full examples (PASS o
 
 ## Reference Directory
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#reference-directory).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#reference-directory).
 
-Core: `references/core-concepts.md`, `references/api-sdk-usage.md`, `references/cli-usage.md`, `references/sdk-templates.md`, `references/troubleshooting.md`, `references/well-architected-assessment.md`, `references/rubric.md`, `references/prompt-templates.md`.
+Core: `references/core-concepts.md`, `references/api-sdk-usage.md`, `references/cli-usage.md`, `references/troubleshooting.md`, `references/well-architected-assessment.md`, `references/rubric.md`, `references/prompt-templates.md`.
 Optional: `references/monitoring.md`, `references/aiops-self-healing.md`, `references/finops-cost-optimization.md`.
 
 ## Operational Best Practices

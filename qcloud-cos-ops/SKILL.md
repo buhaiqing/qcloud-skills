@@ -47,7 +47,7 @@ COS (Cloud Object Storage) on Tencent Cloud provides scalable, secure, and highl
 
 ## Five Core Standards
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates).
 
 ### Well-Architected Framework
 
@@ -482,7 +482,7 @@ See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PA
 {
   "Response": {
     "RequestId": "abc123",
-    "Location": "my-bucket-12345.cos.ap-guangzhou.myqcloud.com",
+    "Location": "my-bucket-12345.cos.{{env.TENCENTCLOUD_REGION}}.myqcloud.com",
     "Bucket": "my-bucket-12345"
   }
 }

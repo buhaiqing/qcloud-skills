@@ -48,7 +48,7 @@ CLS (Cloud Log Service) is Tencent Cloud's fully managed log service providing l
 
 ## Five Core Standards
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates).
 
 > Well-Architected pillars (Reliability, Security, Cost, Efficiency): see `references/well-architected-assessment.md`.
 
@@ -641,7 +641,7 @@ Multi-step analysis of COS access logs imported into CLS. Covers troubleshooting
 
 ## Quality Gate (GCL)
 
-> Boilerplate: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#quality-gate-gcl).
+> Boilerplate: see [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#quality-gate-gcl).
 
 ### When the CLS loop runs
 
@@ -673,18 +673,17 @@ Recovery: Restore from COS archive if available; recreate pipeline.
 
 See [`references/rubric.md`](references/rubric.md) §6 for full examples (PASS on `CreateTopic` + SAFETY_FAIL on `ModifyTopic` retention reduction).
 
-> Decision flow: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#decision-flow-first-match-wins).
+> Decision flow: see [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#quality-gate-gcl).
 
 ## Reference Directory
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#reference-directory).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#reference-directory).
 
 Core: `references/cli-usage.md`, `references/core-concepts.md`, `references/failure-recovery-reference.md`, `references/sdk-templates.md`, `references/troubleshooting.md`, `references/well-architected-assessment.md`, `references/rubric.md`, `references/prompt-templates.md`.
 Optional: `references/cos-log-analysis.md`, `references/query-language.md`, `references/integration.md`.
 
 ---
 
-*Generated for Tencent Cloud CLS Operations Skill*[examples/](../examples/) | Sample scripts and use cases |
 
 ---
 

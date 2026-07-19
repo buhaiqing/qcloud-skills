@@ -50,7 +50,7 @@ TencentDB for PostgreSQL on Tencent Cloud provides fully managed PostgreSQL data
 
 ## Five Core Standards
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#five-core-standards).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates).
 
 > Well-Architected pillars (Reliability, Security, Cost, Efficiency): see `references/well-architected-assessment.md`.
 
@@ -189,7 +189,7 @@ tccli postgres DescribeDBInstances --Limit 20
 
 Every operation: **Pre-flight → Execute (CLI primary, SDK fallback) → Validate → Recover**. Do not skip phases.
 
-> **SDK Templates:** Init/poll/error boilerplate → [references/sdk-templates.md](references/sdk-templates.md); Code examples → [references/sdk-code-examples.md](references/sdk-code-examples.md)
+> **SDK Templates:** Code examples → [references/sdk-code-examples.md](references/sdk-code-examples.md)
 
 ### Operation: Create Instance
 
@@ -571,7 +571,7 @@ tccli postgres ModifyDBInstanceSecurityGroups \
 
 ## Quality Gate (GCL)
 
-> Boilerplate: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#quality-gate-gcl).
+> Boilerplate: see [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#quality-gate-gcl).
 
 > **PostgreSQL has no UNDROP.** A `DropDatabase` or `REVOKE ALL` is immediately effective — running apps fail on the next query with lazy auth errors that look like transient failures.
 
@@ -605,11 +605,11 @@ Recovery: Re-run with `DescribeAccounts` BEFORE/AFTER; warn that running apps wi
 
 See [`references/rubric.md`](references/rubric.md) §6 for full examples (PASS on `CreateDBInstances` + SAFETY_FAIL on `DeleteDBInstance`).
 
-> Decision flow: see [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#decision-flow-first-match-wins).
+> Decision flow: see [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#quality-gate-gcl).
 
 ## Output Schema
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#output-schema-api-response).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#quality-gate-gcl).
 
 ```json
 { "Response": { "RequestId": "...", "DealNames": ["..."], "DBInstanceSet": [{ "DBInstanceId": "postgres-xxx", "DBInstanceStatus": "running",
@@ -640,9 +640,9 @@ Error responses:
 
 ## Reference Directory
 
-> See [shared-boilerplate.md](../qcloud-skill-generator/references/shared-skills-boilerplate.md#reference-directory).
+> See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#reference-directory).
 
-Core: `references/core-concepts.md`, `references/api-sdk-usage.md`, `references/cli-usage.md`, `references/sdk-templates.md`, `references/troubleshooting.md`, `references/well-architected-assessment.md`, `references/rubric.md`, `references/prompt-templates.md`.
+Core: `references/core-concepts.md`, `references/api-sdk-usage.md`, `references/cli-usage.md`, `references/troubleshooting.md`, `references/well-architected-assessment.md`, `references/rubric.md`, `references/prompt-templates.md`.
 Optional: `references/monitoring.md`, `references/aiops-self-healing.md`, `references/finops-cost-optimization.md`.
 
 ## Changelog
