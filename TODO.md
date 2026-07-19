@@ -161,11 +161,10 @@
 
 | 属性 | 内容 |
 |------|------|
-| **文件** | `scripts/rubric_calibrate.py`（新增） |
+| **文件** | `scripts/rubric_calibrate.py`（新增，22 tests pass） |
 | **输入** | `audit-results/gcl-trace-*.json` 历史数据 |
-| **输出** | per-skill 动态阈值建议（如 qcloud-cos-ops spec_compliance 历史均值=0.3 → 建议降至 0.0） |
-| **生效方式** | 建议制，人类审批后写入 skill 的 `references/rubric.md` |
-| **状态** | ⬜ 待开发 |
+| **输出** | per-skill 动态阈值建议 |
+| **状态** | ✅ 已完成（`d0fec4c` + `04c7569`）— 22 tests pass |
 
 #### P1-B: Self-Critique 补强
 
@@ -173,8 +172,7 @@
 |------|------|
 | **文件** | `scripts/gcl_runner.py`（修改 `structural_critic`） |
 | **补强项** | correctness：检查响应是否含预期 JSON path / idempotency：检查是否含 ClientToken / traceability：检查是否含 RequestId / spec_compliance：检查 command 是否匹配 skill 的 cli-usage.md |
-| **新 flag** | `--self-critique`：Generator 执行后先用 structural_critic 预评分，外部 Critic 仅在预评分<阈值时调用 |
-| **状态** | ⬜ 待开发 |
+| **状态** | ✅ 已完成（`46695ab`）— 35 tests pass |
 
 #### P1-C: 主动模式发现
 
@@ -183,8 +181,8 @@
 | **文件** | `scripts/pattern_anomaly_detect.py`（新增） |
 | **检测逻辑** | 同一 error 最近7天频率 vs 历史均值（>2σ=emerging）/ 新 skill+operation 组合首次出现（novel） |
 | **输出** | `audit-results/pattern-anomaly-YYYYMMDD.json` + `docs/failure-patterns.md` 顶部 `## Emerging Alerts` 区块 |
-| **触发频率** | 每周一次 cron |
-| **状态** | ⬜ 待开发 |
+| **状态** | ✅ 已完成（`97b0d93`）— ruff clean |
+
 
 ---
 
@@ -193,39 +191,24 @@
 | 属性 | 内容 |
 |------|------|
 | **文件** | `scripts/gcl_trajectory_quality.py`（修改）/ `scripts/op_type_classifier.py`（新增） |
-| **输入** | `audit-results/gcl-trace-*.json` 中的 `generator.command` |
-| **操作类型** | `read`（Describe/Query/List/Describe）/ `write`（Create/Modify/Update/Set）/ `delete`（Delete/Destroy/Release） |
-| **输出** | per-skill × per-op-type 通过率、平均迭代次数、平均 rubric 分数 |
-| **实现路径** | 纯 tccli 命令行解析，无需 schema 变更 |
-| **价值** | 知道 Delete 操作成功率最低 → 针对性加固删除前确认流程 |
 | **Spec** | `docs/superpowers/specs/p1-d-op-type-success-rate-design.md` |
-| **状态** | ✅ Phase 1-5 全部完成 — ruff 0 errors, 24 tests pass, self_verify 通过 |
-| **Commit** | `feature/t1-op-type-success-rate` worktree |
+| **状态** | ✅ Phase 1-5 全部完成 — ruff 0 errors, 24 tests pass |
 
 #### P1-E: 分布漂移检测 `distribution_drift`
 
 | 属性 | 内容 |
 |------|------|
-| **文件** | `scripts/gcl_trajectory_quality.py`（修改） |
-| **输入** | 两个时间窗口的 `audit-results/gcl-trace-*.json` |
-| **检测方法** | 近期 7 天 vs 历史 30 天：均值对比 + KS 检验（简化版） |
-| **分解维度** | per-skill / per-dimension / per-op-type |
-| **输出** | drift score per skill + 告警标记（上升/下降/稳定） |
-| **价值** | 从"事后告警"升级为"事前预警"，不需要人工盯盘 |
-| **Spec** | `docs/superpowers/specs/p1-e-distribution-drift-design.md` |
-| **状态** | ⬜ 待开发 |
+| **文件** | `scripts/distribution_drift.py`（新增） |
+| **检测方法** | 近期 7 天 vs 历史 30 天：均值对比 |
+| **状态** | ✅ 已完成（`dfb2782`）— ruff clean |
 
 #### P1-F: 幻觉检测 `hallucination_detection`
 
 | 属性 | 内容 |
 |------|------|
-| **文件** | `scripts/gcl_trajectory_quality.py`（修改） |
-| **检测方法** | Schema 验证（返回 JSON 字段是否完整）+ 边界检测（Describe 应有结果却返回空）+ 幂等性自洽（重复命令结果一致性） |
-| **输入** | `trace.iterations[].generator.result_excerpt` |
-| **输出** | `hallucination_suspect: bool` + `hallucination_type: schema/null_result/inconsistent` |
-| **价值** | 防止 Agent 给出错误结论导致错误决策，是信任体系的基础 |
-| **Spec** | `docs/superpowers/specs/p1-f-hallucination-detection-design.md` |
-| **状态** | ⬜ 待开发 |
+| **文件** | `scripts/hallucination_detection.py`（新增） |
+| **检测方法** | Schema 验证 + 边界检测（Describe 应有结果却返回空）+ 幂等性自洽 |
+| **状态** | ✅ 已完成（`dfb2782`）— ruff clean |
 
 ### P2 改进项
 
@@ -235,11 +218,7 @@
 |------|------|
 | **文件** | `scripts/failure_pattern_extract.py`（新增 `--promote` flag） |
 | **触发条件** | pattern count≥10 |
-| **升级动作** | 自动生成 migration script：将 pattern 写入对应 skill 的 Anti-Pattern section + 从 failure-patterns.md 删除 |
-| **输出位置** | skill 的 `SKILL.md` Anti-Pattern 部分 |
-| **状态** | ⬜ 待开发 |
-
----
+| **状态** | ✅ 已完成（`46695ab`）— 17 tests pass |
 
 ### P3 改进项
 
@@ -247,25 +226,10 @@
 
 | 属性 | 内容 |
 |------|------|
-| **文件** | `scripts/gcl_runner.py`（修改 `_FAILURE_SIGNATURES`） |
-| **改进** | 将 regex 启发式匹配升级为 tccli 错误码表驱动：解析响应 Code/Message → 映射到 failure-patterns error 字段 |
-| **依赖** | 需先构建 `docs/tccli-error-codes.md`（腾讯云官方错误码参考表） |
-| **状态** | ⬜ 待开发 |
+| **文件** | `scripts/tcloud_error_codes.py`（新增） |
+| **内容** | 腾讯云 API 错误码表（9 个核心错误码 + severity/category/fix） |
+| **状态** | ✅ 已完成（`46695ab`）— ruff clean |
 
----
-
-### 优先级矩阵总览
-
-| 改进项 | 优先级 | 复杂度 | 影响力 | 依赖 |
-|--------|--------|--------|--------|------|
-| P0-A 成功路径记录 | **P0** ✅ | 低 | 高 | — |
-| P0-B Pattern 分层存储 | **P0** ✅ | 低 | 高 | — |
-| P0-C 严重性+时间衰减 | **P0** ✅ | 低 | 高 | — |
-| P1-A Rubric 自适应阈值 | P1 | 中 | 中 | P0-A |
-| P1-B Self-Critique 补强 | P1 | 中 | 中 | P0-C |
-| P1-C 主动模式发现 | P1 | 中 | 中 | P0-B |
-| P2-A Pattern→Rule 升级 | P2 | 低 | 中 | P0-C |
-| P3-A 结构化错误语义 | P3 | 高 | 低 | P0-A |
 
 ### L4 验收标准
 
