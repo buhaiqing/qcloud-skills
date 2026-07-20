@@ -23,6 +23,7 @@ from copilot.safety.l2 import check_l2
 from copilot.safety.l3 import check_l3
 from copilot.quality.health import record_health
 from copilot.quality.audit import audit_trace
+from copilot.observ import ObservableSink
 from copilot.session import SessionManager
 from copilot.mode_resolver import resolve_inspection_mode, strip_ci_trigger_words
 from copilot.env_loader import ensure_runtime_env
@@ -78,6 +79,19 @@ class CopilotEngine:
 
         l0_result = check_l0(parsed, intent)
         if not l0_result["passed"]:
+            with suppress(Exception):
+                ObservableSink().emit_gate(
+                    self._session_id, "l0", "fail", "; ".join(l0_result["issues"])
+                )
+            with suppress(Exception):
+                record_health(
+                    skill="qcloud-copilot",
+                    operation="ask",
+                    status="error",
+                    duration_ms=0,
+                    trace_id=self._session_id,
+                    error_code="l0",
+                )
             return self._deliver_report(
                 self._error_report(
                     f"L0 gate failed: {', '.join(l0_result['issues'])}",
@@ -104,6 +118,19 @@ class CopilotEngine:
 
         l1_result = check_l1(plan)
         if not l1_result["passed"]:
+            with suppress(Exception):
+                ObservableSink().emit_gate(
+                    self._session_id, "l1", "fail", "; ".join(l1_result["issues"])
+                )
+            with suppress(Exception):
+                record_health(
+                    skill="qcloud-copilot",
+                    operation="ask",
+                    status="error",
+                    duration_ms=0,
+                    trace_id=self._session_id,
+                    error_code="l1",
+                )
             return self._deliver_report(
                 self._error_report(
                     f"L1 gate failed: {', '.join(l1_result['issues'])}",
@@ -122,6 +149,15 @@ class CopilotEngine:
             issues=l2_result["issues"],
         )
         if not l2_result["passed"]:
+            with suppress(Exception):
+                record_health(
+                    skill="qcloud-copilot",
+                    operation="ask",
+                    status="error",
+                    duration_ms=0,
+                    trace_id=self._session_id,
+                    error_code="l2",
+                )
             return self._deliver_report(
                 self._error_report(
                     f"L2 gate failed: {', '.join(l2_result['issues'])}",
@@ -275,6 +311,10 @@ class CopilotEngine:
 
         l3_result = check_l3(exec_result, reviewed=l3_reviewed)
         if not l3_result["passed"]:
+            with suppress(Exception):
+                ObservableSink().emit_gate(
+                    session_id, "l3", "fail", "; ".join(l3_result["issues"])
+                )
             exec_result.status = "aborted"
             exec_result.safety_violations = l3_result["issues"]
             exec_result.final_report = self._error_report(

@@ -14,6 +14,7 @@ from copilot.plan_schema import resolve_blackboard_paths
 from copilot.quality.audit import audit_trace
 from copilot.quality.health import record_health
 from copilot.quality.hallucination import check_h
+from copilot.observ import ObservableSink, Span
 from copilot.quality.reflexion import write_reflexion
 from copilot.report_gen import synthesize_from_blackboard
 
@@ -320,6 +321,7 @@ class PlanDispatcher:
 
         self._emit_trace(session_id, step, result, provenance=provenance)
         self._emit_health(step, result, session_id)
+        self._emit_span(session_id, step, result)
 
         if result.status == "failure":
             with suppress(Exception):
@@ -442,4 +444,21 @@ class PlanDispatcher:
                 status="ok" if result.status == "success" else "error",
                 duration_ms=result.duration_ms,
                 trace_id=session_id,
+            )
+
+    def _emit_span(self, session_id: str, step: PlanStep, result: StepResult) -> None:
+        error_code = None
+        if result.status != "success" and result.error:
+            # First token of the step error is the machine-readable failure signal
+            # (e.g. "H gate failed: ..." -> "H", "boom" -> "boom").
+            error_code = result.error.split()[0] if result.error.split() else step.type
+        with suppress(Exception):
+            ObservableSink().emit_span(
+                Span(
+                    run_id=session_id,
+                    step_id=step.id,
+                    status=result.status,
+                    duration_ms=result.duration_ms,
+                    error_code=error_code,
+                )
             )
