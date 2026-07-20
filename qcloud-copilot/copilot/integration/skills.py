@@ -140,8 +140,17 @@ def _resolve_tccli_operation(skill: str, operation: str) -> str:
 
 
 class SkillDispatcher:
-    def __init__(self):
+    def __init__(self, evolution_policy=None):
         self._known_skills = KNOWN_SKILLS
+        self._evolution_policy = evolution_policy
+
+    def route_advice(self, skill: str) -> str | None:
+        if self._evolution_policy is None:
+            return None
+        try:
+            return self._evolution_policy.route_hint(skill)
+        except Exception:
+            return None
 
     def validate_skill(self, skill: str) -> bool:
         return skill in self._known_skills
@@ -238,14 +247,18 @@ class SkillDispatcher:
             )
 
         response = parsed.get("Response", parsed)
+        output = {
+            "command_invoked": cmd,
+            "skill": skill,
+            "operation": operation,
+            "data": response,
+        }
+        advice = self.route_advice(skill)
+        if advice:
+            output["evolution_warning"] = advice
         return StepResult(
             step_id=step.id,
             status="success",
-            output={
-                "command_invoked": cmd,
-                "skill": skill,
-                "operation": operation,
-                "data": response,
-            },
+            output=output,
             error=None,
         )

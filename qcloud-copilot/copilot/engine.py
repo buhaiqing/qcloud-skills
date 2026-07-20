@@ -23,7 +23,7 @@ from copilot.safety.l2 import check_l2
 from copilot.safety.l3 import check_l3
 from copilot.quality.health import record_health
 from copilot.quality.audit import audit_trace
-from copilot.observ import ObservableSink
+from copilot.observ import Metric, MetricKind, ObservableSink
 from copilot.session import SessionManager
 from copilot.mode_resolver import resolve_inspection_mode, strip_ci_trigger_words
 from copilot.env_loader import ensure_runtime_env
@@ -451,7 +451,45 @@ class CopilotEngine:
                         customer=customer,
                     )
                 )
+        with suppress(Exception):
+            ObservableSink().emit_metric(
+                Metric(
+                    name="copilot_report_delivered",
+                    kind=MetricKind.COUNTER,
+                    value=1.0,
+                    tags={"session_id": str(session_id)},
+                )
+            )
         return report
+
+    def record_feedback(
+        self, session_id: str, *, adopted: bool = False, overridden: bool = False
+    ) -> None:
+        """Emit user-adoption / override signals consumed by the EVO-1 feedback loop.
+
+        Called by the host after the user acts on a delivered report. Best-effort:
+        any failure is swallowed so feedback never blocks the main flow.
+        """
+        with suppress(Exception):
+            sink = ObservableSink()
+            if adopted:
+                sink.emit_metric(
+                    Metric(
+                        name="copilot_user_adopt",
+                        kind=MetricKind.COUNTER,
+                        value=1.0,
+                        tags={"session_id": str(session_id)},
+                    )
+                )
+            if overridden:
+                sink.emit_metric(
+                    Metric(
+                        name="copilot_report_override",
+                        kind=MetricKind.COUNTER,
+                        value=1.0,
+                        tags={"session_id": str(session_id)},
+                    )
+                )
 
     def _error_report(self, message, parsed, intent, duration_ms, audience):
         from copilot.models import ExecutionPlan
