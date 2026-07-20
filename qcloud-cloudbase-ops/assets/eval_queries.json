@@ -1,0 +1,104 @@
+[
+  {
+    "query": "Create a CloudBase environment named my-app",
+    "should_trigger": true,
+    "skill": "qcloud-cloudbase-ops",
+    "intent": "CreateEnv",
+    "keywords": ["CloudBase", "environment", "create", "云开发", "环境"]
+  },
+  {
+    "query": "List all my CloudBase environments",
+    "should_trigger": true,
+    "skill": "qcloud-cloudbase-ops",
+    "intent": "DescribeEnvInfo",
+    "keywords": ["CloudBase", "list", "describe", "云开发", "环境列表"]
+  },
+  {
+    "query": "Delete my CloudBase environment env-12345",
+    "should_trigger": true,
+    "skill": "qcloud-cloudbase-ops",
+    "intent": "DeleteEnv",
+    "keywords": ["CloudBase", "delete", "云开发", "删除环境"]
+  },
+  {
+    "query": "Check CloudBase billing and usage metrics",
+    "should_trigger": true,
+    "skill": "qcloud-cloudbase-ops",
+    "intent": "DescribeBillingInfo",
+    "keywords": ["CloudBase", "billing", "usage", "cost", "云开发", "计费"]
+  },
+  {
+    "query": "Add example.com to auth domains whitelist",
+    "should_trigger": true,
+    "skill": "qcloud-cloudbase-ops",
+    "intent": "CreateAuthDomain",
+    "keywords": ["CloudBase", "auth domain", "whitelist", "云开发", "安全域名"]
+  },
+  {
+    "query": "List CloudBase API keys",
+    "should_trigger": true,
+    "skill": "qcloud-cloudbase-ops",
+    "intent": "DescribeApiKeyLists",
+    "keywords": ["CloudBase", "API key", "云开发", "密钥"]
+  },
+  {
+    "query": "Set database collection permissions for users collection",
+    "should_trigger": true,
+    "skill": "qcloud-cloudbase-ops",
+    "intent": "CreateDatabaseACL",
+    "keywords": ["CloudBase", "database", "ACL", "permissions", "云开发", "数据库权限"]
+  },
+  {
+    "query": "Deploy a static website to CloudBase hosting",
+    "should_trigger": true,
+    "skill": "qcloud-cloudbase-ops",
+    "intent": "CreateHostingDomain",
+    "keywords": ["CloudBase", "static", "hosting", "website", "云开发", "静态托管"]
+  },
+  {
+    "query": "How do I create a TCB environment via CLI",
+    "should_trigger": true,
+    "skill": "qcloud-cloudbase-ops",
+    "intent": "CreateEnv",
+    "keywords": ["TCB", "云开发", "CLI"]
+  },
+  {
+    "query": "Monitor CloudBase function call counts and duration",
+    "should_trigger": true,
+    "skill": "qcloud-cloudbase-ops",
+    "intent": "DescribeCurveData",
+    "keywords": ["CloudBase", "monitor", "metrics", "function", "云开发", "监控"]
+  },
+  {
+    "query": "Create a standalone SCF function (not CloudBase)",
+    "should_trigger": false,
+    "skill": "qcloud-scf-ops",
+    "intent": "N/A",
+    "keywords": ["SCF", "云函数", "serverless"],
+    "negative_reason": "Standalone SCF, not CloudBase-hosted — qcloud-scf-ops handles this"
+  },
+  {
+    "query": "Manage COS bucket files directly",
+    "should_trigger": false,
+    "skill": "qcloud-cos-ops",
+    "intent": "N/A",
+    "keywords": ["COS", "bucket", "object storage"],
+    "negative_reason": "Direct COS operations outside CloudBase context — qcloud-cos-ops handles this"
+  },
+  {
+    "query": "Set up CAM policies for my account",
+    "should_trigger": false,
+    "skill": "qcloud-cam-ops",
+    "intent": "N/A",
+    "keywords": ["CAM", "policy", "permission"],
+    "negative_reason": "General CAM policy management — qcloud-cam-ops handles this"
+  },
+  {
+    "query": "Check my Tencent Cloud bill",
+    "should_trigger": false,
+    "skill": "qcloud-billing-ops",
+    "intent": "N/A",
+    "keywords": ["billing", "bill", "invoice"],
+    "negative_reason": "General billing — not CloudBase-specific operations"
+  }
+]
