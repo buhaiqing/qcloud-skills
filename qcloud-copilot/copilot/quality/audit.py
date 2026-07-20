@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
+from copilot.observ import ObservableSink, Span
+
 
 def audit_trace(
     session_id: str,
@@ -34,3 +36,16 @@ def audit_trace(
         audit_dir / f"step-{step_id}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}.json"
     )
     filename.write_text(json.dumps(record, ensure_ascii=False, indent=2))
+
+    # Delegate span emission so the run-index is auto-built (O2) and the
+    # structured metric stream stays consistent with health/engine signals.
+    status = str(trace_data.get("status", "success"))
+    ObservableSink().emit_span(
+        Span(
+            run_id=run_id,
+            step_id=step_id,
+            status="success" if status == "success" else "fail",
+            duration_ms=int(trace_data.get("duration_ms", 0) or 0),
+            error_code=trace_data.get("error"),
+        )
+    )
