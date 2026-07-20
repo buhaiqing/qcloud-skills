@@ -138,4 +138,13 @@
     "severity": "critical" | "major" | "minor"  // P0-C: critical=Safety=0, major=Correctness/Idempotency=0, minor=others
   }
 }
-```
+
+### Auto-Consumption (EVO-1)
+
+> EVO-1 self-evolution Generator (`qcloud-copilot/copilot/evolution/`) reads this file automatically at runtime.
+
+- `EvolutionStore` parses `failure-patterns.md` + `success-patterns.md` into structured `Pattern` records (dedup via `normalize_reflexion_key`).
+- High-confidence failure patterns feed `EvolutionPolicy.route_hint` → `--confirm` warnings on risky skills.
+- Success-pattern operations feed `EvolutionPolicy.op_allowlist` → whitelisted in `hallucination.check_h` to suppress false "unknown operation" flags.
+- `DriftGuard` gates any evolution-driven change behind a ~5% shadow rollout and reverts on quality drop.
+- These patterns are ground-truth: keep them accurate (dedup, increment `count`, prune `count < 3` when >200 lines).
