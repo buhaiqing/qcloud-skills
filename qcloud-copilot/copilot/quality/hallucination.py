@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import suppress
+
 from copilot.models import PlanStep
 from copilot.integration.skills import KNOWN_SKILLS
 
@@ -151,6 +153,18 @@ KNOWN_OPERATIONS = {
 }
 
 
+_EVO_POLICY_CACHE = None
+
+
+def _get_evolution_policy():
+    global _EVO_POLICY_CACHE
+    if _EVO_POLICY_CACHE is None:
+        from copilot.evolution.store import EvolutionStore
+        from copilot.evolution.policy import EvolutionPolicy
+        _EVO_POLICY_CACHE = EvolutionPolicy(EvolutionStore(), None)
+    return _EVO_POLICY_CACHE
+
+
 def check_h(step: PlanStep) -> dict:
     issues = []
 
@@ -161,9 +175,11 @@ def check_h(step: PlanStep) -> dict:
         if step.skill not in KNOWN_SKILLS:
             issues.append(f"Unknown skill: {step.skill}")
 
-        skill_ops = KNOWN_OPERATIONS.get(step.skill, set())
+        allow = set(KNOWN_OPERATIONS.get(step.skill, set()))
+        with suppress(Exception):
+            allow |= _get_evolution_policy().op_allowlist(step.skill)
         op = step.params.get("operation", "")
-        if skill_ops and op and op not in skill_ops:
+        if allow and op and op not in allow:
             issues.append(f"Unknown operation '{op}' for skill {step.skill}")
 
     return {"passed": len(issues) == 0, "issues": issues}
