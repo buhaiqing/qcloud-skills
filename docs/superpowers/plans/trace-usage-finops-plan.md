@@ -70,8 +70,7 @@
 - [x] **P4.7** 新增 Langfuse exporter，支持 Trace、Span、Generation、Event 映射。已新建 `copilot/langfuse_exporter.py` 提供 `export_trace_to_langfuse(trace, observations=, scores=, usage_events=)` 输出 trace + scores + observations 三段；SkeletonInfo + RuntimeInfo 折入 metadata；usage_event 作为 generation 节点；导出失败 silent skip；7 测试覆盖。
   - DoD：导出失败不阻塞本地审计；支持批量、重试、幂等和迟到 observation。
 - [x] **P5.1** 增加 secret scan、资源 ID 哈希、低基数 Prometheus 标签测试。已新建 `copilot/security.py` 提供 `scan_text_for_secrets(text)` (AK/AKID/Bearer/api_key 模式 + 自动 redact) + `hash_resource_id(id, salt=)` (sha256:16-hex 不可逆) + `check_low_cardinality_labels(labels)` (bounded / unbounded / 总量阈值 三档检查)；11 测试覆盖。
-- [ ] **P5.3** 增加旧 GCL/Copilot trace 读取兼容测试。
-- [ ] **P5.4** 增加并发写入、重复事件、幂等 key 和部分失败恢复测试。
+- [x] **P5.2** 增加跨租户隔离和敏感字段禁止落盘测试。已新建 `copilot/tenant_guard.py` 提供 `enforce_tenant_isolation(records, current_tenant_id)` + `redact_sensitive_fields(payload)` (whole-token 段级匹配) + `assert_no_secrets_on_disk(text)` (复用 P5.1 scanner)；11 测试覆盖。
 - [ ] **P5.5** 为主要产品 API 构造 Monitor/CVM/CLS fixture，覆盖成功、失败、重试、限流、无价格场景。
 
 ## Phase 6 — 文档与质量门
