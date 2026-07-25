@@ -138,6 +138,15 @@
     "severity": "critical" | "major" | "minor"  // P0-C: critical=Safety=0, major=Correctness/Idempotency=0, minor=others
   }
 }
+## 2. Dev Process & Lint Errors
+
+> Pre-commit / CI-grade lint issues that cause builds to fail.
+
+| Context | Rule | Issue | Fix | Count | LastSeen | Severity |
+|---------|------|-------|-----|-------|----------|----------|
+| `*.py` | E741 | `l` used as loop variable — ambiguous with digit `1` | Rename to `line`/`item`/`record` etc. | 1 | 2026-07-25 | minor |
+| `*.py` | F401 | Import `X` imported but unused | Remove unused import or prefix with `_` | 0 | — | minor |
+
 
 ### Auto-Consumption (EVO-1)
 

@@ -43,7 +43,7 @@ Run `ls qcloud-*-ops/` for canonical list.
 - **Commit hygiene**:
   - Default: One commit per logical unit.
   - **Hard stops (MUST pause)**: Credentials/secrets in diff, irreversible destructive ops without confirmation, bypassed safety gates, wrong remote/branch/protected branch, sensitive info in commit, mass destructive changes.
-- **Python lint gate**: After `*.py` changes, run `ruff check <changed-files>`. After Python SDK code blocks in Markdown, run `python3 scripts/check_markdown_python.py --root .`.
+- **Python lint gate**: After `*.py` changes, run `ruff check <changed-files>`. If that exits non-zero, run `ruff check .` to catch pre-existing errors (e.g. E741 ambiguous variable name like `l`) that would break CI — fix them in the same commit. After Python SDK code blocks in Markdown, run `python3 scripts/check_markdown_python.py --root .`.
 - **Spec-Plan-Code Alignment Gate (硬性约束)**: 每次任务开发必须经过三阶段闭环：
   1. **SPEC**：在 `docs/superpowers/specs/` 下编写设计文档（背景、架构、Schema、算法、文件清单）
   2. **PLAN**：在同一文档中编写 Phase 清单（每个 Phase 含具体步骤，checkbox 格式）

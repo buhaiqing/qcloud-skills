@@ -52,6 +52,6 @@ def test_emit_metric_writes_structured_record(tmp_path: Path):
     sink.emit_metric(Metric(name="copilot_inflight", kind=MetricKind.GAUGE, value=2.0, tags={"skill": "x"}))
 
     jsonl = (tmp_path / ".runtime" / "metrics" / "metrics.jsonl").read_text()
-    record = json.loads([l for l in jsonl.splitlines() if l][-1])
+    record = json.loads([line for line in jsonl.splitlines() if line][-1])
     assert record["name"] == "copilot_inflight"
     assert record["metric_kind"] == "gauge"
