@@ -115,3 +115,26 @@ def top_failed_operations(days: int = 7, limit: int = 10) -> list[tuple[str, int
             counts[op] = counts.get(op, 0) + 1
     ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
     return ranked[:limit]
+
+
+
+def read_audit_records(
+    run_id: str,
+    *,
+    runtime_root: Path | None = None,
+) -> list[dict]:
+    """Read legacy audit JSON files for a run_id (one JSON per step).
+
+    Files live at <runtime_root>/.runtime/gcl/copilot/audit/<run_id>/step-*.json
+    Returns list of decoded record dicts in arbitrary order.
+    """
+    base = (runtime_root or Path.cwd()) / ".runtime" / "gcl" / "copilot" / "audit" / run_id
+    if not base.exists():
+        return []
+    out: list[dict] = []
+    for f in sorted(base.glob("step-*.json")):
+        try:
+            out.append(json.loads(f.read_text(encoding="utf-8")))
+        except Exception:
+            continue
+    return out

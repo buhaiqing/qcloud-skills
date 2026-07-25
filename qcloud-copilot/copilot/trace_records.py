@@ -468,23 +468,37 @@ class SummaryRecord:
 def legacy_gcl_to_observation(
     gcl_record: dict[str, Any], trace_id: str
 ) -> ObservationRecord:
-    """Map GCL trace v1 JSON to ObservationRecord (GENERATION type)."""
+    """Map GCL trace JSON to ObservationRecord (GENERATION type).
+
+    v0 (no iteration / no rubric_version) and v1 (with rubric_version /
+    model_version / latency_ms) both supported. Missing optional fields
+    serialize as None (not '' or 'unknown').
+    """
+    generator = gcl_record.get("generator")
+    critic = gcl_record.get("critic")
     return ObservationRecord(
         id=_new_id("obs"),
         trace_id=trace_id,
         type=ObservationType.GENERATION,
-        name=f"gcl-{gcl_record.get('generator', 'unknown')}",
+        name=f"gcl-{generator}" if generator else "gcl-unknown",
         status="success" if gcl_record.get("passed") else "error",
         start_time=gcl_record.get("timestamp", _utc_now()),
         end_time=gcl_record.get("timestamp", _utc_now()),
         metadata={
+            "_from_legacy": True,
             "gcl_run_id": gcl_record.get("run_id"),
-            "gcl_generator": gcl_record.get("generator"),
-            "gcl_critic": gcl_record.get("critic"),
+            "gcl_generator": generator,
+            "gcl_critic": critic,
             "gcl_iteration": gcl_record.get("iteration"),
+            "gcl_passed": gcl_record.get("passed"),
             "gcl_safety_score": gcl_record.get("safety_score"),
             "gcl_score": gcl_record.get("score"),
+            "gcl_rubric_version": gcl_record.get("rubric_version"),
+            "gcl_model_version": gcl_record.get("model_version"),
+            "gcl_latency_ms": gcl_record.get("latency_ms"),
         },
+        output=gcl_record.get("output") or {},
+        input=gcl_record.get("prompt") or {},
         error=None if gcl_record.get("passed") else "gcl_failed",
     )
 
@@ -492,19 +506,28 @@ def legacy_gcl_to_observation(
 def legacy_audit_to_observation(
     audit_record: dict[str, Any], trace_id: str
 ) -> ObservationRecord:
-    """Map Copilot audit JSON to ObservationRecord (SPAN type)."""
-    skill = audit_record.get("skill", "unknown")
+    """Map Copilot audit JSON to ObservationRecord (SPAN type).
+
+    Missing `skill` / `operation` / `region` / `step_id` map to None, never
+    'unknown' sentinel strings.
+    """
+    skill = audit_record.get("skill")
+    operation = audit_record.get("operation")
+    region = audit_record.get("region")
     return ObservationRecord(
         id=_new_id("obs"),
         trace_id=trace_id,
         type=ObservationType.SPAN,
-        name=skill,
+        name=skill or "audit-step",
         status=audit_record.get("status", "success"),
         start_time=audit_record.get("timestamp", _utc_now()),
         end_time=audit_record.get("timestamp", _utc_now()),
         metadata={
+            "_from_legacy": True,
             "skill_name": skill,
-            "audit_step_id": audit_record.get("step_id"),
+            "operation_name": operation,
+            "region": region,
+            "step_id": audit_record.get("step_id"),
         },
         error=None if audit_record.get("status") == "success" else "audit_failed",
     )
