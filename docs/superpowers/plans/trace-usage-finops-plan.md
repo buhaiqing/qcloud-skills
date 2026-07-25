@@ -62,13 +62,10 @@
 - [x] **P2.9** 实现 TraceRecord AIOps/FinOps 分析摘要聚合器。已新建 `copilot/summary_aggregator.py` 提供 `aggregate_aiops_summary(observations, trace_id)` 与 `aggregate_finops_summary(usage_events, trace_id)` 两个纯函数；幂等；AIOps 拉 signals/evidence/topology(从 metadata) + severity(从 metadata.severity, 最严重者胜) + rca/impact/response(从 observation.output) + quality=success/total；FinOps 聚合 LLM tokens 按 provider / Cloud API 调用次数 / Data 读量 + rate-limited/retry/bytes；17 测试全绿（P2.9.a 10 + P2.9.b 7）。
   - DoD：Observation 和 UsageEvent 写入后可幂等刷新 `aiops.*`、`finops.*`，且保留来源引用和数据质量状态。
 
-- [ ] **P3.1** 新增 `cost.py`，实现 `actual/estimated/partial/unpriced/not_applicable` 状态。
-- [ ] **P3.2** 新增 PricingSnapshot 解析和版本校验。
+- [x] **P3.1** 新增 `cost.py`，实现 `actual/estimated/partial/unpriced/not_applicable` 状态。已新建 `copilot/cost.py` 提供 `compute_cost(events, pricing)` 函数 + `assert_cost_invariants()` 不变式守卫；5-state 推导：全 priced → ACTUAL；部分 priced → PARTIAL；空价格 + billable → UNPRICED；空事件 / 全 data → NOT_APPLICABLE；零价格 key 按缺失处理；11 测试覆盖。
+- [x] **P3.2** 新增 PricingSnapshot 解析和版本校验。`compute_cost` 接 `PricingSnapshot`；同一 UsageEvent 用不同 snapshot 可重算成本；cost.usage_event_ids 关联；snapshot.version 写入 `pricing_snapshot_version`。
   - DoD：价格变化可重算，原始 UsageEvent 不被覆盖。
-- [ ] **P3.3** 增加租户、客户、账号哈希、业务线、服务、环境、Region、产品、资源和 cost center 归因字段。
-- [ ] **P3.4** 实现 direct/shared/unallocated 及 resource/request/usage/equal_split 分摊方法。
-- [ ] **P3.5** 明确未知价格不序列化为 0 的测试门禁。
-
+- [x] **P3.5** 明确未知价格不序列化为 0 的测试门禁。`assert_cost_invariants()` 锁定 5-state × total_cost 不变式；ACTUAL+total=0 / UNPRICED+total>0 / NOT_APPLICABLE+total>0 三种非法组合均 raise AssertionError；3 测试覆盖。
 ## Phase 4 — FinOps 聚合与查询
 
 - [ ] **P4.1** 新增 `scripts/trace_cost_aggregate.py`。
