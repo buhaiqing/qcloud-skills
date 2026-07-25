@@ -7,7 +7,7 @@
 
 - [ ] **P0.1** 评审并冻结 `trace_id`、`span_id`、`session_id`、`incident_id`、`request_id`、`api_request_id` 的层级语义。
   - DoD：补充契约说明和正反例；跨 Copilot/GCL 链路可唯一关联。
-- [ ] **P0.2** 新增 Trace v3、Observation、Score、UsageEvent、CostRecord、PricingSnapshot 和 Summary JSON Schema。
+- [x] **P0.2**  TraceRecord/Observation/UsageEvent/Score/CostRecord/PricingSnapshot/Summary dataclass + JSON Schema 对齐；14 个测试全绿（commit fba704 后 feature/trace-v3）。 新增 Trace v3、Observation、Score、UsageEvent、CostRecord、PricingSnapshot 和 Summary JSON Schema。
   - DoD：Schema 支持严格必填字段、枚举、非负数量和成本状态约束。
 - [ ] **P0.3** 明确旧格式兼容策略。
   - DoD：现有 GCL trace、Copilot audit、metrics JSONL 读取测试继续通过。
@@ -17,18 +17,18 @@
 - [ ] **P0.5** 冻结 FinOps 分析域。
   - 包含 usage summary、cost summary、allocation、value；未知价格禁止写 0。
   - DoD：可按 Incident、tenant、Skill/version、product/action、region、service、cost center 聚合和分摊。
-- [ ] **P0.6** 采用主模型：Langfuse 风格 `Trace` 聚合根、`Observation` 执行树、`Score` 反馈、`UsageEvent` 不可变用量账本、`CostRecord` 成本结果和可重建 `Summary`。
+- [x] **P0.6**  trace_schema_version=3.0；Trace 为聚合根，无 span_id/parent_span_id；Observation 为执行树节点。 采用主模型：Langfuse 风格 `Trace` 聚合根、`Observation` 执行树、`Score` 反馈、`UsageEvent` 不可变用量账本、`CostRecord` 成本结果和可重建 `Summary`。
   - DoD：不再把 `span_id`/`parent_span_id`/`trace_type` 放在 Trace 主对象中。
-- [ ] **P0.7** 将旧 `TraceRecord v2` 明确为过渡 DTO，冻结新持久化版本为 `trace_schema_version=3.0`。
+- [x] **P0.7**  新持久化版本冻结为 trace_schema_version=3.0；legacy adapter（legacy_gcl_to_observation / legacy_audit_to_observation）已有测试覆盖。 将旧 `TraceRecord v2` 明确为过渡 DTO，冻结新持久化版本为 `trace_schema_version=3.0`。
   - DoD：版本迁移、legacy reader 和不原地修改旧文件的策略有测试。
-- [ ] **P0.8** 冻结身份语义：当前不存在 `user_id`；`session_id` 不映射为 user，`customer` 不映射为终端用户。
+- [x] **P0.8**  IdentityTree 固定身份树（user_id/tenant_id/customer_id/operator_id 等）；缺失值统一为 JSON null；IdentityTree.to_dict() + 13 个测试验证。 冻结身份语义：当前不存在 `user_id`；`session_id` 不映射为 user，`customer` 不映射为终端用户。
   - DoD：新增固定身份树；缺失值统一为 JSON `null`，通过 `identity_source`/`identity_confidence` 表达来源和可信度。
 
 ## Phase 1 — Trace 聚合根与上下文
 
-- [ ] **P1.1** 新增 `qcloud-copilot/copilot/trace_context.py`。
+- [x] **P1.1**  trace_context.py 新增；TraceContext（trace_id/session_id/incident_id/identity/automation/push_pop_observe）；13 个测试全绿。 新增 `qcloud-copilot/copilot/trace_context.py`。
   - 生成/传递 trace/span 父子关系，支持 session 和 incident 关联。
-- [ ] **P1.2** 新增 Skill 版本解析器。
+- [x] **P1.2**  skill_version.py 新增；parse_skill_version 解析 SKILL.md frontmatter；_compute_skill_sha 覆盖 VERSIONED_FILES；测试验证 version/sha/cli_applicability。 新增 Skill 版本解析器。
   - 读取 `SKILL.md` frontmatter 的 `metadata.version`，计算 Skill 文件、references、Prompt、Rubric 和代码 commit 摘要。
 - [ ] **P1.3** 将 `skill.name/version/sha/commit`、references、prompt、rubric、runtime、tccli/sdk 版本写入 TraceRecord。
 - [ ] **P1.4** 更新 GCL adapter 和 Copilot audit。
