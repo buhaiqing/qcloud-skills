@@ -545,3 +545,5 @@ tccli dc DescribeDirectConnects --Region "{{env.TENCENTCLOUD_REGION}}"
 - [Troubleshooting](references/troubleshooting.md)
 - [Well-Architected Assessment](references/well-architected-assessment.md)
 - [Integration](references/integration.md)
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

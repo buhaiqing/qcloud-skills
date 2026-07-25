@@ -540,3 +540,5 @@ Error response:
   }
 }
 ```
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

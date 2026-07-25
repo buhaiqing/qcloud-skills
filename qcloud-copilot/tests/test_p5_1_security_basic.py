@@ -8,8 +8,6 @@ All three are pure functions that never mutate input.
 
 from __future__ import annotations
 
-import re
-
 
 # ---------------------------------------------------------------------------
 # Secret scanning

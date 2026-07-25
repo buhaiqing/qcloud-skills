@@ -856,3 +856,5 @@ See [`references/rubric.md`](references/rubric.md) §6 for two more examples.
 - [Tencent Cloud CLI (tccli)](https://cloud.tencent.com/document/product/440)
 - [Tencent Cloud SDK for Python (tencentcloud-sdk-python)](https://cloud.tencent.com/document/sdk/Python)
 - [Agent Skills Open Specification](https://agentskills.io/specification)
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

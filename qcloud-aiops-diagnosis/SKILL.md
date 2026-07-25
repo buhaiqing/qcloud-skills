@@ -431,3 +431,5 @@ For detailed diagnosis patterns, see [`references/README.md`](references/README.
 - [CLI Usage](references/cli-usage.md) — CLI-first read-only collection
 - [API & SDK Usage](references/api-sdk-usage.md) — Python SDK fallback (dual-path)
  [Delegation Matrix](references/delegation-matrix.md) — Cross-skill diagnosis routing
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

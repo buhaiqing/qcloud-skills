@@ -334,3 +334,5 @@ python3 -c "from tencentcloud.common import credential; print('OK')"
 - [Integration](references/integration.md)
 
 > Note: This skill uses `cli_applicability: sdk-only` as `tccli codepipeline` is not available. CLI operations are not documented.
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

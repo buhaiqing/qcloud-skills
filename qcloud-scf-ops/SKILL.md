@@ -409,3 +409,5 @@ Error responses:
 - **Security:** Store secrets in environment variables (encrypted); use VPC for private resource access
 - **Versioning:** Use aliases for deployment stages (dev/test/prod); never invoke $LATEST in production
 - **Concurrency:** Configure reserved concurrency for critical functions; understand account concurrency limits
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

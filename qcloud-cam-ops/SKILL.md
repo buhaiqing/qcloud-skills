@@ -360,3 +360,5 @@ For detailed content, see:
 - [Troubleshooting](references/troubleshooting.md) — Error code diagnostics (incl. RequestLimitExceeded backoff)
 - [Well-Architected Assessment](references/well-architected-assessment.md) — Security best practices
 - [Core Concepts](references/core-concepts.md) — Trust policy validation, Principal=`*` detection script
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

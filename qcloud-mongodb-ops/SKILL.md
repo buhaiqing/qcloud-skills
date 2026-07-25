@@ -379,3 +379,5 @@ Error responses:
 - **Backup:** Enable auto-backup with 7-day retention; test restore quarterly
 - **Cost:** Right-size memory/disk via monitoring; prepaid for stable workloads
 - **Security:** Enable SSL, VPC isolation, audit logging, and password rotation
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

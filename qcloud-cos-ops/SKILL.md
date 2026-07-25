@@ -510,3 +510,5 @@ See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PA
 - [FinOps Cost Optimization](references/finops-cost-optimization.md) — CLI-driven cost analysis
 - [SecOps Security Operations](references/secops-security-operations.md)
 - [AIOps Best Practices](references/aiops-best-practices.md)
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

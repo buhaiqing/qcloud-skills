@@ -276,3 +276,5 @@ Missing any ⇒ **Safety = 0** ⇒ **ABORT**. Full rules: [`references/rubric.md
 | 1.2.0 | 2026-07-04 | SLB 5xx fast diagnosis: `references/slb-5xx-diagnosis-optimized.md`, quick 5xx triage, Quick Diagnosis Scenarios table |
 | 1.2.1 | 2026-07-06 | AIOps fixes: duplicate `--Region` flags, hardcoded pricing, retry guidance, idempotency note |
 | 1.3.0 | 2026-07-09 | SKILL.md consolidation: removed duplicate Quick Start / Prerequisites / Output Schema / error-code tables (moved to new `references/error-reference.md`); merged Capabilities into Execution Flows; added Quick Triage entry points; reduced 549 → 276 lines while preserving all operational info |
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

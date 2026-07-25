@@ -688,3 +688,5 @@ Optional: `references/cos-log-analysis.md`, `references/query-language.md`, `ref
 ---
 
 *Generated for Tencent Cloud CLS Operations Skill v1.0.0*
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

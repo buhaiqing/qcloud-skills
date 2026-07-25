@@ -471,3 +471,5 @@ Error responses:
 - **Availability:** Multi-AZ deployment for production clusters; dedicated master nodes for stability
 - **Cost:** Right-size node specifications based on workload; use warm/cold tiering for old indices
 - **Performance:** Monitor JVM heap usage; set ILM policies for index rollover; force-merge read-only indices
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。
