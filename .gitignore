@@ -44,6 +44,7 @@ htmlcov/
 # Local agent runtime cache (NOT .pixi — that one is upstream's Pixi env)
 .pi/
 .pi-subagents/
+.pi-agents/
 .codegraph/
 .coverage
 .coverage.*
@@ -221,7 +222,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-
+.omp/
 .omc/
 .omo/
 .codebuddy/

@@ -86,6 +86,51 @@ class AutomationTree:
 
 
 # ---------------------------------------------------------------------------
+# Runtime / Skill version info (P1.3)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class RuntimeInfo:
+    """Runtime environment version info for traceability (SPEC P1.3)."""
+
+    python_version: Optional[str] = None
+    tccli_version: Optional[str] = None
+    sdk_name: Optional[str] = None
+    sdk_version: Optional[str] = None
+    git_commit: Optional[str] = None
+    deployment_version: Optional[str] = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> RuntimeInfo:
+        return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+
+
+@dataclass
+class SkillInfo:
+    """Skill version info for traceability (SPEC P1.3)."""
+
+    name: Optional[str] = None
+    version: Optional[str] = None
+    source: Optional[str] = None
+    skill_file_sha256: Optional[str] = None
+    skill_commit: Optional[str] = None
+    references: Optional[dict[str, Any]] = None
+    prompt_version: Optional[str] = None
+    rubric_version: Optional[str] = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> SkillInfo:
+        return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+
+
+# ---------------------------------------------------------------------------
 # Trace aggregate root
 # ---------------------------------------------------------------------------
 
@@ -109,14 +154,18 @@ class TraceRecord:
     environment: Optional[str] = None
     tags: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
-    # AIOps fields
-    aiops_summary: Optional[dict[str, Any]] = None
-    # FinOps fields
-    finops_summary: Optional[dict[str, Any]] = None
-    # Refs
-    observation_refs: list[str] = field(default_factory=list)
-    usage_refs: list[str] = field(default_factory=list)
-    score_refs: list[str] = field(default_factory=list)
+    # Skill version info (P1.3)
+    skill: Optional[SkillInfo] = None
+    # Runtime environment info (P1.3)
+    runtime: Optional[RuntimeInfo] = None
+    # AIOps Summary (nested dataclass, not raw dict)
+    aiops_summary: Optional[AIOpsSummary] = None
+    # FinOps Summary (nested dataclass, not raw dict)
+    finops_summary: Optional[FinOpsSummary] = None
+    # Foreign keys
+    observation_ids: list[str] = field(default_factory=list)
+    usage_event_ids: list[str] = field(default_factory=list)
+    score_ids: list[str] = field(default_factory=list)
     summary_version: Optional[str] = None
 
     @classmethod
@@ -141,18 +190,36 @@ class TraceRecord:
                 "environment",
                 "tags",
                 "metadata",
-                "aiops_summary",
-                "finops_summary",
-                "observation_refs",
-                "usage_refs",
-                "score_refs",
+                "observation_ids",
+                "usage_event_ids",
+                "score_ids",
                 "summary_version",
             }
         }
+        # Deserialize nested dataclasses
+        if "aiops_summary" in data and data["aiops_summary"] is not None:
+            known["aiops_summary"] = AIOpsSummary(**data["aiops_summary"])
+        if "finops_summary" in data and data["finops_summary"] is not None:
+            known["finops_summary"] = FinOpsSummary(**data["finops_summary"])
+        if "skill" in data and data["skill"] is not None:
+            known["skill"] = SkillInfo(**data["skill"])
+        if "runtime" in data and data["runtime"] is not None:
+            known["runtime"] = RuntimeInfo(**data["runtime"])
         return cls(**known)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        # Serialize nested dataclasses to plain dicts
+        for field_name, cls_type in [
+            ("aiops_summary", AIOpsSummary),
+            ("finops_summary", FinOpsSummary),
+            ("skill", SkillInfo),
+            ("runtime", RuntimeInfo),
+        ]:
+            val = getattr(self, field_name, None)
+            if val is not None:
+                d[field_name] = val.to_dict() if hasattr(val, "to_dict") else val
+        return d
 
 
 # ---------------------------------------------------------------------------
@@ -324,6 +391,45 @@ class PricingSnapshot:
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
+# ---------------------------------------------------------------------------
+# AIOps Summary (SPEC §20)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class AIOpsSummary:
+    """AIOps summary fields embedded in TraceRecord (SPEC §20)."""
+
+    incident_id: Optional[str] = None
+    severity: Optional[str] = None
+    signals: list[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
+    topology: list[str] = field(default_factory=list)
+    rca: Optional[str] = None
+    impact: Optional[str] = None
+    response: Optional[str] = None
+    quality: float = 0.0
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+# ---------------------------------------------------------------------------
+# FinOps Summary (SPEC §21)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class FinOpsSummary:
+    """FinOps summary fields embedded in TraceRecord (SPEC §21)."""
+
+    usage_summary: dict[str, Any] = field(default_factory=dict)
+    cost_summary: dict[str, Any] = field(default_factory=dict)
+    allocation: dict[str, Any] = field(default_factory=dict)
+    value: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 # ---------------------------------------------------------------------------
 # Summary (rebuilt from Observation/UsageEvent/Score, not a source of truth)

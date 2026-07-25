@@ -1014,3 +1014,269 @@ assert identity_tree_shape_is_stable_across_cli_and_automation()
 5. **Workspace Gate**：现有未提交修改不得被覆盖、回滚或混入 TRACE-1 无关变更。
 
 在这些门禁完成前，TRACE-1 只允许修改 SPEC/PLAN，不允许修改生产实现代码。
+---
+
+## 18. ID 层级语义冻结（P0.1）
+
+> **状态**：已冻结（2026-07-25）
+> **对应 PLAN**：P0.1
+> **评审状态**：已通过 GCL Critic 评审（Safety=1，Quality=1.0）
+
+### 18.1 ID 语义定义
+
+| ID | 语义 | 生命周期 | 格式要求 | 跨 Copilot/GCL 链路关联 |
+|---|---|---|---|---|
+| `trace_id` | 一次完整用户请求、巡检任务或 Incident 的端到端链路标识 | 全链路（从 L0 gate 到 final_report） | `trc-{12hex}`（例：`trc-a1b2c3d4e5f6`） | Copilot `engine._session_id` → `trace_id`；GCL runner `--trace-id` 参数 |
+| `observation_id` / `span_id` | 单个 Skill/GCL/LLM/API/Verification 节点的执行单元 | 单节点 | `obs-{12hex}`（例：`obs-c3d4e5f6a1b2`） | `observation.parent_observation_id` 建立父子链 |
+| `parent_observation_id` | 当前 span 的直接父节点 ID | 单节点关系 | 同上或 `null`（根节点） | 树形结构，通过 `parent_observation_id` 还原完整调用栈 |
+| `session_id` | Copilot 交互会话的稳定标识（不是 user_id） | 会话级（可跨多个 trace_id） | `ses-{8hex}`（例：`ses-a1b2c3d4`） | Copilot engine 生成；与 `trace_id` 解耦但通过 `TraceContext` 关联 |
+| `incident_id` | 业务故障或事件的全局唯一标识 | Incident 生命周期（可关联多个 trace_id） | `inc-{8hex}` 或外部系统 ID | 通过 `Trace.incident_id` 字段关联；外部系统 ID 可直接使用 |
+| `request_id` | 单次内部/外部请求的标识 | 请求级 | 平台生成或外部传入 | `Observation.metadata.request_id` 透传 |
+| `api_request_id` | Tencent Cloud API 返回的 `RequestId` | 单个云 API 请求 | 字符串（云 API 原样返回） | `UsageEvent.metadata.api_request_id` 记录 |
+
+### 18.2 Join 语义（跨 Copilot/GCL/Skill 链路关联）
+
+```
+trace_id（端到端链路）
+  ├── session_id（会话关联，1:1 或 1:N）
+  ├── incident_id（业务事件关联，1:N）
+  ├── observation_id（执行树节点，1:N）
+  │       └── parent_observation_id 建立父子链
+  ├── request_id（内部请求关联，1:N）
+  └── api_request_id（云 API 请求关联，N:1）
+          └── UsageEvent 记录，N 个云 API 请求对应 1 个 api_request_id
+```
+
+### 18.3 跨系统 Join 契约
+
+**Copilot → GCL**：Copilot engine 将 `session_id`（= `trace_id`）传递给 GCL runner via `--trace-id`；GCL trace 文件命名：`gcl-trace-{session_id}.json`；Copilot audit 目录：`.runtime/gcl/copilot/audit/{session_id}/`
+
+**Copilot → Skill**：Skill 调用透传 `trace_id` 和 `observation_id`；Skill 执行结果通过 Blackboard 写回时携带 `trace_id`
+
+**Blackboard**：`strategy-{session_id}.json` 和 `evidence_chain-{session_id}.json` 通过 `session_id` 与 trace 关联
+
+### 18.4 正反例
+
+**正确示例**：
+
+```python
+# Copilot engine 启动时
+ctx = TraceContext(trace_id=session_id, session_id=session_id)
+# GCL runner 接收
+ctx.push_observation(obs_id)  # observation_id 建立父子链
+# Skill 调用时
+Observation(trace_id=ctx.trace_id, parent_observation_id=ctx.current_observation_id)
+```
+
+**错误示例**：
+
+```python
+# 混用 session_id 和 user_id
+identity = {"user_id": session_id}  # 错误：session_id 不是 user_id
+# span_id 放入 Trace 主对象
+Trace(span_id="spn-xxx")  # 错误：span_id 属于 Observation，不属于 Trace
+# parent_span_id 放入 Trace 主对象
+Trace(parent_span_id="spn-yyy")  # 错误：parent_span_id 属于 Observation
+```
+
+### 18.5 DoD 验收标准
+
+- 跨 Copilot/GCL 链路可通过 `trace_id`（= `session_id`）唯一关联
+- `Trace` 主对象不包含 `span_id`、`parent_span_id`、`trace_type`
+- `Observation` 通过 `parent_observation_id` 建立树形父子关系
+- `session_id` 与 `user_id` 不混淆（`user_id` 为 `null` 时不得用 `session_id` 填充）
+- `incident_id` 支持外部系统 ID 直接传入，也支持本地生成
+- `api_request_id` 透传自 Tencent Cloud API 响应，不自行生成
+
+---
+
+## 19. 旧格式兼容策略（P0.3）
+
+> **状态**：已冻结（2026-07-25）
+> **对应 PLAN**：P0.3
+> **评审状态**：已通过 GCL Critic 评审（Safety=1，Quality=1.0）
+
+### 19.1 兼容范围
+
+本策略覆盖以下三类遗留数据格式：
+
+| 遗留格式 | 来源 | 写入位置 | 读取适配器 |
+|---|---|---|---|
+| GCL trace JSON | `scripts/gcl_runner.py` | `.runtime/gcl/traces/gcl-trace-{session_id}.json` | `legacy_gcl_to_observation()` |
+| Copilot audit JSON | `copilot/quality/audit.py` | `.runtime/gcl/copilot/audit/{session_id}/` | `legacy_audit_to_observation()` |
+| metrics JSONL | `copilot/observ.py` | `.runtime/metrics/metrics.jsonl` | `observ_query.py` 向后兼容 fallback |
+
+### 19.2 写入侧策略（不修改旧文件）
+
+**原则**：遗留格式继续按原路径写入，新增 v3 数据按新路径写入，两者并存。
+
+- GCL trace 继续写入 `.runtime/gcl/traces/gcl-trace-{session_id}.json`（不变）
+- Copilot audit 继续写入 `.runtime/gcl/copilot/audit/{session_id}/`（不变）
+- OBS-1 metrics 继续写入 `.runtime/metrics/metrics.jsonl`（不变）
+- 新增 v3 数据写入 `.runtime/audit/{trace_id}/observations/`、`.runtime/audit/{trace_id}/usage/`（新增路径）
+
+**禁止**：不原地修改遗留文件内容；不将遗留文件迁移为 v3 主模型。
+
+### 19.3 读取侧适配器（v3 视图）
+
+```python
+def legacy_gcl_to_observation(gcl_record: dict, trace_id: str) -> ObservationRecord:
+    """GCL trace JSON → v3 ObservationRecord（GENERATION 类型）"""
+    return ObservationRecord(
+        id=_new_id("obs"),
+        trace_id=trace_id,
+        type=ObservationType.GENERATION,
+        name=f"gcl-{gcl_record.get('generator', 'unknown')}",
+        status="success" if gcl_record.get("passed") else "error",
+        metadata={
+            "gcl_run_id": gcl_record.get("run_id"),
+            "gcl_generator": gcl_record.get("generator"),
+            "gcl_iteration": gcl_record.get("iteration"),
+        }
+    )
+
+def legacy_audit_to_observation(audit_record: dict, trace_id: str) -> ObservationRecord:
+    """Copilot audit JSON → v3 ObservationRecord（SPAN 类型）"""
+    return ObservationRecord(
+        id=_new_id("obs"),
+        trace_id=trace_id,
+        type=ObservationType.SPAN,
+        name=audit_record.get("skill", "unknown"),
+        status=audit_record.get("status", "success"),
+        metadata={"skill_name": audit_record.get("skill")}
+    )
+```
+
+### 19.4 向后兼容测试门禁
+
+所有遗留格式读取测试必须继续通过：
+
+- `test_legacy_gcl_to_observation`：GCL v1 JSON → ObservationRecord → to_dict() 正常序列化
+- `test_legacy_audit_to_observation`：Copilot audit JSON → ObservationRecord → to_dict() 正常序列化
+- `observ_query.py` 对 legacy health JSONL 的 fallback 路径有测试覆盖（返回 `[]` 而非抛出异常）
+
+### 19.5 迁移策略（未来）
+
+当以下条件**全部满足**时，可将遗留格式标记为 deprecated：
+
+1. v3 `Observation` 写入覆盖所有 Copilot/Skill/GCL 调用路径
+2. `observ_query.py` 不再需要 legacy fallback 路径
+3. 所有消费者切换到 v3 Schema 查询
+4. 遗留文件已有明确删除计划（通过 Artifact lifecycle policy）
+
+**在上述条件满足前，遗留格式持续维护。**
+
+### 19.6 DoD 验收标准
+
+- 现有 GCL trace 读取测试继续通过（`test_legacy_gcl_to_observation`）
+- 现有 Copilot audit 读取测试继续通过（`test_legacy_audit_to_observation`）
+- `observ_query.py` 对 legacy health JSONL 的 fallback 路径有测试覆盖
+- 遗留格式文件不被原地修改（grep 确认无写入）
+- 新 v3 数据写入独立路径，不污染遗留文件路径
+
+---
+
+## 20. AIOps 分析域冻结（P0.4）
+
+> **状态**：已冻结（2026-07-25）
+> **对应 PLAN**：P0.4
+> **评审状态**：已通过 GCL Critic 评审（Safety=1，Quality=1.0）
+
+### 20.1 域定义原则
+
+AIOps 分析域必须同时满足：
+1. **可推导**：给定一组 `Observation` + `Score` + `UsageEvent`，可计算出域内所有指标
+2. **不泄漏**：禁止将自由格式 `output` 或 `metadata` 作为唯一数据来源；一等字段必须存在
+3. **可归因**：每个结论必须能回答"用了哪些数据、数据是否新鲜、缺了什么"
+
+### 20.2 域内维度定义
+
+#### `aiops.incident`
+
+MTTD（平均检测时间）= 检测到首次信号时间 - 检测到首次症状时间
+
+MTTR（平均恢复时间）= resolved_at - detected_at
+
+#### `aiops.signals`
+
+告警压缩率 = 1 - (去重后信号数 / 原始告警数)
+
+#### `aiops.evidence` + `data_quality`
+
+数据质量分 = coverage_ratio × freshness_score（由 freshness_ms 推导）
+
+#### `aiops.rca`
+
+RCA 精确率 = supporting_count / (supporting + contradicting_count)
+
+RCA 召回率代理 = supporting_count / evidence_count
+
+### 20.3 可推导指标汇总
+
+| 指标 | 推导公式 | 所在维度 |
+|---|---|---|
+| MTTD | 检测到首次信号时间 - 检测到首次症状时间 | Incident |
+| MTTR | resolved_at - detected_at | Incident |
+| 告警压缩率 | 1 - 去重信号数 / 原始告警数 | Signals |
+| 数据质量分 | coverage_ratio × freshness_score | Evidence |
+| RCA 精确率 | supporting / (supporting + contradicting) | RCA |
+| 修复成功率 | verification_status=passed / 总 action 数 | Response |
+
+### 20.4 DoD 验收标准
+
+- `aiops.incident`、`aiops.signals`、`aiops.evidence`、`aiops.topology`、`aiops.rca`、`aiops.impact`、`aiops.response`、`aiops.quality` 八个维度全部定义为 `Summary` 的嵌套对象
+- 每个维度可通过 `Observation` + `UsageEvent` 推导（不得仅依赖自由格式 `output`）
+- MTTD、MTTA、MTTR、RCA 准确率、告警压缩率、修复成功率可从数据中计算
+- 数据质量不足时，`Summary.data_quality.status` 必须反映真实状态，不得伪造为 `complete`
+
+---
+
+## 21. FinOps 分析域冻结（P0.5）
+
+> **状态**：已冻结（2026-07-25）
+> **对应 PLAN**：P0.5
+> **评审状态**：已通过 GCL Critic 评审（Safety=1，Quality=1.0）
+
+### 21.1 域定义原则
+
+FinOps 分析域必须同时满足：
+1. **用量与成本分离**：`UsageEvent` 记录不可变事实，`CostRecord` 可按 `PricingSnapshot` 重算
+2. **未知价格不写 0**：`cost_status = unpriced` 时 `total_cost = 0` 但必须标注 `cost_status`
+3. **可分摊**：成本可按 tenant、incident、skill、product、region 等维度归因和分摊
+
+### 21.2 CostStatus 枚举（强制约束）
+
+| 状态 | 语义 | total_cost | 使用场景 |
+|---|---|---|---|
+| `actual` | 实际成本（已按真实价格计算） | > 0 | 云 API 有定价且可用 |
+| `estimated` | 估算成本（参考定价估算） | ≥ 0 | 云 API 有参考价 |
+| `partial` | 部分成本（仅部分用量有定价） | ≥ 0 | 混合场景 |
+| `unpriced` | 未定价（无价格数据） | = 0 | 首次接入或无定价接口 |
+| `not_applicable` | 不适用（无需计费） | = 0 | 免费操作 |
+
+**强制约束**：`total_cost = 0` 时 `cost_status` 不得为 `actual`；`cost_status = actual` 时 `total_cost` 不得为 `0`。
+
+### 21.3 强制门禁规则
+
+```python
+def assert_cost_invariants(cost_record: CostRecord) -> None:
+    """强制不变量检查，任何违规立即抛出 ValueError。"""
+    if cost_record.cost_status == CostStatus.ACTUAL and cost_record.total_cost == 0:
+        raise ValueError("cost_status=actual 但 total_cost=0：违反强制约束")
+    if cost_record.cost_status in (CostStatus.ESTIMATED, CostStatus.PARTIAL) and cost_record.total_cost < 0:
+        raise ValueError("估算/部分成本 total_cost 必须 >= 0")
+    if cost_record.total_cost > 0 and cost_record.cost_status == CostStatus.UNPRICED:
+        raise ValueError("total_cost > 0 但 cost_status=unpriced：数据不一致")
+```
+
+### 21.4 聚合维度
+
+成本归因和分摊支持以下维度：`incident_id`、`tenant_id`、`skill_name`、`skill_version`、`product`、`action`、`region`、`service`、`cost_center`、`model`
+
+### 21.5 DoD 验收标准
+
+- `finops.usage_summary`、`finops.cost_summary`、`finops.allocation`、`finops.value` 四个维度全部定义为 `Summary` 的嵌套对象
+- `CostStatus.ACTUAL` 时 `total_cost > 0`；`CostStatus.UNPRICED` 时 `total_cost = 0`；两条规则均有测试覆盖
+- 成本可按 incident、tenant、skill/version、product/action、region、service、cost_center 聚合和分摊
+- 未知价格接口不写 `0`，统一标记为 `unpriced` 且 `total_cost = 0`
+- 存在测试门禁：构造 `total_cost=0` + `cost_status=actual` 的输入，断言抛出 `ValueError`

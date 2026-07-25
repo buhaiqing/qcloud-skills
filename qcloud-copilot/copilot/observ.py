@@ -110,9 +110,41 @@ class ObservableSink:
             {"gate": gate, "decision": decision},
             1,
         )
+    # -- TRACE-1 v3 write entry points (P2.2) -----------------------------
+
+    def emit_observation(self, obs) -> None:
+        """Persist an `ObservationRecord` to ``audit/<trace_id>/observations.jsonl``."""
+        from copilot.trace_records import ObservationRecord  # local to avoid cycle
+
+        assert isinstance(obs, ObservationRecord), (
+            f"emit_observation expects ObservationRecord, got {type(obs).__name__}"
+        )
+        trace_dir = self._audit_dir / obs.trace_id
+        trace_dir.mkdir(parents=True, exist_ok=True)
+        record = obs.to_dict()
+        record["_kind"] = "observation"
+        self._append_jsonl(
+            trace_dir / "observations.jsonl",
+            record,
+        )
+
+    def emit_usage_event(self, evt) -> None:
+        """Persist a `UsageEvent` to ``audit/<trace_id>/usage_events.jsonl``."""
+        from copilot.trace_records import UsageEvent  # local to avoid cycle
+
+        assert isinstance(evt, UsageEvent), (
+            f"emit_usage_event expects UsageEvent, got {type(evt).__name__}"
+        )
+        trace_dir = self._audit_dir / evt.trace_id
+        trace_dir.mkdir(parents=True, exist_ok=True)
+        record = evt.to_dict()
+        record["_kind"] = "usage_event"
+        self._append_jsonl(
+            trace_dir / "usage_events.jsonl",
+            record,
+        )
 
     # -- internal writers ---------------------------------------------------
-
     def _metric_record(self, m: Metric) -> dict:
         return {
             "kind": "metric",
