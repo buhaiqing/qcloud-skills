@@ -508,3 +508,52 @@ def legacy_audit_to_observation(
         },
         error=None if audit_record.get("status") == "success" else "audit_failed",
     )
+
+
+# ---------------------------------------------------------------------------
+# Attribution & Allocation (P3.3, P3.4)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class AttributionTree:
+    """Fixed attribution shape; missing values must be None (JSON null)."""
+
+    tenant_id: Optional[str] = None
+    customer_id: Optional[str] = None
+    account_id_hash: Optional[str] = None
+    business_unit: Optional[str] = None
+    cost_center: Optional[str] = None
+    region: Optional[str] = None
+    service: Optional[str] = None
+    environment: Optional[str] = None
+    product: Optional[str] = None
+    resource_id: Optional[str] = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> AttributionTree:
+        return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+
+
+@dataclass
+class AllocationRecord:
+    """Per-attribution-key share slice of a CostRecord (P3.4)."""
+
+    cost_id: str
+    attribution_key: tuple[str, str]  # (scope, value), e.g. ("tenant", "t1")
+    share: float  # 0..1
+    allocated_cost: float
+    method: str  # direct|shared|resource|request|usage|equal_split
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def key(self) -> tuple[str, str]:
+        return self.attribution_key
+
+    def to_dict(self) -> dict[str, Any]:
+        d = asdict(self)
+        d["attribution_key"] = list(self.attribution_key)
+        return d

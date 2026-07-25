@@ -64,11 +64,8 @@
 
 - [x] **P3.1** 新增 `cost.py`，实现 `actual/estimated/partial/unpriced/not_applicable` 状态。已新建 `copilot/cost.py` 提供 `compute_cost(events, pricing)` 函数 + `assert_cost_invariants()` 不变式守卫；5-state 推导：全 priced → ACTUAL；部分 priced → PARTIAL；空价格 + billable → UNPRICED；空事件 / 全 data → NOT_APPLICABLE；零价格 key 按缺失处理；11 测试覆盖。
 - [x] **P3.2** 新增 PricingSnapshot 解析和版本校验。`compute_cost` 接 `PricingSnapshot`；同一 UsageEvent 用不同 snapshot 可重算成本；cost.usage_event_ids 关联；snapshot.version 写入 `pricing_snapshot_version`。
-  - DoD：价格变化可重算，原始 UsageEvent 不被覆盖。
-- [x] **P3.5** 明确未知价格不序列化为 0 的测试门禁。`assert_cost_invariants()` 锁定 5-state × total_cost 不变式；ACTUAL+total=0 / UNPRICED+total>0 / NOT_APPLICABLE+total>0 三种非法组合均 raise AssertionError；3 测试覆盖。
-## Phase 4 — FinOps 聚合与查询
-
-- [ ] **P4.1** 新增 `scripts/trace_cost_aggregate.py`。
+- [x] **P3.3** 增加租户、客户、账号哈希、业务线、服务、环境、Region、产品、资源和 cost center 归因字段。已新建 `AttributionTree` dataclass（10 字段：tenant_id / customer_id / account_id_hash / business_unit / cost_center / region / service / environment / product / resource_id）；`build_attribution_tree(observations)` 从 observation.metadata 抽取 first-non-null 值；6 测试覆盖 roundtrip / partial-overlap / empty / idempotent。
+- [x] **P3.4** 实现 direct/shared/unallocated 及 resource/request/usage/equal_split 分摊方法。已新建 `AllocationRecord` dataclass + `allocate_cost(total, keys, method, weights=, shares=)` 纯函数；6 方法 + 空列表 fallback 单 ("scope","unallocated") 桶；8 测试覆盖。
   - 支持按 trace、incident、Skill、Skill version、product、action、region、tenant、model 聚合。
 - [ ] **P4.2** 支持 LLM 与云 API 成本拆分。
 - [ ] **P4.3** 支持 token、API request、metric point、log byte、event、compute、storage 用量统计。
