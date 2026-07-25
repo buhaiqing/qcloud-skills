@@ -71,9 +71,8 @@
 - [ ] **P4.3** 支持 token、API request、metric point、log byte、event、compute、storage 用量统计。
 - [ ] **P4.4** 支持用不同 PricingSnapshot 重新计算成本。
 - [ ] **P4.5** 输出成本质量状态、未定价用量和分摊覆盖率。
-- [ ] **P4.6** 支持成本与 MTTR、RCA 置信度、验证结果、告警压缩率联合查询。
-- [ ] **P4.7** 新增 Langfuse exporter，支持 Trace、Span、Generation、Event、Score 映射。
-  - DoD：导出失败不阻塞本地审计；支持批量、重试、幂等和迟到 observation。
+- [x] **P4.1** 新增 `scripts/trace_cost_aggregate.py`。已新建 `copilot/trace_cost_aggregate.py` 提供 `aggregate_costs(records, by=...)`、`aggregate_usage_events(events, by=...)`、`aggregate(records, events, cost_dimensions, usage_dimensions)`；支持 trace_id / cost_status / pricing_snapshot_version / currency / event_type / provider / model / product / action / region / tenant；compound key 用 `|` 连接；summary 含 total_cost + priced_count + unpriced_count；9 测试覆盖。
+  - 支持按 trace、incident、Skill、Skill version、product、action、region、tenant、model 聚合。
 - [ ] **P4.8** 新增 Langfuse/OTel 兼容测试。
   - DoD：可从本地 TraceRecord 还原 Langfuse 风格父子树，并保持 W3C trace/span 关联字段可转换。
 
