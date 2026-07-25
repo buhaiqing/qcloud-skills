@@ -303,3 +303,5 @@ destructive operations to product skills which apply their own GCL safety gates.
 | 1.5.1 | 2026-07-11 | ADR 文档化：Agent Runtime 无关性、Agent 内调主路径、架构决策表；链至 `docs/architecture/2026-07-11-llm-native-agent-inband-adr.md` |
 | 1.5.0 | 2026-07-11 | Blackboard evidence_chain（schema 1.1）、报告「巡检证据链」节、topology_reasoner_v1、双报告 v1.4 增强 |
 | 1.4.0 | 2026-07-11 | 双报告落盘、结论先行、到期晋升 P1/P2、拓扑资源覆盖表、L1/L2 Skill 调用链 |
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

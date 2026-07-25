@@ -486,3 +486,5 @@ SSL-specific: **Expiry monitoring** (alert at 90/30/14/7 days), **auto-renewal**
 > **FinOps Principle:** Every certificate has a cost — direct (paid certs) or indirect (expiry-driven outages).
 
 → Unused cert detection, free quota monitoring, wildcard vs SAN cost analysis: see `references/finops-cost-optimization.md`.
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

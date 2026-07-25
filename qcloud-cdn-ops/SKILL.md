@@ -326,3 +326,5 @@ For detailed content, see:
 - [Well-Architected Assessment](references/well-architected-assessment.md) — Multi-CDN, cache safety, HTTPS automation
 - [FinOps Cost Optimization](references/finops-cost-optimization.md) — Traffic analysis, cache hit optimization
 - [SecOps Security Operations](references/secops-security-operations.md) — Anti-hotlinking, URL signing
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

@@ -670,3 +670,5 @@ Error responses:
 |---------|------|---------|
 | 1.1.0 | 2026-07-08 | Self-review fixes: added related_skills, restructured error codes with Category Legend, created missing references (rubric.md, prompt-templates.md, proactive-inspection.md), added example-config.yaml, fixed import time in sdk-code-examples, replaced TBD placeholders with HTML comments |
 | 1.0.0 | 2026-07-08 | Initial skill generated from qcloud-skill-generator template |
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

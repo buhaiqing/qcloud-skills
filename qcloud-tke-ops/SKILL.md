@@ -452,3 +452,5 @@ Error responses:
 - **Networking:** Use VPC-CNI for large clusters (>500 pods per node)
 - **Cost:** Use prepaid nodes for baseline capacity, pay-as-you-go for burst in autoscaling pools
 - **Security:** Rotate kubeconfig credentials regularly; use CAM roles instead of static keys
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

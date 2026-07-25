@@ -437,3 +437,5 @@ Exclude `not_assessed` pillars from weight denominator; document excluded pillar
 - [worker-output-schema.md](references/worker-output-schema.md) — worker return contract
 - [cross-product-analysis.md](references/cross-product-analysis.md) — orchestrator correlation
 - [troubleshooting.md](references/troubleshooting.md) — delegation failures
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

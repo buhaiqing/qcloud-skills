@@ -350,3 +350,5 @@ For detailed inspection patterns, see:
 - [Diagnosis Workflows](references/diagnosis.md) — Root cause analysis per anomaly
 - [Reporting Templates](references/reporting.md) — Report generation and formats (incl. GCL quality §Phase 3)
 - [scripts/README.md](scripts/README.md) — Script pipeline usage
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

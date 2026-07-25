@@ -506,3 +506,5 @@ tccli tdmq DescribeRocketMQClusters --Region "{{env.TENCENTCLOUD_REGION}}"
 - [GCL Prompt Templates](references/prompt-templates.md)
 - [Eval Queries](assets/eval_queries.json)
 - [Example Configuration](assets/example-config.yaml)
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

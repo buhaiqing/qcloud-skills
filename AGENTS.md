@@ -147,6 +147,7 @@ cp .env.example .env
   | gcl_runner.py/gcl_trace_aggregate.py | GCL smoke command + `python3 scripts/gcl_trace_aggregate.py --since-hours 168` |
   | Skill quality score / upgrade signal | `python3 scripts/skill_quality_score.py --json` (optional; skipped by `validate_local.py` if absent) |
   | Reflexion retrieval (self-evolution) | `python3 scripts/reflexion_retrieve.py retrieve --skill <skill>` |
+  | CADL hook compliance | `python3 scripts/cadl_lint.py` (exit 1 if any `qcloud-*-ops/SKILL.md` lacks the canonical hook; `--fix` injects idempotently) |
   | Python files | `ruff check <changed-files>` |
   | Script tests | `cd scripts && python3 -m unittest discover -p "*_test.py" -v` |
   | GCL alarm wiring | `python3 scripts/gcl_alarm_wire.py plan --summary scripts/fixtures/gcl-quality-summary-healthy.json` |
@@ -180,6 +181,7 @@ cp .env.example .env
 | `docs/gcl-spec.md` | Runtime GCL spec — rubric, trace schema, prompt templates |
 | `docs/reflexion-memory.md` | Reflexion rules — cross-session failure-pattern memory governance |
 | `docs/failure-patterns.md` | Reflexion memory store |
+| `docs/cadl-spec.md` | CADL long-form spec — trigger conditions, 5-step loop, asset types, anti-patterns |
 
 ## Runtime Quality Gates: GCL & Reflexion
 
@@ -263,63 +265,25 @@ After task completion, run: `python3 scripts/verify_gcl_execution.py "<task_desc
 
 ## 复利资产沉淀机制（Compound-Asset Distillation Loop, CADL, P0）
 
-**这不是一条规范，而是一套工作闭环——任何实质任务完成后，Agent 必须走完「提取 → 落点判定 → 写入 → 门禁 → 复用」才能结束。** 目的是让每次踩坑、每次评审、每次跨 skill 协作都变成下一次的可复用资产，形成复利。
+实质任务完成 = 走完 CADL 闭环（不做沉淀 = 任务未完成）。**长篇规范 → [`docs/cadl-spec.md`](docs/cadl-spec.md)**；本节只列硬规则。
 
-> 本机制升级自原 `Reflection & Retrospective` 段。原资产类型清单（failure-patterns 条目 / checklist / 脚本 / 模板 / 决策记录 / 排查流）继续有效，下文将其纳入闭环的「写入」步骤。
+### 硬规则（MUST / SHOULD NOT）
+- **MUST**：每个完成的任务走 5 步：`提取 → 落点判定 → 写入 → 门禁 → 复用`（详见 `docs/cadl-spec.md` §3）。
+- **MUST**：所有 `qcloud-*-ops/SKILL.md` 末尾保留规范的钩子行；`scripts/cadl_lint.py` 是强制门禁，缺钩子即构建失败。
+- **MUST**：沉淀前先 `grep` 现有 AGENTS.md / `docs/failure-patterns.md` 避免重复（去重键：`skill + command + error`）。
+- **MUST**：写本文件前查 `wc -l AGENTS.md`；≥500 行先精简再写。
+- **SHOULD NOT**：一次性上下文、跨任务无复用价值的经验，写进 AGENTS.md。
+- **SHOULD NOT**：覆盖 Reflexion 的 200 行 cap 或去重约束（详见 `docs/reflexion-memory.md`）。
 
-### 为什么是机制而非规范
-
-单条规则（如"记得写 AGENTS.md"）会被忽略，因为无触发、无闭环。CADL 把沉淀变成工作流的**必经出口**：任务不做沉淀 = 任务未完成。Agent 调用任何 Skill 后都走到这一步，Skill 本身也通过 `qcloud-skill-generator` 的「资产沉淀钩子」（见 `qcloud-skill-generator/SKILL.md` Standard 6）提示大模型。
-
-### 触发条件（满足任一即必须走 CADL，不局限某特定代码智能工具）
-
-- 多步 / 跨文件任务完成
-- 跨 Skill 协作（用了 delegation matrix 或并行 agent）
-- 评审 / 修复循环（如 GCL、2-round self-review、adversarial review）
-- 发现 repo 缺陷 / 坑（即使不在本次 scope，也记）
-- 验证中发现预存 FAIL 并归因
-- 用户给出可复用的工作流偏好（如"用双写子命令绕过 tccli bug"）
-
-### 闭环步骤
-
+### 钩子行（canonical hook, byte-for-byte）
 ```
-1. 提取   → 从刚完成的任务中抽象出可复用模式：
-            踩坑避免 / 评审维度 / 协作模式 / 验证命令 / 复用 helper
-            格式："问题 → 反模式 → 正确做法（含代码示例）"
-2. 落点判定 → 离开本仓库还有用？ → 用户级 agent 指引文件（路径随所用 coding agent 而定，如各 agent 的 AGENTS/CLAUDE/CURSOR 类指引文件，不绑定任一特定产品）
-            仅本仓库适用？     → 项目级 AGENTS.md（本文件）
-            是某 skill 专属可调用的能力？ → 独立 Skill 文件（经 qcloud-skill-generator）
-3. 写入   → 可执行、有示例、有边界、先 grep 现有 AGENTS.md 确认未覆盖（不重复）
-4. 门禁   → 写入前查 wc -l，本文件 ≥500 行先精简再写（见 AGENTS.md 行数门禁）
-            写入 failure-patterns.md 时遵守 ≤200 行约束与 skill+command+error 去重（见 Reflexion hard constraints）
-5. 复用   → 下次同类任务，Agent 读 AGENTS.md 即获得该资产 → 复利生效
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。
 ```
+源头：`qcloud-skill-generator/references/qcloud-skill-template.md` 末尾。`Standard 6` 在生成时强制注入；`scripts/cadl_lint.py` 在验证时强制存在。
 
-### 资产类型（写入步骤的可选落点）
+### 快速入口
+- 自动化：`python3 scripts/cadl_lint.py`（lint）/ `--fix`（幂等补钩子）
 
-- `docs/failure-patterns.md` entry（踩坑 / 失败模式，受 Reflexion 约束）
-- Check list / rule
-- Script / utility function（`scripts/` 共享可执行文件）
-- Template
-- Decision record
-- Troubleshooting flow
-
-### Skill 侧钩子（让每个 Skill 自带沉淀意识）
-
-- **源头**：`qcloud-skill-generator` 在生成每个 skill 时，须在 `SKILL.md` 末尾注入一行（见 Standard 6）：
-  `> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。`
-  未来所有 `qcloud-*-ops` 自动继承此意识。
-- **现存 skill（渐进迁移，pending）**：后续迭代中逐批在 SKILL.md 末尾补同一行提示，使大模型调用任何 skill 后都看到触发信号。本次合并仅落地机制定义 + qcloud-skill-template.md 注入点 + qcloud-skill-generator Standard 6 强制约束；存量 qcloud-*-ops 的逐批补行不在本次 scope，按最小改动原则不在此时批量改写 34 个 skill 文件。
-- **大模型侧**：Agent 在任意 skill 调用结束前，主动检查 CADL 触发条件，而非等用户提醒。
-
-### 反模式（违反 CADL）
-
-| 反模式 | 正确做法 |
-|---|---|
-| 任务做完就结束，不沉淀 | 走完 CADL 闭环再交付 |
-| 把一次性上下文当资产写进 AGENTS.md | 只沉淀跨任务可复用的模式 |
-| 重复已有条目 | 写入前 grep 确认未覆盖 |
-| 只在某特定代码智能工具 / GCL 相关任务才沉淀 | 评审/修复/协作/验证都触发 |
 
 ## Agent-Agnostic Principle (P0)
 

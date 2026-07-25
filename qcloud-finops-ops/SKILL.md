@@ -388,3 +388,5 @@ See [`references/rubric.md`](references/rubric.md) §6 for two more examples (PA
 | `qcloud-finops-ops` | 架构评估（含 TCO）| [`references/well-architected-assessment.md`](references/well-architected-assessment.md) |
 | `qcloud-cam-ops` | 权限/账号/密钥 |
 | 23 个产品 skill | 资源元数据归因（只读）|
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

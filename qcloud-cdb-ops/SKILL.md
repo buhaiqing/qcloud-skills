@@ -455,3 +455,5 @@ contrast.
 - **Availability:** Multi-AZ deployment for production; automatic backup enabled with appropriate retention
 - **Cost:** Right-size specifications; use prepaid for stable workloads, postpaid for variable loads
 - **Performance:** Regular slow query analysis; optimize indexes; maintain appropriate connection pools
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

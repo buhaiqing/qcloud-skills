@@ -530,3 +530,5 @@ Error responses:
 - **Security:** Always use VPC (private IP); set strong password; configure whitelist
 - **Version:** Use latest Redis version available in TencentDB (currently Redis 6.0/7.0)
 - **Multi-AZ:** Deploy master-replica in different availability zones for fault tolerance
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。

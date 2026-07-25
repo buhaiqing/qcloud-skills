@@ -661,3 +661,5 @@ Optional: `references/monitoring.md`, `references/aiops-self-healing.md`, `refer
 - **Security:** Enable SSL, VPC isolation, strong passwords, and regular patching
 - **Maintenance:** Set maintenance window during off-peak hours
 - **Cost-aware creation:** Default to `postpaid` for dev/test; `prepaid` for prod with 12+ month commitment
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。
