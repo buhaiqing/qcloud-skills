@@ -422,7 +422,6 @@ re-deriving the local KG. (In non-CodeGraph environments this rule is moot — j
 进度文档包括：
 - `docs/superpowers/plans/*.md` 中的 Phase/Step checkbox 表
 - `docs/superpowers/specs/*.md` 中的 DoD/验收标准对照表
-- `docs/superpowers/TODO.md`（主任务清单）
 
 每项勾选须注明：
 - 状态：`[x]` 完成 / `[⚠️]` 部分完成 / `[❌]` 放弃

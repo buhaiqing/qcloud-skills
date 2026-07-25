@@ -8,4 +8,5 @@ exclude = [
   ".codebuddy",
   ".ruff_cache",
   "audit-results",
+  "*.md",
 ]

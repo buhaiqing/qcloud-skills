@@ -1,7 +1,3 @@
-<!-- TE-1: Query API for dynamic data (regions, envs) — no hardcoded tables -->
-<!-- TE-3: Error tables use 3 columns max (Code | Meaning | Action) — see troubleshooting.md -->
-<!-- TE-4: JSON paths centralized in API Response table above -->
-<!-- TE-6: Pre-flight → Execute → Validate → Recover flows are NOT duplicated in references -->
 ---
 name: qcloud-cloudbase-ops
 description: >-
@@ -45,6 +41,10 @@ metadata:
     - qcloud-cls-ops          # 委托：日志分析
     - qcloud-finops-ops       # 反向：成本优化分析
 ---
+<!-- TE-1: Query API for dynamic data (regions, envs) — no hardcoded tables -->
+<!-- TE-3: Error tables use 3 columns max (Code | Meaning | Action) — see troubleshooting.md -->
+<!-- TE-4: JSON paths centralized in API Response table above -->
+<!-- TE-6: Pre-flight → Execute → Validate → Recover flows are NOT duplicated in references -->
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).
 

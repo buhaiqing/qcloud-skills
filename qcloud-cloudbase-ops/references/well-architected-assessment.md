@@ -118,38 +118,142 @@ This document provides a four-pillar assessment framework for CloudBase (云开�
 
 ```json
 {
+  "skill_id": "qcloud-cloudbase-ops",
   "product": "cloudbase",
   "assessment_date": "YYYY-MM-DD",
+  "scope": "env-xxxxxxxx",
+  "region": "ap-guangzhou",
+  "status": "OK",
+  "partial": false,
+  "errors": [],
+  "resource_count": {"env": 1, "function": 2, "storage": 1, "database": 1},
   "pillars": {
     "reliability": {
-      "score": "1-5",
-      "findings": ["..."],
-      "risks": ["..."],
-      "recommendations": ["..."]
+      "score": 75,
+      "status": "assessed",
+      "findings": [
+        {
+          "id": "cloudbase-rel-001",
+          "severity": "High",
+          "confidence": "HIGH",
+          "title": "Single-AZ concentration",
+          "evidence": "All CloudBase functions in same region",
+          "recommendation": "Enable multi-region deployment for critical functions",
+          "effort": "medium"
+        }
+      ]
     },
     "security": {
-      "score": "1-5",
-      "findings": ["..."],
-      "risks": ["..."],
-      "recommendations": ["..."]
+      "score": 88,
+      "status": "assessed",
+      "findings": []
     },
     "cost": {
-      "score": "1-5",
-      "findings": ["..."],
-      "risks": ["..."],
-      "recommendations": ["..."]
+      "score": 70,
+      "status": "assessed",
+      "findings": []
     },
     "efficiency": {
-      "score": "1-5",
-      "findings": ["..."],
-      "risks": ["..."],
-      "recommendations": ["..."]
+      "score": 80,
+      "status": "assessed",
+      "findings": []
     }
   },
-  "overall_score": "1-5",
-  "priority_actions": ["..."]
+  "overall_score": 78,
+  "recommendations": [],
+  "trace": {
+    "commands": ["tccli tcb DescribeEnvInfo --EnvId xxx"],
+    "duration_ms": 1234
+  }
 }
 ```
+
+## Worker Output Contract (Read-Only Assessment Mode)
+
+> Invoked when `qcloud-well-architected-review` sets `{{user.mode}}=well-architected-readonly`.
+> Return **`{{output.product_assessment}}`** — field names MUST match the canonical schema.
+
+**Canonical schema:** [worker-output-schema.md](../../qcloud-well-architected-review/references/worker-output-schema.md)
+
+| Constant | Value |
+|----------|-------|
+| `skill_id` | `qcloud-cloudbase-ops` |
+| `product` | `cloudbase` |
+| Finding `id` pattern | `cloudbase-{rel|sec|cost|eff}-NNN` (3-digit sequence per pillar) |
+
+### Pillar → checklist map
+
+| `pillars` key | Checklist source in this document |
+|---------------|-------------------------------------|
+| `reliability` | §2 Reliability Pillar |
+| `security` | §3 Security Pillar |
+| `cost` | §4 Cost Pillar |
+| `efficiency` | §5 Efficiency Pillar |
+
+### Populate rules
+
+1. Include only pillar keys requested by orchestrator `{{user.pillars}}` (`all` = four keys).
+2. `score = round(passed / applicable × 100)`; use `status=not_assessed` when data missing (omit score or null).
+3. Each failed/warn checklist item → one `findings[]` entry with all six finding fields (§2.1 in schema).
+4. `recommendations[]`: top 1–5 actions with `priority`, `pillar`, `action`, `effort` (§2.2 in schema).
+5. `partial=true` when any pillar is `not_assessed`; top-level `status=PARTIAL`.
+6. `trace.commands`: every read API call; mask credentials. `errors[]` on API failure (§3 in schema).
+7. Local "Score Calculation" sections are for manual review only — **worker mode must emit this JSON**.
+
+### Example `{{output.product_assessment}}`
+
+```json
+{
+  "skill_id": "qcloud-cloudbase-ops",
+  "product": "cloudbase",
+  "assessment_date": "2026-07-25",
+  "scope": "env-xxxxxxxx",
+  "region": "ap-guangzhou",
+  "status": "OK",
+  "partial": false,
+  "errors": [],
+  "resource_count": {"env": 1, "function": 2, "storage": 1, "database": 1},
+  "pillars": {
+    "reliability": {
+      "score": 75,
+      "status": "assessed",
+      "findings": [
+        {
+          "id": "cloudbase-rel-001",
+          "severity": "High",
+          "confidence": "HIGH",
+          "title": "Single-AZ concentration",
+          "evidence": "All CloudBase functions in same region",
+          "recommendation": "Enable multi-region deployment for critical functions",
+          "effort": "medium"
+        }
+      ]
+    },
+    "security": {
+      "score": 88,
+      "status": "assessed",
+      "findings": []
+    },
+    "cost": {
+      "score": 70,
+      "status": "assessed",
+      "findings": []
+    },
+    "efficiency": {
+      "score": 80,
+      "status": "assessed",
+      "findings": []
+    }
+  },
+  "overall_score": 78,
+  "recommendations": [],
+  "trace": {
+    "commands": ["tccli tcb DescribeEnvInfo --EnvId xxx"],
+    "duration_ms": 1234
+  }
+}
+```
+
 
 ## References
 

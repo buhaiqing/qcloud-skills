@@ -137,7 +137,7 @@ def validate_assessment(data: object, source: str) -> list[str]:
             errs.append(f"{source}: pillars.{pk}.findings must be array")
             continue
         for fi, f in enumerate(findings):
-            if isinstance(product, str):
+            if isinstance(f, dict):
                 errs.extend(validate_finding(product, pk, f, f"{source} pillars.{pk}[{fi}]"))
 
     recs = data.get("recommendations", [])
