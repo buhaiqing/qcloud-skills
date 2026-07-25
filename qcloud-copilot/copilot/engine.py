@@ -91,6 +91,7 @@ class CopilotEngine:
                     duration_ms=0,
                     trace_id=self._session_id,
                     error_code="l0",
+                    source="gate",
                 )
             return self._deliver_report(
                 self._error_report(
@@ -130,6 +131,7 @@ class CopilotEngine:
                     duration_ms=0,
                     trace_id=self._session_id,
                     error_code="l1",
+                    source="gate",
                 )
             return self._deliver_report(
                 self._error_report(
@@ -150,6 +152,10 @@ class CopilotEngine:
         )
         if not l2_result["passed"]:
             with suppress(Exception):
+                ObservableSink().emit_gate(
+                    self._session_id, "l2", "fail", "; ".join(l2_result["issues"])
+                )
+            with suppress(Exception):
                 record_health(
                     skill="qcloud-copilot",
                     operation="ask",
@@ -157,6 +163,7 @@ class CopilotEngine:
                     duration_ms=0,
                     trace_id=self._session_id,
                     error_code="l2",
+                    source="gate",
                 )
             return self._deliver_report(
                 self._error_report(

@@ -201,6 +201,7 @@ class PlanDispatcher:
                             "skill": step.skill,
                             "operation": step.operation,
                         },
+                        skill=step.skill,
                         provenance={
                             "eval_id": f"{session_id}:{step.id}.l2:safety.l2_confirm",
                             "rule": "safety.l2_confirm",
@@ -434,6 +435,7 @@ class PlanDispatcher:
                     "output": result.output,
                 },
                 provenance=provenance,
+                skill=step.skill,
             )
 
     def _emit_health(self, step: PlanStep, result: StepResult, session_id: str) -> None:
@@ -444,6 +446,7 @@ class PlanDispatcher:
                 status="ok" if result.status == "success" else "error",
                 duration_ms=result.duration_ms,
                 trace_id=session_id,
+                source="step",
             )
 
     def _emit_span(self, session_id: str, step: PlanStep, result: StepResult) -> None:
@@ -456,7 +459,10 @@ class PlanDispatcher:
             ObservableSink().emit_span(
                 Span(
                     run_id=session_id,
-                    step_id=step.id,
+                    # Key spans by skill name so the observ_query layer
+                    # (skill_success_rate / p_latency / top_failed_operations)
+                    # can match them; step.id is an internal plan identifier.
+                    step_id=step.skill or "qcloud-copilot",
                     status=result.status,
                     duration_ms=result.duration_ms,
                     error_code=error_code,
