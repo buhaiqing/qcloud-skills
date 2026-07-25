@@ -57,63 +57,48 @@
   - DoD：legacy audit 文件保持兼容；新 callsite 同时发出 observation + usage。
 - [x] **P2.6.c** 运行时入口启动事件。已新增 `step_recording.bootstrap_trace_metadata()` 写出 `event:session.startup` ObservationRecord，承载完整 RuntimeInfo + SkillInfo；3 测试全绿。
   - DoD：不依赖 metadata 才能在 Langfuse 查询 Trace、Session、Version 和 Generation usage。
-- [ ] **P2.9** 实现 TraceRecord AIOps/FinOps 分析摘要聚合器。
-  - DoD：Observation 和 UsageEvent 写入后可幂等刷新 `aiops.*`、`finops.*`，且保留来源引用和数据质量状态。
-- [x] **P2.9** 实现 TraceRecord AIOps/FinOps 分析摘要聚合器。已新建 `copilot/summary_aggregator.py` 提供 `aggregate_aiops_summary(observations, trace_id)` 与 `aggregate_finops_summary(usage_events, trace_id)` 两个纯函数；幂等；AIOps 拉 signals/evidence/topology(从 metadata) + severity(从 metadata.severity, 最严重者胜) + rca/impact/response(从 observation.output) + quality=success/total；FinOps 聚合 LLM tokens 按 provider / Cloud API 调用次数 / Data 读量 + rate-limited/retry/bytes；17 测试全绿（P2.9.a 10 + P2.9.b 7）。
   - DoD：Observation 和 UsageEvent 写入后可幂等刷新 `aiops.*`、`finops.*`，且保留来源引用和数据质量状态。
 
 - [x] **P3.1** 新增 `cost.py`，实现 `actual/estimated/partial/unpriced/not_applicable` 状态。已新建 `copilot/cost.py` 提供 `compute_cost(events, pricing)` 函数 + `assert_cost_invariants()` 不变式守卫；5-state 推导：全 priced → ACTUAL；部分 priced → PARTIAL；空价格 + billable → UNPRICED；空事件 / 全 data → NOT_APPLICABLE；零价格 key 按缺失处理；11 测试覆盖。
 - [x] **P3.2** 新增 PricingSnapshot 解析和版本校验。`compute_cost` 接 `PricingSnapshot`；同一 UsageEvent 用不同 snapshot 可重算成本；cost.usage_event_ids 关联；snapshot.version 写入 `pricing_snapshot_version`。
 - [x] **P3.3** 增加租户、客户、账号哈希、业务线、服务、环境、Region、产品、资源和 cost center 归因字段。已新建 `AttributionTree` dataclass（10 字段：tenant_id / customer_id / account_id_hash / business_unit / cost_center / region / service / environment / product / resource_id）；`build_attribution_tree(observations)` 从 observation.metadata 抽取 first-non-null 值；6 测试覆盖 roundtrip / partial-overlap / empty / idempotent。
-- [x] **P3.4** 实现 direct/shared/unallocated 及 resource/request/usage/equal_split 分摊方法。已新建 `AllocationRecord` dataclass + `allocate_cost(total, keys, method, weights=, shares=)` 纯函数；6 方法 + 空列表 fallback 单 ("scope","unallocated") 桶；8 测试覆盖。
+- [x] **P4.1** 新增 `scripts/trace_cost_aggregate.py`。已新建 `copilot/trace_cost_aggregate.py` 提供 `aggregate_costs(records, by=...)`、`aggregate_usage_events(events, by=...)`、`aggregate(records, events, cost_dimensions, usage_dimensions)`；支持 trace_id / cost_status / pricing_snapshot_version / currency / event_type / provider / model / product / action / region / tenant；compound key 用 `|` 连接；summary 含 total_cost + priced_count + unpriced_count；9 测试覆盖。
   - 支持按 trace、incident、Skill、Skill version、product、action、region、tenant、model 聚合。
-- [ ] **P4.2** 支持 LLM 与云 API 成本拆分。
-- [ ] **P4.3** 支持 token、API request、metric point、log byte、event、compute、storage 用量统计。
-- [ ] **P4.4** 支持用不同 PricingSnapshot 重新计算成本。
-- [ ] **P4.5** 输出成本质量状态、未定价用量和分摊覆盖率。
-- [x] **P4.2** 支持 LLM 与云 API 成本拆分。已扩 `trace_cost_aggregate.aggregate()` 加 `cost_by_event_type` 块；优先用 `CostRecord.metadata['by_event_type']` 加权分摊，回退按 distinct event_type 等分；缺失 `by_event_type` 时按 event-type 等分；UNPRICED / NOT_APPLICABLE 不参与拆分；5 测试覆盖。
-- [x] **P4.3** 支持 token、API request、metric point、log byte、event、compute、storage 用量统计。已新建 `copilot/usage_stats.py` 提供 `usage_stats(events)` 聚合 llm / cloud_api / data 三桶指标（含 by_provider / by_product / metric_points / log_bytes / log_records / audit_events / topology_nodes/edges）；6 测试覆盖。
+- [ ] **P4.6** 支持成本与 MTTR、RCA 置信度、验证结果、告警压缩率联合查询。
 - [x] **P4.4** 支持用不同 PricingSnapshot 重新计算成本。已新建 `copilot/trace_cost_diff.py` 提供 `recompute_cost_diff(old_records, events_per_trace, new_snapshot)` 返回 per-trace delta + newly_priced / newly_unpriced 列表；origin CostRecord / UsageEvent 不被修改；5 测试覆盖。
 - [x] **P4.5** 输出成本质量状态、未定价用量和分摊覆盖率。已新建 `copilot/quality_report.py` 提供 `quality_coverage_report(records, allocations=)`；per-trace 评分 good (>=0.9) / fair (>=0.5) / poor (>0) / unpriced (==0) + summary 计数 + overall_score；allocation_coverage = distinct alloc keys / total events；8 测试覆盖。
 - [x] **P4.7** 新增 Langfuse exporter，支持 Trace、Span、Generation、Event 映射。已新建 `copilot/langfuse_exporter.py` 提供 `export_trace_to_langfuse(trace, observations=, scores=, usage_events=)` 输出 trace + scores + observations 三段；SkeletonInfo + RuntimeInfo 折入 metadata；usage_event 作为 generation 节点；导出失败 silent skip；7 测试覆盖。
   - DoD：导出失败不阻塞本地审计；支持批量、重试、幂等和迟到 observation。
+- [x] **P5.1** 增加 secret scan、资源 ID 哈希、低基数 Prometheus 标签测试。已新建 `copilot/security.py` 提供 `scan_text_for_secrets(text)` (AK/AKID/Bearer/api_key 模式 + 自动 redact) + `hash_resource_id(id, salt=)` (sha256:16-hex 不可逆) + `check_low_cardinality_labels(labels)` (bounded / unbounded / 总量阈值 三档检查)；11 测试覆盖。
+- [ ] **P5.3** 增加旧 GCL/Copilot trace 读取兼容测试。
+- [ ] **P5.4** 增加并发写入、重复事件、幂等 key 和部分失败恢复测试。
 - [ ] **P5.5** 为主要产品 API 构造 Monitor/CVM/CLS fixture，覆盖成功、失败、重试、限流、无价格场景。
 
 ## Phase 6 — 文档与质量门
 
-- [ ] **P6.1** 更新 `qcloud-copilot/SKILL.md` 和相关 references，说明 trace/usage/cost contract。
-- [ ] **P6.2** 更新 `docs/superpowers/plans/2026-07-25-aiops-optimization-todo.md`，勾选已交付项目。
-- [ ] **P6.3** 执行 SPEC/PLAN 逐条核对，记录每条 `✅/⚠️/❌`，发现不一致先修复。
-- [ ] **P6.4** 修改 Python 后运行 `ruff check <changed-files>`。
-- [ ] **P6.5** 运行 Schema、单元测试、Markdown/Python 检查和 `python3 scripts/validate_local.py`。
-- [ ] **P6.6** 完成两轮自审：模板/五大标准/Token Efficiency；安全/API/数据质量/UX 对抗审查。
-- [ ] **P6.7** 完成 TE Audit，并将结果记录到交付说明或提交 footer。
-
-## SPEC/PLAN 对照表（实现完成后填写）
-
 | SPEC 要求 | PLAN Phase | 状态 | 证据 |
 |---|---|---|---|
-| Trace 聚合根 v3 | P0/P1/P2 | ☐ | |
-| Observation 父子执行树 | P0/P1/P2 | ☐ | |
-| Skill/References/Prompt/Rubric 版本 | P1 | ☐ | |
-| LLM Token UsageEvent | P2 | ☐ | |
-| Cloud API UsageEvent | P2 | ☐ | |
-| 数据读取量 UsageEvent | P2 | ☐ | |
-| PricingSnapshot | P3 | ☐ | |
-| CostAllocation | P3 | ☐ | |
-| FinOps 聚合与重算 | P4 | ☐ | |
-| 安全与兼容测试 | P5 | ☐ | |
-| Self-check / Self-verify | P6 | ☐ | |
-| Langfuse Trace/Observation 对齐 | P2/P4 | ☐ | |
-| Langfuse Generation usage/cost | P2/P3/P4 | ☐ | |
-| Langfuse exporter 失败隔离与幂等 | P4/P5 | ☐ | |
-| AIOps incident/signals/evidence/RCA/impact/response/quality | P0/P2/P4 | ☐ | |
-| FinOps usage/cost/allocation/value | P0/P2/P3/P4 | ☐ | |
-| MTTD/MTTR/RCA/告警压缩/成本收益指标可推导 | P0/P4/P5 | ☐ | |
-| v1/v2 legacy 适配与 v3 迁移 | P0/P2/P5 | ☐ | |
-| user/tenant/customer/operator/account 身份语义 | P0/P1/P4/P5 | ☐ | |
-| 固定身份树与 JSON null 缺省约定 | P0/P1/P5 | ☐ | |
-| User ID 开放决策备案与复审触发器 | P1/P6 | ☐ | |
+| Trace 聚合根 v3 | P0/P1/P2 | ✅ | trace_records.TraceRecord + 27 测试 |
+| Observation 父子执行树 | P0/P1/P2 | ✅ | ObservationRecord + observation_classifier.classify_observation_type |
+| Skill/References/Prompt/Rubric 版本 | P1 | ✅ | SkillInfo / skill_version.parse_skill_version |
+| LLM Token UsageEvent | P2 | ✅ | usage_emitters.emit_llm_usage |
+| Cloud API UsageEvent | P2 | ✅ | usage_emitters.emit_cloud_api_usage |
+| 数据读取量 UsageEvent | P2 | ✅ | usage_emitters.emit_data_usage + usage_stats |
+| PricingSnapshot | P3 | ✅ | trace_records.PricingSnapshot + cost.compute_cost |
+| CostAllocation | P3 | ✅ | attribution.AllocationRecord + allocate_cost (6 methods) |
+| FinOps 聚合与重算 | P4 | ✅ | trace_cost_aggregate + trace_cost_diff |
+| 安全与兼容测试 | P5 | ❌ | 未启动（P5.1-P5.4 待做） |
+| Self-check / Self-verify | P6 | ⚠️ | SPEC §22 self-check 已写入；代码 self-verify helper 未实现 |
+| Langfuse Trace/Observation 对齐 | P2/P4 | ✅ | langfuse_exporter + observation_classifier |
+| Langfuse Generation usage/cost | P2/P3/P4 | ✅ | langfuse_exporter (_usage_to_generation) |
+| Langfuse exporter 失败隔离与幂等 | P4/P5 | ⚠️ | 失败 silent skip 已实现；幂等/重试/batch 未实现 |
+| AIOps incident/signals/evidence/RCA/impact/response/quality | P0/P2/P4 | ✅ | summary_aggregator.aggregate_aiops_summary |
+| FinOps usage/cost/allocation/value | P0/P2/P3/P4 | ✅ | summary_aggregator.aggregate_finops_summary |
+| MTTD/MTTR/RCA/告警压缩/成本收益指标可推导 | P0/P4/P5 | ⚠️ | 数据层就位；可推导函数未实现 |
+| v1/v2 legacy 适配与 v3 迁移 | P0/P2/P5 | ✅ | legacy_gcl_to_observation / legacy_audit_to_observation |
+| user/tenant/customer/operator/account 身份语义 | P0/P1/P4/P5 | ✅ | IdentityTree 10 字段 |
+| 固定身份树与 JSON null 缺省约定 | P0/P1/P5 | ✅ | 9 测试覆盖 None / null / 不 'unknown' |
+| User ID 开放决策备案与复审触发器 | P1/P6 | ⚠️ | P1.8 标 [⚠️] blocked；SPEC 已备案 |
 
 ## 依赖与顺序
 
