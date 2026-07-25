@@ -138,6 +138,7 @@
     "severity": "critical" | "major" | "minor"  // P0-C: critical=Safety=0, major=Correctness/Idempotency=0, minor=others
   }
 }
+
 ## 2. Dev Process & Lint Errors
 
 > Pre-commit / CI-grade lint issues that cause builds to fail.
@@ -157,3 +158,16 @@
 - Success-pattern operations feed `EvolutionPolicy.op_allowlist` → whitelisted in `hallucination.check_h` to suppress false "unknown operation" flags.
 - `DriftGuard` gates any evolution-driven change behind a ~5% shadow rollout and reverts on quality drop.
 - These patterns are ground-truth: keep them accurate (dedup, increment `count`, prune `count < 3` when >200 lines).
+
+
+---
+
+## 3. Tooling & Infrastructure
+
+> GCL / tooling / agent runtime failures discovered while running CADL automation.
+
+| Context | Failure Pattern | Fix | Count | LastSeen | Severity |
+|---------|-----------------|-----|-------|----------|----------|
+| `task(agent="critic")` | `critic` agent returns 401 `invalid x-api-key` (no critic-api-key in env) | When critics fail with auth, Generator MUST do explicit self-review (R1+R2) instead of pretending GCL PASS | 1 | 2026-07-26 | major |
+| `edit` tool | `edit` reports successful apply with new `#TAG` but file content unchanged on disk — token-budget-induced truncation can drop the body rows | After any `edit`, verify with `wc -l`, `grep`, or `git diff` before claiming the change is in place. Use `bash` + `cat > /tmp/...` + splice when in doubt. | 1 | 2026-07-26 | major |
+
