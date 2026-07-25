@@ -11,8 +11,8 @@ compatibility: >-
   optional OpenAI-compatible LLM for CI inspection strategy mode.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-07-11"
+  version: "1.1.0"
+  last_updated: "2026-07-25"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   cli_applicability: cli-first
   cli_support_evidence: >-
@@ -124,6 +124,38 @@ Phase 2 executes steps **serially** by `depends_on` + `parallel_group` order whe
 - **L1** (semantic): step budget ≤ 10, no duplicate step IDs
 - **L2** (destructive): user confirmation required for `destructive=True` steps
 - **L3** (report): critical findings require human review before output
+
+
+## Observability
+
+Copilot 内建统一可观测性底座，基于 `ObservableSink`（`copilot/observ.py`）。
+
+### 输出文件
+
+| 输出 | 路径 | 用途 |
+|------|------|------|
+| structured metric stream | `.runtime/metrics/metrics.jsonl` | 查询 API 数据源 |
+| run span index | `.runtime/audit/{run_id}/_index.jsonl` | O(1) 链路重建 |
+| Prometheus exposition | `.runtime/metrics/metrics.prom` | 接入 Prometheus/Grafana |
+
+### 埋点事件
+
+- `emit_span`：每个 step 执行（run_id/step_id/status/duration_ms/error_code/source）
+- `emit_gate`：L0/L1/L2/L3 gate 决策（run_id/gate/decision/reason）
+- `emit_metric`：任意命名指标（name/kind/value/tags）
+
+### 查询 API（`copilot/observ_query.py`）
+
+| 函数 | 用途 |
+|------|------|
+| `skill_success_rate(skill, days)` | 指定 Skill 最近 N 天成功率 |
+| `p_latency(op, p=99, days)` | 指定操作 P99 延迟 |
+| `gate_decision_rate(gate)` | 指定 gate 通过/拒绝率 |
+| `top_failed_operations(days)` | Top-N 失败操作（含 error_code） |
+
+### 向后兼容
+
+`health.py` 和 `audit.py` 内部委托 `ObservableSink`，保留原有 JSON 落盘行为。旧 `TraceRecord v2` / `Span` 仅作 legacy adapter，不作为新主模型。TRACE-1 v3（Langfuse 风格 Trace/Observation/UsageEvent/Score）由独立 Phase 实现，当前 OBS-1 为其提供写入基础设施。
 
 ## Output
 
@@ -266,6 +298,7 @@ destructive operations to product skills which apply their own GCL safety gates.
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 1.7.0 | 2026-07-11 | LC-3：`copilot strategy apply`、Agent 策略写回 evidence_chain、巡检剧本 |
+| 1.1.0 | 2026-07-25 | OBS-1：ObservableSink 统一埋点（metrics.jsonl + audit/{run_id}/_index.jsonl + metrics.prom）、gate/step/任意指标写入、查询 API（skill_success_rate/p_latency/gate_decision_rate/top_failed_operations）；health.py/audit.py 委托 Sink；旧 Span 仅作 legacy adapter |
 | 1.6.0 | 2026-07-11 | LC-1：Agent-Driven Inspection Flow + `references/agent-inspection-prompt.md` |
 | 1.5.1 | 2026-07-11 | ADR 文档化：Agent Runtime 无关性、Agent 内调主路径、架构决策表；链至 `docs/architecture/2026-07-11-llm-native-agent-inband-adr.md` |
 | 1.5.0 | 2026-07-11 | Blackboard evidence_chain（schema 1.1）、报告「巡检证据链」节、topology_reasoner_v1、双报告 v1.4 增强 |

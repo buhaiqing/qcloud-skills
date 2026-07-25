@@ -75,3 +75,15 @@ E0 → E1 → E2 → E3 → E4 → E5（串行）
 ⚠️ OBS-1 的 P4（observ_query）必须在 E1.1 之前完成，否则 `EvolutionPolicy.__init__` 缺 query 依赖
 
 > 实现说明：E0–E5 已全部落地。单元测试整合进 `qcloud-copilot/tests/test_evo_generator.py`（覆盖 store / policy / guard / hooks / feedback 全部 DoD）；OBS-1 的 `observ_query` 已先行落地，依赖已满足；提交 footer 含 `TE-Audit: evo-1`。
+
+---
+
+## 完成记录（2026-07-25）
+
+- **实现 commit**: 357ee48 `feat(copilot): implement EVO-1 self-evolution Generator`
+- **合并 commit**: 9ed4915 `Merge feature/evo1-self-evolution: EVO-1 Generator`
+- **测试**: `test_evo_generator.py` 15个测试全绿（store/policy/guard/hooks/feedback/integration）
+- **依赖满足**: OBS-1 的 `observ_query`（P4）已先行落地，E1.1 依赖已打通
+- **文档**: `docs/failure-patterns.md` Usage Guidelines 已增加自动消费说明
+- **TE-Audit**: 已记录于提交 footer
+- **Phase 顺序**: E0 → E1 → E2 → E3 → E4 → E5 全部完成

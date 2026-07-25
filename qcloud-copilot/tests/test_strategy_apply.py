@@ -14,13 +14,13 @@ from copilot.evidence import build_evidence_chain
 from copilot.strategy import apply_strategy, load_strategy_file
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-FIXTURE = REPO_ROOT / ".runtime/blackboard/fixtures/strategy-agent-session.json"
+FIXTURE = REPO_ROOT / "qcloud-copilot" / "tests" / "fixtures" / "blackboard" / "strategy-agent-session.json"
 runner = CliRunner()
 
 
 @pytest.fixture
 def board_dir(tmp_path):
-    repo_schema = REPO_ROOT / ".runtime" / "blackboard" / "schema.json"
+    repo_schema = REPO_ROOT / "qcloud-copilot" / "assets" / "blackboard.schema.json"
     target_dir = tmp_path / "blackboard"
     target_dir.mkdir()
     target_dir.joinpath("schema.json").write_text(

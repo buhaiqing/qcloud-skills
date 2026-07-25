@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.2",
+  "session_id": "ses-fixture",
+  "user_request": "fixture request",
+  "created_at": "2025-01-01T00:00:00Z",
+  "updated_at": "2025-01-01T00:00:00Z",
+  "status": "completed",
+  "shared_context": {
+    "contributions": {},
+    "pending_actions": [
+      {
+        "action": "ask_user_response",
+        "skill": "qcloud-copilot",
+        "reason": "user selected delivery region",
+        "question_id": "ask-region-0",
+        "selected_option": "ap-guangzhou",
+        "selected_label": "广州",
+        "timeout_seconds": 60,
+        "responded_at": "2026-07-11T08:30:00Z"
+      }
+    ],
+    "evidence_chain": null
+  }
+}

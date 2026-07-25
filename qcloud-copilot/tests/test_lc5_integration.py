@@ -13,7 +13,7 @@ from copilot.integration.cruise import CruiseRunner, _apply_ci_mode_strategy
 from copilot.models import PlanStep
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA = REPO_ROOT / ".runtime" / "blackboard" / "schema.json"
+SCHEMA = REPO_ROOT / "qcloud-copilot" / "assets" / "blackboard.schema.json"
 
 
 @pytest.fixture
@@ -67,7 +67,7 @@ def test_apply_ci_mode_strategy_writes_llm_reasoner(board_client: BlackboardClie
 
 def test_apply_ci_mode_never_overrides_agent(board_client: BlackboardClient) -> None:
     agent = json.loads(
-        (REPO_ROOT / ".runtime/blackboard/fixtures/strategy-agent-session.json").read_text(
+        (REPO_ROOT / "qcloud-copilot" / "tests" / "fixtures" / "blackboard" / "strategy-agent-session.json").read_text(
             encoding="utf-8"
         )
     )

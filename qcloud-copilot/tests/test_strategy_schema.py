@@ -9,8 +9,8 @@ import jsonschema
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_PATH = REPO_ROOT / ".runtime" / "blackboard" / "schema.json"
-FIXTURES_DIR = REPO_ROOT / ".runtime" / "blackboard" / "fixtures"
+SCHEMA_PATH = REPO_ROOT / "qcloud-copilot" / "assets" / "blackboard.schema.json"
+FIXTURES_DIR = REPO_ROOT / "qcloud-copilot" / "tests" / "fixtures" / "blackboard"
 
 
 @pytest.fixture

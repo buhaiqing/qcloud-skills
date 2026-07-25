@@ -393,3 +393,61 @@ re-deriving the local KG. (In non-CodeGraph environments this rule is moot — j
   know what needs new tests BEFORE editing.
 - **Staleness banner**: only the listed files are pending re-index — Read those,
   trust the rest.
+
+## Senior Delivery Protocol
+
+- **Autonomous execution**: Once requirements and risk boundaries are clear, proceed without repeated confirmation; ask only when an irreversible decision or missing external fact cannot be safely inferred.
+- **Complexity-based isolation**: For multi-file, high-risk, or parallel work, choose a worktree when it improves isolation or rollback. Merge, verify, and remove it before handoff; keep small, low-risk changes in the current checkout.
+- **Plan-before-code**: For substantial work, complete SPEC/PLAN and execution gates before touching implementation. Do not use documentation as a substitute for tests or verification.
+- **Evidence before claims**: Never claim fixed, complete, or passing without fresh command output. Report pre-existing failures separately from regressions introduced by the task.
+- **Minimal senior refactoring**: Prefer root-cause fixes and coherent boundaries over compatibility clutter; preserve legacy adapters only where they protect existing consumers, and define their removal criteria.
+- **Post-delivery review**: After every substantial task, review architecture, tests, failures, operational risks, and reusable lessons. Record only cross-task assets; place repo-wide rules here and detailed patterns in the narrowest relevant document.
+- **AGENTS.md budget**: Before adding rules, search for overlap and check line count. If this file grows, consolidate or move detailed examples/checklists to linked docs; keep this file as a concise policy index.
+
+## 进度文档维护规范（Progress Document Maintenance）
+
+> 进度文档是团队协作的事实来源；任务完成但文档未更新等于未交付。
+
+### 触发条件
+
+满足任一即必须更新对应进度文档（与 CADL 触发条件重叠，不重复）：
+
+- 任意 SPEC/PLAN 中标记的任务项完成（`[ ]` → `[x]`/`[⚠️]`/`[❌]`）
+- 跨 Phase 依赖打通或新增遗留项
+- 架构决策变更（即使未写代码）
+- Pre-existing 问题发现（不影响本任务但需记录）
+
+### 范围认定
+
+进度文档包括：
+- `docs/superpowers/plans/*.md` 中的 Phase/Step checkbox 表
+- `docs/superpowers/specs/*.md` 中的 DoD/验收标准对照表
+- `docs/superpowers/TODO.md`（主任务清单）
+
+每项勾选须注明：
+- 状态：`[x]` 完成 / `[⚠️]` 部分完成 / `[❌]` 放弃
+- 证据：commit hash（若已提交）或变更摘要
+- 说明：关键决策、遗留项、与其他 Phase 的依赖
+
+### 最小更新单位
+
+- 单个 `[ ]` 勾选可单独更新，无需等待整个 Phase 完成
+- 跨 Phase 共用项（如身份语义）在一个 Phase 更新后，其他 Phase 同步勾注引用
+- DoD 未满足但需继续前进时，先标记 `[⚠️]` + 说明阻塞原因，再继续
+
+### 反模式
+
+| 反模式 | 正确做法 |
+|---|---|
+| 任务完成后不更新 plan，留在 `[ ]` 状态 | 按本规范立即更新 checkbox + 证据 |
+| 遗留项不记录，假装已完成 | 标记 `[ ]` 保留或 `[❌]` + 说明原因 |
+| 只更新 checkbox 不写证据（commit/摘要） | 证据是必需的；无 commit 时写变更摘要 |
+| 批量完成后一次性补更新 | 单项完成即更新，不攒批 |
+
+### 与 CADL 的关系
+
+进度文档更新是 CADL "复用" 步骤的显式门禁之一：完成某项后若不更新进度文档，CADL 闭环不完整。不要求每条 CADL 都写进度文档（那是规范层），但每条 SPEC/PLAN checkbox 变更必须同步。
+
+### AGENTS.md 行数门禁
+
+本规范若使 AGENTS.md ≥500 行，应将详细示例/检查清单移至 linked docs，保持本文件为简洁策略索引。

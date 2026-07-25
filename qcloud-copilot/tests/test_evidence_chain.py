@@ -14,8 +14,8 @@ from copilot.models import ClassifiedIntent, ExecutionPlan, IntentType, PlanStep
 from copilot.report_gen import synthesize_from_blackboard
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_PATH = REPO_ROOT / ".runtime" / "blackboard" / "schema.json"
-FIXTURE_PATH = REPO_ROOT / ".runtime" / "blackboard" / "fixtures" / "evidence-chain.json"
+SCHEMA_PATH = REPO_ROOT / "qcloud-copilot" / "assets" / "blackboard.schema.json"
+FIXTURE_PATH = REPO_ROOT / "qcloud-copilot" / "tests" / "fixtures" / "blackboard" / "evidence-chain.json"
 
 
 @pytest.fixture
@@ -77,7 +77,7 @@ def test_build_evidence_chain_topology_strategy() -> None:
 
 
 def test_blackboard_write_evidence_chain(tmp_path: Path) -> None:
-    repo_schema = REPO_ROOT / ".runtime" / "blackboard" / "schema.json"
+    repo_schema = REPO_ROOT / "qcloud-copilot" / "assets" / "blackboard.schema.json"
     board_dir = tmp_path / "blackboard"
     board_dir.mkdir()
     board_dir.joinpath("schema.json").write_text(

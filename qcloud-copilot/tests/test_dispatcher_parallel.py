@@ -17,7 +17,7 @@ SLEEP_SEC = 0.2
 
 
 def _board_dir(tmp_path):
-    repo_schema = Path(__file__).resolve().parents[2] / ".runtime" / "blackboard" / "schema.json"
+    repo_schema = Path(__file__).resolve().parents[1] / "assets" / "blackboard.schema.json"
     target_dir = tmp_path / "blackboard"
     target_dir.mkdir()
     target_dir.joinpath("schema.json").write_text(
@@ -49,7 +49,7 @@ def test_parallel_group_faster_than_serial(tmp_path):
     )
 
     class SlowDispatcher(PlanDispatcher):
-        def _execute_step(self, step, plan, blackboard, session_id):
+        def _execute_step(self, step, plan, blackboard, session_id, *, l2_confirmed=False):
             if step.id == "cruise-1":
                 time.sleep(SLEEP_SEC)
                 return StepResult(step_id=step.id, status="success", output={"inspected": []})
@@ -97,11 +97,11 @@ def test_parallel_group_order(tmp_path):
     waves: list[int] = []
 
     class WaveDispatcher(PlanDispatcher):
-        def _execute_batch(self, batch, plan, blackboard, session_id, completed, *, parallel):
+        def _execute_batch(self, batch, plan, blackboard, session_id, completed, *, parallel, l2_confirmed=False):
             if batch:
                 waves.append(batch[0].parallel_group)
             return super()._execute_batch(
-                batch, plan, blackboard, session_id, completed, parallel=parallel
+                batch, plan, blackboard, session_id, completed, parallel=parallel, l2_confirmed=l2_confirmed
             )
 
     PlanDispatcher(skill_dispatcher=skill).execute(

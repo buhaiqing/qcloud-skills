@@ -38,7 +38,7 @@ _INTENT = ClassifiedIntent(primary=IntentType.CRUISE, targets=["vm"])
 
 @pytest.fixture
 def board_dir(tmp_path: Path) -> Path:
-    repo_schema = Path(__file__).resolve().parents[2] / ".runtime" / "blackboard" / "schema.json"
+    repo_schema = Path(__file__).resolve().parents[1] / "assets" / "blackboard.schema.json"
     target_dir = tmp_path / "blackboard"
     target_dir.mkdir()
     target_dir.joinpath("schema.json").write_text(
@@ -59,7 +59,7 @@ def _build_runner(board_dir: Path) -> PlanDispatcher:
     """PlanDispatcher that bypasses tccli / SDK; cruise/alert runners stubbed."""
 
     class _StubbedDispatcher(PlanDispatcher):
-        def _execute_step(self, step, plan, blackboard, session_id):
+        def _execute_step(self, step, plan, blackboard, session_id, *, l2_confirmed=False):
             from time import time as _time
 
             start = _time()

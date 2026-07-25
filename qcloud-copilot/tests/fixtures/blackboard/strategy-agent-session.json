@@ -1,0 +1,32 @@
+{
+  "strategy_schema": "1.2",
+  "mode": "standard",
+  "execution_path": "dual_path",
+  "decision_maker": "agent_session_v1",
+  "llm_native_target": false,
+  "llm_native_note": "note",
+  "customer": "acme",
+  "region": "ap-guangzhou",
+  "user_request": "inspect redis",
+  "topology_summary": {
+    "redis": 1
+  },
+  "resources_analyzed": 1,
+  "agent_rationale": "cost opt",
+  "selected_analyzers": [
+    "redis",
+    "cdb",
+    "rds_mysql"
+  ],
+  "skipped_analyzers": [
+    {
+      "service": "redis",
+      "reason": "low risk, skip for cost"
+    }
+  ],
+  "analysis_depth": {
+    "vm": "normal"
+  },
+  "early_stop": false,
+  "priority_chain": []
+}

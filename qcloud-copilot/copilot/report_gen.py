@@ -1120,6 +1120,8 @@ def _format_action_item(item: dict[str, str]) -> str:
 
 def _rollup_verdict(contributions: dict[str, dict]) -> str:
     verdicts = [str(c.get("verdict", "PASS")).upper() for c in contributions.values()]
+    if not verdicts:
+        return "PASS"
     return min(verdicts, key=lambda v: _OVERALL_VERDICT.get(v, 2))
 
 

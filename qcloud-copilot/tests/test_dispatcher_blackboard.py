@@ -15,7 +15,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "plan-vpc-cruise-alert-report.jso
 
 
 def _board_dir(tmp_path):
-    repo_schema = Path(__file__).resolve().parents[2] / ".runtime" / "blackboard" / "schema.json"
+    repo_schema = Path(__file__).resolve().parents[1] / "assets" / "blackboard.schema.json"
     target_dir = tmp_path / "blackboard"
     target_dir.mkdir()
     target_dir.joinpath("schema.json").write_text(

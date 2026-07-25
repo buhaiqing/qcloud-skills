@@ -20,7 +20,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "plan-vpc-cruise-alert-report.jso
 
 @pytest.fixture
 def board_dir(tmp_path):
-    repo_schema = Path(__file__).resolve().parents[2] / ".runtime" / "blackboard" / "schema.json"
+    repo_schema = Path(__file__).resolve().parents[1] / "assets" / "blackboard.schema.json"
     target_dir = tmp_path / "blackboard"
     target_dir.mkdir()
     target_dir.joinpath("schema.json").write_text(
@@ -109,18 +109,18 @@ def test_e2e_plan_execution_order(board_dir):
             alert_runner.analyze.side_effect = fake_analyze
             self._plan_dispatcher._alert_runner = alert_runner
 
-        def _run_execution(self, plan, *, audience, l3_reviewed):
+        def _run_execution(self, plan, *, audience, l3_reviewed, l2_confirmed=False):
             import time
 
             original = self._plan_dispatcher._execute_step
 
-            def tracked(step, p, bb, sid):
-                result = original(step, p, bb, sid)
+            def tracked(step, p, bb, sid, *, l2_confirmed=False):
+                result = original(step, p, bb, sid, l2_confirmed=l2_confirmed)
                 finish_times[step.id] = time.time()
                 return result
 
             self._plan_dispatcher._execute_step = tracked
-            return super()._run_execution(plan, audience=audience, l3_reviewed=l3_reviewed)
+            return super()._run_execution(plan, audience=audience, l3_reviewed=l3_reviewed, l2_confirmed=l2_confirmed)
 
     with patch("copilot.engine.SessionManager") as sm_mock:
         sm = sm_mock.return_value

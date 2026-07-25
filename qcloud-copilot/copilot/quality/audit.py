@@ -12,6 +12,7 @@ def audit_trace(
     trace_data: dict,
     trace_id: str | None = None,
     provenance: dict | None = None,
+    skill: str | None = None,
 ) -> None:
     """Persist a step-level execution trace.
 
@@ -37,15 +38,19 @@ def audit_trace(
     )
     filename.write_text(json.dumps(record, ensure_ascii=False, indent=2))
 
-    # Delegate span emission so the run-index is auto-built (O2) and the
-    # structured metric stream stays consistent with health/engine signals.
-    status = str(trace_data.get("status", "success"))
-    ObservableSink().emit_span(
-        Span(
-            run_id=run_id,
-            step_id=step_id,
-            status="success" if status == "success" else "fail",
-            duration_ms=int(trace_data.get("duration_ms", 0) or 0),
-            error_code=trace_data.get("error"),
+    # Emit a span only for non-step (system) traces: per-step dispatcher
+    # traces already get a skill-keyed span from dispatcher._emit_span, so
+    # emitting one here would duplicate it and double-count success_rate /
+    # inflate the prom counter. System traces (e.g. "l2-gate",
+    # "blackboard-init") pass no skill and are the sole emitter for their span.
+    if skill is None:
+        status = str(trace_data.get("status", "success"))
+        ObservableSink().emit_span(
+            Span(
+                run_id=run_id,
+                step_id=step_id,
+                status="success" if status == "success" else "fail",
+                duration_ms=int(trace_data.get("duration_ms", 0) or 0),
+                error_code=trace_data.get("error"),
+            )
         )
-    )

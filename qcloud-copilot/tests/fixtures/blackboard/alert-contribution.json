@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.2",
+  "session_id": "ses-fixture",
+  "user_request": "fixture request",
+  "created_at": "2025-01-01T00:00:00Z",
+  "updated_at": "2025-01-01T00:00:00Z",
+  "status": "completed",
+  "shared_context": {
+    "contributions": {
+      "qcloud-monitor-ops": {
+        "version": "1.0.0",
+        "verdict": "PASS",
+        "findings": [
+          {
+            "id": "f1",
+            "severity": "INFO",
+            "summary": "monitor ok"
+          }
+        ],
+        "topology_hints": [
+          "hint-a"
+        ],
+        "metadata": {
+          "skill": "qcloud-monitor-ops"
+        }
+      }
+    },
+    "pending_actions": [
+      {
+        "action": "invoke_skill",
+        "skill": "qcloud-monitor-ops",
+        "reason": "follow-up check"
+      }
+    ]
+  }
+}

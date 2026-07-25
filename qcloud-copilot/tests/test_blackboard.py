@@ -13,10 +13,9 @@ from copilot.blackboard import BlackboardClient, validate_blackboard
 @pytest.fixture
 def board_dir(tmp_path):
     repo_schema = (
-        __import__("pathlib").Path(__file__).resolve().parents[2]
-        / ".runtime"
-        / "blackboard"
-        / "schema.json"
+        __import__("pathlib").Path(__file__).resolve().parents[1]
+        / "assets"
+        / "blackboard.schema.json"
     )
     target_dir = tmp_path / "blackboard"
     target_dir.mkdir()
