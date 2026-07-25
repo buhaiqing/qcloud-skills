@@ -53,8 +53,9 @@
   - 记录 client_type、product、service、action、api_version、region、RequestId、请求/响应字节、资源数、重试、限流和缓存命中。
 - [x] **P2.5** 新增数据用量 emitter。已实现 `emit_data_usage()`；字段：metric_points / log_bytes / log_records / audit_events / topology_nodes / topology_edges + latency_ms；全部可空。
   - 记录 metric points、log bytes/records、audit events、topology nodes/edges、compute/storage 用量。
-- [x] **P2.6.a** 已新建 `copilot/step_recording.py` 提供 `with_step_recording()` context manager，自动绑定 `ObservableSink.emit_observation()` + `add_usage()` queue + `emit_usage_event()`；P2.7 类型分类器自动判别；显式 `kind` 覆盖；成功 / 异常 / 无 usage 三路径全覆盖；5 测试全绿。
-  - DoD：为 P2.6.b/c 接入到 dispatcher / engine / skills 提供统一 helper；当前 helper 已可直接包绕现有 audit_trace 调用点。
+- [x] **P2.6.b** audit_trace_v3 桥。已新建 `audit_trace_v3()` 在 `copilot/quality/audit.py`：仍调 legacy `audit_trace()` 不破坏旧消费者；额外 `emit_observation` + `usage_events` 通过 `add_usage` 关联；接入 `engine.py blackboard-init` 一处作为可工作样例；4 测试全绿。
+  - DoD：legacy audit 文件保持兼容；新 callsite 同时发出 observation + usage。
+- [x] **P2.6.c** 运行时入口启动事件。已新增 `step_recording.bootstrap_trace_metadata()` 写出 `event:session.startup` ObservationRecord，承载完整 RuntimeInfo + SkillInfo；3 测试全绿。
   - DoD：不依赖 metadata 才能在 Langfuse 查询 Trace、Session、Version 和 Generation usage。
 - [ ] **P2.9** 实现 TraceRecord AIOps/FinOps 分析摘要聚合器。
   - DoD：Observation 和 UsageEvent 写入后可幂等刷新 `aiops.*`、`finops.*`，且保留来源引用和数据质量状态。

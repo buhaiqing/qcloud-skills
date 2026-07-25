@@ -22,13 +22,11 @@ from copilot.safety.l1 import check_l1
 from copilot.safety.l2 import check_l2
 from copilot.safety.l3 import check_l3
 from copilot.quality.health import record_health
-from copilot.quality.audit import audit_trace
+from copilot.quality.audit import audit_trace, audit_trace_v3
 from copilot.observ import Metric, MetricKind, ObservableSink
 from copilot.session import SessionManager
 from copilot.mode_resolver import resolve_inspection_mode, strip_ci_trigger_words
 from copilot.env_loader import ensure_runtime_env
-
-
 class CopilotEngine:
     """Main orchestrator: NL → Parse → Classify → Plan → Execute → Report."""
 
@@ -73,7 +71,20 @@ class CopilotEngine:
                     "user_request": query[:500],
                 },
             )
-
+            with suppress(Exception):
+                audit_trace_v3(
+                    sink=ObservableSink(),
+                    session_id=session_id,
+                    trace_id=session_id,
+                    step_id="blackboard-init",
+                    trace_data={
+                        "step_type": "blackboard_init",
+                        "status": "success",
+                        "user_request": query[:500],
+                    },
+                    skill=None,
+                    observation_name="event:blackboard-init",
+                )
         parsed = parse(parse_query)
         intent = classify(parsed)
 

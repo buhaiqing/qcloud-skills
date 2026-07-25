@@ -100,3 +100,37 @@ def with_step_recording(
     finally:
         obs.metadata["step_id"] = step_id  # join key for downstream queries
         _flush(sink, ctx)
+
+
+def bootstrap_trace_metadata(
+    *,
+    sink,
+    trace_id: str,
+    runtime_info=None,
+    skill_info=None,
+) -> "ObservationRecord":
+    """P2.6.c — Emit a session-startup observation carrying RuntimeInfo + SkillInfo.
+
+    Writes one ObservationRecord marked `event:session.startup` (type=EVENT)
+    at the start of an invocation so a later query can answer:
+      "which Python + which tccli + which SDK + which git commit + which
+       Skill version was running when this trace started?"
+    """
+    from copilot.trace_metadata import build_runtime_info, build_skill_info
+
+    rt = runtime_info if runtime_info is not None else build_runtime_info()
+    si = skill_info if skill_info is not None else build_skill_info(None)
+
+    start_time = _utc_now()
+    obs = ObservationRecord(
+        id=f"obs-{uuid.uuid4().hex[:12]}",
+        trace_id=trace_id,
+        type=ObservationType.EVENT,
+        name="event:session.startup",
+        start_time=start_time,
+        end_time=start_time,
+        status="success",
+        metadata={"runtime": rt.to_dict(), "skill": si.to_dict()},
+    )
+    sink.emit_observation(obs)
+    return obs

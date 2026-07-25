@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 from copilot.observ import ObservableSink, Span
-
 
 def audit_trace(
     session_id: str,
@@ -64,3 +64,81 @@ def audit_trace(
                 error_code=trace_data.get("error"),
             )
         )
+
+
+
+
+def audit_trace_v3(
+    *,
+    sink: ObservableSink,
+    session_id: str,
+    trace_id: str,
+    step_id: str,
+    trace_data: dict,
+    skill: str | None = None,
+    provenance: dict | None = None,
+    skill_info=None,
+    runtime_info=None,
+    observation_name: str | None = None,
+    kind: str | None = None,
+    usage_events: list | None = None,
+) -> None:
+    """P2.6.b — bridge: fire legacy audit_trace() AND emit TRACE-1 v3 record.
+
+    Calls the legacy ``audit_trace`` unchanged so existing JSON consumers keep
+    working, then writes one ObservationRecord to ``audit/<trace_id>/observations.jsonl``
+    (and any provided ``usage_events`` to ``usage_events.jsonl``).
+
+    The emitted observation's id is reused as ``observation_id`` on every
+    usage event so downstream queries can join them by id.
+    """
+    from copilot.observation_classifier import classify_observation_type
+    from copilot.trace_records import (
+        ObservationRecord,
+        ObservationType,
+    )
+
+    # 1. Legacy write
+    audit_trace(
+        session_id=session_id,
+        step_id=step_id,
+        trace_data=trace_data,
+        trace_id=trace_id,
+        provenance=provenance,
+        skill=skill,
+        skill_info=skill_info,
+        runtime_info=runtime_info,
+    )
+
+    # 2. v3 observation
+    name = observation_name or step_id
+    obs_type: ObservationType = classify_observation_type(name=name, kind=kind)
+    raw_status = str(trace_data.get("status", "success")).lower()
+    obs_status = "success" if raw_status in {"success", "pass"} else (
+        "error" if raw_status in {"error", "fail", "unconfirmed"} else "partial"
+    )
+    obs = ObservationRecord(
+        id=f"obs-{uuid.uuid4().hex[:12]}",
+        trace_id=trace_id,
+        type=obs_type,
+        name=name,
+        start_time=datetime.now(timezone.utc).isoformat(),
+        end_time=datetime.now(timezone.utc).isoformat(),
+        status=obs_status,
+        metadata={"step_id": step_id, "session_id": session_id, "skill": skill} if skill else {"step_id": step_id, "session_id": session_id},
+        input=dict(trace_data),
+    )
+    if trace_data.get("error"):
+        obs.error = str(trace_data["error"])
+    sink.emit_observation(obs)
+
+    # 3. v3 usage events (join by observation_id)
+    for evt in (usage_events or []):
+        try:
+            # Set observation_id on a copy-like update without mutating input
+            if getattr(evt, "observation_id", None) is None:
+                evt.observation_id = obs.id
+            sink.emit_usage_event(evt)
+        except Exception:
+            # never let v3 emission fail legacy audit path
+            pass
