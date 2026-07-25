@@ -71,17 +71,12 @@
 - [ ] **P4.3** 支持 token、API request、metric point、log byte、event、compute、storage 用量统计。
 - [ ] **P4.4** 支持用不同 PricingSnapshot 重新计算成本。
 - [ ] **P4.5** 输出成本质量状态、未定价用量和分摊覆盖率。
-- [x] **P4.1** 新增 `scripts/trace_cost_aggregate.py`。已新建 `copilot/trace_cost_aggregate.py` 提供 `aggregate_costs(records, by=...)`、`aggregate_usage_events(events, by=...)`、`aggregate(records, events, cost_dimensions, usage_dimensions)`；支持 trace_id / cost_status / pricing_snapshot_version / currency / event_type / provider / model / product / action / region / tenant；compound key 用 `|` 连接；summary 含 total_cost + priced_count + unpriced_count；9 测试覆盖。
-  - 支持按 trace、incident、Skill、Skill version、product、action、region、tenant、model 聚合。
-- [ ] **P4.8** 新增 Langfuse/OTel 兼容测试。
-  - DoD：可从本地 TraceRecord 还原 Langfuse 风格父子树，并保持 W3C trace/span 关联字段可转换。
-
-## Phase 5 — 安全、兼容与测试
-
-- [ ] **P5.1** 增加 secret scan、资源 ID 哈希、低基数 Prometheus 标签测试。
-- [ ] **P5.2** 增加跨租户隔离和敏感字段禁止落盘测试。
-- [ ] **P5.3** 增加旧 GCL/Copilot trace 读取兼容测试。
-- [ ] **P5.4** 增加并发写入、重复事件、幂等 key 和部分失败恢复测试。
+- [x] **P4.2** 支持 LLM 与云 API 成本拆分。已扩 `trace_cost_aggregate.aggregate()` 加 `cost_by_event_type` 块；优先用 `CostRecord.metadata['by_event_type']` 加权分摊，回退按 distinct event_type 等分；缺失 `by_event_type` 时按 event-type 等分；UNPRICED / NOT_APPLICABLE 不参与拆分；5 测试覆盖。
+- [x] **P4.3** 支持 token、API request、metric point、log byte、event、compute、storage 用量统计。已新建 `copilot/usage_stats.py` 提供 `usage_stats(events)` 聚合 llm / cloud_api / data 三桶指标（含 by_provider / by_product / metric_points / log_bytes / log_records / audit_events / topology_nodes/edges）；6 测试覆盖。
+- [x] **P4.4** 支持用不同 PricingSnapshot 重新计算成本。已新建 `copilot/trace_cost_diff.py` 提供 `recompute_cost_diff(old_records, events_per_trace, new_snapshot)` 返回 per-trace delta + newly_priced / newly_unpriced 列表；origin CostRecord / UsageEvent 不被修改；5 测试覆盖。
+- [x] **P4.5** 输出成本质量状态、未定价用量和分摊覆盖率。已新建 `copilot/quality_report.py` 提供 `quality_coverage_report(records, allocations=)`；per-trace 评分 good (>=0.9) / fair (>=0.5) / poor (>0) / unpriced (==0) + summary 计数 + overall_score；allocation_coverage = distinct alloc keys / total events；8 测试覆盖。
+- [x] **P4.7** 新增 Langfuse exporter，支持 Trace、Span、Generation、Event 映射。已新建 `copilot/langfuse_exporter.py` 提供 `export_trace_to_langfuse(trace, observations=, scores=, usage_events=)` 输出 trace + scores + observations 三段；SkeletonInfo + RuntimeInfo 折入 metadata；usage_event 作为 generation 节点；导出失败 silent skip；7 测试覆盖。
+  - DoD：导出失败不阻塞本地审计；支持批量、重试、幂等和迟到 observation。
 - [ ] **P5.5** 为主要产品 API 构造 Monitor/CVM/CLS fixture，覆盖成功、失败、重试、限流、无价格场景。
 
 ## Phase 6 — 文档与质量门

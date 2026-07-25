@@ -174,6 +174,55 @@ def aggregate_usage_events(
     return out
 
 
+def _split_cost_by_event_type(
+    records: Iterable[CostRecord], events: Iterable[UsageEvent]
+) -> dict[str, float]:
+    """Allocate each priced record's total_cost across LLM / Cloud API / Data.
+
+    Allocation per record:
+      - prefer CostRecord.metadata['by_event_type'] if present -> weighted share
+      - else fall back to UsageEvent event_type counts observed in scope
+      - skip priced records whose bucket has zero billable events
+      - UNPRICED / NOT_APPLICABLE records contribute zero
+    Returns {event_type_bucket: cost}. Empty dict if no priced records.
+    """
+    rec_list = list(records)
+    ev_list = list(events)
+    if not rec_list:
+        return {}
+
+    # Fallback event-type proportions from the events list.
+    fallback_counts: dict[str, int] = {}
+    for evt in ev_list:
+        fallback_counts[evt.event_type] = fallback_counts.get(evt.event_type, 0) + 1
+
+    out: dict[str, float] = {}
+    for rec in rec_list:
+        if rec.cost_status not in {CostStatus.ACTUAL, CostStatus.PARTIAL, CostStatus.ESTIMATED}:
+            continue
+        if abs(rec.total_cost) < 1e-12:
+            continue
+        breakdown = (rec.metadata or {}).get("by_event_type") or {}
+        if not breakdown:
+            # Fallback: equal split across distinct event_type buckets.
+            breakdown = {et: 1 for et in sorted(fallback_counts.keys())}
+        if not breakdown:
+            continue
+        total_weight = sum(int(v) for v in breakdown.values())
+        if total_weight == 0:
+            continue
+        for k, v in breakdown.items():
+            try:
+                w = int(v)
+            except Exception:
+                continue
+            if w <= 0:
+                continue
+            share = w / total_weight
+            out[k] = out.get(k, 0.0) + round(rec.total_cost * share, 9)
+    return out
+
+
 def aggregate(
     *,
     records: Iterable[CostRecord],
@@ -181,7 +230,8 @@ def aggregate(
     cost_dimensions: list[str],
     usage_dimensions: list[str],
 ) -> dict:
-    """Combined aggregate: CostRecord reports + UsageEvent reports + joint summary."""
+    """Combined aggregate: CostRecord reports + UsageEvent reports + joint summary +
+    LLM vs Cloud API cost split (P4.2)."""
     rec_list = list(records)
     ev_list = list(events)
     cost_report = aggregate_costs(rec_list, by=cost_dimensions)
@@ -190,4 +240,5 @@ def aggregate(
     out.update({k: v for k, v in cost_report.items() if k != "summary"})
     out.update({k: v for k, v in usage_report.items() if k != "summary"})
     out["usage_summary"] = usage_report["summary"]
+    out["cost_by_event_type"] = _split_cost_by_event_type(rec_list, ev_list)
     return out
