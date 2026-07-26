@@ -11,14 +11,16 @@ description: >-
   automated fault detection across CVM, Redis, CDB, ES, TKE, CLB, VPC, COS,
   CKafka, MongoDB, Postgres, SCF, CDN products. Not for live resource
   CRUD operations unless paired with a product-specific ops skill.
+  Active inspection / cruise: "巡检", "主动巡检", "cruise", "智能巡检",
+  "巡检报告", "拓扑巡检", "按拓扑巡检".
 license: MIT
 compatibility: >-
   Tencent Cloud CLI (`tccli`), Python 3.8+ runtime for metric collection and
   log analysis, valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "2.5.2"
-  last_updated: "2026-07-04"
+  version: "2.6.0"
+  last_updated: "2026-07-27"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   type: cross-cutting-diagnosis
   python_version_minimum: "3.8"
@@ -33,15 +35,28 @@ metadata:
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
   related_skills:
-    - qcloud-finops-ops   # 双向：F1/F2 账单异常+指标联合诊断；A2 容量信号回传 FinOps 优化
-    - qcloud-proactive-inspection  # 双向：F1 finops 派发巡检后 AIOps 深化；P1 巡检 CRITICAL→验证；A1 事后防复发巡检项
-    - qcloud-tke-ops       # 反向：TKE 告警降噪与事件聚合能力集成（tke 触发告警风暴，aiops 提供聚合诊断）
-    - qcloud-monitor-ops   # 反向：Monitor 告警历史与指标查询被 aiops 告警聚合管道使用
-    - qcloud-cvm-ops       # 反向：节点/实例压力证据与 VM 诊断建议委托
-    - qcloud-clb-ops       # 反向：CLB 5xx/backend health 与 TKE 后端链路关联
-    - qcloud-vpc-ops       # 反向：变更关联 Rule F4 网络/SG 证据委托只读采集
-    - qcloud-cam-ops       # 反向：CloudAudit 凭证/权限类变更证据
-    - qcloud-cdb-ops       # 反向：Rule H CDB 慢查询/连接链只读证据与修复委托
+    - qcloud-finops-ops
+    - qcloud-proactive-inspection
+    - qcloud-tke-ops
+    - qcloud-monitor-ops
+    - qcloud-cvm-ops
+    - qcloud-clb-ops
+    - qcloud-vpc-ops
+    - qcloud-cam-ops
+    - qcloud-cdb-ops
+    - qcloud-redis-ops
+    - qcloud-es-ops
+    - qcloud-cos-ops
+    - qcloud-ckafka-ops
+    - qcloud-mongodb-ops
+    - qcloud-postgres-ops
+    - qcloud-scf-ops
+    - qcloud-cdn-ops
+---
+Rule O SCF 错误/超时/限流诊断委托
+    - qcloud-cdn-ops       # 反向：Rule P CDN 源站5xx/缓存/延迟诊断委托
+---
+   - qcloud-cdb-ops       # 反向：Rule H CDB 慢查询/连接链只读证据与修复委托
     - qcloud-redis-ops     # 反向：Rule I Redis 内存/连接风暴诊断委托
     - qcloud-es-ops        # 反向：Rule J ES 集群红黄/索引延迟诊断委托
     - qcloud-cos-ops       # 反向：Rule K COS 4xx/5xx/延迟诊断委托

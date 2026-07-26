@@ -8,9 +8,8 @@ Central JSON path registry for all AIOps bundles. Full examples live in linked r
 |-------------|------|--------------|-------------------|
 | **Event Bundle** | TKE alarm storm / aggregation | — (inline) | [`alarm-handling.md`](alarm-handling.md) §5 |
 | **RCA Bundle** | Multi-source / product / network RCA | — (inline) | [`multi-source-rca.md`](multi-source-rca.md) §4 |
-| **Anomaly Bundle** | Baseline-only scan | `./audit-results/anomaly-bundle-*.json` | [`anomaly-detection.md`](anomaly-detection.md) §6 |
-| **Incident Timeline** | Post RCA/Event assembly | `./audit-results/incident-timeline-*.json` | [`incident-timeline.md`](incident-timeline.md) §3 |
-| **Cross-Skill Bundle** | F1/F2/P1/A1/A2 orchestration | `./audit-results/cross-skill-bundle-*.json` | [`cross-skill-orchestration.md`](cross-skill-orchestration.md) §5 |
+| **Cruise Bundle** | Active inspection run | `./audit-results/cruise-*.json` | [`cruise-report-format.md`](cruise-report-format.md) |
+| **Anomaly Bundle** | Baseline-only scan | `./audit-results/anomaly-bundle-*.json` | [`anomaly-detection.md`](anomaly-detection.md) |
 | **GCL trace ref** | Post-GCL diagnosis embed | `./audit-results/gcl-trace-*.json` | [`SKILL.md`](../SKILL.md) Quality Gate §Phase 3 |
 | **Incident KB record** | Post-incident feedback | `./audit-results/incident-kb-*.json` | [`incident-knowledge.md`](incident-knowledge.md) §3 |
 
@@ -74,8 +73,9 @@ Central JSON path registry for all AIOps bundles. Full examples live in linked r
 | `participating_skills[]` | array | yes |
 | `joint_hypothesis.confidence` | string | yes |
 | `artifacts.rca_id` | string | when RCA ran |
-| `prevention_items[]` | array | Mode A1 |
-| `finops_advisory` | object | Mode A2 |
+## FinOps Thresholds (Capacity Forecast)
+
+Shared per-metric FinOps thresholds used by `capacity_forecaster`. See [`capacity-forecast.md`](capacity-forecast.md) §Default FinOps Thresholds for full table and override instructions.
 
 ## Shared Sub-Objects
 

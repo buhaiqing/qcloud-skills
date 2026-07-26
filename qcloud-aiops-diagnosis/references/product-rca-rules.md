@@ -429,11 +429,27 @@ When `resource_type` is `cdb`, `redis`, `es`, `cos`, `ckafka`, `mongodb`, `postg
 ```
 
 Cross-link to CLB/VPC/origin layers when user supplies `{{user.load_balancer_id}}`, `{{user.vpc_id}}`, or origin domain from `DescribeDomainsConfig`.
+## 12. FinOps Capacity Thresholds
 
-## 12. Changelog
+Capacity utilization thresholds used for proactive capacity alerts in RCA and cruise inspection.
+Managed centrally in [`capacity-forecast.md`](capacity-forecast.md) §Default FinOps Thresholds.
+
+| Metric | Warning | Critical | Product |
+|--------|---------|----------|---------|
+| `cpu_util` | 75% | 90% | CVM, CDB, Redis, ES, CKafka, MongoDB, Postgres, SCF |
+| `mem_util` | 80% | 95% | CVM, CDB, Redis, ES, CKafka, MongoDB, Postgres |
+| `disk_util` | 85% | 95% | CVM, CDB, CKafka, MongoDB, Postgres |
+| `cpu_allocated` | 80% | 95% | TKE cluster |
+| `mem_allocated` | 85% | 98% | TKE cluster |
+
+These thresholds trigger `CapacityAlert` in `lib/capacity_forecaster.py` and feed into Cross-Skill Bundles for A2 FinOps advisories.
+
+## 13. Changelog
 
 | Version | Date | Changes |
-|---|---|---|
+|--------|------|---------|
 | 1.0.0 | 2026-06-09 | Rules H/I/J for CDB slow-query chain, Redis memory/connection storm, ES cluster health |
 | 2.0.0 | 2026-06-13 | **Phase F:** Rules K–N (COS, CKafka, MongoDB, Postgres) |
 | 2.1.0 | 2026-06-13 | **Phase F cont.:** Rules O (SCF error/timeout/throttle), P (CDN origin 5xx/cache/latency) |
+| 2.2.0 | 2026-07-27 | **Phase cruise enhancement:** FinOps capacity thresholds (cpu_util/mem_util/disk_util) added to RCA rules; managed centrally in `capacity-forecast.md` |
+| 2.6.0 | 2026-07-27 | Phase G: Active inspection + ML detectors + capacity forecast + finding fingerprint + selective workflow + FinOps thresholds + cruise_logger |

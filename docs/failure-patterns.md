@@ -168,6 +168,7 @@
 
 | Context | Failure Pattern | Fix | Count | LastSeen | Severity |
 |---------|-----------------|-----|-------|----------|----------|
-| `task(agent="critic")` | `critic` agent returns 401 `invalid x-api-key` (no critic-api-key in env) | When critics fail with auth, Generator MUST do explicit self-review (R1+R2) instead of pretending GCL PASS | 1 | 2026-07-26 | major |
-| `edit` tool | `edit` reports successful apply with new `#TAG` but file content unchanged on disk — token-budget-induced truncation can drop the body rows | After any `edit`, verify with `wc -l`, `grep`, or `git diff` before claiming the change is in place. Use `bash` + `cat > /tmp/...` + splice when in doubt. | 1 | 2026-07-26 | major |
+| `task(agent="executor")` | MCP subagent returns `401 invalid x-api-key` | MCP auth unavailable → write files directly via `Write` tool; do NOT block on subagent retry | 2 | 2026-07-27 | major |
+| `edit` tool | `edit` reports success with new `#TAG` but file unchanged — stale TAG or concurrent modification drops body rows | Always verify edit result with `ruff check <file>` or `git diff`; prefer `write` for new files; use `bash` heredoc when in doubt | 1 | 2026-07-27 | major |
+| `ruff check` (CI gate) | `F821 Undefined name` / `F811 Redefinition of unused` — edit tool silently accepted but produced invalid code | Run `ruff check <file>` after every Python write/edit before claiming the change works | 1 | 2026-07-27 | major |
 
