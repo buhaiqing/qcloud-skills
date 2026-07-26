@@ -350,6 +350,30 @@ re-deriving the local KG. (In non-CodeGraph environments this rule is moot — j
 - It is read-only intelligence. Correctness is still the compiler/tests' job —
   trust the returned source, but verify with LSP/tests before claiming done.
 
+### Rule 5 — API-First before writing tests or invoking external tools (P0 when CodeGraph available)
+
+Before writing tests for any module/class, or before calling an external tool/MCP
+that depends on a module's API, you MUST confirm the actual signature with
+`codegraph_explore`. Writing tests against a misread or outdated signature produces
+three costs: (1) tests that crash at import, (2) tests that pass against the wrong
+behavior, (3) rework every time the discrepancy surfaces in CI.
+
+**Workflow**:
+1. `codegraph_explore <symbol_name>` → get actual signature + field names
+2. If stale (staleness banner) → `Read` the file directly to confirm
+3. Only then write tests or call the external tool with correct arguments
+
+**Fallback** (when CodeGraph unavailable): `Read` the source file directly — same
+expected outcome, no sub-agents or grep+read loops.
+
+**This rule applies to ALL test files**, including tests for modules written in
+previous sessions or by other agents.
+
+**Evidence from this repo**: Writing unit tests for `ml/predictors/` and
+`lib/selective_workflow` without confirming signatures → `TypeError` on every
+test (3 rounds of rework). After confirming signatures via `codegraph_explore`,
+all 49 tests pass in one shot.
+
 ### What to extract from each result
 
 - **Source blocks**: safe to Edit from; do not re-Read.

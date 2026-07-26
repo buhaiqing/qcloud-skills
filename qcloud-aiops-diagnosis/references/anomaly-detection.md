@@ -243,8 +243,18 @@ Repeat for `{{user.baseline_week_start}}` / `{{user.baseline_week_end}}` (−7d 
 | `InvalidParameterValue` namespace/metric | Skip metric; list in `degraded_metrics` |
 | Window > 24h | HALT baseline mode; static thresholds only |
 | Rate limit | Retry once; then scan fewer metrics |
+## 10. ML-Based Detection (complementary)
 
-## 9. Changelog
+Baseline detection (§1–§9) uses statistical deviation from historical windows.
+ML-based detection ([`ml-anomaly-detection.md`](ml-anomaly-detection.md)) uses trained models
+(IsolationForest, XGBoost) for metrics where baselines are unreliable or patterns are non-linear.
+
+| Approach | Training | Best for | Works without labels |
+|----------|---------|----------|-----------------------|
+| Baseline ratio (§3) | None — compare windows | Seasonal metrics, known patterns | ✅ |
+| ML detectors (ml/) | Fit on history | Non-linear patterns, noisy baselines | ✅ |
+
+Use both in parallel; surface anomalies detected by either method.
 
 | Version | Date | Changes |
 |---|---|---|

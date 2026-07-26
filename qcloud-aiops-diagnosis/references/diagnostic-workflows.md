@@ -244,5 +244,39 @@ A2: capacity/drift signals → attach finops_advisory → delegate qcloud-finops
   ↓
 Merge artifacts into Cross-Skill Bundle; embed cross_skill_ref on RCA Bundle
   ↓
-Persist ./audit-results/cross-skill-bundle-YYYYMMDD-HHMMSS.json
+## Workflow 12: Active Inspection (Cruise)
+
+Canonical spec: [`cruise-report-format.md`](cruise-report-format.md).
+
 ```
+User requests: "巡检", "cruise", "主动巡检"
+  ↓
+Topology Discovery (§1 topology-discovery-workflow.md):
+  Discover CVM / CLB / VPC / ENI / Peering via tccli
+  ↓
+Selective Workflow (lib/selective_workflow.py):
+  Map topology nodes → required analyzers
+  Skip analyzers for absent resource types
+  ↓
+ML Anomaly Detection (ml/detectors/):
+  IsolationForestDetector — trains on historical metrics, no labels
+  ThresholdDetector — rule-based for known thresholds
+  ↓
+Capacity Forecast (lib/capacity_forecaster.py):
+  LinearTrendPredictor or XGBoostCapacityPredictor
+  Check against FinOps thresholds → CapacityAlerts
+  ↓
+Finding Fingerprint (lib/finding_fingerprint.py):
+  Deduplicate across runs via stable hash key
+  ↓
+Finding Filters (lib/finding_filters.py):
+  Suppress informational + known-bad findings
+  ↓
+Output Cruise Bundle (§cruise-report-format.md):
+  topology + findings + fingerprints + capacity_forecast
+  ↓
+Persist: ./audit-results/cruise-YYYYMMDD-HHMMSS.json
+```
+
+**Selective execution:** If topology contains no CVM nodes, `cvm_analyzer` is skipped.
+Full table: [`topology-discovery-workflow.md`](topology-discovery-workflow.md) §Tier Priority.
