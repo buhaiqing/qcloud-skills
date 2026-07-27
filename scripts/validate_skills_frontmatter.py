@@ -16,7 +16,6 @@ from pathlib import Path
 
 CLI_APPLICABILITY = {"dual-path", "cli-first", "cli-only", "sdk-only"}
 FRONTMATTER = re.compile(r"^---\s*\n(.*?)\n---", re.DOTALL)
-LEGACY_NO_METADATA = {"qcloud-finops-ops"}
 OPTIONAL_CLI = {"qcloud-skill-generator"}
 
 
@@ -63,12 +62,8 @@ def validate_skill(path: Path) -> list[str]:
     )
     if cli and cli not in CLI_APPLICABILITY:
         errs.append(f"{path}: invalid cli_applicability '{cli}'")
-    elif not cli and name not in LEGACY_NO_METADATA and name not in OPTIONAL_CLI:
+    elif not cli and name not in OPTIONAL_CLI:
         errs.append(f"{path}: missing cli_applicability")
-
-    skill_name = name or ""
-    if skill_name in LEGACY_NO_METADATA:
-        return errs
 
     version = nested_metadata_field(block, "version")
     updated = nested_metadata_field(block, "last_updated")

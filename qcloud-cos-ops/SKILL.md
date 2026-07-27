@@ -22,11 +22,11 @@ metadata:
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/436"
   cli_applicability: "dual-path"
-    cli_support_evidence: >-
-      coscmd (the COS CLI) covers object operations (upload/download/list/delete/
-      copy, multipart, sync). Bucket/lifecycle/ACL/versioning operations use the
-      Python SDK (qcloud_cos). Note: there is NO `tccli cos` service — bucket
-      ops cannot be done via tccli.
+  cli_support_evidence: >-
+    coscmd (the COS CLI) covers object operations (upload/download/list/delete/
+    copy, multipart, sync). Bucket/lifecycle/ACL/versioning operations use the
+    Python SDK (qcloud_cos). Note: there is NO `tccli cos` service — bucket
+    ops cannot be done via tccli.
   environment:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY

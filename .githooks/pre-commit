@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# qcloud-skills pre-commit hook
+# Runs ruff on staged .py files and frontmatter validation on staged SKILL.md files.
+# Install: git config core.hooksPath .githooks
+
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+STAGED_PY=()
+STAGED_SKILL=()
+while IFS= read -r -d '' f; do
+  case "$f" in
+    *.py) STAGED_PY+=("$f") ;;
+    */SKILL.md) STAGED_SKILL+=("$f") ;;
+  esac
+done < <(git diff --cached --name-only -z)
+
+# --- Ruff on staged .py ---
+if [ ${#STAGED_PY[@]} -gt 0 ]; then
+  echo "[pre-commit] ruff check --fix (${#STAGED_PY[@]} .py files)..."
+  ruff check --fix "${STAGED_PY[@]}" 2>/dev/null || {
+    echo "[pre-commit] FAIL: ruff check --fix failed on staged .py files"
+    echo "  Run 'ruff check' locally to see details."
+    exit 1
+  }
+  # Re-stage any auto-fixed files so the fixes go into the commit
+  git add "${STAGED_PY[@]}" 2>/dev/null || true
+fi
+
+# --- Frontmatter validation on staged SKILL.md ---
+if [ ${#STAGED_SKILL[@]} -gt 0 ]; then
+  echo "[pre-commit] validate_skills_frontmatter.py (${#STAGED_SKILL[@]} SKILL.md)..."
+  python3 scripts/validate_skills_frontmatter.py 2>/dev/null || {
+    echo "[pre-commit] FAIL: SKILL.md frontmatter validation failed"
+    exit 1
+  }
+fi
+
+echo "[pre-commit] OK"
+exit 0

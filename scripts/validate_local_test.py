@@ -35,6 +35,8 @@ class BuildStepsTests(unittest.TestCase):
                 "GCL alarm wire plan",
                 "GCL Tier-A conformance",
                 "SecOps filename completeness",
+                "Charter C2-C6 compliance",
+                "CADL hook compliance",
             ],
         )
         self.assertEqual(steps[0].argv, ("ruff", "check", "."))

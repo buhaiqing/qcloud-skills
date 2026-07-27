@@ -56,6 +56,27 @@ metadata:
 | Output | `{{output.*}}` | Skill execution result |
 | Context | `{{ctx.*}}` | SessionManager history |
 
+## Five Core Standards (Quality Gates)
+
+Every generated skill MUST satisfy these five standards:
+
+| # | Standard | How This Skill Fulfills It |
+|---|----------|---------------------------|
+| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT Use with triggers (copilot, 巡检, 编排) and delegation (product ops → respective skills) |
+| 2 | **Structured I/O** | Placeholders (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`, `{{ctx.*}}`) typed per conversation turn |
+| 3 | **Explicit Actionable Steps** | Four-layer safety gate (L0→L1→L2→L3) with NL query → plan → execute → report lifecycle |
+| 4 | **Complete Failure Strategies** | Error taxonomy: L0/L1/L2/L3 gate failures, H gate hallucinations, timeout, schema validation; HALT on any gate failure |
+| 5 | **Absolute Single Responsibility** | One orchestrator (Copilot), delegates execution to product skills; never performs direct resource CRUD |
+
+## Well-Architected Framework Integration (卓越架构)
+
+| Pillar | Skill Integration | Reference |
+|--------|-------------------|-----------|
+| **可靠性 (Reliability)** | Multi-step plan retry, step timeout (300s), Blackboard evidence chain for audit trail | `references/architecture.md` |
+| **安全性 (Security)** | Four-layer safety gate (L0–L3) + H hallucination detection on every skill call; `--reviewed` flag for CRITICAL findings | `references/architecture.md` |
+| **成本 (Cost)** | LLM-native inspection strategy avoids unnecessary analyzer runs; topology-driven priority chain reduces API calls | `references/architecture.md` |
+| **效率 (Efficiency)** | Parallel group execution, topology-driven selective inspection, persistent session context | `references/architecture.md` |
+
 ## Execution Flow
 
 ```

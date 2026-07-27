@@ -1,29 +1,37 @@
 ---
 name: qcloud-finops-ops
-description: 腾讯云 FinOps 一站式 Skill。聚焦单账号（可扩展多账号）的账单/费用/成本/预算/优化全闭环。能力包括：账单汇总与明细、账户余额与代金券、订单/收支、成本分摊（Tag）、预算与告警、闲置识别与优化建议、月度/季度报告、异常账单自动巡检。与 27 个产品 skill 联动实现"为什么花 → 怎么省"闭环。
+description: >-
+  腾讯云 FinOps 一站式 Skill。聚焦单账号（可扩展多账号）的
+  账单/费用/成本/预算/优化全闭环。能力包括：账单汇总与明细、
+  账户余额与代金券、订单/收支、成本分摊（Tag）、预算与告警、
+  闲置识别与优化建议、月度/季度报告、异常账单自动巡检。
+  与 27 个产品 skill 联动实现"为什么花 → 怎么省"闭环。
 keywords: [账单, 费用, 计费, FinOps, 成本优化, 预算, 代金券, 订单, 收支明细, 成本分析, 异常账单]
-compatibility: tccli >= 3.0 + tencentcloud-sdk-python >= 4.0
-cli_applicability: dual-path
-cli_support_evidence: tccli billing DescribeBillSummaryByPayMode --help
-environment:
-  TENCENTCLOUD_SECRET_ID: "{{env.TENCENTCLOUD_SECRET_ID}}"
-  TENCENTCLOUD_SECRET_KEY: "{{env.TENCENTCLOUD_SECRET_KEY}}"
-  TENCENTCLOUD_REGION: "{{env.TENCENTCLOUD_REGION}}"
-  TENCENTCLOUD_FINOPS_CONFIG: "{{env.TENCENTCLOUD_FINOPS_CONFIG}}"
-related_skills:
-  - qcloud-monitor-ops
-  - qcloud-aiops-diagnosis
-  - qcloud-proactive-inspection
-  - qcloud-well-architected-review
-  - qcloud-cam-ops
-  - 27 个产品 skill（CVM/CDB/CLB/COS/ES/Redis/VPC 等）
+compatibility: >-
+  tccli >= 3.0 + tencentcloud-sdk-python >= 4.0
+license: MIT
 metadata:
-  version: 1.0.0
-  last_updated: "2026-07-08"
-  license: MIT
   author: HDOP
+  version: "1.0.0"
+  last_updated: "2026-07-08"
   runtime: cli+sdk
   python_version_minimum: "3.8"
+  api_profile: "https://cloud.tencent.com/document/api/555"
+  cli_applicability: "dual-path"
+  cli_support_evidence: >-
+    Verified via `tccli billing DescribeBillSummaryByPayMode --help`
+  environment:
+    - TENCENTCLOUD_SECRET_ID
+    - TENCENTCLOUD_SECRET_KEY
+    - TENCENTCLOUD_REGION
+    - TENCENTCLOUD_FINOPS_CONFIG
+  related_skills:
+    - qcloud-monitor-ops
+    - qcloud-aiops-diagnosis
+    - qcloud-proactive-inspection
+    - qcloud-well-architected-review
+    - qcloud-cam-ops
+    - 27 个产品 skill（CVM/CDB/CLB/COS/ES/Redis/VPC 等）
 ---
 
 # qcloud-finops-ops · FinOps 一站式
@@ -81,6 +89,18 @@ export TENCENTCLOUD_REGION=ap-guangzhou
 **配置文件**（推荐生产环境，`$TENCENTCLOUD_FINOPS_CONFIG` 指向 `assets/example-config.yaml`）：支持预算定义、告警通道、Tag 映射、异常阈值、**预留多账号扩展位**（当前不读取）。
 
 → 详见 `references/setup-and-permissions.md`（最小权限策略、凭证安全、轮换流程）
+
+## Five Core Standards (Quality Gates)
+
+Every generated skill MUST satisfy these five standards:
+
+| # | Standard | How This Skill Fulfills It |
+|---|----------|---------------------------|
+| 1 | **Clear Boundaries** | SHOULD/SHOULD NOT Use with triggers (FinOps, 账单, 费用, 成本, 预算, 代金券, 订单) and delegation (product ops → respective skills) |
+| 2 | **Structured I/O** | Placeholders (`{{env.*}}`, `{{user.*}}`, `{{output.*}}`) typed per operation |
+| 3 | **Explicit Actionable Steps** | Pre-flight → Execute → Verify → Recover, numbered imperative steps with Well-Architected worker contract references |
+| 4 | **Complete Failure Strategies** | Error taxonomy ≥ 10 codes (billing API throttling, permission denied, account balance, etc.); HALT vs retry per error |
+| 5 | **Absolute Single Responsibility** | One product (FinOps), resources (billing/budget/cost); product ops delegated to respective skills |
 
 ## 8 大核心模块
 

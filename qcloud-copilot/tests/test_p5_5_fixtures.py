@@ -17,7 +17,7 @@ no_price) covered by a dedicated test.
 """
 from __future__ import annotations
 
-import pytest
+from copilot.trace_records import PricingSnapshot
 
 
 def _ev(product, action, trace_id, **kw):
@@ -188,9 +188,7 @@ def test_fixture_cls_no_pricing():
 # ---------------------------------------------------------------------------
 
 
-def _fixture_pricing_snapshot() -> "PricingSnapshot":
-    from copilot.trace_records import PricingSnapshot
-
+def _fixture_pricing_snapshot() -> PricingSnapshot:
     return PricingSnapshot(
         version="v1",
         timestamp="2026-07-25T00:00:00Z",
