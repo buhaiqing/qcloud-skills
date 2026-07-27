@@ -278,6 +278,33 @@ a real one in CI but gives false assurance (repeats L8 at the data layer).
 PRODUCER's actual emission (don't trust the field name) AND assert the CONSUMER
 rejects malformed/empty input; ship both halves with a firing test.
 
+### L12 — Stricter detection that fixes a bug can break tests relying on the bug
+A correctness fix that makes detection stricter (e.g. `is_destructive` moved from
+exact word-match to prefix-match so "deleted"/"removes" are caught) will make
+previously-passing tests fail — NOT because the fix is wrong, but because the test
+was written against the OLD, buggy behavior. In `gcl_runner_reflexion_test`, the
+command `tccli cvm TerminateInstances` had slipped past the gate under the old
+matcher; the fix correctly flags it, so `cmd_run` now returns 2 (PREFLIGHT
+BLOCKED). Resolution: update the TEST to satisfy the gate (set
+`HARNESS_CONFIRM_TOKEN = plan_hash(command)` around the call) — do NOT revert the
+fix to make the test green.
+**Why:** reverting a real correctness fix to satisfy a test reinstates the bug
+(here: a destructive-op safety gate bypass).
+**How to apply:** when a behavior fix breaks a test, first ask "was the test
+asserting the bug?" If yes, update the test to the corrected contract; only
+revert the fix if the new behavior is itself wrong.
+
+### L13 — Destructive-verb detection must be inflection-tolerant
+`v in plan_text.lower().split()` matches only the exact token "delete"; inflected
+forms ("deleted", "removes", "removing", "stopping") slip through. Any
+destructive/risk classifier must match on a verb STEM or prefix, not exact
+word equality. Single source of truth: `harness_safety.VERBS`, reused by
+`evidence_kernel` (avoid duplicating the set — drift = one path misses a verb).
+**Why:** a single missed inflection silently disables the human-confirmation gate
+for genuinely destructive plans (highest-risk safety gap).
+**How to apply:** all destructive/sensitive keyword matchers in this repo; use
+`t == v or t.startswith(v)` over a shared verb set.
+
 ## Adding or modifying a skill
 
 1. **New skill**: Use `qcloud-skill-generator` (enforces 2-round review).
