@@ -382,6 +382,43 @@ all 49 tests pass in one shot.
 - **Staleness banner**: only the listed files are pending re-index — Read those,
   trust the rest.
 
+## Code Review Best Practices
+
+> 来自 Phase G review 实战：5 分钟读代码发现 1 个 CRITICAL + 2 个 HIGH 安全隐患，单元测试 100% 通过但从未触发。
+
+### Review 时必须检查的边界（与测试正交）
+
+**审计/日志类**：
+- `__exit__` 是否 re-raise 原始异常？静默吞异常 = 审计数据丢失（CRITICAL）
+- 写入文件时磁盘满 / 权限错误是否有 fallback？
+
+**外部调用类**：
+- `subprocess.run()` 后是否检查 `returncode`？错误信息是否可见给调用方？
+- tccli/API 失败时调用方是否一致检查 `"Error"` key？
+
+**正则类**：
+- regex 是否在 `__post_init__` 预编译（不在循环/热路径现编译）？
+- 是否有搜索长度限制（`[:10_000]`）防止 ReDoS？
+
+**Fallback/降解类**：
+- 模块级 fallback 用 `except Exception` 而非 `except ImportError`（捕获语法错误和传递依赖）
+- 外部库私有属性（`_tree_variance` 等）跨版本可能失效 → 用公共 API 替代
+
+**Docstring 类**：
+- 示例代码块 `sw = SelectiveWorkflow(...)` 是否与实际 `__init__` 签名一致？
+- 默认路径/配置是否与代码一致？
+
+### Review 产出标准
+
+每条 issue 必须包含：
+- `file:line` 精确定位
+- severity 评级（CRITICAL/HIGH/MEDIUM/LOW）
+- 修复建议（具体代码，不是方向）
+
+### 子 Agent MCP 不可用时的 Fallback
+
+code-reviewer 返回 403 → 直接用 `Read` 工具读文件，手动执行上述检查列表。
+
 ## Senior Delivery Protocol
 
 - **Autonomous execution**: Once requirements and risk boundaries are clear, proceed without repeated confirmation; ask only when an irreversible decision or missing external fact cannot be safely inferred.
