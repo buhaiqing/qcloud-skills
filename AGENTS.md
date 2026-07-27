@@ -198,6 +198,16 @@ populated value (non-empty list, real substring) for at least one representative
 **Why:** presence-only assertions give false confidence (green CI, broken data).
 **How to apply:** every parser/extractor test in `scripts/`; pair with L1/L4.
 
+### L6 — New CI gates must be proven to BOTH fire and stay silent
+An additive gate (e.g. KPI gate in `validate_local`) that only passes the
+"no trigger" path gives false confidence. Prove it two ways: (1) silent /
+exit-0 when its trigger condition is absent, AND (2) fails (non-zero exit) when
+a deliberately-bad fixture that *should* trip it is dropped in. For the KPI gate
+this meant crafting an `evidence-*.json` with `safety.leak_checked=false` and
+asserting `validate_local` exits 1 with "KPI targets unmet".
+**Why:** a gate that never rejects is a no-op wearing a green checkmark.
+**How to apply:** every additive CI/quality gate in `scripts/`; craft a negative
+fixture that must trip it and assert the non-zero exit (pairs with L4).
 
 ## Adding or modifying a skill
 
