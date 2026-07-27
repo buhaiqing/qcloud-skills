@@ -3,6 +3,7 @@
 references load (by the caller after selection), per-run budget enforcement, and
 intent confusion matrix over existing eval_queries.json (ground truth)."""
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
@@ -10,15 +11,33 @@ from typing import Any, Dict, List
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _tokens(text: str) -> set:
+    """Lowercase word tokens, splitting CamelCase / underscore boundaries so
+    'DescribeInstances' -> {'describe', 'instances'} and 'Run_Health_Check'
+    -> {'run', 'health', 'check'}."""
+    parts = re.split(r"[\s_\-]+|(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", text)
+    return {p.lower() for p in parts if p}
+
+def _keyword_overlap(keyword: str, query_tokens: set) -> int:
+    """Count how many word-tokens of a keyword (e.g. 'DescribeInstances') are
+    present in the query token set. Whole-word overlap, not raw substring, so
+    'describe my cvm instances' matches 'DescribeInstances' (describe+instances)."""
+    kt = _tokens(keyword)
+    if not kt:
+        return 0
+    return sum(1 for t in kt if t in query_tokens)
+
 def select_top1(registry: Dict[str, Any], intent: str) -> Dict[str, Any]:
-    """Frontmatter-only candidate ranking. Scores each skill by how many of its
-    intent_keywords appear in the intent text; returns the best match plus the
-    full candidate list (caller loads references only for top1)."""
+    """Frontmatter-only candidate ranking. Scores each skill by word-token
+    overlap between its intent_keywords (CamelCase API names) and the intent
+    text; returns the best match plus the full candidate list (caller loads
+    references only for top1)."""
+    q_tokens = _tokens(intent)
     best, best_score = None, -1
     for s in registry["skills"]:
         score = sum(
-            1 for kw in s.get("intent_keywords", [])
-            if kw and kw.lower() in intent.lower()
+            _keyword_overlap(kw, q_tokens)
+            for kw in s.get("intent_keywords", [])
         )
         if score > best_score:
             best, best_score = s["name"], score

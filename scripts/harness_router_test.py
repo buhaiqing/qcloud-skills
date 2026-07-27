@@ -13,7 +13,7 @@ import build_skill_registry  # noqa: E402
 
 
 class HarnessRouterTest(unittest.TestCase):
-    def test_router_selects_top1(self) -> None:
+    def test_router_selects_top1_in_memory(self) -> None:
         registry = {
             "skills": [
                 {
@@ -37,6 +37,15 @@ class HarnessRouterTest(unittest.TestCase):
         result = harness_router.select_top1(registry, "describe my CVM instances")
         self.assertEqual(result["top1_skill"], "qcloud-cvm-ops")
 
+    def test_router_selects_cvm_on_real_registry(self) -> None:
+        """L5/L6: prove the algorithm ranks cvm first for a clear cvm query
+        (token-overlap on 'describe'+'instances'), not just that it returns
+        *a* name. Guards against vacuous ranking. The companion confusion-matrix
+        test asserts the metric is meaningfully > 0 across the full eval set."""
+        registry = build_skill_registry.build()
+        top = harness_router.select_top1(registry, "describe my CVM instances")["top1_skill"]
+        self.assertEqual(top, "qcloud-cvm-ops", f"clear cvm query -> {top}")
+
     def test_confusion_matrix_from_eval_queries(self) -> None:
         registry = build_skill_registry.build()
         eval_path = ROOT / "qcloud-cvm-ops" / "assets" / "eval_queries.json"
@@ -49,6 +58,12 @@ class HarnessRouterTest(unittest.TestCase):
             self.assertIsInstance(result[key], float)
             self.assertGreaterEqual(result[key], 0.0)
             self.assertLessEqual(result[key], 1.0)
+        # L5/L6: the matrix must be meaningful, not vacuous zeros. cvm's own
+        # positive eval queries should route to cvm (top1_accuracy > 0).
+        self.assertGreater(
+            result["top1_accuracy"], 0.0,
+            "cvm positive queries must route to cvm (non-vacuous accuracy)",
+        )
 
 
 if __name__ == "__main__":
