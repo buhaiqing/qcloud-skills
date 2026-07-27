@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import shlex
 import subprocess
@@ -233,6 +234,17 @@ def main(argv: list[str] | None = None) -> int:
     if quality_result["upgrade_signal"] == "critical":
         print("\nWARNING: Critical upgrade signal detected", file=sys.stderr)
         return 1
+
+    # Harness Evidence gates (additive — does not alter existing gates)
+    ev_files = glob.glob(str(root / "audit-results" / "evidence-*.json"))
+    if ev_files:
+        rc = subprocess.run(
+            [sys.executable, str(root / "scripts" / "aggregate_kpi.py"), *ev_files],
+            capture_output=True, text=True,
+        ).returncode
+        if rc != 0:
+            print("FAIL: KPI targets unmet (see aggregate_kpi output)", file=sys.stderr)
+            return 1
 
     print("\nOK: local validation suite passed")
     return 0
