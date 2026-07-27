@@ -209,6 +209,20 @@ asserting `validate_local` exits 1 with "KPI targets unmet".
 **How to apply:** every additive CI/quality gate in `scripts/`; craft a negative
 fixture that must trip it and assert the non-zero exit (pairs with L4).
 
+### L7 — Re-read the live target file before writing integration specs
+A written plan's integration steps are HYPOTHESES, not instructions. Earlier or
+parallel efforts may have already implemented the piece you planned to add. On
+this branch, `gcl_runner.py` (from an unrelated prior commit) ALREADY had
+`mask_secrets()`, `run_command(timeout=...)`, and `persist_trace()` — so the
+plan's "add timeout to subprocess.run" / "replace persistence with post_record"
+snippets would have conflicted and broken the L4 metrics tracker. Re-reading the
+live file first turned a would-be regression into a clean additive integration.
+**Why:** executing plan integration snippets against a drifted target causes
+duplication or breakage the reviewer must undo.
+**How to apply:** before any task that edits an existing file, Read the current
+file (or grep its defs) and reconcile the plan step with reality; adapt the spec
+to be strictly additive when the capability already exists.
+
 ## Adding or modifying a skill
 
 1. **New skill**: Use `qcloud-skill-generator` (enforces 2-round review).
