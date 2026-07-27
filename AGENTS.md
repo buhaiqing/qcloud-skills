@@ -190,6 +190,14 @@ per rejection branch so a future regression fails CI instead of passing silently
 **Why:** correct-but-untested logic hides regressions.
 **How to apply:** every gating validator in `scripts/`.
 
+### L5 — Tests must assert populated values, not just key presence
+A test that asserts a field *exists* (`"intent_keywords" in s`) passes even when the
+value is `[]`/empty — letting a parser/transform bug through (seen: YAML block-scalar
+`>-` broke `description`→`intent_keywords` for all 30 skills). Assert the actual
+populated value (non-empty list, real substring) for at least one representative case.
+**Why:** presence-only assertions give false confidence (green CI, broken data).
+**How to apply:** every parser/extractor test in `scripts/`; pair with L1/L4.
+
 
 ## Adding or modifying a skill
 
