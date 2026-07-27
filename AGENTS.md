@@ -156,6 +156,128 @@ cp .env.example .env
 
 - **Runtime GCL**: `scripts/gcl_runner.py` requires external isolated Critic scores in production. `--structural-critic-only` only for CI/local smoke tests.
 
+## Execution lessons (CADL — distilled, reusable)
+
+> Updated as tasks land. Each item is a machine-hardened lesson, de-duplicated against
+> the rules above. Absorb these before writing `scripts/*_test.py` or any credential-masking code.
+
+### L1 — `unittest discover` only finds `TestCase` subclasses
+Bare `def test_*(self)` functions at module top level are **NOT** discovered by
+`cd scripts && python3 -m unittest discover -p "*_test.py"` — it reports "Ran 0 tests".
+Always wrap tests in a `class XxxTest(unittest.TestCase)` and call `unittest.main()`.
+**Why:** a plan snippet with bare functions silently passes CI with zero coverage.
+**How to apply:** every new `scripts/*_test.py` must use `unittest.TestCase`.
+
+### L2 — Subprocess test paths must be cwd-independent
+A test that runs `subprocess.run(["scripts/validate_x.py", ...])` fails when the test
+is executed from inside `scripts/` (resolves to `scripts/scripts/...`). Use
+`Path(__file__).resolve().parent / "validate_x.py"` so the path is cwd-independent.
+**Why:** same test passes in one cwd, fails in another — flaky CI.
+**How to apply:** any `scripts/*_test.py` that shells out to a sibling script.
+
+### L3 — Credential-masking regex must cover bare secret-id suffixes
+`mask_trace`-style redaction must mask `AKID<hex>` (Tencent secret id with no
+`=`/`:`/space delimiter) and `TENCENTCLOUD_SECRET_KEY=<val>`. A pattern that only
+matches `key=value` shape leaks the bare id. Use
+`re.sub(r"(AKID|secretId|secretKey)[A-Za-z0-9]+", r"\1<masked>", text)`.
+**Why:** a brittle regex passed review but leaked `AKIDabcdef12345` verbatim.
+**How to apply:** any trace/source sanitization before persistence (KPI#1).
+
+### L4 — KPI rejection paths need explicit tests
+A validator may enforce a rule correctly yet have zero tests for the rejection path
+(e.g. destructive-without-token → KPI#2, `leak_checked=false` → KPI#1). Add a test
+per rejection branch so a future regression fails CI instead of passing silently.
+**Why:** correct-but-untested logic hides regressions.
+**How to apply:** every gating validator in `scripts/`.
+
+### L5 — Tests must assert populated values, not just key presence
+A test that asserts a field *exists* (`"intent_keywords" in s`) passes even when the
+value is `[]`/empty — letting a parser/transform bug through (seen: YAML block-scalar
+`>-` broke `description`→`intent_keywords` for all 30 skills). Assert the actual
+populated value (non-empty list, real substring) for at least one representative case.
+**Why:** presence-only assertions give false confidence (green CI, broken data).
+**How to apply:** every parser/extractor test in `scripts/`; pair with L1/L4.
+
+### L6 — New CI gates must be proven to BOTH fire and stay silent
+An additive gate (e.g. KPI gate in `validate_local`) that only passes the
+"no trigger" path gives false confidence. Prove it two ways: (1) silent /
+exit-0 when its trigger condition is absent, AND (2) fails (non-zero exit) when
+a deliberately-bad fixture that *should* trip it is dropped in. For the KPI gate
+this meant crafting an `evidence-*.json` with `safety.leak_checked=false` and
+asserting `validate_local` exits 1 with "KPI targets unmet".
+**Why:** a gate that never rejects is a no-op wearing a green checkmark.
+**How to apply:** every additive CI/quality gate in `scripts/`; craft a negative
+fixture that must trip it and assert the non-zero exit (pairs with L4).
+
+### L7 — Re-read the live target file before writing integration specs
+A written plan's integration steps are HYPOTHESES, not instructions. Earlier or
+parallel efforts may have already implemented the piece you planned to add. On
+this branch, `gcl_runner.py` (from an unrelated prior commit) ALREADY had
+`mask_secrets()`, `run_command(timeout=...)`, and `persist_trace()` — so the
+plan's "add timeout to subprocess.run" / "replace persistence with post_record"
+snippets would have conflicted and broken the L4 metrics tracker. Re-reading the
+live file first turned a would-be regression into a clean additive integration.
+**Why:** executing plan integration snippets against a drifted target causes
+duplication or breakage the reviewer must undo.
+**How to apply:** before any task that edits an existing file, Read the current
+file (or grep its defs) and reconcile the plan step with reality; adapt the spec
+to be strictly additive when the capability already exists.
+
+### L8 — Green but vacuous: assert metrics are non-vacuous, not just well-typed
+A test that checks "returns a float in [0,1]" passes even when the algorithm is
+starved of data or uses a wrong matching strategy. The router's confusion_matrix
+returned valid floats (test passed) but was 0.0 everywhere — because (a) the
+registry had 21/30 skills with EMPTY intent_keywords (L5), and (b) raw substring
+matching can't match CamelCase `DescribeInstances` against `describe my cvm
+instances`. Fix required BOTH enriching the source data AND correcting the
+algorithm (token-overlap on CamelCase-split words). For any ranking/ML-style
+component, assert the metric is MEANINGFUL (e.g. `top1_accuracy > 0` on real
+fixtures), not just well-typed. Pairs with L5/L6.
+
+### L9 — Consumer quality is bounded by producer data contract
+A consumer (router) only parses what the producer (registry) emits. The router
+"passed" while the registry fed it empty keywords — the bug lived upstream. When
+a component depends on data from another module, verify the PRODUCER emits
+populated, correctly-shaped data (here: enrich `intent_keywords` from the skill's
+own curated `eval_queries.json intents`), rather than papering over the gap in
+the consumer. Trace the data contract end-to-end before declaring a feature done.
+
+### L10 — Convergence gates on runtime artifacts must skip gracefully, not fail
+The single-entry `scripts/Makefile` `all` target wires validate → registry →
+golden → kpi. The `kpi` step consumes `audit-results/evidence-*.json`, which is
+(1) generated only at runtime and (2) gitignored. A naive `python3
+aggregate_kpi.py audit-results/evidence-*.json` would explode (no match → argv
+literal → FileNotFound) on a clean checkout, turning a green pipeline red. Fix:
+guard the recipe with `if ls audit-results/evidence-*.json >/dev/null 2>&1; then
+…; else echo "skipped"; fi`. This is the COUNTERPART of L6 (prove gates fire)
+and L4 (rejection tests): gates on *optional runtime output* must be silent-skip
+when absent, while gates on *committed input* must hard-fail. Pair the skip with a
+unit/integration test that asserts the gate DOES fire when the artifact IS
+present (see aggregate_kpi rejection tests, L4/L6).
+
+**Why:** a convergence entry point that fails on a clean checkout blocks every
+dev and CI run that hasn't produced evidence yet — the pipeline becomes unc0mmittable.
+**How to apply:** any Makefile/CI step that depends on gitignored or
+runtime-generated files; make it skip-with-message when absent, and keep a
+separate test proving it rejects when present.
+
+### L11 — A KPI gate is only as real as the data it ingests (close the producer→consumer gap)
+After wiring the Evidence Kernel, `aggregate_kpi` KPIs `#2 destructive_coverage`
+and `#3 provenance` were GREEN but VACUOUS: `emit_evidence_record` HARDCODED
+`"destructive": False` and `"token": env_value` (never consulting the real
+`preflight`/`bind_token` result already computed in `cmd_run`), while `provenance`
+was scored truthy on ANY dict — so both KPIs were pinned at 1.0 and could never
+fail. The fix was two-sided (L9 again): (a) PRODUCER — thread the actual PreFlight
+`pf` into `emit_evidence_record` and emit real `destructive` + `token_bound`;
+(b) CONSUMER — require `provenance.source` ∈ a known enum, and count `token_bound`
+not raw token presence. Then add REJECTION tests proving each gate fires (a
+destructive op without a bound token → exit 1; unknown provenance source → exit 1).
+**Why:** a metric computed from hardcoded/pinned inputs is indistinguishable from
+a real one in CI but gives false assurance (repeats L8 at the data layer).
+**How to apply:** when a gate reads data emitted by another module, trace the
+PRODUCER's actual emission (don't trust the field name) AND assert the CONSUMER
+rejects malformed/empty input; ship both halves with a firing test.
+
 ## Adding or modifying a skill
 
 1. **New skill**: Use `qcloud-skill-generator` (enforces 2-round review).
@@ -165,7 +287,7 @@ cp .env.example .env
 ## Files that do NOT exist
 
 - No repo-root `assets/` directory.
-- No `package.json`, `Makefile`, non-stdlib test runner (except listed scripts in `scripts/` and `.github/workflows/validate-skills.yml`).
+- No repo-root `Makefile`, `package.json`, or non-stdlib test runner (except listed scripts in `scripts/` and `.github/workflows/validate-skills.yml`). A `scripts/Makefile` exists as the harness convergence entry point — it is NOT a repo build system.
 - No agent-specific config files (e.g. `CLAUDE.md`, `opencode.json`, `.cursorrules`, and similar per-agent artifacts).
 - Agent runtime state dirs (e.g. `.omc/`, `.omo/`, `.codebuddy/`, and similar) are gitignored.
 - `docs/superpowers/plans/` contains historical notes, not runtime source.

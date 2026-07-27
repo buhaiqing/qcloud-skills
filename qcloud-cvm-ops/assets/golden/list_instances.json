@@ -1,0 +1,11 @@
+{
+  "intent": "list CVM instances in ap-guangzhou",
+  "input": {"action": "DescribeInstances", "region": "ap-guangzhou", "Limit": 1},
+  "expected": {
+    "fixture": "assets/fixtures/describe_instances.json",
+    "assertions": [
+      {"path": "$.Response.InstanceSet[0].InstanceId", "op": "exists"},
+      {"path": "$.Response.TotalCount", "op": ">=", "value": 0}
+    ]
+  }
+}
