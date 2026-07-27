@@ -15,13 +15,32 @@ def parse_frontmatter(text: str) -> dict:
     if not m:
         return {}
     fm = {}
-    for line in m.group(1).splitlines():
-        if ":" in line:
-            k, v = line.split(":", 1)
-            fm[k.strip()] = v.strip().strip('"')
+    lines = m.group(1).splitlines()
+    i = 0
+    BLOCK_INDICATORS = (">-", ">", "|", "|-", "|+")
+    while i < len(lines):
+        line = lines[i]
+        if ":" not in line:
+            i += 1
+            continue
+        key, _, raw = line.partition(":")
+        key = key.strip()
+        val = raw.strip()
+        # block scalar: value empty or an indicator -> gather indented continuation
+        if val == "" or val.rstrip() in BLOCK_INDICATORS:
+            body = []
+            j = i + 1
+            while j < len(lines) and (lines[j].startswith(" ") or lines[j].startswith("\t")):
+                body.append(lines[j].strip())
+                j += 1
+            fm[key] = " ".join(body)
+            i = j
+        else:
+            fm[key] = val.strip().strip('"')
+            i += 1
     return fm
 
-def build():
+def build() -> dict:
     skills = []
     for sk in sorted(ROOT.glob("qcloud-*-ops/SKILL.md")):
         fm = parse_frontmatter(sk.read_text())

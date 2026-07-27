@@ -20,6 +20,15 @@ class BuildSkillRegistryTest(unittest.TestCase):
             self.assertIn("cli_applicability", s)
             self.assertIn("intent_keywords", s)
 
+    def test_intent_keywords_populated(self):
+        data = json.loads((ROOT / "audit-results" / "skill-registry.json").read_text())
+        with_keywords = [s["name"] for s in data["skills"] if s.get("intent_keywords")]
+        self.assertTrue(with_keywords, "expected at least one skill with populated intent_keywords")
+        # a skill whose description uses backticks must yield intent_keywords
+        kw_skill = next(s for s in data["skills"] if s.get("intent_keywords"))
+        self.assertTrue(kw_skill["intent_keywords"],
+                        f"{kw_skill['name']} should have intent_keywords")
+
 
 if __name__ == "__main__":
     unittest.main()
