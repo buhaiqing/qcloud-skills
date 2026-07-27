@@ -261,6 +261,23 @@ dev and CI run that hasn't produced evidence yet — the pipeline becomes unc0mm
 runtime-generated files; make it skip-with-message when absent, and keep a
 separate test proving it rejects when present.
 
+### L11 — A KPI gate is only as real as the data it ingests (close the producer→consumer gap)
+After wiring the Evidence Kernel, `aggregate_kpi` KPIs `#2 destructive_coverage`
+and `#3 provenance` were GREEN but VACUOUS: `emit_evidence_record` HARDCODED
+`"destructive": False` and `"token": env_value` (never consulting the real
+`preflight`/`bind_token` result already computed in `cmd_run`), while `provenance`
+was scored truthy on ANY dict — so both KPIs were pinned at 1.0 and could never
+fail. The fix was two-sided (L9 again): (a) PRODUCER — thread the actual PreFlight
+`pf` into `emit_evidence_record` and emit real `destructive` + `token_bound`;
+(b) CONSUMER — require `provenance.source` ∈ a known enum, and count `token_bound`
+not raw token presence. Then add REJECTION tests proving each gate fires (a
+destructive op without a bound token → exit 1; unknown provenance source → exit 1).
+**Why:** a metric computed from hardcoded/pinned inputs is indistinguishable from
+a real one in CI but gives false assurance (repeats L8 at the data layer).
+**How to apply:** when a gate reads data emitted by another module, trace the
+PRODUCER's actual emission (don't trust the field name) AND assert the CONSUMER
+rejects malformed/empty input; ship both halves with a firing test.
+
 ## Adding or modifying a skill
 
 1. **New skill**: Use `qcloud-skill-generator` (enforces 2-round review).
