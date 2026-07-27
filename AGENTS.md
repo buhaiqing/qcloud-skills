@@ -156,6 +156,41 @@ cp .env.example .env
 
 - **Runtime GCL**: `scripts/gcl_runner.py` requires external isolated Critic scores in production. `--structural-critic-only` only for CI/local smoke tests.
 
+## Execution lessons (CADL — distilled, reusable)
+
+> Updated as tasks land. Each item is a machine-hardened lesson, de-duplicated against
+> the rules above. Absorb these before writing `scripts/*_test.py` or any credential-masking code.
+
+### L1 — `unittest discover` only finds `TestCase` subclasses
+Bare `def test_*(self)` functions at module top level are **NOT** discovered by
+`cd scripts && python3 -m unittest discover -p "*_test.py"` — it reports "Ran 0 tests".
+Always wrap tests in a `class XxxTest(unittest.TestCase)` and call `unittest.main()`.
+**Why:** a plan snippet with bare functions silently passes CI with zero coverage.
+**How to apply:** every new `scripts/*_test.py` must use `unittest.TestCase`.
+
+### L2 — Subprocess test paths must be cwd-independent
+A test that runs `subprocess.run(["scripts/validate_x.py", ...])` fails when the test
+is executed from inside `scripts/` (resolves to `scripts/scripts/...`). Use
+`Path(__file__).resolve().parent / "validate_x.py"` so the path is cwd-independent.
+**Why:** same test passes in one cwd, fails in another — flaky CI.
+**How to apply:** any `scripts/*_test.py` that shells out to a sibling script.
+
+### L3 — Credential-masking regex must cover bare secret-id suffixes
+`mask_trace`-style redaction must mask `AKID<hex>` (Tencent secret id with no
+`=`/`:`/space delimiter) and `TENCENTCLOUD_SECRET_KEY=<val>`. A pattern that only
+matches `key=value` shape leaks the bare id. Use
+`re.sub(r"(AKID|secretId|secretKey)[A-Za-z0-9]+", r"\1<masked>", text)`.
+**Why:** a brittle regex passed review but leaked `AKIDabcdef12345` verbatim.
+**How to apply:** any trace/source sanitization before persistence (KPI#1).
+
+### L4 — KPI rejection paths need explicit tests
+A validator may enforce a rule correctly yet have zero tests for the rejection path
+(e.g. destructive-without-token → KPI#2, `leak_checked=false` → KPI#1). Add a test
+per rejection branch so a future regression fails CI instead of passing silently.
+**Why:** correct-but-untested logic hides regressions.
+**How to apply:** every gating validator in `scripts/`.
+
+
 ## Adding or modifying a skill
 
 1. **New skill**: Use `qcloud-skill-generator` (enforces 2-round review).
