@@ -170,9 +170,9 @@ distinct from Golden, which checks the candidate against the expected fixture al
 ## Phase 1 — Evidence-based Trust
 
 - **Executable skill** = any `qcloud-*-ops` skill whose `cli_applicability` is
-  `dual-path` / `cli-first` / `sdk-only` (i.e. performs mutating or read actions),
-  excluding pure cross-product meta references. Read-only `cli-only` skills need ≥2
-  golden scenarios (coverage KPI #3 scales accordingly).
+  `dual-path` or `sdk-only` (verified: 27 + 3 = 30 skills in this repo; no
+  `cli-only`/`cli-first` exists). Every executable skill needs ≥5 golden scenarios
+  (KPI #3).
 - **Golden scenarios**: each executable skill gets ≥5 golden scenarios in
   `qcloud-*-ops/assets/golden/*.json` (input intent + expected structured output).
 - **CLI fixtures + sandbox E2E**: `scripts/sandbox_e2e.py` runs skills against recorded
