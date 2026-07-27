@@ -43,6 +43,24 @@ class EvidenceSchemaTests(unittest.TestCase):
                            capture_output=True, text=True)
         self.assertNotEqual(r.returncode, 0)
 
+    def test_kpi2_destructive_requires_token(self):
+        bad = dict(VALID)
+        bad["safety"] = {"destructive": True, "token": None,
+                         "plan_hash": None, "leak_checked": True}
+        r = subprocess.run([sys.executable, str(VALIDATOR), _dump(bad)],
+                           capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("KPI#2", r.stdout)
+
+    def test_kpi1_leak_checked_required(self):
+        bad = dict(VALID)
+        bad["safety"] = {"destructive": False, "token": None,
+                         "plan_hash": None, "leak_checked": False}
+        r = subprocess.run([sys.executable, str(VALIDATOR), _dump(bad)],
+                           capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("KPI#1", r.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -21,6 +21,9 @@ AUDIT.mkdir(exist_ok=True)
 
 DESTRUCTIVE_VERBS = {"delete", "terminate", "destroy", "drop", "reset", "remove", "stop"}
 
+SENSITIVE_KEY_RE = re.compile(r"(AKID|secretId|secretKey)[A-Za-z0-9]+")
+SECRET_VAL_RE = re.compile(r"(TENCENTCLOUD_SECRET_KEY=)[A-Za-z0-9_-]+")
+
 
 def plan_hash(plan_text: str) -> str:
     return hashlib.sha256(plan_text.encode()).hexdigest()[:16]
@@ -40,15 +43,16 @@ def preflight(plan_text: str, human_token: str | None) -> dict:
 
 
 def mask_trace(trace: dict) -> dict:
+    """Redact obvious secret patterns (KPI#1). Returns a sanitized copy."""
     text = json.dumps(trace, ensure_ascii=False)
-    text = re.sub(r"(AKID|secretId|secretKey)[\w]*[\"'= :]+[\w-]+", "<masked>", text)
-    text = re.sub(r"TENCENTCLOUD_SECRET_KEY=[\w-]+", "TENCENTCLOUD_SECRET_KEY=<masked>", text)
+    text = SENSITIVE_KEY_RE.sub(r"\1<masked>", text)
+    text = SECRET_VAL_RE.sub(r"\1<masked>", text)
     return json.loads(text)
 
 
 def post_record(record: dict) -> Path:
     out = AUDIT / f"evidence-{record['run_id']}.json"
-    out.write_text(json.dumps(record, indent=2, ensure_ascii=False))
+    out.write_text(json.dumps(mask_trace(record), indent=2, ensure_ascii=False))
     return out
 
 
