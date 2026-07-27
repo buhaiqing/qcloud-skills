@@ -3,8 +3,9 @@
 import subprocess
 import sys
 import unittest
+from pathlib import Path
 
-REPO_ROOT = __file__.replace("/scripts/harness_safety_test.py", "")
+REPO_ROOT = str(Path(__file__).resolve().parents[1])
 
 
 class HarnessSafetyTest(unittest.TestCase):
@@ -44,6 +45,24 @@ class HarnessSafetyTest(unittest.TestCase):
             "    bind_token('delete ins-1', 'deadbeef')\n"
             "except PermissionError:\n"
             "    print('ok')\n"
+        )
+        res = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=REPO_ROOT, capture_output=True, text=True,
+        )
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertIn("ok", res.stdout)
+
+    def test_inflected_verbs_still_destructive(self) -> None:
+        # Regression guard for the inflection gap: "deleted" / "removes" must be
+        # caught (a bare substring/split match would let them bypass the token gate).
+        code = (
+            "import sys; sys.path.insert(0,'scripts'); "
+            "from harness_safety import is_destructive; "
+            "assert is_destructive('the instance will be deleted'); "
+            "assert is_destructive('this removes the disk'); "
+            "assert is_destructive('stopping the cluster'); "
+            "print('ok')"
         )
         res = subprocess.run(
             [sys.executable, "-c", code],

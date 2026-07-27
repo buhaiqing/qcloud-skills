@@ -10,12 +10,14 @@ from typing import Any, Dict, List
 
 ROOT = Path(__file__).resolve().parents[1]
 
+_TOKEN_RE = re.compile(r"[\s_\-]+|(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+
 
 def _tokens(text: str) -> set:
     """Lowercase word tokens, splitting CamelCase / underscore boundaries so
     'DescribeInstances' -> {'describe', 'instances'} and 'Run_Health_Check'
     -> {'run', 'health', 'check'}."""
-    parts = re.split(r"[\s_\-]+|(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", text)
+    parts = _TOKEN_RE.split(text)
     return {p.lower() for p in parts if p}
 
 def _keyword_overlap(keyword: str, query_tokens: set) -> int:
@@ -31,10 +33,15 @@ def select_top1(registry: Dict[str, Any], intent: str) -> Dict[str, Any]:
     """Frontmatter-only candidate ranking. Scores each skill by word-token
     overlap between its intent_keywords (CamelCase API names) and the intent
     text; returns the best match plus the full candidate list (caller loads
-    references only for top1)."""
+    references only for top1).
+
+    Deterministic tie-break: on equal score, the alphabetically-first skill name
+    wins (avoids dict-order non-determinism). Returns top1_skill="" when no
+    skill scores (e.g. empty intent_keywords), never None.
+    """
     q_tokens = _tokens(intent)
-    best, best_score = None, -1
-    for s in registry["skills"]:
+    best, best_score = "", -1
+    for s in sorted(registry["skills"], key=lambda x: x["name"]):
         score = sum(
             _keyword_overlap(kw, q_tokens)
             for kw in s.get("intent_keywords", [])

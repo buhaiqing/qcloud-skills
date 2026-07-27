@@ -21,10 +21,12 @@ ROOT = Path(__file__).resolve().parents[1]
 AUDIT = ROOT / "audit-results"
 AUDIT.mkdir(exist_ok=True)
 
-DESTRUCTIVE_VERBS = {"delete", "terminate", "destroy", "drop", "reset", "remove", "stop"}
-
 SENSITIVE_KEY_RE = re.compile(r"(AKID|secretId|secretKey)[A-Za-z0-9]+")
 SECRET_VAL_RE = re.compile(r"(TENCENTCLOUD_SECRET_KEY=)[A-Za-z0-9_-]+")
+
+# Canonical destructive-verb set lives in harness_safety (Phase 3 owner); reuse it
+# so the two detection paths can never drift.
+from harness_safety import VERBS as DESTRUCTIVE_VERBS  # noqa: E402 - late import keeps top clean
 
 
 def plan_hash(plan_text: str) -> str:
@@ -32,7 +34,8 @@ def plan_hash(plan_text: str) -> str:
 
 
 def is_destructive(plan_text: str) -> bool:
-    return any(v in plan_text.lower().split() for v in DESTRUCTIVE_VERBS)
+    tokens = plan_text.lower().split()
+    return any(t == v or t.startswith(v) for t in tokens for v in DESTRUCTIVE_VERBS)
 
 
 def preflight(plan_text: str, human_token: str | None) -> dict:

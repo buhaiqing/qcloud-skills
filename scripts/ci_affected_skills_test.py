@@ -20,6 +20,18 @@ class CiAffectedSkillsTest(TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("qcloud-cvm-ops", result.stdout)
 
+    def test_no_false_positive_on_unrelated_diff(self) -> None:
+        # A diff touching only non-skill files must NOT emit any qcloud-*-ops name.
+        diff = "README.md\nscripts/validate_local.py\ndocs/design.md\n"
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT)],
+            input=diff,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.strip(), "")
+
 
 if __name__ == "__main__":
     from unittest import main

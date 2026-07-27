@@ -12,6 +12,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -25,6 +26,7 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 import gcl_runner  # noqa: E402
+from harness_safety import plan_hash  # noqa: E402
 
 
 def quiet_cmd_run(ns) -> int:
@@ -589,7 +591,14 @@ class TestReflexionEndToEnd(unittest.TestCase):
                     "--command", 'tccli cvm TerminateInstances',
                     "--critic-json", str(critic_file),
                 ])
-                rc = quiet_cmd_run(ns)
+                # TerminateInstances is destructive; satisfy the Phase-3 human
+                # token gate with the plan hash so the run proceeds (run_command
+                # is mocked, but the gate runs before the loop).
+                os.environ["HARNESS_CONFIRM_TOKEN"] = plan_hash('tccli cvm TerminateInstances')
+                try:
+                    rc = quiet_cmd_run(ns)
+                finally:
+                    os.environ.pop("HARNESS_CONFIRM_TOKEN", None)
 
             # Verify execution succeeded
             self.assertEqual(rc, 0)

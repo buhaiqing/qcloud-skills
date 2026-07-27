@@ -25,12 +25,18 @@ def get_path(obj: Any, pointer: str) -> Any:
     segment_re = re.compile(r"\.([^.\[\]]+)|\[(\d+)\]")
     pos = 1  # skip leading '$'
     current: Any = obj
+    last_end = pos
     for match in segment_re.finditer(pointer, pos):
         key, idx = match.group(1), match.group(2)
         if idx is not None:
             current = current[int(idx)]
         else:
             current = current[key]
+        last_end = match.end()
+    # A trailing unparsed tail (e.g. "$.a." or "$.a@b") means a malformed
+    # pointer — raise instead of silently returning the wrong value.
+    if last_end != len(pointer):
+        raise ValueError(f"malformed pointer tail: {pointer[last_end:]!r} in {pointer!r}")
     return current
 
 
