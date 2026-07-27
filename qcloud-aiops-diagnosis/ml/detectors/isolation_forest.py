@@ -34,6 +34,7 @@ class IsolationForestDetector(BaseDetector):
             Higher values increase sensitivity.
         n_estimators: Number of isolation trees. More trees → more stable.
     """
+
     name = "IsolationForestDetector"
 
     def __init__(self, contamination: float = 0.05, n_estimators: int = 100):
@@ -119,13 +120,12 @@ class IsolationForestDetector(BaseDetector):
             return 0.5
         import numpy as np
         try:
-            # Re-fit on a small synthetic sample to get a baseline score
-            # distribution, then take the contamination percentile.
             X = np.random.randn(500, 1).astype(float)
             baseline_scores = self._forest.score_samples(X)
             return float(np.percentile(baseline_scores, self.contamination * 100))
         except Exception:
             return 0.5
+
 
 class _ZScoreFallback:
     """Z-score fallback when sklearn is unavailable."""
