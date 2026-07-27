@@ -586,11 +586,19 @@ def cmd_run(args: argparse.Namespace) -> int:
         command = args.command
         run_id = os.environ.get("HARNESS_RUN_ID", args.trace_id or "local")
 
-        # Evidence Kernel PreFlight (additive gate — does not block existing flow)
-        pf = preflight(args.command, os.environ.get("HARNESS_CONFIRM_TOKEN"))
+        # Evidence Kernel PreFlight + Phase 3 human-token binding (additive gates)
+        from harness_safety import is_destructive, bind_token  # local import to keep top clean
+        token = os.environ.get("HARNESS_CONFIRM_TOKEN")
+        pf = preflight(args.command, token)
         if not pf["allowed"]:
             print(f"PREFLIGHT BLOCKED: {pf['reason']}", file=sys.stderr)
             return 2
+        if is_destructive(args.command):
+            try:
+                bind_token(args.command, token or "")
+            except PermissionError as e:
+                print(f"PLAN-TOKEN MISMATCH: {e} (human must set HARNESS_CONFIRM_TOKEN=plan_hash)", file=sys.stderr)
+                return 2
 
         for iteration in range(1, max_iter + 1):
             generator = run_command(command, timeout=args.timeout, env=gen_env)
