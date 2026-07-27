@@ -9,10 +9,12 @@ validate_evidence_schema.py). This module provides:
 """
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import re
 import sys
+import threading
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,6 +56,31 @@ def post_record(record: dict) -> Path:
     out = AUDIT / f"evidence-{record['run_id']}.json"
     out.write_text(json.dumps(mask_trace(record), indent=2, ensure_ascii=False))
     return out
+
+
+def with_timeout(fn, seconds: float):
+    """Run an in-process generator fn; raise TimeoutError if it exceeds seconds.
+
+    For GCL subprocess workers use run_command(timeout=...) in gcl_runner.py;
+    this helper covers in-process generator functions.
+    """
+    @functools.wraps(fn)
+    def _wrapped():
+        result: dict = {}
+        def _run():
+            try:
+                result["v"] = fn()
+            except Exception as e:  # noqa: BLE001 - re-raised below
+                result["exc"] = e
+        t = threading.Thread(target=_run)
+        t.start()
+        t.join(seconds)
+        if t.is_alive():
+            raise TimeoutError(f"exceeded {seconds}s")
+        if "exc" in result:
+            raise result["exc"]
+        return result.get("v")
+    return _wrapped()
 
 
 if __name__ == "__main__":
