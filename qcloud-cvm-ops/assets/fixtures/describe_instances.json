@@ -1,0 +1,7 @@
+{
+  "Response": {
+    "TotalCount": 1,
+    "InstanceSet": [{"InstanceId": "ins-abc123", "InstanceName": "web01"}],
+    "RequestId": "req-pilot"
+  }
+}
