@@ -223,6 +223,25 @@ duplication or breakage the reviewer must undo.
 file (or grep its defs) and reconcile the plan step with reality; adapt the spec
 to be strictly additive when the capability already exists.
 
+### L8 — Green but vacuous: assert metrics are non-vacuous, not just well-typed
+A test that checks "returns a float in [0,1]" passes even when the algorithm is
+starved of data or uses a wrong matching strategy. The router's confusion_matrix
+returned valid floats (test passed) but was 0.0 everywhere — because (a) the
+registry had 21/30 skills with EMPTY intent_keywords (L5), and (b) raw substring
+matching can't match CamelCase `DescribeInstances` against `describe my cvm
+instances`. Fix required BOTH enriching the source data AND correcting the
+algorithm (token-overlap on CamelCase-split words). For any ranking/ML-style
+component, assert the metric is MEANINGFUL (e.g. `top1_accuracy > 0` on real
+fixtures), not just well-typed. Pairs with L5/L6.
+
+### L9 — Consumer quality is bounded by producer data contract
+A consumer (router) only parses what the producer (registry) emits. The router
+"passed" while the registry fed it empty keywords — the bug lived upstream. When
+a component depends on data from another module, verify the PRODUCER emits
+populated, correctly-shaped data (here: enrich `intent_keywords` from the skill's
+own curated `eval_queries.json intents`), rather than papering over the gap in
+the consumer. Trace the data contract end-to-end before declaring a feature done.
+
 ## Adding or modifying a skill
 
 1. **New skill**: Use `qcloud-skill-generator` (enforces 2-round review).
