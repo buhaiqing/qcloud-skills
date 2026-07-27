@@ -32,8 +32,18 @@ def aggregate(records: list[dict[str, Any]]) -> dict[str, Any]:
         }
     leak = sum(0 if r["safety"]["leak_checked"] else 1 for r in records)
     dest = [r for r in records if r["safety"]["destructive"]]
-    dest_cov = (sum(1 for r in dest if r["safety"]["token"]) / len(dest)) if dest else 1.0
-    prov = sum(1 for r in records if r.get("provenance")) / n
+    dest_cov = (sum(1 for r in dest if r["safety"]["token_bound"]) / len(dest)) if dest else 1.0
+    # Non-vacuous provenance: require a populated, known source enum — a bare/empty
+    # provenance dict must NOT pass (otherwise the gate is always 1.0, see L8).
+    KNOWN_SOURCES = {"gcl_runner", "sandbox_e2e", "ci"}
+    prov = (
+        sum(
+            1
+            for r in records
+            if isinstance(r.get("provenance"), dict) and r["provenance"].get("source") in KNOWN_SOURCES
+        )
+        / n
+    )
     mixing = (
         sum(
             1

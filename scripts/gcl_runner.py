@@ -440,10 +440,18 @@ def persist_trace(root: Path, trace: dict[str, Any], trace_id: str | None = None
     return path
 
 
-def emit_evidence_record(root: Path, trace: dict[str, Any], args: argparse.Namespace, run_id: str) -> None:
-    """Additive EvidenceRecord side-emit (KPI pipeline). Does NOT replace persist_trace."""
+def emit_evidence_record(root: Path, trace: dict[str, Any], args: argparse.Namespace, run_id: str,
+                         pf: dict[str, Any] | None = None) -> None:
+    """Additive EvidenceRecord side-emit (KPI pipeline). Does NOT replace persist_trace.
+
+    `pf` is the PreFlight result already computed in cmd_run — carries the REAL
+    destructive decision + token binding outcome so KPI #2 (destructive_coverage)
+    is non-vacuous instead of hardcoded-false.
+    """
     try:
         masked = mask_trace(trace)
+        destructive = bool(pf.get("destructive")) if pf else False
+        token_bound = bool(pf.get("token_bound")) if pf else False
         record = {
             "skill": args.skill,
             "run_id": run_id,
@@ -453,8 +461,9 @@ def emit_evidence_record(root: Path, trace: dict[str, Any], args: argparse.Names
                                  "misdelegated": False, "fell_back": False},
             "trace": masked,
             "golden_ref": None, "fixture_ref": None,
-            "safety": {"destructive": False, "token": os.environ.get("HARNESS_CONFIRM_TOKEN"),
-                       "plan_hash": None, "leak_checked": True},
+            "safety": {"destructive": destructive,
+                       "token": os.environ.get("HARNESS_CONFIRM_TOKEN") if destructive else None,
+                       "token_bound": token_bound, "plan_hash": None, "leak_checked": True},
             "provenance": {"source": "gcl_runner", "tool": "tccli",
                            "captured_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")},
             "budgets": {"context_tokens": 0, "tool_calls": len(trace.get("iterations", [])),
@@ -590,12 +599,14 @@ def cmd_run(args: argparse.Namespace) -> int:
         from harness_safety import is_destructive, bind_token  # local import to keep top clean
         token = os.environ.get("HARNESS_CONFIRM_TOKEN")
         pf = preflight(args.command, token)
+        pf["token_bound"] = False
         if not pf["allowed"]:
             print(f"PREFLIGHT BLOCKED: {pf['reason']}", file=sys.stderr)
             return 2
         if is_destructive(args.command):
             try:
                 bind_token(args.command, token or "")
+                pf["token_bound"] = True
             except PermissionError as e:
                 print(f"PLAN-TOKEN MISMATCH: {e} (human must set HARNESS_CONFIRM_TOKEN=plan_hash)", file=sys.stderr)
                 return 2
@@ -649,7 +660,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     ),
                 }
                 path = persist_trace(root, trace, trace_id=args.trace_id)
-                emit_evidence_record(root, trace, args, run_id)
+                emit_evidence_record(root, trace, args, run_id, pf)
                 print(f"SAFETY_FAIL — trace: {path}", file=sys.stderr)
                 return 3
     
@@ -660,7 +671,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     "output": generator.get("result_excerpt", ""),
                 }
                 path = persist_trace(root, trace, trace_id=args.trace_id)
-                emit_evidence_record(root, trace, args, run_id)
+                emit_evidence_record(root, trace, args, run_id, pf)
                 # P0-A: write success pattern to pending log
                 try:
                     scores = critic.get("scores") or {}
@@ -696,7 +707,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             ),
         }
         path = persist_trace(root, trace)
-        emit_evidence_record(root, trace, args, run_id)
+        emit_evidence_record(root, trace, args, run_id, pf)
         print(f"MAX_ITER — trace: {path}", file=sys.stderr)
         if args.enable_post_process:
             post_process(path, root)
