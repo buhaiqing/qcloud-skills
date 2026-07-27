@@ -242,6 +242,25 @@ populated, correctly-shaped data (here: enrich `intent_keywords` from the skill'
 own curated `eval_queries.json intents`), rather than papering over the gap in
 the consumer. Trace the data contract end-to-end before declaring a feature done.
 
+### L10 — Convergence gates on runtime artifacts must skip gracefully, not fail
+The single-entry `scripts/Makefile` `all` target wires validate → registry →
+golden → kpi. The `kpi` step consumes `audit-results/evidence-*.json`, which is
+(1) generated only at runtime and (2) gitignored. A naive `python3
+aggregate_kpi.py audit-results/evidence-*.json` would explode (no match → argv
+literal → FileNotFound) on a clean checkout, turning a green pipeline red. Fix:
+guard the recipe with `if ls audit-results/evidence-*.json >/dev/null 2>&1; then
+…; else echo "skipped"; fi`. This is the COUNTERPART of L6 (prove gates fire)
+and L4 (rejection tests): gates on *optional runtime output* must be silent-skip
+when absent, while gates on *committed input* must hard-fail. Pair the skip with a
+unit/integration test that asserts the gate DOES fire when the artifact IS
+present (see aggregate_kpi rejection tests, L4/L6).
+
+**Why:** a convergence entry point that fails on a clean checkout blocks every
+dev and CI run that hasn't produced evidence yet — the pipeline becomes unc0mmittable.
+**How to apply:** any Makefile/CI step that depends on gitignored or
+runtime-generated files; make it skip-with-message when absent, and keep a
+separate test proving it rejects when present.
+
 ## Adding or modifying a skill
 
 1. **New skill**: Use `qcloud-skill-generator` (enforces 2-round review).
@@ -251,7 +270,7 @@ the consumer. Trace the data contract end-to-end before declaring a feature done
 ## Files that do NOT exist
 
 - No repo-root `assets/` directory.
-- No `package.json`, `Makefile`, non-stdlib test runner (except listed scripts in `scripts/` and `.github/workflows/validate-skills.yml`).
+- No repo-root `Makefile`, `package.json`, or non-stdlib test runner (except listed scripts in `scripts/` and `.github/workflows/validate-skills.yml`). A `scripts/Makefile` exists as the harness convergence entry point — it is NOT a repo build system.
 - No agent-specific config files (e.g. `CLAUDE.md`, `opencode.json`, `.cursorrules`, and similar per-agent artifacts).
 - Agent runtime state dirs (e.g. `.omc/`, `.omo/`, `.codebuddy/`, and similar) are gitignored.
 - `docs/superpowers/plans/` contains historical notes, not runtime source.
