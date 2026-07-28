@@ -5,6 +5,28 @@
 > *why* we chose one path over another, *what* the consequences are, and how
 > later ADRs may supersede it.
 
+## Glossary
+
+| Term | Full name | Purpose | Doc |
+|---|---|---|---|
+| **ADR** | Architecture Decision Record | Documents a cross-subsystem decision: why we chose X over Y, consequences, and how later ADRs supersede it. | `docs/architecture/ADR-*.md` |
+| **CADL** | Compound-Asset Distillation Loop | Per-task lesson → persistent reusable asset. 5 steps: Extract → Place → Write → Gate → Reuse. | `docs/cadl-spec.md` |
+| **GCL** | Generator-Critic Loop | Runtime quality gate: Generator produces, Critic scores (Safety, Quality), loop bounded by max_iterations. | `docs/gcl-spec.md` |
+| **Reflexion** | Reflexion Memory | Cross-session failure pattern store. Dedupe by `skill + command + error`. Patterns from GCL traces or self-review. | `docs/reflexion-memory.md` |
+| **Hook** | CADL Hook Line | Canonical marker at end of `SKILL.md` that triggers CADL self-reflection. | `qcloud-skill-generator/references/qcloud-skill-template.md` |
+| **CLI** | Command Line Interface (Tencent Cloud) | Primary execution path (`tccli`). SDK fallback when CLI unavailable. | `qcloud-*-ops/references/cli-usage.md` |
+
+**Boundary rule**: Single-task lessons / CLI error patterns → CADL. Cross-subsystem / long-term direction → ADR. (See [ADR-0001 §2.5](ADR-0001-establish-adr-mechanism.md#25-boundary-with-cadl-critical))
+
+## Index
+
+```
+README.md                              # This file
+ADR-0001-establish-adr-mechanism.md   # ADR mechanism definition
+ADR-0002-l3-to-l4-daemon-migration.md # L3→L4 daemon decision
+ADR-0003-faiops-event-driven-architecture.md # FinOps/AIOps/SecOps events
+```
+
 ## When to write an ADR
 
 Write an ADR (instead of, or in addition to, a CADL entry) when the decision:
