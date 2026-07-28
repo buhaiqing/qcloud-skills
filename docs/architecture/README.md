@@ -18,15 +18,6 @@
 
 **Boundary rule**: Single-task lessons / CLI error patterns → CADL. Cross-subsystem / long-term direction → ADR. (See [ADR-0001 §2.5](ADR-0001-establish-adr-mechanism.md#25-boundary-with-cadl-critical))
 
-## Index
-
-```
-README.md                              # This file
-ADR-0001-establish-adr-mechanism.md   # ADR mechanism definition
-ADR-0002-l3-to-l4-daemon-migration.md # L3→L4 daemon decision
-ADR-0003-faiops-event-driven-architecture.md # FinOps/AIOps/SecOps events
-```
-
 ## When to write an ADR
 
 Write an ADR (instead of, or in addition to, a CADL entry) when the decision:
@@ -50,6 +41,8 @@ Proposed ──► Accepted ──► Superseded by ADR-NNNN
 See [ADR-0001 §2.2](ADR-0001-establish-adr-mechanism.md#22-lifecycle-states) for full semantics.
 
 ## Index
+
+> ADR table — links to each decision.
 
 | ID | Title | Status | Date | Topic |
 |---|---|---|---|---|
