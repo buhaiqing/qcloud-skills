@@ -305,6 +305,41 @@ for genuinely destructive plans (highest-risk safety gap).
 **How to apply:** all destructive/sensitive keyword matchers in this repo; use
 `t == v or t.startswith(v)` over a shared verb set.
 
+### L14 — Major architectural initiative: build CHECKPOINT.md FIRST
+Before writing any artifact for a multi-file initiative (>3 artifacts), create
+`.runtime/<scope>/CHECKPOINT.md` with: status table, step list, hard constraints,
+resumption log. The file is BOTH progress UI AND resume protocol — if the session
+drops mid-flight, the next session reads it and resumes cleanly. Update on each
+step flip. **Why:** the 2026-07-28 L3→L4 daemon initiative (3 ADRs + Spec + Plan
++ AGENTS update) lost 2 exchanges to mid-session aborts before this pattern
+was applied; CHECKPOINT.md reduced restart cost from "re-read everything"
+to "read top-of-file + the last ✅ step". **How to apply:** any task with
+the word "架构决策 / migration / 重构 / 跨多个目录" — build checkpoint before
+first artifact.
+
+### L15 — Multi-perspective review without sub-agents: fold into artifact bodies
+When user asks for "multi-role review / 多人讨论 / 多个视角" but environment
+does not support parallel sub-agents (`spawn_agent` returns unsupported),
+fold each perspective into the relevant ADR/Spec as a dedicated section (e.g.
+"§X Architect-Perspective Risks", "§Y Domain Use Cases", "§Z Quality
+Invariants") instead of producing standalone opinion docs. **Why:** standalone
+opinion docs (2026-07-28 plan called for A1/A2/A3 + STATE-OF-UNION + 2 review
+docs = 7 files for what was actually 5 final artifacts) inflate token cost 30-50%
+and force orchestrator to re-cross-reference. Folding gives the same value
+inline. **How to apply:** any task that says "stakeholder / multi-role / multi-
+perspective" — confirm sub-agent availability FIRST; if unavailable, plan for
+fold-in rather than separate docs.
+
+### L16 — AGENTS.md surgical edits at >500 lines
+When AGENTS.md is >500 lines (current: 641), use line-anchored `sed -i.bak`
+with `a\` (append-after) for table row insertions and short section additions.
+Always `cp AGENTS.md /tmp/AGENTS.md.bak` first; verify with `diff` post-edit;
+remove `.bak` after. Never wholesale-rewrite the file. **Why:** the file is
+referenced from many places and rewriting risks losing alignment markers
+(CADL hook line references, L*-rule numbers) that downstream tools depend on.
+**How to apply:** any edit to AGENTS.md, especially when adding a new L*-rule
+or Key Reference row.
+
 ## Adding or modifying a skill
 
 1. **New skill**: Use `qcloud-skill-generator` (enforces 2-round review).
@@ -331,6 +366,8 @@ for genuinely destructive plans (highest-risk safety gap).
 | `docs/reflexion-memory.md` | Reflexion rules — cross-session failure-pattern memory governance |
 | `docs/failure-patterns.md` | Reflexion memory store |
 | `docs/cadl-spec.md` | CADL long-form spec — trigger conditions, 5-step loop, asset types, anti-patterns |
+| `docs/architecture/README.md` | ADR index — cross-subsystem decisions |
+| `docs/architecture/ADR-0001-establish-adr-mechanism.md` | ADR mechanism — format, lifecycle, when to write |
 
 ## Runtime Quality Gates: GCL & Reflexion
 
@@ -432,6 +469,19 @@ After task completion, run: `python3 scripts/verify_gcl_execution.py "<task_desc
 
 ### 快速入口
 - 自动化：`python3 scripts/cadl_lint.py`（lint）/ `--fix`（幂等补钩子）
+
+## Architecture Decision Records (ADR, P0)
+
+ADR 记录**跨子系统**架构决策（参见 [`docs/architecture/ADR-0001-establish-adr-mechanism.md`](docs/architecture/ADR-0001-establish-adr-mechanism.md) §2.5 边界规则）。
+
+### ADR vs CADL 边界
+
+| 触发 | 落点 |
+|---|---|
+| 影响 >1 个子系统 / 运行时拓扑 / 长期方向 | ADR（`docs/architecture/ADR-NNNN-*.md`） |
+| 单次任务经验 / CLI 错误模式 / 跨任务小技巧 | CADL（`docs/failure-patterns.md` 或本文件 L*-rules） |
+
+**Rule of thumb**："We picked X over Y because …" → ADR；"I learned a tricky parameter" → CADL。
 
 
 ## Agent-Agnostic Principle (P0)
