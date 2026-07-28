@@ -10,6 +10,10 @@
 
 Design of `qcloud-agent-daemon/`, the persistent event-driven scheduler that elevates QCloud from L3 to L4. Zero-invasion: no existing `qcloud-*-ops/` skill is modified. All integration is via existing public APIs (`scripts/gcl_runner.py`, `qcloud-copilot/copilot/blackboard.py`, `scripts/harness_safety.py`).
 
+**Python version**: 3.10+ (consistent with existing `qcloud-copilot/copilot/` use of `match` statements; `aiohttp` + `fcntl` confirmed available).
+
+**SKILL.md role**: The `SKILL.md` in this package exists for **documentation and discoverability only**. AI agents do NOT invoke `qcloud-agent-daemon/` via the Skill interface; the daemon runs as a standalone CLI process (`python3 -m qcloud_agent_daemon`). The SKILL.md follows the standard format so the package is discoverable in skill registries.
+
 ## 2. Module layout
 
 ```
@@ -125,6 +129,8 @@ Filters out "normal transient" cloud states (Starting/Stopping/…) that would o
 
 ### 6.1 Whitelist (DRAFT — verify via fixtures, do not port JDCloud values)
 
+> **⚠️ VALUES NOT VALIDATED.** Each row in the table below is a placeholder. Every entry MUST be replaced from `tests/fixtures/transient-states/<product>.json` (Plan T3.1) before production use. Do NOT ship the placeholder values as-is.
+
 | Service | Transient states | Source CLI |
 |---|---|---|
 | `cvm` | `RUNNING`, `STOPPED` (real); transient: STARTING/STOPPING/REBOOTING/SHUTTING_DOWN | `tccli cvm DescribeInstances` |
@@ -202,6 +208,33 @@ Per-event session with `trigger_mode` + `trigger_source` fields. Persisted to `.
 ## 11. Quality-perspective invariants (must hold across all modules)
 
 ### 11.1 Blackboard schema compatibility
+
+**Concrete write target** (existing schema 1.2 field paths; do NOT introduce new top-level keys):
+
+```json
+{
+  "shared_context": {
+    "evidence_chain": {
+      "process": [
+        {
+          "step_id": "evt_abc123",
+          "actor": "qcloud-agent-daemon",
+          "status": "executed",
+          "duration_ms": 1234,
+          "artifact": ".runtime/daemon/sessions/evt_abc123.json"
+        }
+      ]
+    },
+    "pending_action": {
+      "action": "approval_required",
+      "trigger_mode": "auto",
+      "trigger_source": "CronSource.finops_daily",
+      "risk": "dangerous",
+      "blocked_reason": "DANGEROUS in auto-mode; queued for ApprovalQueue (Phase 3)"
+    }
+  }
+}
+```
 - Daemon MUST use existing `shared_context.evidence_chain` and `pending_action` slots
 - Daemon MUST NOT introduce new top-level Blackboard fields
 - CI gate: existing `validate_evidence_schema.py` exits 0 after daemon integration test

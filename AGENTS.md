@@ -243,7 +243,7 @@ own curated `eval_queries.json intents`), rather than papering over the gap in
 the consumer. Trace the data contract end-to-end before declaring a feature done.
 
 ### L10 — Convergence gates on runtime artifacts must skip gracefully, not fail
-The single-entry `scripts/Makefile` `all` target wires validate → registry →
+The single-entry scripts/Makefile `all` target wires validate → registry →
 golden → kpi. The `kpi` step consumes `audit-results/evidence-*.json`, which is
 (1) generated only at runtime and (2) gitignored. A naive `python3
 aggregate_kpi.py audit-results/evidence-*.json` would explode (no match → argv
@@ -331,7 +331,7 @@ perspective" — confirm sub-agent availability FIRST; if unavailable, plan for
 fold-in rather than separate docs.
 
 ### L16 — AGENTS.md surgical edits at >500 lines
-When AGENTS.md is >500 lines (current: 641), use line-anchored `sed -i.bak`
+When AGENTS.md is >500 lines, use line-anchored `sed -i.bak`
 with `a\` (append-after) for table row insertions and short section additions.
 Always `cp AGENTS.md /tmp/AGENTS.md.bak` first; verify with `diff` post-edit;
 remove `.bak` after. Never wholesale-rewrite the file. **Why:** the file is
@@ -349,7 +349,7 @@ or Key Reference row.
 ## Files that do NOT exist
 
 - No repo-root `assets/` directory.
-- No repo-root `Makefile`, `package.json`, or non-stdlib test runner (except listed scripts in `scripts/` and `.github/workflows/validate-skills.yml`). A `scripts/Makefile` exists as the harness convergence entry point — it is NOT a repo build system.
+- No repo-root `Makefile`, `package.json`, or non-stdlib test runner (except listed scripts in `scripts/` and `.github/workflows/validate-skills.yml`). A scripts/Makefile exists as the harness convergence entry point — it is NOT a repo build system.
 - No agent-specific config files (e.g. `CLAUDE.md`, `opencode.json`, `.cursorrules`, and similar per-agent artifacts).
 - Agent runtime state dirs (e.g. `.omc/`, `.omo/`, `.codebuddy/`, and similar) are gitignored.
 - `docs/superpowers/plans/` contains historical notes, not runtime source.

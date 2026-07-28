@@ -44,6 +44,8 @@ We define **three event domains**, each with explicit event sources, target skil
 
 ### 2.3 SecurityOps event domain (future, sketch only)
 
+> **⚠️ DO NOT IMPLEMENT UNTIL PHASE 3 APPROVAL QUEUE IS LANDED.** Every SecOps remediation listed below is DANGEROUS and requires human approval. Phase 1+2 implements FinOps + AIOps SAFE/CAUTION actions only.
+
 | Trigger | Source | Target skill(s) | Risk | Auto allowed? |
 |---|---|---|---|---|
 | CAM policy change event | `EventBusSource` (Blackboard `event_type="cam.policy.changed"`) | `qcloud-cam-ops` (audit) | CAUTION | ✅ (read-only audit) |
@@ -61,6 +63,26 @@ We define **three event domains**, each with explicit event sources, target skil
 4. **Rate limiting**: each (event_source, target_skill) pair has a configurable cooldown (default 60s) via the EventBus dedup mechanism already in place.
 5. **Daemon health is observable**: `/healthz` endpoint returns last-event-processed timestamp; L4 metrics tracker adds 2 new indicators: `auto_event_throughput` and `auto_event_p95_latency_ms`.
 
+
+### 2.5 Latency budget per source
+
+| Source | Typical end-to-end latency | Notes |
+|---|---|---|
+| `WebhookSource` | **<1s** | Real-time push; primary for CRITICAL alarms |
+| `EventBusSource` | **≤5s** | Polling interval (5s); secondary path |
+| `CronSource` | cron-driven | Scheduled; not latency-sensitive |
+
+**End-to-end SLA**: CRITICAL alarm → Blackboard `evidence_chain` entry written ≤30s via Webhook path. Validated by Plan T5 + T8 load tests; L4 metrics `auto_event_p95_latency_ms` must stay under this budget.
+
+### 2.6 Coexistence with manual proactive-inspection scripts
+
+Phase 1+2 daemon is the **default** entry for FinOps/AIOps auto-mode runs. The existing scripts under `qcloud-proactive-inspection/scripts/01-perceive/cruise_sniff.py` and `02-reason/cruise_analyze.py` remain as:
+
+- **Manual CLI entry point** for ad-hoc user-triggered runs (`python3 scripts/01-perceive/cruise_sniff.py --region …`)
+- **Fallback** when daemon is unavailable (e.g. during Phase 1+2 rollout, or in CI environments without long-lived processes)
+- **Reference implementation** for daemon tests (Spec §11 test fixtures reuse sniff outputs)
+
+**De-duplication**: daemon-cron runs write a Blackboard `evidence_chain` block with `trigger_mode=auto`; manual runs write `trigger_mode=manual`. Both feed the same Reflexion / L4 metrics pipeline — no collision, no double-counting. L4 metrics `avg_iterations` and `auto_event_throughput` track the two paths separately.
 ## 3. Domain-Perspective Risks (folded in)
 
 | Risk | Mitigation |
