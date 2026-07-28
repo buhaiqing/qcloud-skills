@@ -1,0 +1,14 @@
+{
+  "_provenance": "Based on TencentDB for Redis state enumeration from public API documentation. NOT verified against live tccli redis. Verify with: `tccli redis DescribeInstances --region ap-guangzhou`",
+  "_verify_command": "tccli redis DescribeInstances --region ap-guangzhou --limit 1",
+  "stable_states": ["RUNNING"],
+  "transient_states": [
+    "CREATING",
+    "INITING",
+    "FLUSHING",
+    "UPGRADING",
+    "DELETING",
+    "ISOLATED",
+    "TO_BE_RECYCLED"
+  ]
+}

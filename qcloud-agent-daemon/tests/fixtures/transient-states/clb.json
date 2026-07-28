@@ -1,0 +1,10 @@
+{
+  "_provenance": "Based on CLB state enumeration from public API documentation. NOT verified against live tccli clb. Verify with: `tccli clb DescribeLoadBalancers --region ap-guangzhou`",
+  "_verify_command": "tccli clb DescribeLoadBalancers --region ap-guangzhou --limit 1",
+  "stable_states": ["RUNNING", "ACTIVE"],
+  "transient_states": [
+    "CREATING",
+    "CONFIGURING",
+    "DELETING"
+  ]
+}

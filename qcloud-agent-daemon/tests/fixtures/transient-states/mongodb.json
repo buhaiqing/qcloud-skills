@@ -1,0 +1,12 @@
+{
+  "_provenance": "Based on TencentDB for MongoDB state enumeration from public API documentation. NOT verified against live tccli mongodb. Verify with: `tccli mongodb DescribeDBInstances --region ap-guangzhou`",
+  "_verify_command": "tccli mongodb DescribeDBInstances --region ap-guangzhou --limit 1",
+  "stable_states": ["RUNNING"],
+  "transient_states": [
+    "CREATING",
+    "INITING",
+    "UPGRADING",
+    "DELETING",
+    "ISOLATED"
+  ]
+}

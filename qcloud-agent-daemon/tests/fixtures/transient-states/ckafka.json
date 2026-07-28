@@ -1,0 +1,11 @@
+{
+  "_provenance": "Based on CKafka state enumeration from public API documentation. NOT verified against live tccli ckafka. Verify with: `tccli ckafka DescribeInstances --region ap-guangzhou`",
+  "_verify_command": "tccli ckafka DescribeInstances --region ap-guangzhou --limit 1",
+  "stable_states": ["RUNNING"],
+  "transient_states": [
+    "CREATING",
+    "INITING",
+    "UPGRADING",
+    "DELETING"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "_provenance": "Based on TencentDB for PostgreSQL state enumeration from public API documentation. NOT verified against live tccli postgres. Verify with: `tccli postgres DescribeDBInstances --region ap-guangzhou`",
+  "_verify_command": "tccli postgres DescribeDBInstances --region ap-guangzhou --limit 1",
+  "stable_states": ["RUNNING"],
+  "transient_states": [
+    "CREATING",
+    "INITING",
+    "UPGRADING",
+    "RESIZING",
+    "DELETING",
+    "ISOLATED"
+  ]
+}

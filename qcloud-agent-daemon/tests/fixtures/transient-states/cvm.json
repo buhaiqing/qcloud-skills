@@ -1,0 +1,13 @@
+{
+  "_provenance": "Based on Tencent Cloud CVM state enumeration from public API documentation (https://cloud.tencent.com/document/api/213/15728). NOT verified against live `tccli cvm DescribeInstances` output — verify with: `tccli cvm DescribeInstances --region ap-guangzhou | jq '.InstanceSet[0].State'`",
+  "_verify_command": "tccli cvm DescribeInstances --region ap-guangzhou --limit 1",
+  "stable_states": ["RUNNING", "STOPPED"],
+  "transient_states": [
+    "PENDING",
+    "STARTING",
+    "STOPPING",
+    "REBOOTING",
+    "SHUTDOWN",
+    "TERMINATING"
+  ]
+}

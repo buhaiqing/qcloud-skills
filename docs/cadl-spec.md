@@ -13,8 +13,7 @@ A rule like "remember to write AGENTS.md" is forgettable. CADL turns accumulatio
 That is the same logic GCL uses for Generators (`Safety = 0` → abort), and the same
 logic Self-Review uses for R1+R2. CADL is the post-task equivalent.
 
-Before CADL: lessons evaporate after the session. After CADL: every踩坑 becomes a
-cross-task asset.
+Before CADL: lessons evaporate after the session. After CADL: every lesson that was learned becomes a cross-task asset.
 
 ---
 
@@ -22,12 +21,12 @@ cross-task asset.
 
 | # | Trigger | Example |
 |---|---|---|
-| 1 | Multi-step / cross-file task completed | "Refactor `scripts/validate_*.py`" |
-| 2 | Cross-skill delegation (delegation matrix used) | `qcloud-cvm-ops` → `qcloud-cdb-ops` |
-| 3 | Review or fix loop (GCL, 2-round self-review, adversarial review) | Any GCL PASS path |
-| 4 | Found a repo defect (even outside scope) | "Pre-existing FAIL in `tccli cvm` arg parsing" |
-| 5 | Pre-existing FAIL observed and assigned root cause | "E741 ambiguous `l` in `scripts/<name>.py`" |
-| 6 | User supplied a reusable workflow preference | "Use the dual-write subcommand to bypass tccli bug" |
+| 1 | Multi-step / cross-file task | "Refactor `validate_*.py`" |
+| 2 | Cross-skill delegation | `qcloud-cvm-ops` → `qcloud-cdb-ops` |
+| 3 | Review or fix loop | GCL PASS, 2-round self-review |
+| 4 | Found a repo defect | "FAIL in `tccli cvm` arg parsing" |
+| 5 | Pre-existing FAIL + root cause | "E741 ambiguous `l`" |
+| 6 | Reusable workflow from user | "dual-write subcommand bypass tccli bug" |
 
 If unsure → run it. False positives are cheap (~30 seconds of file write).
 
@@ -62,11 +61,11 @@ overriding the cap.
 
 | Type | Typical landing point | Example |
 |---|---|---|
-| `failure_patterns.md` entry | `docs/failure-patterns.md` (≤200 lines) | E741 ambiguous `l` in `validate_local.py` (count+=1) |
-| Checklist / rule | root `AGENTS.md` (with grep-dupe check) | "Always pre-flight branch before GCL worktree" |
-| Script / helper | `scripts/` (shared executables) | `scripts/cadl_lint.py` for hook enforcement |
+| `failure_patterns.md` entry | `docs/failure-patterns.md` ≤200 lines | E741 ambiguous `l` |
+| Checklist / rule | root `AGENTS.md` | "pre-flight branch before GCL worktree" |
+| Script / helper | `scripts/` | `scripts/cadl_lint.py` |
 | Template | `qcloud-skill-generator/references/` | `qcloud-skill-generator/references/qcloud-skill-template.md` |
-| Decision record | repo root or docs/ | "WHY we excluded SDT-7 destructive ops from auto" |
+| Decision record | repo root or docs/ | "WHY we excluded SDT-7 destructive ops" |
 | Troubleshooting flow | skill-level `references/` or docs/ | "tccli cvm 401 → re-check `TENCENTCLOUD_SECRET_ID`" |
 
 Drift heuristic: if the asset is shorter than the explanation it replaces, it wins.
@@ -104,6 +103,8 @@ the WRITE step.
 Schema for `failure_patterns.md` rows and the EVO-1 auto-consumption pipeline live in
 `docs/reflexion-memory.md`. CADL does NOT define schema; it directs traffic there.
 
+Schema: see `docs/reflexion-memory.md` §3.
+
 ---
 
 ## 7. Anti-patterns
@@ -112,10 +113,10 @@ Schema for `failure_patterns.md` rows and the EVO-1 auto-consumption pipeline li
 |---|---|
 | Task done, no accumulation | Walk the full loop before delivery |
 | One-shot context dumped into AGENTS.md | Only cross-task patterns belong in AGENTS.md |
-| Duplicate an existing entry | `grep` AGENTS.md / failure-patterns.md before write |
-| Only on GCL / CodeGraph-aware tasks | Any review, fix, collaboration, or verification triggers CADL |
-| Bypass 500-line cap by deleting the rule | Move examples/checklists to linked docs, keep the rule |
-| Skip the line-cap → 600-line AGENTS.md | Rule 4 is the gate; trim first, write second |
+| Duplicate an existing entry | `grep` before write |
+| Only on GCL / CodeGraph tasks | Any review, fix, or verification triggers CADL |
+| Bypass 500-line cap | Move examples to linked docs, keep the rule |
+| Skip the line-cap | Rule 4 is the gate; trim first, write second |
 
 ---
 

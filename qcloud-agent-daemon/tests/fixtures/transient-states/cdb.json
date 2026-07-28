@@ -1,0 +1,15 @@
+{
+  "_provenance": "Based on TencentDB for MySQL state enumeration from public API documentation. NOT verified against live tccli cdb. Verify with: `tccli cdb DescribeDBInstances --region ap-guangzhou`",
+  "_verify_command": "tccli cdb DescribeDBInstances --region ap-guangzhou --limit 1",
+  "stable_states": ["RUNNING"],
+  "transient_states": [
+    "CREATING",
+    "INITING",
+    "RESTARTING",
+    "UPGRADING",
+    "RESIZING",
+    "PAUSING",
+    "PAUSED",
+    "DESTROYING"
+  ]
+}
