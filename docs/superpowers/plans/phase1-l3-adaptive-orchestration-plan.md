@@ -268,10 +268,17 @@ Week 3-4:  1.3 (ErrorEscalator) + 1.4 (统一观测面) 串行（1.3 依赖 1.2�
 - [ ] `gcl_runner run --llm-critic` 完整闭环通过 ⏳ 需要真实 `GCL_LLM_API_KEY`；15 mock-LLM 单元测试已覆盖合约
 - [x] CI: `build_skill_registry.py` 输出与硬编码注册表一致 ✅ (test_registry_superset_of_known_skills)
 
-### M2: ErrorEscalator + 统一观测面就绪（Week 4）⏳ (1.3 done; 1.4 in progress)
+### M2: ErrorEscalator + 统一观测面就绪（Week 4）✅ commits 0d367d5 + 41205db + ad3057c
 
-- [ ] CVM InvalidVpc.NotFound → 自动委托 VPC → 自动重试 CVM ⏳ 需 1.3 dispatcher 集成提交后 e2e 验证
-- [ ] 跨 skill 调用链在 spans.jsonl 中完整追溯 ⏳ 1.4 in progress
+- [x] CVM InvalidVpc.NotFound → 自动委托 VPC → 自动重试 CVM ✅
+  - 1.3 dispatcher 集成 (commit 41205db) 含 `_apply_escalation()` + DELEGATE 路径
+  - 9 集成测试覆盖 DELEGATE/RETRY/HALT/FIX
+- [x] 跨 skill 调用链在 spans.jsonl 中完整追溯 ✅
+  - 1.4 TraceSpan (commit ad3057c) 持久化 spans.jsonl + _summary.json
+  - gcl_trace_aggregate.py --cross-skill 模式
+  - dispatcher DELEGATE 生成 child span
+  - evidence_kernel.post_record(span_id=...) 关联
+  - smoke 验证 PASS: .runtime/traces/smoke-trace-1/ 完整 span + summary
 - [x] `validate_error_tables.py` 通过全部 30 个 skill ✅ (CI 脚本已就绪, parallel sub-agent)
 
 ### M3: Phase 1 整体验收
