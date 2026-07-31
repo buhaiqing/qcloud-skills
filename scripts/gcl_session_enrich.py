@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -258,7 +258,7 @@ def _load_session_events(session_path: Path) -> list[dict]:
     try:
         lines = [line for line in session_path.read_text(encoding="utf-8").splitlines() if line.strip()]
         return [json.loads(line) for line in lines]
-    except Exception:
+    except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
         return []
 
 
@@ -291,12 +291,12 @@ def collect_session_metrics(root: Path, since_hours: int) -> dict[str, Any]:
     if not sessions_dir.exists():
         return {"error": "sessions dir not found", "metrics": {}}
 
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=since_hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=since_hours)
 
     # Find recent qcloud-skills session dirs
     skill_sessions = []
     for sd in sessions_dir.glob("*qcloud-skills*"):
-        mtime = datetime.fromtimestamp(sd.stat().st_mtime, tz=timezone.utc)
+        mtime = datetime.fromtimestamp(sd.stat().st_mtime, tz=UTC)
         if mtime >= cutoff:
             for sp in sd.rglob("*.jsonl"):
                 skill_sessions.append(sp)
@@ -327,7 +327,7 @@ def analyze_enrichment(traces: list[dict], root: Path, since_hours: int) -> dict
 
     # Per-shape metrics
     shape_metrics = {}
-    for shape in set(s["shape"] for s in shapes):
+    for shape in {s["shape"] for s in shapes}:
         matching = [s for s in shapes if s["shape"] == shape]
         shape_metrics[shape] = {
             "count": len(matching),
@@ -339,7 +339,7 @@ def analyze_enrichment(traces: list[dict], root: Path, since_hours: int) -> dict
 
     return {
         "version": "1.0",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "window": {"trace_count": len(traces)},
         "trajectory_shapes": {
             "distribution": shape_counts,
@@ -418,11 +418,11 @@ def _load_traces(root: Path, since_hours: int | None) -> list[dict]:
     paths = sorted(audit.glob("gcl-trace-*.json"))
     if since_hours is None:
         return [json.loads(p.read_text(encoding="utf-8")) for p in paths]
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=since_hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=since_hours)
     out = []
     for p in paths:
         try:
-            ts = datetime.strptime(p.stem.replace("gcl-trace-", ""), "%Y%m%d-%H%M%S").replace(tzinfo=timezone.utc)
+            ts = datetime.strptime(p.stem.replace("gcl-trace-", ""), "%Y%m%d-%H%M%S").replace(tzinfo=UTC)
         except ValueError:
             continue
         if ts >= cutoff:

@@ -11,7 +11,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, List
+from typing import Any
 
 
 def get_path(obj: Any, pointer: str) -> Any:
@@ -66,9 +66,9 @@ def _eval_assertion(target: Any, assertion: dict) -> None:
     raise ValueError(f"unknown op: {op}")
 
 
-def check_scenario(scenario: dict, skill_dir: Path) -> List[str]:
+def check_scenario(scenario: dict, skill_dir: Path) -> list[str]:
     """Return a list of failure messages (empty == pass)."""
-    failures: List[str] = []
+    failures: list[str] = []
     expected = scenario.get("expected")
     if not isinstance(expected, dict):
         return ["scenario missing 'expected'"]
@@ -92,7 +92,7 @@ def check_scenario(scenario: dict, skill_dir: Path) -> List[str]:
     return failures
 
 
-def main(argv: List[str]) -> int:
+def main(argv: list[str]) -> int:
     args = argv[1:]
     if len(args) != 2 or args[0] != "--skill-dir":
         print("usage: sandbox_e2e.py --skill-dir <path>", file=sys.stderr)
@@ -105,7 +105,7 @@ def main(argv: List[str]) -> int:
         print(f"GOLDEN MISMATCH: no golden/ dir in {skill_dir}", file=sys.stderr)
         return 2
 
-    all_failures: List[str] = []
+    all_failures: list[str] = []
     scenario_files = sorted(golden_dir.glob("*.json"))
     if not scenario_files:
         print(f"GOLDEN MISMATCH: no scenarios in {golden_dir}", file=sys.stderr)

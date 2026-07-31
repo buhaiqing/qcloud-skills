@@ -199,7 +199,7 @@ def scan_file(path: Path, root: Path):
                             "message": check_item["message"],
                             "snippet": line_cache.get(abs_lineno, "").strip(),
                         }
-                except Exception:
+                except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
                     pass  # Skip on ctx access errors — conservative
 
 

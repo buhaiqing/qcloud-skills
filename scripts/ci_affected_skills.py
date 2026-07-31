@@ -4,12 +4,11 @@ the unique qcloud-*-ops skill names that must pass self-test in CI.
 Each emitted name is on its own line (empty output if none)."""
 import re
 import sys
-from typing import List
 
 SKILL_RE = re.compile(r"^(?:[ab]/)?(qcloud-[a-z0-9-]+-ops)/")
 
 
-def extract_skills(diff_text: str) -> List[str]:
+def extract_skills(diff_text: str) -> list[str]:
     skills = set()
     for line in diff_text.splitlines():
         m = SKILL_RE.match(line.strip())
@@ -27,12 +26,12 @@ def main() -> int:
             ["git", "merge-base", "HEAD", "origin/main"],
             capture_output=True,
             text=True,
-        ).stdout.strip() or "HEAD~1"
+        check=False).stdout.strip() or "HEAD~1"
         diff = subprocess.run(
             ["git", "diff", "--name-only", f"{base}...HEAD"],
             capture_output=True,
             text=True,
-        ).stdout
+        check=False).stdout
     else:
         diff = sys.stdin.read()
     for name in extract_skills(diff):

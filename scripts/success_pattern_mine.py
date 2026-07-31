@@ -68,9 +68,16 @@ DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 class SuccessEntry:
     __slots__ = (
-        "skill", "operation", "command_signature", "full_command",
-        "iter", "count", "first_hit", "last_hit",
-        "scores", "avg_iter",
+        "avg_iter",
+        "command_signature",
+        "count",
+        "first_hit",
+        "full_command",
+        "iter",
+        "last_hit",
+        "operation",
+        "scores",
+        "skill",
     )
 
     def __init__(self, **kwargs: Any) -> None:
@@ -90,7 +97,7 @@ class SuccessEntry:
         return {f: getattr(self, f) for f in self.__slots__}
 
     @classmethod
-    def from_pending(cls, raw: dict[str, Any]) -> "SuccessEntry":
+    def from_pending(cls, raw: dict[str, Any]) -> SuccessEntry:
         """Build entry from a pending JSON line."""
         cmd = raw.get("command", "")
         sig = cmd[:80] if cmd else ""
@@ -543,7 +550,7 @@ def cmd_batch(args: argparse.Namespace) -> int:
     lock_fd = open(lock_path, "w")
     try:
         fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
-    except (IOError, OSError) as e:
+    except OSError as e:
         print(f"WARN: could not acquire lock {lock_path}: {e}", file=sys.stderr)
 
     try:
@@ -591,7 +598,7 @@ def cmd_batch(args: argparse.Namespace) -> int:
         try:
             fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
             lock_fd.close()
-        except Exception:
+        except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
             pass
 
 

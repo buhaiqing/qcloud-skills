@@ -7,12 +7,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 from reflexion_store import (
-    store_failure_pattern,
     MAX_LINES,
-    parse_existing_safe,
     normalize_reflexion_key,
+    parse_existing_safe,
+    store_failure_pattern,
 )
 
 

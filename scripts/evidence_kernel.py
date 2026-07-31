@@ -82,7 +82,7 @@ def with_timeout(fn, seconds: float):
         def _run():
             try:
                 result["v"] = fn()
-            except Exception as e:  # noqa: BLE001 - re-raised below
+            except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError) as e:
                 result["exc"] = e
         t = threading.Thread(target=_run)
         t.start()

@@ -15,7 +15,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-
 IGNORED_DIR_PARTS = {
     ".git",
     ".github",

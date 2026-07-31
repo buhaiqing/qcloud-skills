@@ -50,7 +50,7 @@ class AggregateKpiTest(unittest.TestCase):
                 [sys.executable, str(SCRIPT), tmp],
                 capture_output=True,
                 text=True,
-            )
+            check=False)
             self.assertEqual(proc.returncode, 0, msg=proc.stderr)
             out = json.loads(proc.stdout)
             self.assertEqual(out["kpi"]["leak"], 0)
@@ -75,7 +75,7 @@ class AggregateKpiTest(unittest.TestCase):
             json.dump(rec, f)
             tmp = f.name
         try:
-            proc = subprocess.run([sys.executable, str(SCRIPT), tmp], capture_output=True, text=True)
+            proc = subprocess.run([sys.executable, str(SCRIPT), tmp], capture_output=True, text=True, check=False)
             self.assertEqual(proc.returncode, 1, msg=proc.stdout + proc.stderr)
             out = json.loads(proc.stdout)
             self.assertGreater(out["kpi"]["leak"], 0)
@@ -99,7 +99,7 @@ class AggregateKpiTest(unittest.TestCase):
             json.dump(rec, f)
             tmp = f.name
         try:
-            proc = subprocess.run([sys.executable, str(SCRIPT), tmp], capture_output=True, text=True)
+            proc = subprocess.run([sys.executable, str(SCRIPT), tmp], capture_output=True, text=True, check=False)
             self.assertEqual(proc.returncode, 1, msg=proc.stdout + proc.stderr)
             out = json.loads(proc.stdout)
             self.assertLess(out["kpi"]["destructive_coverage"], 1.0)
@@ -122,7 +122,7 @@ class AggregateKpiTest(unittest.TestCase):
             json.dump(rec, f)
             tmp = f.name
         try:
-            proc = subprocess.run([sys.executable, str(SCRIPT), tmp], capture_output=True, text=True)
+            proc = subprocess.run([sys.executable, str(SCRIPT), tmp], capture_output=True, text=True, check=False)
             self.assertEqual(proc.returncode, 1, msg=proc.stdout + proc.stderr)
             out = json.loads(proc.stdout)
             self.assertLess(out["kpi"]["provenance"], 1.0)

@@ -7,7 +7,7 @@ import json
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 # Import directly so tests run against the live source file
@@ -15,10 +15,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from rubric_calibrate import (
     DEFAULT_THRESHOLDS,
+    _confidence,
     _extract_iteration_scores,
     _load_traces,
     _suggested_with_safety,
-    _confidence,
     generate_report,
     print_table,
 )
@@ -149,7 +149,7 @@ class TestLoadTraces(unittest.TestCase):
             root = Path(tmpdir)
             audit = root / "audit-results"
             audit.mkdir()
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             old_date = (now - timedelta(days=60)).strftime("%Y%m%d")
             recent_date = now.strftime("%Y%m%d")
             (audit / f"gcl-trace-{old_date}-120000.json").write_text(
@@ -169,7 +169,7 @@ class TestLoadTraces(unittest.TestCase):
             root = Path(tmpdir)
             audit = root / "audit-results"
             audit.mkdir()
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             old_date = (now - timedelta(days=60)).strftime("%Y%m%d")
             recent_date = (now - timedelta(days=5)).strftime("%Y%m%d")
             (audit / f"gcl-trace-{old_date}-120000.json").write_text(

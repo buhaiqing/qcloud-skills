@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from reflexion_retrieve import load_failure_patterns, format_for_injection, _mask_credentials
+from reflexion_retrieve import _mask_credentials, format_for_injection, load_failure_patterns
 
 
 class TestReflexionRetrieve(unittest.TestCase):

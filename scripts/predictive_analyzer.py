@@ -22,7 +22,7 @@ import json
 import math
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -211,7 +211,7 @@ def predict_capacity(
                     predicted = moving_average_predict(cleaned)
                     method, r_sq, slope = "moving_average", None, 0.0
                     trend = "stable"
-        except Exception:
+        except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
             predicted = moving_average_predict(cleaned)
             method, r_sq, slope = "moving_average", None, 0.0
             trend = "unknown"
@@ -245,7 +245,7 @@ def predict_capacity(
         else:
             severity = "MEDIUM"
         exhaustion_date = (
-            (datetime.now(timezone.utc)
+            (datetime.now(UTC)
              + timedelta(hours=tte_val * 24 if tte_unit == "days" else tte_val))
             .strftime("%Y-%m-%dT%H:%M:%S+08:00")
         )
@@ -293,7 +293,7 @@ def predict_capacity(
             "recommended_action": f"RECOMMENDATION (not execution): {rec}",
             "priority": priority,
         },
-        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
 
@@ -321,7 +321,7 @@ def _dim_name(ns: str) -> str:
 
 
 def _iso_range(days: int) -> tuple[str, str]:
-    end = datetime.now(timezone.utc)
+    end = datetime.now(UTC)
     start = end - timedelta(days=days)
     return start.strftime("%Y-%m-%dT%H:%M:%SZ"), end.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -339,13 +339,13 @@ def _fetch(namespace: str, metric: str, inst_id: str, region: str,
            "--StartTime", start, "--EndTime", end, "--Period", str(period)]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=60,
-                          env={**subprocess.os.environ, "TCLOUD_OUTPUT_FORMAT": "json"})
+                          env={**subprocess.os.environ, "TCLOUD_OUTPUT_FORMAT": "json"}, check=False)
         if r.returncode != 0:
             return []
         dps = json.loads(r.stdout).get("Response", {}).get("DataPoints", [])
         if dps and dps[0].get("Values"):
             return [float(v) for v in dps[0]["Values"]]
-    except Exception:
+    except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
         pass
     return []
 
@@ -427,7 +427,7 @@ def self_verify() -> bool:
                   f"trend={t} (expected {expected})")
             if not passed:
                 ok = False
-        except Exception as e:
+        except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError) as e:
             print(f"  [FAIL] {name}: {e}")
             ok = False
     # Unit tests

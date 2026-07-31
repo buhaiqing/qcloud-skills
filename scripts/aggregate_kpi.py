@@ -13,7 +13,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 TARGETS = {"leak": 0, "destructive_coverage": 1.0, "provenance": 1.0, "mixing": 0.0}
 
 

@@ -2,12 +2,11 @@
 """pattern_anomaly_detect.py — Detect emerging failure patterns."""
 import argparse
 import json
+import statistics
 import sys
 from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
-
-import statistics
 
 DAYS_RECENT = 7
 DAYS_HISTORICAL = 30
@@ -21,10 +20,10 @@ def load_traces(trace_dir: Path, since_days: int):
         try:
             t = json.loads(f.read_text())
             ts = t.get("timestamp", "")
-            if ts and datetime.fromisoformat(ts.replace("Z", "+00:00")) < cutoff:
+            if ts and datetime.fromisoformat(ts) < cutoff:
                 continue
             traces.append(t)
-        except Exception:
+        except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
             pass
     return traces
 
@@ -37,8 +36,8 @@ def detect_anomalies(traces: list):
     for t in traces:
         ts = t.get("timestamp", "")
         try:
-            age = (now - datetime.fromisoformat(ts.replace("Z", "+00:00"))).days
-        except Exception:
+            age = (now - datetime.fromisoformat(ts)).days
+        except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
             age = 0
         fp = t.get("final", {}).get("failure_pattern", {})
         if not fp:

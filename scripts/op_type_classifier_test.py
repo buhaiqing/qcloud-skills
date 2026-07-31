@@ -3,8 +3,7 @@
 
 import unittest
 
-from op_type_classifier import classify_operation, classify_batch
-
+from op_type_classifier import classify_batch, classify_operation
 
 CASES = [
     # read

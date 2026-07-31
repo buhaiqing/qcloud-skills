@@ -16,7 +16,7 @@ class CiAffectedSkillsTest(TestCase):
             input=diff,
             capture_output=True,
             text=True,
-        )
+        check=False)
         self.assertEqual(result.returncode, 0)
         self.assertIn("qcloud-cvm-ops", result.stdout)
 
@@ -28,7 +28,7 @@ class CiAffectedSkillsTest(TestCase):
             input=diff,
             capture_output=True,
             text=True,
-        )
+        check=False)
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), "")
 

@@ -20,7 +20,7 @@ import json
 import re
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
@@ -28,7 +28,7 @@ _ROOT = _HERE.parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-import commit_hygiene_score as chs  # noqa: E402
+import commit_hygiene_score as chs
 
 AUDIT = _ROOT / "audit-results"
 FACTS_JSONL = AUDIT / "commit-hygiene-trial.jsonl"
@@ -137,7 +137,7 @@ def _record_from_commit(c: dict) -> dict:
 
 def cmd_collect(days: int) -> int:
     """Collect commits from the past `days` days, append to facts jsonl."""
-    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     commits = _git_log(since)
     if not commits:
         print(f"No commits in the past {days} days. Nothing to append.")
@@ -187,7 +187,7 @@ def cmd_score() -> dict:
     facts = _load_facts()
     metrics = chs.score_window(facts)
     metrics["recommend"] = chs.recommend(metrics)
-    metrics["ts"] = datetime.now(timezone.utc).isoformat()
+    metrics["ts"] = datetime.now(UTC).isoformat()
     metrics["n_total"] = len(facts)
 
     AUDIT.mkdir(parents=True, exist_ok=True)
@@ -208,7 +208,7 @@ def _status_emoji(metrics: dict, recommend: str) -> str:
 
 def _render_report(metrics: dict, recent: list[dict]) -> str:
     rec_emoji = _status_emoji(metrics, metrics["recommend"])
-    today = datetime.now(timezone.utc).strftime("%Y%m%d")
+    today = datetime.now(UTC).strftime("%Y%m%d")
     lines = [
         f"# Commit Hygiene Trial — Weekly Report {today}",
         "",
@@ -255,7 +255,7 @@ def cmd_report() -> int:
     metrics = cmd_score()
     facts = _load_facts()
     DOCS.mkdir(parents=True, exist_ok=True)
-    today = datetime.now(timezone.utc).strftime("%Y%m%d")
+    today = datetime.now(UTC).strftime("%Y%m%d")
     report_path = DOCS / f"commit-hygiene-trial-report-{today}.md"
     report_path.write_text(_render_report(metrics, facts), encoding="utf-8")
     print(f"Wrote {report_path}")

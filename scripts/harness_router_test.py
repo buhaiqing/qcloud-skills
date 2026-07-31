@@ -8,8 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-import harness_router  # noqa: E402
-import build_skill_registry  # noqa: E402
+import build_skill_registry
+import harness_router
 
 
 class HarnessRouterTest(unittest.TestCase):

@@ -18,7 +18,7 @@ def detect_hallucinations(traces: list):
                 continue
             try:
                 result = json.loads(resp)
-            except Exception:
+            except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
                 continue
             checks = []
             req_id = "RequestId" in str(result)

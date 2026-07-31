@@ -20,7 +20,7 @@ class HarnessSafetyTest(unittest.TestCase):
         res = subprocess.run(
             [sys.executable, "-c", code],
             cwd=REPO_ROOT, capture_output=True, text=True,
-        )
+        check=False)
         self.assertEqual(res.returncode, 0, res.stderr)
 
     def test_token_binding_ok(self) -> None:
@@ -33,7 +33,7 @@ class HarnessSafetyTest(unittest.TestCase):
         res = subprocess.run(
             [sys.executable, "-c", code],
             cwd=REPO_ROOT, capture_output=True, text=True,
-        )
+        check=False)
         self.assertEqual(res.returncode, 0, res.stderr)
 
     def test_token_mismatch_refuses(self) -> None:
@@ -49,7 +49,7 @@ class HarnessSafetyTest(unittest.TestCase):
         res = subprocess.run(
             [sys.executable, "-c", code],
             cwd=REPO_ROOT, capture_output=True, text=True,
-        )
+        check=False)
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertIn("ok", res.stdout)
 
@@ -67,7 +67,7 @@ class HarnessSafetyTest(unittest.TestCase):
         res = subprocess.run(
             [sys.executable, "-c", code],
             cwd=REPO_ROOT, capture_output=True, text=True,
-        )
+        check=False)
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertIn("ok", res.stdout)
 

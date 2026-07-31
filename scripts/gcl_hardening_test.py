@@ -27,7 +27,7 @@ class GclHardeningTest(unittest.TestCase):
             cwd=str(REPO_ROOT),
             capture_output=True,
             text=True,
-        )
+        check=False)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn("ok", proc.stdout)
 
@@ -47,7 +47,7 @@ class GclHardeningTest(unittest.TestCase):
             cwd=str(REPO_ROOT),
             capture_output=True,
             text=True,
-        )
+        check=False)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn("ok", proc.stdout)
 

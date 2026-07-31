@@ -52,8 +52,16 @@ DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 class SuccessEntry:
     __slots__ = (
-        "skill", "operation", "command_signature", "full_command",
-        "iter", "count", "first_hit", "last_hit", "scores", "avg_iter",
+        "avg_iter",
+        "command_signature",
+        "count",
+        "first_hit",
+        "full_command",
+        "iter",
+        "last_hit",
+        "operation",
+        "scores",
+        "skill",
     )
 
     def __init__(self, **kwargs: Any) -> None:

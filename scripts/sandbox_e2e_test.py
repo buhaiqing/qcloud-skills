@@ -43,7 +43,7 @@ class SandboxE2ETest(TestCase):
             [sys.executable, str(ROOT / "scripts" / "sandbox_e2e.py"), "--skill-dir", str(skill_dir)],
             capture_output=True,
             text=True,
-        )
+        check=False)
         self.assertEqual(result.returncode, 0, msg=result.stderr)
 
     def test_golden_mismatch_fails(self) -> None:
@@ -62,7 +62,7 @@ class SandboxE2ETest(TestCase):
             [sys.executable, str(ROOT / "scripts" / "sandbox_e2e.py"), "--skill-dir", str(skill_dir)],
             capture_output=True,
             text=True,
-        )
+        check=False)
         self.assertNotEqual(result.returncode, 0, msg=result.stderr)
 
 

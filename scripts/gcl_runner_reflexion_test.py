@@ -25,8 +25,8 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-import gcl_runner  # noqa: E402
-from harness_safety import plan_hash  # noqa: E402
+import gcl_runner
+from harness_safety import plan_hash
 
 
 def quiet_cmd_run(ns) -> int:

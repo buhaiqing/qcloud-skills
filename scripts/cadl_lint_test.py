@@ -12,7 +12,7 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-import cadl_lint as cl  # noqa: E402
+import cadl_lint as cl
 
 
 class CanonicalHookConstantTests(unittest.TestCase):
@@ -73,7 +73,7 @@ class LintOneTests(unittest.TestCase):
         ghost = Path("/tmp/definitely-missing-skill.md")
         if ghost.exists():  # pragma: no cover — paranoid cleanup
             ghost.unlink()
-        name, ok, msg = cl.lint_one(ghost)
+        _name, ok, msg = cl.lint_one(ghost)
         self.assertFalse(ok)
         self.assertIn("not found", msg)
 

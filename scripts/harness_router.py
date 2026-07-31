@@ -6,7 +6,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -29,7 +29,7 @@ def _keyword_overlap(keyword: str, query_tokens: set) -> int:
         return 0
     return sum(1 for t in kt if t in query_tokens)
 
-def select_top1(registry: Dict[str, Any], intent: str) -> Dict[str, Any]:
+def select_top1(registry: dict[str, Any], intent: str) -> dict[str, Any]:
     """Frontmatter-only candidate ranking. Scores each skill by word-token
     overlap between its intent_keywords (CamelCase API names) and the intent
     text; returns the best match plus the full candidate list (caller loads
@@ -56,8 +56,8 @@ def select_top1(registry: Dict[str, Any], intent: str) -> Dict[str, Any]:
 
 
 def confusion_matrix(
-    registry: Dict[str, Any], eval_queries: List[dict], skill: str
-) -> Dict[str, float]:
+    registry: dict[str, Any], eval_queries: list[dict], skill: str
+) -> dict[str, float]:
     """Reuse eval_queries.json (ground truth) for routing accuracy.
 
     Each eval item: {"query": str, "should_trigger": bool, "intent": keyword}.
@@ -75,7 +75,7 @@ def confusion_matrix(
     return {"top1_accuracy": top1, "misdelegation": misdelegation, "fallback": 0.0}
 
 
-def _top1_has_intent(registry: Dict[str, Any], q: dict, skill: str) -> bool:
+def _top1_has_intent(registry: dict[str, Any], q: dict, skill: str) -> bool:
     top = select_top1(registry, q.get("query", ""))["top1_skill"]
     skills = {s["name"]: s for s in registry["skills"]}
     top_kw = skills.get(top, {}).get("intent_keywords", [])

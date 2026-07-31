@@ -114,7 +114,7 @@ def strip_generic_antipatterns(sec5: str) -> str:
             out.append(line)
             skip_bullet = False
             continue
-        if re.match(r"^### .+-specific anti-patterns", line, re.I):
+        if re.match(r"^### .+-specific anti-patterns", line, re.IGNORECASE):
             skip_bullet = False
             out.append(line)
             continue
@@ -145,18 +145,18 @@ def build_compact_section4(skill: str, meta: dict[str, str | int | bool]) -> str
     lines = [
         "## 4. Per-operation variants",
         "",
-        f"> **TE-6:** Pre-flight / Critic rule checks are **canonical** in "
+        (f"> **TE-6:** Pre-flight / Critic rule checks are **canonical** in "
         f"[`references/rubric.md`](rubric.md) §4 ({title} — 5 rules). "
-        "Do not duplicate gate text here.",
+        "Do not duplicate gate text here."),
         "",
         "| Role | Action |",
         "|---|---|",
-        "| Generator | Load rubric §4; map op → rule 1–5; run gates; "
-        "append to trace `preflight` |",
-        "| Critic | Score rubric §3 + mark §4 rules "
-        "VIOLATED / SATISFIED / NOT-APPLICABLE |",
-        "| Orchestrator | Safety=0 on §4 violation (destructive) → ABORT; "
-        "advisory/read-only: rubric §2 |",
+        ("| Generator | Load rubric §4; map op → rule 1–5; run gates; "
+        "append to trace `preflight` |"),
+        ("| Critic | Score rubric §3 + mark §4 rules "
+        "VIOLATED / SATISFIED / NOT-APPLICABLE |"),
+        ("| Orchestrator | Safety=0 on §4 violation (destructive) → ABORT; "
+        "advisory/read-only: rubric §2 |"),
     ]
     if meta.get("readonly"):
         lines.append(
@@ -197,7 +197,7 @@ def clean_section5(sec5: str) -> str:
         if line.startswith(">"):
             out.append(line)
             continue
-        if re.match(r"^### .+-specific anti-patterns", line, re.I):
+        if re.match(r"^### .+-specific anti-patterns", line, re.IGNORECASE):
             in_product = True
             out.append(line)
             continue
@@ -205,7 +205,7 @@ def clean_section5(sec5: str) -> str:
             in_product = True
             out.append(line)
             continue
-        if line.startswith("|") or line.startswith("##"):
+        if line.startswith(("|", "##")):
             out.append(line)
             continue
         if line.strip() == "":
@@ -313,7 +313,7 @@ def compress_prompt(skill: str, dry_run: bool) -> tuple[int, int]:
     sec7 = sections.get(7, f"## 7. See also\n\n- [`gcl-prompt-backbone.md`]({BACKBONE})\n")
 
     new = normalize_doc(
-        te6 + "\n---\n\n" + "\n\n---\n\n".join([s1, s2, s3, s4, sec5, sec6, sec7]) + "\n"
+        te6 + "\n---\n\n" + f"{s1}\n\n---\n\n{s2}\n\n---\n\n{s3}\n\n---\n\n{s4}\n\n---\n\n{sec5}\n\n---\n\n{sec6}\n\n---\n\n{sec7}" + "\n"
     )
     new_lines = len(new.splitlines())
     if not dry_run:

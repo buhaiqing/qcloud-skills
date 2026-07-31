@@ -11,7 +11,7 @@ SCRIPT = Path(__file__).resolve().parent / "build_skill_registry.py"
 class BuildSkillRegistryTest(unittest.TestCase):
     def test_registry_has_all_skills(self):
         r = subprocess.run([sys.executable, str(SCRIPT), "--emit"],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, check=False)
         self.assertEqual(r.returncode, 0, r.stderr)
         data = json.loads((ROOT / "audit-results" / "skill-registry.json").read_text())
         self.assertGreaterEqual(data["count"], 30)

@@ -276,7 +276,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
         ]
         print(f"[apply] {' '.join(shlex.quote(c) for c in cmd)}")
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60, check=False)
         except subprocess.TimeoutExpired:
             print(f"[apply] TIMEOUT on {entry['name']}", file=sys.stderr)
             rc = 3
