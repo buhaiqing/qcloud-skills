@@ -430,10 +430,15 @@ python3 scripts/gcl_trace_aggregate.py --cross-skill --run-id abc-123
 
 ```python
 # 1.2: SkillRegistry 完整性
+# Actual count: 30 production skills (qcloud-*-ops/) + 1 M3 stub (qcloud-test-ops) = 31.
+# Plan originally estimated 34; actual disk had 30 before stub was added.
 reg = SkillRegistry.from_skill_dirs(Path("."))
-assert len(reg.discover()) == 34
+assert len(reg.discover()) == 31  # 30 production + 1 stub
 assert reg.validate("qcloud-cvm-ops")
+assert reg.validate("qcloud-test-ops")  # M3 stub
 assert not reg.validate("nonexistent")
+# M3 acceptance: curated queries route to the stub without code changes
+assert reg.route("M3 acceptance probe stub validation")[0] == "qcloud-test-ops"
 
 # 1.3: ErrorEscalator 安全默认值
 esc = ErrorEscalator()
