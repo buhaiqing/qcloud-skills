@@ -16,6 +16,11 @@ Usage:
   # Rule-based structural audit only (CI / dry-run; NOT a substitute for isolated Critic):
   python3 scripts/gcl_runner.py run ... --structural-critic-only
 
+  # Built-in LLM Critic (Phase 1 module 1.1). Uses OpenAI-compatible chat API.
+  python3 scripts/gcl_runner.py run ... --llm-critic \\
+    [--llm-model MODEL] [--llm-base-url URL]
+  # Falls back to structural_critic on timeout / malformed response.
+
 Trace output: ``audit-results/gcl-trace-YYYYMMDD-HHMMSS.json``
 """
 
@@ -24,23 +29,25 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
-import re
 import os
+import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+import urllib.error
+import urllib.request
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from distribution_drift import compute_drift
+from distribution_drift import load_traces as _load_traces_dd
+from evidence_kernel import mask_trace, post_record, preflight
 from gcl_trajectory_quality import classify_op
-from reflexion_retrieve import load_failure_patterns, format_for_injection as ff_fail
+from hallucination_detection import detect_hallucinations
+from reflexion_retrieve import format_for_injection as ff_fail
+from reflexion_retrieve import load_failure_patterns
 from success_pattern_mine import write_pending_with_lock
 from success_pattern_retrieve import retrieve_success_patterns
-from hallucination_detection import detect_hallucinations
-from distribution_drift import load_traces as _load_traces_dd, compute_drift
-from evidence_kernel import mask_trace, post_record, preflight
-
-
 
 
 def load_tcloud_error_hints() -> str:
@@ -52,7 +59,7 @@ def load_tcloud_error_hints() -> str:
         for code, info in TCLOUD_ERROR_CODES.items():
             lines.append(f"- `{code}`: {info['category']} — {info['fix']}")
         return "\n".join(lines)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return ""
 
 
@@ -62,7 +69,7 @@ def load_error_code_map() -> dict[str, dict[str, str]]:
         from tcloud_error_codes import TCLOUD_ERROR_CODES
 
         return TCLOUD_ERROR_CODES
-    except Exception:
+    except Exception:  # noqa: BLE001
         return {}
 
 # Per AGENTS.md §8 defaults (override via --max-iter)
@@ -119,7 +126,7 @@ def _rubric_calibration(root: Path, skill: str):
                     f"[rubric_calibrate] Using calibrated thresholds for {skill}",
                     file=sys.stderr,
                 )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass  # non-blocking
     try:
         yield
@@ -137,16 +144,16 @@ RUBRIC_THRESHOLDS: dict[str, float] = {
 }
 
 SECRET_PATTERNS = [
-    re.compile(r"SecretKey\s*=\s*[^<\s][^\s\"']+", re.I),
-    re.compile(r"TENCENTCLOUD_SECRET_KEY\s*=\s*[^\s\"']+", re.I),
+    re.compile(r"SecretKey\s*=\s*[^<\s][^\s\"']+", re.IGNORECASE),
+    re.compile(r"TENCENTCLOUD_SECRET_KEY\s*=\s*[^\s\"']+", re.IGNORECASE),
     re.compile(r"AKID[A-Za-z0-9]{20,}"),
 ]
 
 
 def mask_secrets(text: str) -> str:
     out = text
-    out = re.sub(r"(SecretKey\s*=\s*)([^\s\"']+)", r"\1<masked>", out, flags=re.I)
-    out = re.sub(r"(TENCENTCLOUD_SECRET_KEY\s*=\s*)([^\s\"']+)", r"\1<masked>", out, flags=re.I)
+    out = re.sub(r"(SecretKey\s*=\s*)([^\s\"']+)", r"\1<masked>", out, flags=re.IGNORECASE)
+    out = re.sub(r"(TENCENTCLOUD_SECRET_KEY\s*=\s*)([^\s\"']+)", r"\1<masked>", out, flags=re.IGNORECASE)
     return out
 
 
@@ -229,7 +236,7 @@ def structural_critic(generator: dict[str, Any]) -> dict[str, Any]:
         try:
             out_dict = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
             has_request_id = "RequestId" in out_dict.get("Response", {})
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
     scores["traceability"] = 1.0 if has_request_id else 0.5
     if not has_request_id and (exit_code == 0 or excerpt):
@@ -241,7 +248,7 @@ def structural_critic(generator: dict[str, Any]) -> dict[str, Any]:
         try:
             out_dict = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
             has_client_token = "ClientToken" in out_dict.get("Response", {})
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
     scores["idempotency"] = 1.0 if has_client_token else 0.5
     if not has_client_token and exit_code == 0:
@@ -261,7 +268,7 @@ def structural_critic(generator: dict[str, Any]) -> dict[str, Any]:
             try:
                 out_dict = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
                 has_error_field = "Error" in out_dict.get("Response", {})
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
         # Delete success should have Error: null or absent
         if has_error_field:
@@ -283,6 +290,178 @@ def load_critic(path: Path | None, stdin: bool) -> dict[str, Any] | None:
     if stdin and not sys.stdin.isatty():
         return json.loads(sys.stdin.read())
     return None
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 module 1.1: built-in LLM Critic
+# ---------------------------------------------------------------------------
+
+DEFAULT_LLM_TIMEOUT = 120
+DEFAULT_LLM_MODEL = "gpt-4o-mini"
+
+_LLM_PROMPT_TEMPLATE = """You are the Critic in a Generator-Critic Loop for Tencent Cloud ops skills.
+
+Score the Generator's tccli command execution against the rubric. Return JSON:
+{
+  "scores": {
+    "correctness": 0 | 0.5 | 1,
+    "safety":      0 | 1,
+    "idempotency": 0 | 0.5 | 1,
+    "traceability":0 | 0.5 | 1,
+    "spec_compliance": 0 | 0.5 | 1
+  },
+  "suggestions": ["..."],
+  "blocking": true | false
+}
+
+Rules:
+- safety=0 if credentials appear in command/output, or destructive op without confirmation
+- correctness=0 if exit_code != 0 or result is malformed
+- idempotency=0 if side-effects confirmed (read-only is fine)
+- traceability=0 if no RequestId / no structured output
+- spec_compliance=0 if operation doesn't match skill intent
+- blocking=true only when safety=0 or correctness=0
+- Wrap your JSON in a ```json``` code fence for clarity."""
+
+
+def _load_skill_rubric(root: Path, skill: str) -> str:
+    """Load skill-specific rubric. Falls back to generic if absent."""
+    rubric = root / skill / "references" / "rubric.md"
+    if rubric.exists():
+        return rubric.read_text(encoding="utf-8")
+    return "(no skill-specific rubric; use generic GCL rubric from docs/gcl-spec.md)"
+
+
+def _build_llm_config() -> dict[str, Any] | None:
+    """Build LLM config from GCL_LLM_* env vars. Returns None when incomplete."""
+    api_key = os.environ.get("GCL_LLM_API_KEY", "").strip()
+    base_url = os.environ.get("GCL_LLM_BASE_URL", "").strip()
+    model = os.environ.get("GCL_LLM_MODEL", "").strip() or DEFAULT_LLM_MODEL
+    raw_timeout = os.environ.get("GCL_LLM_TIMEOUT", "").strip()
+    try:
+        timeout = int(raw_timeout) if raw_timeout else DEFAULT_LLM_TIMEOUT
+    except ValueError:
+        timeout = DEFAULT_LLM_TIMEOUT
+    if not api_key or not base_url:
+        return None
+    return {
+        "api_key": api_key,
+        "base_url": base_url.rstrip("/"),
+        "model": model,
+        "timeout": timeout,
+    }
+
+
+def _call_llm_chat(
+    llm_config: dict[str, Any],
+    system_prompt: str,
+    user_prompt: str,
+) -> str:
+    """Call OpenAI-compatible chat completion API; return raw response body string.
+
+    Raises urllib.error.URLError / TimeoutError on network failures.
+    """
+    url = f"{llm_config['base_url']}/chat/completions"
+    payload = {
+        "model": llm_config["model"],
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": 0.0,
+    }
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {llm_config['api_key']}",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=llm_config["timeout"]) as resp:
+        body = resp.read().decode("utf-8")
+    # OpenAI format: response.choices[0].message.content
+    try:
+        parsed = json.loads(body)
+        return parsed["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, json.JSONDecodeError):
+        # Some providers return raw JSON; fall through
+        return body
+
+
+def _parse_llm_response(body: str) -> dict[str, Any]:
+    """Extract a Critic JSON payload from an LLM response string.
+
+    Tolerates:
+      - raw JSON
+      - JSON wrapped in ```json ... ``` fences
+      - prose prefix before the JSON block
+    Raises ValueError when no JSON object can be found.
+    """
+    text = body.strip()
+    # Strip code fences
+    fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if fence_match:
+        text = fence_match.group(1)
+    else:
+        # Find the first { ... } block
+        brace_start = text.find("{")
+        brace_end = text.rfind("}")
+        if brace_start != -1 and brace_end != -1 and brace_end > brace_start:
+            text = text[brace_start:brace_end + 1]
+    parsed = json.loads(text)
+    parsed["_mode"] = "llm-builtin"
+    return parsed
+
+
+def llm_critic(
+    generator: dict[str, Any],
+    skill: str,
+    rubric_text: str,
+    prompt_template: str,
+    llm_config: dict[str, Any],
+) -> dict[str, Any]:
+    """Built-in LLM Critic (Phase 1 module 1.1).
+
+    - Sends generator output + skill-specific rubric to OpenAI-compatible API
+    - On timeout / malformed response: retries once, then falls back to
+      ``structural_critic()`` with ``_mode = "structural-only-fallback"``.
+    - Never raises: returns a Critic payload that satisfies
+      ``validate_critic_payload()`` (or its fallback).
+    """
+    system_prompt = (
+        f"{prompt_template}\n\n"
+        f"--- RUBRIC ({skill}) ---\n{rubric_text}"
+    )
+    user_prompt = (
+        f"Skill: {skill}\n"
+        f"Command: {generator.get('command', '')}\n"
+        f"Exit code: {generator.get('exit_code', '?')}\n"
+        f"Result excerpt: {generator.get('result_excerpt', '')}\n"
+    )
+
+    last_exc: Exception | None = None
+    for attempt in range(2):  # initial + 1 retry
+        try:
+            body = _call_llm_chat(llm_config, system_prompt, user_prompt)
+            parsed = _parse_llm_response(body)
+            # Validate shape; on invalid shape, fall through to fallback
+            errs = validate_critic_payload(parsed)
+            if errs:
+                last_exc = ValueError("; ".join(errs))
+                continue
+            return parsed
+        except (TimeoutError, urllib.error.URLError, json.JSONDecodeError, ValueError) as e:
+            last_exc = e
+            continue
+    # Fallback to structural critic
+    structural = structural_critic(generator)
+    structural["_mode"] = "structural-only-fallback"
+    structural["_fallback_reason"] = (
+        f"LLM critic failed after 2 attempts: {type(last_exc).__name__ if last_exc else 'unknown'}"
+    )
+    return structural
 
 
 def validate_critic_payload(critic: dict[str, Any]) -> list[str]:
@@ -358,11 +537,11 @@ def decide(scores: dict[str, float]) -> str:
 # docs/failure-patterns.md. Categories match the schema in that file:
 #   cli_parameter | skill_generation | cross_skill | runtime | token_efficiency
 _FAILURE_SIGNATURES: list[tuple[str, re.Pattern[str]]] = [
-    ("cli_parameter", re.compile(r"InvalidParameter|MissingParameter|AuthFailure\.", re.I)),
-    ("runtime", re.compile(r"TIMEOUT|RequestLimitExceeded|InternalError|ConnectionError", re.I)),
-    ("cross_skill", re.compile(r"delegate-to|not found in target skill|cross-skill", re.I)),
-    ("token_efficiency", re.compile(r"token budget|exceeds.*token|too long|truncated", re.I)),
-    ("skill_generation", re.compile(r"frontmatter missing|missing rubric|broken link", re.I)),
+    ("cli_parameter", re.compile(r"InvalidParameter|MissingParameter|AuthFailure\.", re.IGNORECASE)),
+    ("runtime", re.compile(r"TIMEOUT|RequestLimitExceeded|InternalError|ConnectionError", re.IGNORECASE)),
+    ("cross_skill", re.compile(r"delegate-to|not found in target skill|cross-skill", re.IGNORECASE)),
+    ("token_efficiency", re.compile(r"token budget|exceeds.*token|too long|truncated", re.IGNORECASE)),
+    ("skill_generation", re.compile(r"frontmatter missing|missing rubric|broken link", re.IGNORECASE)),
 ]
 
 
@@ -434,7 +613,7 @@ def persist_trace(root: Path, trace: dict[str, Any], trace_id: str | None = None
         trace = {**trace, "trace_id": trace_id}
         path = out_dir / f"gcl-trace-{trace_id}.json"
     else:
-        ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         path = out_dir / f"gcl-trace-{ts}.json"
     path.write_text(json.dumps(trace, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return path
@@ -465,7 +644,7 @@ def emit_evidence_record(root: Path, trace: dict[str, Any], args: argparse.Names
                        "token": os.environ.get("HARNESS_CONFIRM_TOKEN") if destructive else None,
                        "token_bound": token_bound, "plan_hash": None, "leak_checked": True},
             "provenance": {"source": "gcl_runner", "tool": "tccli",
-                           "captured_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")},
+                           "captured_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")},
             "budgets": {"context_tokens": 0, "tool_calls": len(trace.get("iterations", [])),
                         "wall_clock_ms": 0},
             "cost": {"tokens": 0, "usd": None},
@@ -511,7 +690,7 @@ def post_process(trace_path: Path, root: Path) -> None:
     """
     try:
         trace_data = json.loads(trace_path.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception:  # noqa: BLE001
         return
     # Hallucination detection
     suspects = detect_hallucinations([trace_data])
@@ -547,7 +726,7 @@ def post_process(trace_path: Path, root: Path) -> None:
                         f"delta={d['delta']:.3f} [{d['alert']}]",
                         file=sys.stderr,
                     )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass  # non-blocking
 
 
@@ -560,7 +739,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         # Load failure patterns (prevention hints)
         try:
             prior_fail = load_failure_patterns(args.skill, args.command)
-        except Exception:
+        except Exception:  # noqa: BLE001
             prior_fail = []
         fail_block = ff_fail(prior_fail)
     
@@ -569,7 +748,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         operation = op_match.group(1) if op_match else None
         try:
             prior_success = retrieve_success_patterns(args.skill, operation=operation, top_n=3)
-        except Exception:
+        except Exception:  # noqa: BLE001
             prior_success = []
         succ_block = _format_success_injection(prior_success)
     
@@ -596,7 +775,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         run_id = os.environ.get("HARNESS_RUN_ID", args.trace_id or "local")
 
         # Evidence Kernel PreFlight + Phase 3 human-token binding (additive gates)
-        from harness_safety import is_destructive, bind_token  # local import to keep top clean
+        from harness_safety import bind_token, is_destructive  # local import to keep top clean
         token = os.environ.get("HARNESS_CONFIRM_TOKEN")
         pf = preflight(args.command, token)
         pf["token_bound"] = False
@@ -619,6 +798,30 @@ def cmd_run(args: argparse.Namespace) -> int:
     
             if args.structural_critic_only:
                 critic = structural_critic(generator)
+            elif args.llm_critic:
+                # Phase 1 module 1.1: built-in LLM Critic
+                cfg = _build_llm_config()
+                # CLI flags override env vars
+                if args.llm_model:
+                    cfg = cfg or {}
+                    cfg["model"] = args.llm_model
+                if args.llm_base_url:
+                    cfg = cfg or {}
+                    cfg["base_url"] = args.llm_base_url.rstrip("/")
+                if cfg is None:
+                    print(
+                        "ERROR: --llm-critic requires GCL_LLM_API_KEY and GCL_LLM_BASE_URL "
+                        "(or --llm-base-url + --llm-model).",
+                        file=sys.stderr,
+                    )
+                    return 2
+                rubric_text = _load_skill_rubric(root, args.skill)
+                critic = llm_critic(
+                    generator, args.skill,
+                    rubric_text= rubric_text,
+                    prompt_template=_LLM_PROMPT_TEMPLATE,
+                    llm_config=cfg,
+                )
             else:
                 critic = load_critic(args.critic_json, args.critic_stdin)
                 if critic is None:
@@ -683,9 +886,9 @@ def cmd_run(args: argparse.Namespace) -> int:
                         "command": command or "",
                         "iter": iteration,
                         "scores": scores,
-                        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+                        "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S"),
                     })
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass  # non-blocking: success logging must not break the main return path
                 print(f"PASS (iter {iteration}) — trace: {path}")
                 if args.enable_post_process:
@@ -736,6 +939,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--structural-critic-only",
         action="store_true",
         help="Use rule-based structural critic (CI/dry-run; not for production mutations)",
+    )
+    run.add_argument(
+        "--llm-critic",
+        action="store_true",
+        help="Use built-in LLM Critic (Phase 1 module 1.1). Requires GCL_LLM_* env vars. "
+             "Falls back to structural critic on timeout/malformed response.",
+    )
+    run.add_argument(
+        "--llm-model",
+        default=None,
+        help="LLM model name (overrides GCL_LLM_MODEL env var)",
+    )
+    run.add_argument(
+        "--llm-base-url",
+        default=None,
+        help="LLM API base URL (overrides GCL_LLM_BASE_URL env var)",
     )
     run.add_argument(
         "--trace-id",
