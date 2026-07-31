@@ -41,6 +41,7 @@ metadata:
     - qcloud-finops-ops       # 反向：成本优化分析
     - qcloud-tcop-ops         # 反向：资源优化与架构评估
     - qcloud-aiops-diagnosis  # 反向：多指标问题诊断
+  product_name: scf
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).
@@ -278,16 +279,16 @@ tccli scf ListFunctions --Region {{env.TENCENTCLOUD_REGION}} --Namespace default
 
 > **Canonical reference:** See [`references/troubleshooting.md`](references/troubleshooting.md) § Error Code Reference for complete error taxonomy with retry policies and agent actions. Key SCF-specific codes:
 
-| Code | Retry? | Quick Action |
-|------|--------|--------------|
-| `InvalidParameter` / `InvalidParameterValue` | No | Fix per API spec |
-| `ResourceNotFound` | No | Verify name; suggest ListFunctions |
-| `ResourceInUse` | No | Use unique name |
-| `ResourceLimitExceeded` | No | HALT; request quota increase |
-| `OperationConflict` | Yes (3x) | Wait; retry |
-| `RequestLimitExceeded` | Yes (3x) | Exponential backoff |
-| `InternalError` | Yes (3x) | Retry; escalate with RequestId |
-| `InvalidCode` / `CodeExceeded` | No | Fix package; reduce size (<500MB) |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter / InvalidParameterValue` | FIX | 0 | — | — | Fix per API spec |
+| `ResourceNotFound` | HALT | 0 | — | — | Verify name; suggest ListFunctions |
+| `ResourceInUse` | HALT | 0 | — | — | Use unique name |
+| `ResourceLimitExceeded` | HALT | 0 | — | — | HALT; request quota increase |
+| `OperationConflict` | HALT | 0 | — | — | Wait; retry |
+| `RequestLimitExceeded` | RETRY | 0 | — | — | Exponential backoff |
+| `InternalError` | RETRY | 0 | — | — | Retry; escalate with RequestId |
+| `InvalidCode / CodeExceeded` | FIX | 0 | — | — | Fix package; reduce size (<500MB) |
 
 ## Safety Gates (Destructive Operations)
 

@@ -33,6 +33,7 @@ metadata:
     - TENCENTCLOUD_REGION
   gcl: required
   gcl_max_iter: 2
+  product_name: apigateway
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).
@@ -224,11 +225,11 @@ tccli apigateway CreateService \
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `LimitExceeded.ServiceLimitExceeded` | HALT; raise service quota |
-| `InvalidParameterValue` | Fix name/protocol per spec |
-| `RequestLimitExceeded` | Backoff retry (2s,4s,8s) |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `LimitExceeded.ServiceLimitExceeded` | HALT | 0 | — | — | HALT; raise service quota |
+| `InvalidParameterValue` | FIX | 0 | — | — | Fix name/protocol per spec |
+| `RequestLimitExceeded` | RETRY | 3 | 2s,4s,8s | — | Backoff retry (2s,4s,8s) |
 
 ### Operation: Create API
 
@@ -265,11 +266,11 @@ tccli apigateway CreateApi \
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `ResourceNotFound.InvalidService` | Verify `{{user.service_id}}` |
-| `LimitExceeded.ApiLimitExceeded` | HALT; raise API quota |
-| `InvalidParameterValue` | Fix RequestConfig / ServiceConfig |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.InvalidService` | HALT | 0 | — | — | Verify `{{user.service_id}}` |
+| `LimitExceeded.ApiLimitExceeded` | HALT | 0 | — | — | HALT; raise API quota |
+| `InvalidParameterValue` | FIX | 0 | — | — | Fix RequestConfig / ServiceConfig |
 
 ### Operation: Release Service (Publish to Environment)
 
@@ -296,11 +297,11 @@ tccli apigateway ReleaseService \
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `ResourceNotFound.InvalidService` | Verify service ID |
-| `FailedOperation.ServiceInUse` | Another release in progress; retry after wait |
-| `UnsupportedOperation.ReleasedEnvironment` | Check env state |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.InvalidService` | HALT | 0 | — | — | Verify service ID |
+| `FailedOperation.ServiceInUse` | HALT | 0 | — | — | Another release in progress; retry after wait |
+| `UnsupportedOperation.ReleasedEnvironment` | HALT | 0 | — | — | Check env state |
 
 ### Operation: Create Usage Plan + Bind
 
@@ -347,10 +348,10 @@ tccli apigateway BindSubDomain \
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `InvalidParameterValue.CertificateId` | Verify certificate in SSL console → `qcloud-ssl-ops` |
-| `ResourceNotFound.InvalidService` | Verify service ID |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameterValue.CertificateId` | HALT | 0 | — | — | Verify certificate in SSL console → `qcloud-ssl-ops` |
+| `ResourceNotFound.InvalidService` | HALT | 0 | — | — | Verify service ID |
 
 ### Operation: Modify API
 
@@ -387,10 +388,10 @@ Poll `DescribeApisStatus --ServiceId "{{output.service_id}}"`; expect API absent
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `ResourceNotFound.InvalidApi` | Already removed; treat as success |
-| `UnsupportedOperation.ApiInUse` | Unbind usage plans / un-release first |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.InvalidApi` | HALT | 0 | — | — | Already removed; treat as success |
+| `UnsupportedOperation.ApiInUse` | HALT | 0 | — | — | Unbind usage plans / un-release first |
 
 ### Operation: Delete Service
 
@@ -416,28 +417,28 @@ Poll `DescribeServicesStatus --ServiceIds "[\"{{output.service_id}}\"]"`; expect
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `ResourceNotFound.InvalidService` | Already removed |
-| `UnsupportedOperation.ServiceInUse` | Delete all child APIs / unbind domains first |
-| `FailedOperation.ServiceInUse` | Wait for in-flight traffic; retry |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.InvalidService` | HALT | 0 | — | — | Already removed |
+| `UnsupportedOperation.ServiceInUse` | HALT | 0 | — | — | Delete all child APIs / unbind domains first |
+| `FailedOperation.ServiceInUse` | HALT | 0 | — | — | Wait for in-flight traffic; retry |
 
 ## Error Code Reference (Minimum 10 API Gateway-Specific Codes)
 
-| Code | Meaning | Retry? | Agent Action |
-|------|---------|--------|--------------|
-| `InvalidParameterValue` | Parameter value invalid | No | Adjust per spec |
-| `InvalidParameter` | Parameter validation failed | No | Fix parameter |
-| `MissingParameter` | Required parameter missing | No | Add missing parameter |
-| `ResourceNotFound.InvalidService` | Service not found | No | Verify service ID |
-| `ResourceNotFound.InvalidApi` | API not found | No | Verify API ID |
-| `LimitExceeded.ServiceLimitExceeded` | Service quota exceeded | No | HALT; raise quota |
-| `LimitExceeded.ApiLimitExceeded` | API quota exceeded | No | HALT; raise quota |
-| `UnsupportedOperation.ServiceInUse` | Service has active resources | No | Delete children / unbind first |
-| `FailedOperation.ServiceInUse` | Service busy with in-flight op | Yes (3x, 30s) | Wait; retry |
-| `InvalidSecretKey` | Credential invalid | No | HALT; fix credentials |
-| `RequestLimitExceeded` | API rate limit | Yes (3x) | Exponential backoff |
-| `InternalError` | Server error | Yes (3x) | Retry; escalate with RequestId |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameterValue` | HALT | 0 | — | — | No |
+| `InvalidParameter` | HALT | 0 | — | — | No |
+| `MissingParameter` | HALT | 0 | — | — | No |
+| `ResourceNotFound.InvalidService` | HALT | 0 | — | — | No |
+| `ResourceNotFound.InvalidApi` | HALT | 0 | — | — | No |
+| `LimitExceeded.ServiceLimitExceeded` | HALT | 0 | — | — | No |
+| `LimitExceeded.ApiLimitExceeded` | HALT | 0 | — | — | No |
+| `UnsupportedOperation.ServiceInUse` | HALT | 0 | — | — | No |
+| `FailedOperation.ServiceInUse` | HALT | 0 | — | — | Yes (3x, 30s) |
+| `InvalidSecretKey` | HALT | 0 | — | — | No |
+| `RequestLimitExceeded` | HALT | 0 | — | — | Yes (3x) |
+| `InternalError` | HALT | 0 | — | — | Yes (3x) |
 
 ## Safety Gates (Destructive Operations)
 

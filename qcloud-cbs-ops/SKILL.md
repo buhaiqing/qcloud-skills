@@ -30,6 +30,11 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  product_name: cbs
+  operation_aliases:
+    describe: describe-disks
+  param_mapping:
+    describe-disk: DiskIds.0
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).

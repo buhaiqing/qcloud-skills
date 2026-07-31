@@ -204,12 +204,12 @@ tccli dc CreateDirectConnect \
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `InvalidParameter.AccessPointNotFound` | Verify access point ID |
-| `InvalidParameterValue.Bandwidth` | Use supported bandwidth value |
-| `ResourceQuotaExceeded.DirectConnect` | HALT; request quota increase |
-| `RequestLimitExceeded` | Backoff retry (2s,4s,8s) |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.AccessPointNotFound` | HALT | 0 | — | — | Verify access point ID |
+| `InvalidParameterValue.Bandwidth` | HALT | 0 | — | — | Use supported bandwidth value |
+| `ResourceQuotaExceeded.DirectConnect` | HALT | 0 | — | — | HALT; request quota increase |
+| `RequestLimitExceeded` | RETRY | 3 | 2s,4s,8s | — | Backoff retry (2s,4s,8s) |
 
 ### Operation: Create Direct Connect Tunnel
 
@@ -242,11 +242,11 @@ Poll `DescribeDirectConnectTunnels` until `State = AVAILABLE`.
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `ResourceNotFound.DirectConnect` | Verify DC ID |
-| `ResourceNotFound.DirectConnectGateway` | Verify gateway ID |
-| `InvalidParameterValue.NetworkType` | Use supported network type |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.DirectConnect` | HALT | 0 | — | — | Verify DC ID |
+| `ResourceNotFound.DirectConnectGateway` | HALT | 0 | — | — | Verify gateway ID |
+| `InvalidParameterValue.NetworkType` | HALT | 0 | — | — | Use supported network type |
 
 ### Operation: Describe Direct Connects
 
@@ -303,11 +303,11 @@ Poll `DescribeDirectConnects`; expect DC absent within 60s.
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `ResourceNotFound.DirectConnect` | Already deleted; treat as success |
-| `OperationDenied.HasTunnels` | Delete all tunnels first |
-| `OperationDenied.DCInUse` | Remove dependencies first |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.DirectConnect` | HALT | 0 | — | — | Already deleted; treat as success |
+| `OperationDenied.HasTunnels` | HALT | 0 | — | — | Delete all tunnels first |
+| `OperationDenied.DCInUse` | HALT | 0 | — | — | Remove dependencies first |
 
 ### Operation: Create Redundant Tunnel (Failover Prep)
 
@@ -399,12 +399,12 @@ tccli dc ModifyDirectConnectTunnelExtra \
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `ResourceNotFound.DirectConnectTunnel` | Verify tunnel IDs |
-| Backup not `AVAILABLE` | Wait for backup provisioning; do NOT withdraw primary yet |
-| `OperationDenied` | Automatic failover still active; avoid double-switch |
-| Already switched (primary routes already withdrawn) | Verify backup carries traffic via `DescribeDirectConnectTunnelExtra`; treat as no-op, do not re-withdraw |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.DirectConnectTunnel` | HALT | 0 | — | — | Verify tunnel IDs |
+| `Backup not AVAILABLE` | HALT | 0 | — | — | Wait for backup provisioning; do NOT withdraw primary yet |
+| `OperationDenied` | HALT | 0 | — | — | Automatic failover still active; avoid double-switch |
+| `Already switched (primary routes already withdrawn)` | HALT | 0 | — | — | Verify backup carries traffic via `DescribeDirectConnectTunnelExtra`; treat as no-op, do not re-withdraw |
 
 ### Operation: Multi-cloud / Multi-region Access (Cloud Attach → CCN)
 
@@ -438,28 +438,28 @@ tccli dc CreateCloudAttachService \
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `ResourceNotFound.DirectConnectGateway` | Verify gateway ID |
-| `InvalidParameter.CcnNotFound` | Create/verify CCN via `qcloud-ccn-ops` |
-| `OperationDenied.GatewayInUse` | Gateway already attached; verify existing `CloudAttachId` matches expected CCN; reuse or detach first |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.DirectConnectGateway` | HALT | 0 | — | — | Verify gateway ID |
+| `InvalidParameter.CcnNotFound` | HALT | 0 | — | — | Create/verify CCN via `qcloud-ccn-ops` |
+| `OperationDenied.GatewayInUse` | RETRY | 3 | exponential | — | Gateway already attached; verify existing `CloudAttachId` matches expected CCN; reuse or detach first |
 
 ## Error Code Reference (DC-Specific)
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `InvalidParameter.AccessPointNotFound` | Access point not found | Verify access point ID |
-| `InvalidParameterValue.Bandwidth` | Invalid bandwidth value | Use supported values |
-| `ResourceNotFound.DirectConnect` | DC ID not found | Verify DC ID |
-| `ResourceNotFound.DirectConnectTunnel` | Tunnel ID not found | Verify tunnel ID |
-| `ResourceNotFound.DirectConnectGateway` | Gateway ID not found | Verify gateway ID |
-| `ResourceQuotaExceeded.DirectConnect` | DC quota exceeded | HALT; request quota increase |
-| `OperationDenied.HasTunnels` | DC has active tunnels | Delete tunnels first |
-| `OperationDenied.DCInUse` | DC is in use | Remove dependencies first |
-| `OperationDenied.DCNotAvailable` | DC not in available state | Wait for DC provisioning |
-| `InvalidSecretKey` | Credential invalid | HALT; fix credentials |
-| `RequestLimitExceeded` | API rate limit | Exponential backoff (3x) |
-| `InternalError` | Server error | Retry with RequestId (3x) |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.AccessPointNotFound` | HALT | 0 | — | — | Verify access point ID |
+| `InvalidParameterValue.Bandwidth` | HALT | 0 | — | — | Use supported values |
+| `ResourceNotFound.DirectConnect` | HALT | 0 | — | — | Verify DC ID |
+| `ResourceNotFound.DirectConnectTunnel` | HALT | 0 | — | — | Verify tunnel ID |
+| `ResourceNotFound.DirectConnectGateway` | HALT | 0 | — | — | Verify gateway ID |
+| `ResourceQuotaExceeded.DirectConnect` | HALT | 0 | — | — | HALT; request quota increase |
+| `OperationDenied.HasTunnels` | HALT | 0 | — | — | Delete tunnels first |
+| `OperationDenied.DCInUse` | HALT | 0 | — | — | Remove dependencies first |
+| `OperationDenied.DCNotAvailable` | HALT | 0 | — | — | Wait for DC provisioning |
+| `InvalidSecretKey` | HALT | 0 | — | — | HALT; fix credentials |
+| `RequestLimitExceeded` | RETRY | 0 | — | — | Exponential backoff (3x) |
+| `InternalError` | RETRY | 0 | — | — | Retry with RequestId (3x) |
 
 ## Safety Gates (Destructive Operations)
 

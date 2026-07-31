@@ -30,6 +30,11 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  product_name: clb
+  operation_aliases:
+    describe: describe-load-balancers
+  param_mapping:
+    describe-load-balancers: LoadBalancerIds.0
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).
@@ -205,14 +210,14 @@ Every operation: **Pre-flight → Execute (CLI + SDK) → Validate → Recover**
 
 ## Failure Recovery
 
-| Error pattern | Max retries | Agent Action |
-|--------------|-------------|--------------|
-| `InvalidParameter.LBIdNotFound` / `ListenerIdNotFound` | 0 | HALT — verify ID |
-| `ResourceInsufficient` | 0 | HALT — contact administrator |
-| `InvalidSecretKey` / `InvalidSecretId` | 0 | HALT — check credentials |
-| `RequestLimitExceeded` | 3 | Exponential backoff, retry |
-| `InternalError` | 3 | Retry (2s/4s/8s), then HALT |
-| `FailedOperation.ResourceInOperating` | 3 | Wait 30s, retry |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.LBIdNotFound / ListenerIdNotFound` | HALT | 0 | — | — | HALT — verify ID |
+| `ResourceInsufficient` | HALT | 0 | — | — | HALT — contact administrator |
+| `InvalidSecretKey / InvalidSecretId` | HALT | 0 | — | — | HALT — check credentials |
+| `RequestLimitExceeded` | RETRY | 3 | — | — | Exponential backoff, retry |
+| `InternalError` | RETRY | 3 | — | — | Retry (2s/4s/8s), then HALT |
+| `FailedOperation.ResourceInOperating` | RETRY | 3 | — | — | Wait 30s, retry |
 
 > Full CLB error taxonomy (parameter / status / auth / resource codes) in [references/error-reference.md](references/error-reference.md).
 

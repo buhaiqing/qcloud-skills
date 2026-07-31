@@ -32,6 +32,11 @@ metadata:
     - TENCENTCLOUD_REGION
   related_skills:
     - qcloud-finops-ops   # 反向：监控指标 + 告警通道是 FinOps 异常检测 + 成本告警的基础
+  product_name: monitor
+  operation_aliases:
+    describe: describe-alarms
+  param_mapping:
+    describe-alarm: Module
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).
@@ -300,96 +305,96 @@ Five-step flow per [Proactive Inspection Template](../qcloud-proactive-inspectio
 
 ### Auth & Permission Errors
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `AuthFailure.AccessCAMFail` | CAM access failed | HALT — verify CAM roles & policies |
-| `UnauthorizedOperation.CamNoAuth` | No CAM permission | HALT — check principal, grant `QcloudMonitorFullAccess` or custom policy |
-| `AuthFailure.InvalidAuthorization` | Invalid Authorization header | FIX — re-sign request per TC3-HMAC-SHA256 |
-| `AuthFailure.SecretIdNotFound` | SecretId does not exist | HALT — verify credentials in `TENCENTCLOUD_SECRET_ID` |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `AuthFailure.AccessCAMFail` | HALT | 0 | — | — | HALT — verify CAM roles & policies |
+| `UnauthorizedOperation.CamNoAuth` | HALT | 0 | — | — | HALT — check principal, grant `QcloudMonitorFullAccess` or custom policy |
+| `AuthFailure.InvalidAuthorization` | FIX | 0 | — | — | FIX — re-sign request per TC3-HMAC-SHA256 |
+| `AuthFailure.SecretIdNotFound` | HALT | 0 | — | — | HALT — verify credentials in `TENCENTCLOUD_SECRET_ID` |
 
 ### Alarm Policy Lifecycle
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `FailedOperation.AlertPolicyCreateFailed` | Create alarm policy failed | RETRY — if persists, check policy name uniqueness |
-| `FailedOperation.AlertPolicyDeleteFailed` | Delete alarm policy failed | RETRY — verify policy still exists |
-| `FailedOperation.AlertPolicyModifyFailed` | Modify alarm policy failed | RETRY — log diff of attempted changes |
-| `FailedOperation.AlertPolicyDescribeFailed` | Describe alarm policy failed | RETRY — check policy ID validity |
-| `FailedOperation.AlertFilterRuleDeleteFailed` | Delete filter rule failed | RETRY — verify rule ID |
-| `FailedOperation.AlertTriggerRuleDeleteFailed` | Delete trigger rule failed | RETRY — verify trigger ID |
-| `InvalidParameterValue.DashboardNameExists` | Dashboard name duplicate | FIX — use unique dashboard name |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `FailedOperation.AlertPolicyCreateFailed` | RETRY | 0 | — | — | RETRY — if persists, check policy name uniqueness |
+| `FailedOperation.AlertPolicyDeleteFailed` | RETRY | 0 | — | — | RETRY — verify policy still exists |
+| `FailedOperation.AlertPolicyModifyFailed` | RETRY | 0 | — | — | RETRY — log diff of attempted changes |
+| `FailedOperation.AlertPolicyDescribeFailed` | RETRY | 0 | — | — | RETRY — check policy ID validity |
+| `FailedOperation.AlertFilterRuleDeleteFailed` | RETRY | 0 | — | — | RETRY — verify rule ID |
+| `FailedOperation.AlertTriggerRuleDeleteFailed` | RETRY | 0 | — | — | RETRY — verify trigger ID |
+| `InvalidParameterValue.DashboardNameExists` | FIX | 0 | — | — | FIX — use unique dashboard name |
 
 ### Data & Query Errors
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `FailedOperation.DataQueryFailed` | Data query failed | RETRY — may be transient backend load |
-| `FailedOperation.DataColumnNotFound` | Data column not found | FIX — verify metric/column name in namespace |
-| `FailedOperation.DataTableNotFound` | Data table not found | FIX — verify namespace is correct |
-| `FailedOperation.DimQueryRequestFailed` | Dimension query failed | RETRY — check dimension parameters |
-| `FailedOperation.DruidQueryFailed` | Druid query analysis failed | RETRY — timeout or backend shuffle |
-| `FailedOperation.DivisionByZero` | Division by zero in query | FIX — review metric expression logic |
-| `LimitExceeded.LimitedAccess` | Request limited | RETRY — reduce query concurrency or instance count |
-| `LimitExceeded.MetricQuotaExceeded` | Metric quota exceeded | HALT — remove unregistered metrics from request |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `FailedOperation.DataQueryFailed` | RETRY | 0 | — | — | RETRY — may be transient backend load |
+| `FailedOperation.DataColumnNotFound` | FIX | 0 | — | — | FIX — verify metric/column name in namespace |
+| `FailedOperation.DataTableNotFound` | FIX | 0 | — | — | FIX — verify namespace is correct |
+| `FailedOperation.DimQueryRequestFailed` | RETRY | 0 | — | — | RETRY — check dimension parameters |
+| `FailedOperation.DruidQueryFailed` | RETRY | 0 | — | — | RETRY — timeout or backend shuffle |
+| `FailedOperation.DivisionByZero` | FIX | 0 | — | — | FIX — review metric expression logic |
+| `LimitExceeded.LimitedAccess` | RETRY | 0 | — | — | RETRY — reduce query concurrency or instance count |
+| `LimitExceeded.MetricQuotaExceeded` | HALT | 0 | — | — | HALT — remove unregistered metrics from request |
 
 ### Database & Backend Internal Errors
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `FailedOperation.DbQueryFailed` | DB query failed | RETRY — transient, retry |
-| `FailedOperation.DbRecordCreateFailed` | Create DB record failed | RETRY — check payload |
-| `FailedOperation.DbRecordDeleteFailed` | Delete DB record failed | RETRY — verify record exists |
-| `FailedOperation.DbRecordUpdateFailed` | Update DB record failed | RETRY — log update payload |
-| `FailedOperation.DbTransactionBeginFailed` | DB transaction start failed | RETRY — transient, retry |
-| `FailedOperation.DbTransactionCommitFailed` | DB transaction commit failed | RETRY — transient, retry |
-| `FailedOperation.DoHTTPTransferFailed` | Backend HTTP timeout | RETRY — transient, retry; if persists, check backend |
-| `FailedOperation.DoTRPCTransferFailed` | Network RPC error | RETRY — transient, retry |
-| `InternalError.DependsApi` | Dependent API error | HALT — escalate, dependent service failure |
-| `InternalError.DependsDb` | Dependent DB error | HALT — escalate, database incident |
-| `InternalError.DependsMq` | Dependent MQ error | HALT — escalate, message queue incident |
-| `InternalError.ExeTimeout` | Execution timeout | RETRY — split into smaller batches |
-| `InternalError.System` | Internal system error | HALT — escalate, platform bug |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `FailedOperation.DbQueryFailed` | RETRY | 0 | — | — | RETRY — transient, retry |
+| `FailedOperation.DbRecordCreateFailed` | RETRY | 0 | — | — | RETRY — check payload |
+| `FailedOperation.DbRecordDeleteFailed` | RETRY | 0 | — | — | RETRY — verify record exists |
+| `FailedOperation.DbRecordUpdateFailed` | RETRY | 0 | — | — | RETRY — log update payload |
+| `FailedOperation.DbTransactionBeginFailed` | RETRY | 0 | — | — | RETRY — transient, retry |
+| `FailedOperation.DbTransactionCommitFailed` | RETRY | 0 | — | — | RETRY — transient, retry |
+| `FailedOperation.DoHTTPTransferFailed` | RETRY | 0 | — | — | RETRY — transient, retry; if persists, check backend |
+| `FailedOperation.DoTRPCTransferFailed` | RETRY | 0 | — | — | RETRY — transient, retry |
+| `InternalError.DependsApi` | HALT | 0 | — | — | HALT — escalate, dependent service failure |
+| `InternalError.DependsDb` | HALT | 0 | — | — | HALT — escalate, database incident |
+| `InternalError.DependsMq` | HALT | 0 | — | — | HALT — escalate, message queue incident |
+| `InternalError.ExeTimeout` | RETRY | 0 | — | — | RETRY — split into smaller batches |
+| `InternalError.System` | HALT | 0 | — | — | HALT — escalate, platform bug |
 
 ### STS, Tag & TKE Integration
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `FailedOperation.AccessSTSFail` | STS access failed | HALT — check temporary credential validity |
-| `FailedOperation.AccessTagFail` | Tag service failed | HALT — check Tag service status |
-| `FailedOperation.AccessTKEFail` | TKE cluster access failed | HALT — verify TKE cluster connectivity |
-| `FailedOperation.TKEEndpointStatusError` | TKE endpoint unreachable | HALT — check TKE cluster APIServer |
-| `FailedOperation.TKEResourceConflict` | TKE resource conflict | RETRY — concurrent update detected |
-| `FailedOperation.ClusterNotFound` | Cluster not found | HALT — verify cluster ID |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `FailedOperation.AccessSTSFail` | HALT | 0 | — | — | HALT — check temporary credential validity |
+| `FailedOperation.AccessTagFail` | HALT | 0 | — | — | HALT — check Tag service status |
+| `FailedOperation.AccessTKEFail` | HALT | 0 | — | — | HALT — verify TKE cluster connectivity |
+| `FailedOperation.TKEEndpointStatusError` | HALT | 0 | — | — | HALT — check TKE cluster APIServer |
+| `FailedOperation.TKEResourceConflict` | RETRY | 0 | — | — | RETRY — concurrent update detected |
+| `FailedOperation.ClusterNotFound` | HALT | 0 | — | — | HALT — verify cluster ID |
 
 ### Agent & Instance Errors
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `FailedOperation.AgentNotAllowed` | Agent state disallows operation | FIX — check agent status via `tccli monitor DescribeMonitorAgents` |
-| `FailedOperation.AgentVersionNotSupported` | Agent version too old | FIX — upgrade agent to latest version |
-| `FailedOperation.AgentsNotInUninstallStage` | Agent still running on instance | FIX — stop agent before uninstall |
-| `FailedOperation.InstanceNotFound` | Instance not found | HALT — verify instance ID |
-| `FailedOperation.InstanceNotRunning` | Instance not running | HALT — check instance power state |
-| `FailedOperation.ResourceConflict` | Resource conflict | RETRY — concurrent modification |
-| `FailedOperation.ResourceExist` | Resource already exists | FIX — use a different name |
-| `FailedOperation.ResourceNotFound` | Resource not found | HALT — verify resource ID/ARN |
-| `FailedOperation.ResourceOperating` | Resource being operated | RETRY — operation in progress |
-| `FailedOperation.CreateInstanceLimited` | Instance creation limited | HALT — check account quota or billing |
-| `FailedOperation.DuplicateName` | Duplicate name | FIX — choose unique name |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `FailedOperation.AgentNotAllowed` | FIX | 0 | — | — | FIX — check agent status via `tccli monitor DescribeMonitorAgents` |
+| `FailedOperation.AgentVersionNotSupported` | FIX | 0 | — | — | FIX — upgrade agent to latest version |
+| `FailedOperation.AgentsNotInUninstallStage` | FIX | 0 | — | — | FIX — stop agent before uninstall |
+| `FailedOperation.InstanceNotFound` | HALT | 0 | — | — | HALT — verify instance ID |
+| `FailedOperation.InstanceNotRunning` | HALT | 0 | — | — | HALT — check instance power state |
+| `FailedOperation.ResourceConflict` | RETRY | 0 | — | — | RETRY — concurrent modification |
+| `FailedOperation.ResourceExist` | FIX | 0 | — | — | FIX — use a different name |
+| `FailedOperation.ResourceNotFound` | HALT | 0 | — | — | HALT — verify resource ID/ARN |
+| `FailedOperation.ResourceOperating` | RETRY | 0 | — | — | RETRY — operation in progress |
+| `FailedOperation.CreateInstanceLimited` | HALT | 0 | — | — | HALT — check account quota or billing |
+| `FailedOperation.DuplicateName` | FIX | 0 | — | — | FIX — choose unique name |
 
 ### Service Status & Billing
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `FailedOperation.ErrNotOpen` | Service not enabled | HALT — enable Monitor service |
-| `FailedOperation.ErrOwed` | Account in arrears | HALT — top up account |
-| `FailedOperation.ServiceNotEnabled` | Service not enabled | HALT — activate service |
-| `FailedOperation.RegionUnavailable` | Region unavailable | HALT — select another region |
-| `FailedOperation.ZoneUnavailable` | Zone unavailable | HALT — select another availability zone |
-| `ResourceInUse.ResourceExistAlready` | Resource already in use | FIX — check for existing resource |
-| `ResourceNotFound.NotExistTask` | Task does not exist | FIX — verify task ID |
-| `ResourcesSoldOut` | Resources sold out | HALT — choose another specification or region |
-| `OperationDenied` | Operation denied | HALT — check operation permissions |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `FailedOperation.ErrNotOpen` | HALT | 0 | — | — | HALT — enable Monitor service |
+| `FailedOperation.ErrOwed` | HALT | 0 | — | — | HALT — top up account |
+| `FailedOperation.ServiceNotEnabled` | HALT | 0 | — | — | HALT — activate service |
+| `FailedOperation.RegionUnavailable` | HALT | 0 | — | — | HALT — select another region |
+| `FailedOperation.ZoneUnavailable` | HALT | 0 | — | — | HALT — select another availability zone |
+| `ResourceInUse.ResourceExistAlready` | FIX | 0 | — | — | FIX — check for existing resource |
+| `ResourceNotFound.NotExistTask` | FIX | 0 | — | — | FIX — verify task ID |
+| `ResourcesSoldOut` | HALT | 0 | — | — | HALT — choose another specification or region |
+| `OperationDenied` | HALT | 0 | — | — | HALT — check operation permissions |
 
 ---
 

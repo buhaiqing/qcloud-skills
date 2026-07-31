@@ -243,26 +243,26 @@ tccli vpc DescribeCCNs --Region "{{env.TENCENTCLOUD_REGION}}"
 
 ## Error Code Reference (CCN-Specific)
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `InvalidParameter.CcnNameTooLong` | CCN name exceeds 60 chars | Shorten name |
-| `InvalidParameter.InvalidInstanceType` | `InstanceType` not in `VPC` / `DIRECTCONNECT` / `VPNGW` | Use a valid value |
-| `InvalidParameter.InvalidRegion` | Region code not recognized | Use `DescribeRegions` to pick a valid region |
-| `InvalidParameter.CidrConflict` | Attached VPC CIDR conflicts with another attachment | Pick a non-overlapping VPC or migrate one CIDR |
-| `InvalidParameter.CidrInvalid` | Route destination CIDR is malformed | Fix CIDR |
-| `InvalidParameter.RouteConflict` | A static route with the same destination exists | Remove the conflicting route first |
-| `InvalidParameter.BandwidthRange` | Bandwidth limit out of supported range | Use 1–5000 Mbps per region pair (verify per docs) |
-| `ResourceNotFound.Ccn` | CCN ID not found | Verify `{{output.ccn_id}}` |
-| `ResourceNotFound.Instance` | Target instance not found | Verify instance ID and region |
-| `ResourceNotFound.NextHop` | Next-hop instance not found in CCN | Attach the next hop first |
-| `ResourceQuotaExceeded.Ccn` | Per-region CCN quota exceeded | HALT; raise quota |
-| `ResourceQuotaExceeded.Instance` | Per-CCN attachment quota exceeded | HALT; raise quota |
-| `ResourceInUse.Ccn` | CCN has remaining attachments or route refs | Detach / clean routes first |
-| `InvalidStatus.CcnNotAvailable` | CCN is not `AVAILABLE` (often `ISOLATED`) | Restore CCN (e.g., settle overdue) then retry |
-| `InvalidStatus.CcnIsolated` | CCN is isolated (overdue / suspended) | Settle account, then retry |
-| `InvalidSecretKey` | Credential invalid | HALT; fix credentials |
-| `RequestLimitExceeded` | API rate limit | Exponential backoff (3x) |
-| `InternalError` | Server error | Retry with RequestId (3x) |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.CcnNameTooLong` | HALT | 60 | — | — | Shorten name |
+| `InvalidParameter.InvalidInstanceType` | HALT | 0 | — | — | Use a valid value |
+| `InvalidParameter.InvalidRegion` | HALT | 0 | — | — | Use `DescribeRegions` to pick a valid region |
+| `InvalidParameter.CidrConflict` | HALT | 0 | — | — | Pick a non-overlapping VPC or migrate one CIDR |
+| `InvalidParameter.CidrInvalid` | FIX | 0 | — | — | Fix CIDR |
+| `InvalidParameter.RouteConflict` | HALT | 0 | — | — | Remove the conflicting route first |
+| `InvalidParameter.BandwidthRange` | HALT | 0 | — | — | Use 1–5000 Mbps per region pair (verify per docs) |
+| `ResourceNotFound.Ccn` | HALT | 0 | — | — | Verify `{{output.ccn_id}}` |
+| `ResourceNotFound.Instance` | HALT | 0 | — | — | Verify instance ID and region |
+| `ResourceNotFound.NextHop` | HALT | 0 | — | — | Attach the next hop first |
+| `ResourceQuotaExceeded.Ccn` | HALT | 0 | — | — | HALT; raise quota |
+| `ResourceQuotaExceeded.Instance` | HALT | 0 | — | — | HALT; raise quota |
+| `ResourceInUse.Ccn` | HALT | 0 | — | — | Detach / clean routes first |
+| `InvalidStatus.CcnNotAvailable` | HALT | 0 | — | — | Restore CCN (e.g., settle overdue) then retry |
+| `InvalidStatus.CcnIsolated` | RETRY | 0 | — | — | Settle account, then retry |
+| `InvalidSecretKey` | HALT | 0 | — | — | HALT; fix credentials |
+| `RequestLimitExceeded` | RETRY | 0 | — | — | Exponential backoff (3x) |
+| `InternalError` | RETRY | 0 | — | — | Retry with RequestId (3x) |
 
 ## Safety Gates (Destructive Operations)
 

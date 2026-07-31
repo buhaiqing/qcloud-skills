@@ -32,6 +32,11 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  product_name: vpc
+  operation_aliases:
+    describe: describe-vpcs
+  param_mapping:
+    describe-vpc: VpcIds.0
 related_skills:
   - qcloud-ccn-ops
   - qcloud-vpn-ops
@@ -244,24 +249,24 @@ Every **DeleteVpc / DeleteSubnet / DeleteRouteTable / DeleteVpcPeeringConnection
 
 ## Error Code Reference (VPC-Specific)
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `InvalidParameter.InvalidCidr` | CIDR format invalid | Fix CIDR notation |
-| `InvalidParameter.InvalidVpcName` | VPC name invalid | Use valid name |
-| `ResourceNotFound.InvalidVpc` | VPC not found | Verify VPC ID |
-| `ResourceNotFound.InvalidSubnet` | Subnet not found | Verify subnet ID |
-| `ResourceQuotaExceeded.Vpc` | VPC quota exceeded | HALT; raise quota |
-| `ResourceQuotaExceeded.Subnet` | Subnet quota exceeded | HALT; raise quota |
-| `InvalidVpc.StateMismatch` | VPC state invalid | Wait for stable state |
-| `InvalidSubnet.CidrConflict` | CIDR overlaps | Use different CIDR |
-| `InvalidSubnet.NotInVpcCidr` | Subnet CIDR outside VPC | Use subset CIDR |
-| `InvalidSecretKey` | Credential invalid | HALT; fix credentials |
-| `RequestLimitExceeded` | API rate limit | Exponential backoff (3x) |
-| `InternalError` | Server error | Retry with RequestId (3x) |
-| `InvalidParameter.CidrConflict` | Peering: local and peer VPC CIDR blocks overlap | Pick a non-overlapping peer VPC or migrate one VPC's CIDR |
-| `InvalidParameter.InvalidRegion` | Peering: cross-region request sent to this skill | Delegate to `qcloud-ccn-ops` for cross-region interconnect |
-| `ResourceQuotaExceeded.PeerConn` | Peering: per-region peering quota exceeded | HALT; raise quota via console |
-| `ResourceInUse.PeerConn` | Peering: route table still references peering as next hop | Delete the dependent routes first, then retry |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.InvalidCidr` | FIX | 0 | — | — | Fix CIDR notation |
+| `InvalidParameter.InvalidVpcName` | HALT | 0 | — | — | Use valid name |
+| `ResourceNotFound.InvalidVpc` | HALT | 0 | — | — | Verify VPC ID |
+| `ResourceNotFound.InvalidSubnet` | HALT | 0 | — | — | Verify subnet ID |
+| `ResourceQuotaExceeded.Vpc` | HALT | 0 | — | — | HALT; raise quota |
+| `ResourceQuotaExceeded.Subnet` | HALT | 0 | — | — | HALT; raise quota |
+| `InvalidVpc.StateMismatch` | HALT | 0 | — | — | Wait for stable state |
+| `InvalidSubnet.CidrConflict` | HALT | 0 | — | — | Use different CIDR |
+| `InvalidSubnet.NotInVpcCidr` | HALT | 0 | — | — | Use subset CIDR |
+| `InvalidSecretKey` | HALT | 0 | — | — | HALT; fix credentials |
+| `RequestLimitExceeded` | RETRY | 0 | — | — | Exponential backoff (3x) |
+| `InternalError` | RETRY | 0 | — | — | Retry with RequestId (3x) |
+| `InvalidParameter.CidrConflict` | HALT | 0 | — | — | Pick a non-overlapping peer VPC or migrate one VPC's CIDR |
+| `InvalidParameter.InvalidRegion` | DELEGATE | 0 | — | qcloud-ccn-ops | Delegate to `qcloud-ccn-ops` for cross-region interconnect |
+| `ResourceQuotaExceeded.PeerConn` | HALT | 0 | — | — | HALT; raise quota via console |
+| `ResourceInUse.PeerConn` | RETRY | 0 | — | — | Delete the dependent routes first, then retry |
 
 ## Quality Gate (GCL)
 

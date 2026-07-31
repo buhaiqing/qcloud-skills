@@ -30,6 +30,11 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  product_name: redis
+  operation_aliases:
+    describe: describe-cache-instances
+  param_mapping:
+    describe-cache-instance: InstanceId
 related_skills:
   - qcloud-vpc-ops
   - qcloud-monitor-ops
@@ -274,16 +279,16 @@ done
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Backoff | Agent Action | UX Feedback |
-|---------------|-------------|---------|--------------|-------------|
-| `InvalidParameter` | 0–1 | — | Fix args per API spec; retry once | `[ERROR] InvalidParameter: Check CreateInstance API spec → Retry` |
-| `ResourceInsufficient.SpecCode` | 0 | — | HALT | `[ERROR] Instance spec unavailable → Check DescribeProductInfo` |
-| `QuotaExceeded.InstanceCount` | 0 | — | HALT | `[ERROR] Instance quota exceeded → Request increase` |
-| `ResourceInUse.InstanceName` | 0 | — | HALT | `[ERROR] Instance name already exists → Use unique name` |
-| `InvalidSecretKey` / `InvalidSecretId` | 0 | — | HALT | `[ERROR] Credential invalid → Verify env vars` |
-| `RequestLimitExceeded` | 3 | exponential | Back off; retry | `⚠️ Rate limit → Retry in {backoff}s` |
-| `InternalError` | 3 | 2s, 4s, 8s | Retry; HALT with RequestId | `[ERROR] InternalError → Escalate with RequestId` |
-| `VPCNotInZone` | 0 | — | HALT | `[ERROR] VPC not in selected zone → Create VPC in correct zone` |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter` | FIX | 0 | — | — | Fix args per API spec; retry once; `[ERROR] InvalidParameter: Check CreateInstance API spec → Retry` |
+| `ResourceInsufficient.SpecCode` | HALT | 0 | — | — | HALT; `[ERROR] Instance spec unavailable → Check DescribeProductInfo` |
+| `QuotaExceeded.InstanceCount` | HALT | 0 | — | — | HALT; `[ERROR] Instance quota exceeded → Request increase` |
+| `ResourceInUse.InstanceName` | HALT | 0 | — | — | HALT; `[ERROR] Instance name already exists → Use unique name` |
+| `InvalidSecretKey / InvalidSecretId` | HALT | 0 | — | — | HALT; `[ERROR] Credential invalid → Verify env vars` |
+| `RequestLimitExceeded` | RETRY | 3 | exponential | — | Back off; retry; `⚠️ Rate limit → Retry in {backoff}s` |
+| `InternalError` | RETRY | 3 | 2s,4s,8s | — | Retry; HALT with RequestId; `[ERROR] InternalError → Escalate with RequestId` |
+| `VPCNotInZone` | HALT | 0 | — | — | HALT; `[ERROR] VPC not in selected zone → Create VPC in correct zone` |
 
 ### Operation: DescribeInstances
 
@@ -388,22 +393,22 @@ tccli redis CleanInstance \
 
 ## Error Code Reference (Redis-Specific)
 
-| Code | Meaning | Retry? | Agent Action |
-|------|---------|--------|--------------|
-| `InvalidParameter` | Parameter validation failed | No | Fix parameter per API spec |
-| `InvalidParameterValue` | Parameter value out of range | No | Adjust value |
-| `MissingParameter` | Required parameter missing | No | Add missing parameter |
-| `ResourceNotFound` | Instance does not exist | No | Verify InstanceId; list instances |
-| `ResourceInsufficient` | Instance type/spec not available | No | Check DescribeProductInfo for alternatives |
-| `ResourceInUse` | Instance name already exists | No | Use unique name |
-| `InstancePreRunning` | Instance not yet ready | Yes (3x, 30s) | Poll DescribeInstances; retry when running |
-| `InstancePreIsolate` | Instance not yet isolatable | Yes (3x, 30s) | Wait; retry |
-| `OperationConflict` | Concurrent operation on instance | Yes (3x, 30s) | Wait for completion; retry |
-| `InvalidSecretKey` / `InvalidSecretId` | Credential invalid | No | HALT; fix credentials |
-| `RequestLimitExceeded` | API rate limit exceeded | Yes (3x) | Exponential backoff |
-| `InternalError` | Server-side error | Yes (3x) | Retry; escalate with RequestId |
-| `QuotaExceeded` | Instance quota exceeded | No | HALT; request quota increase |
-| `VPCNotInZone` | VPC not in selected zone | No | Create VPC in correct zone |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter` | HALT | 0 | — | — | No |
+| `InvalidParameterValue` | HALT | 0 | — | — | No |
+| `MissingParameter` | HALT | 0 | — | — | No |
+| `ResourceNotFound` | HALT | 0 | — | — | No |
+| `ResourceInsufficient` | HALT | 0 | — | — | No |
+| `ResourceInUse` | HALT | 0 | — | — | No |
+| `InstancePreRunning` | HALT | 0 | — | — | Yes (3x, 30s) |
+| `InstancePreIsolate` | HALT | 0 | — | — | Yes (3x, 30s) |
+| `OperationConflict` | HALT | 0 | — | — | Yes (3x, 30s) |
+| `InvalidSecretKey / InvalidSecretId` | HALT | 0 | — | — | No |
+| `RequestLimitExceeded` | HALT | 0 | — | — | Yes (3x) |
+| `InternalError` | HALT | 0 | — | — | Yes (3x) |
+| `QuotaExceeded` | HALT | 0 | — | — | No |
+| `VPCNotInZone` | HALT | 0 | — | — | No |
 
 > **After use:** Verify each code in the official Redis API error documentation.
 

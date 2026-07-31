@@ -32,6 +32,9 @@ metadata:
     - qcloud-well-architected-review
     - qcloud-cam-ops
     - 27 个产品 skill（CVM/CDB/CLB/COS/ES/Redis/VPC 等）
+  product_name: billing
+  operation_aliases:
+    describe: describe-bills
 ---
 
 # qcloud-finops-ops · FinOps 一站式
@@ -259,11 +262,11 @@ done
 
 #### 失败恢复
 
-| 错误码 | 处理 |
-|--------|------|
-| `UnauthorizedOperation` | HALT；检查 CAM 委托配置 |
-| `OrganizationNotExists` | HALT；账号未加入组织 |
-| `ResourceNotFound.Role` | HALT；创建 FinOps 只读角色 |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `UnauthorizedOperation` | HALT | 0 | — | — | HALT；检查 CAM 委托配置 |
+| `OrganizationNotExists` | HALT | 0 | — | — | HALT；账号未加入组织 |
+| `ResourceNotFound.Role` | HALT | 0 | — | — | HALT；创建 FinOps 只读角色 |
 
 ## 核心工作流（Pre-check → Execute → Verify → Recover）
 

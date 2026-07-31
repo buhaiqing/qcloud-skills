@@ -26,7 +26,7 @@ SECRET_VAL_RE = re.compile(r"(TENCENTCLOUD_SECRET_KEY=)[A-Za-z0-9_-]+")
 
 # Canonical destructive-verb set lives in harness_safety (Phase 3 owner); reuse it
 # so the two detection paths can never drift.
-from harness_safety import VERBS as DESTRUCTIVE_VERBS  # noqa: E402 - late import keeps top clean
+from harness_safety import VERBS as DESTRUCTIVE_VERBS
 
 
 def plan_hash(plan_text: str) -> str:
@@ -55,7 +55,16 @@ def mask_trace(trace: dict) -> dict:
     return json.loads(text)
 
 
-def post_record(record: dict) -> Path:
+def post_record(record: dict, span_id: str | None = None) -> Path:
+    """Persist an EvidenceRecord under audit-results/.
+
+    ``span_id`` is the Phase 1.4 cross-system join key: when supplied it is
+    recorded in the Evidence JSON so downstream queries can walk from a
+    destructive-op audit back to the TraceSpan that caused it. Optional for
+    backward compatibility with existing callers that don't pass it.
+    """
+    if span_id is not None:
+        record = {**record, "span_id": span_id}
     out = AUDIT / f"evidence-{record['run_id']}.json"
     out.write_text(json.dumps(mask_trace(record), indent=2, ensure_ascii=False))
     return out

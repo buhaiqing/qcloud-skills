@@ -215,11 +215,11 @@ tccli tdmq CreateRocketMQCluster \
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `InvalidParameter.ClusterNameExists` | Use a different cluster name |
-| `ResourceInsufficient` | HALT; raise quota |
-| `RequestLimitExceeded` | Backoff retry (2s,4s,8s) |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.ClusterNameExists` | HALT | 0 | — | — | Use a different cluster name |
+| `ResourceInsufficient` | HALT | 0 | — | — | HALT; raise quota |
+| `RequestLimitExceeded` | RETRY | 3 | 2s,4s,8s | — | Backoff retry (2s,4s,8s) |
 
 ### Operation: Create RocketMQ Namespace
 
@@ -266,11 +266,11 @@ tccli tdmq CreateRocketMQTopic \
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `InvalidParameter.TopicExists` | Topic already exists; reuse or rename |
-| `ResourceNotFound.Cluster` | Verify cluster ID |
-| `ResourceNotFound.Namespace` | Verify namespace |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.TopicExists` | HALT | 0 | — | — | Topic already exists; reuse or rename |
+| `ResourceNotFound.Cluster` | HALT | 0 | — | — | Verify cluster ID |
+| `ResourceNotFound.Namespace` | HALT | 0 | — | — | Verify namespace |
 
 ### Operation: Create RocketMQ Group (Consumer Group)
 
@@ -365,10 +365,10 @@ Poll `DescribeRocketMQTopics`; expect topic absent.
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `ResourceNotFound.Topic` | Already removed; treat as success |
-| `OperationDenied.TopicInUse` | Detach consumers first |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.Topic` | HALT | 0 | — | — | Already removed; treat as success |
+| `OperationDenied.TopicInUse` | HALT | 0 | — | — | Detach consumers first |
 
 ### Operation: Delete RocketMQ Cluster
 
@@ -392,10 +392,10 @@ Poll `DescribeRocketMQClusters`; expect cluster absent.
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `ResourceNotFound.Cluster` | Already removed |
-| `OperationDenied.ClusterNotEmpty` | Delete all child topics/groups/namespaces first |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.Cluster` | HALT | 0 | — | — | Already removed |
+| `OperationDenied.ClusterNotEmpty` | HALT | 0 | — | — | Delete all child topics/groups/namespaces first |
 
 ### Operation: CMQ Queue Rewind
 
@@ -410,20 +410,20 @@ tccli tdmq RewindCmqQueue \
 
 ## Error Code Reference (Minimum 10 TDMQ-Specific Codes)
 
-| Code | Meaning | Retry? | Agent Action |
-|------|---------|--------|--------------|
-| `InvalidParameter.ClusterNameExists` | Cluster name already exists | No | Use different name |
-| `InvalidParameter.TopicExists` | Topic already exists | No | Reuse or rename |
-| `InvalidParameterValue` | Parameter value out of range | No | Adjust per spec |
-| `MissingParameter` | Required parameter missing | No | Add missing parameter |
-| `ResourceNotFound.Cluster` | Cluster not found | No | Verify cluster ID |
-| `ResourceNotFound.Namespace` | Namespace not found | No | Verify namespace |
-| `ResourceNotFound.Topic` | Topic not found | No | Verify topic name |
-| `ResourceInsufficient` | Quota exceeded | No | HALT; request quota increase |
-| `OperationDenied.ClusterNotEmpty` | Cluster has child resources | No | Delete children first |
-| `InvalidSecretKey` | Credential invalid | No | HALT; fix credentials |
-| `RequestLimitExceeded` | API rate limit | Yes (3x) | Exponential backoff |
-| `InternalError` | Server error | Yes (3x) | Retry; escalate with RequestId |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.ClusterNameExists` | HALT | 0 | — | — | No |
+| `InvalidParameter.TopicExists` | HALT | 0 | — | — | No |
+| `InvalidParameterValue` | HALT | 0 | — | — | No |
+| `MissingParameter` | HALT | 0 | — | — | No |
+| `ResourceNotFound.Cluster` | HALT | 0 | — | — | No |
+| `ResourceNotFound.Namespace` | HALT | 0 | — | — | No |
+| `ResourceNotFound.Topic` | HALT | 0 | — | — | No |
+| `ResourceInsufficient` | HALT | 0 | — | — | No |
+| `OperationDenied.ClusterNotEmpty` | HALT | 0 | — | — | No |
+| `InvalidSecretKey` | HALT | 0 | — | — | No |
+| `RequestLimitExceeded` | HALT | 0 | — | — | Yes (3x) |
+| `InternalError` | HALT | 0 | — | — | Yes (3x) |
 
 ## Safety Gates (Destructive Operations)
 

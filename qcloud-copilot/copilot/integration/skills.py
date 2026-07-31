@@ -140,20 +140,49 @@ def _resolve_tccli_operation(skill: str, operation: str) -> str:
 
 
 class SkillDispatcher:
-    def __init__(self, evolution_policy=None):
+    def __init__(self, evolution_policy=None, registry=None):
+        """Phase 1 Step 1.2.4: accept optional SkillRegistry.
+
+        When ``registry`` is provided, ``validate_skill`` / ``resolve_operation`` /
+        ``resolve_param`` consult the registry first. When not provided, the
+        legacy hardcoded ``KNOWN_SKILLS`` / ``SKILL_TO_PRODUCT`` mappings are
+        used (backward compatible).
+        """
         self._known_skills = KNOWN_SKILLS
         self._evolution_policy = evolution_policy
+        self._registry = registry
 
     def route_advice(self, skill: str) -> str | None:
         if self._evolution_policy is None:
             return None
         try:
             return self._evolution_policy.route_hint(skill)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
     def validate_skill(self, skill: str) -> bool:
+        if self._registry is not None:
+            return self._registry.validate(skill)
         return skill in self._known_skills
+
+    def get_product(self, skill: str) -> str | None:
+        if self._registry is not None:
+            return self._registry.get_product(skill)
+        return SKILL_TO_PRODUCT.get(skill)
+
+    def resolve_operation(self, skill: str, operation: str) -> str:
+        if self._registry is not None:
+            return self._registry.resolve_operation(skill, operation)
+        # Legacy path (unchanged)
+        operation = OPERATION_ALIAS.get((skill, operation), operation)
+        if operation not in SAFE_OPERATIONS:
+            raise ValueError(operation)
+        return OPERATION_TO_TCCLI[operation]
+
+    def resolve_param(self, skill: str, operation: str) -> str | None:
+        if self._registry is not None:
+            return self._registry.resolve_param(skill, operation)
+        return None
 
     def execute(self, step: PlanStep, context: dict) -> StepResult:
         skill = step.skill or ""
@@ -211,7 +240,7 @@ class SkillDispatcher:
                 )
 
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30, check=False)
         except subprocess.TimeoutExpired:
             return StepResult(
                 step_id=step.id,

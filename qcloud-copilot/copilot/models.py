@@ -92,6 +92,11 @@ class StepResult:
     output: dict[str, Any] | None = None
     error: str | None = None
     duration_ms: int = 0
+    # Phase 1.3 — populated by ErrorEscalator integration. Optional for
+    # backward compatibility with existing call sites that don't read them.
+    error_code: str | None = None
+    retry_count: int = 0
+    delegate_to: str | None = None
 
 
 @dataclass

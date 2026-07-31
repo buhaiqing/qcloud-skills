@@ -31,6 +31,7 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  product_name: cdn
 related_skills:
   - qcloud-redis-ops
   - qcloud-clb-ops
@@ -302,18 +303,18 @@ tccli cdn UpdateDomainConfig \
 
 ## Troubleshooting
 
-| Error Code | Meaning | Recovery |
-|---|---|---|
-| `ResourceNotFound.CdnDomain` | Domain not found | Verify domain name, check if added |
-| `InvalidParameter.DomainExists` | Domain already configured | Use UpdateDomainConfig instead |
-| `OperationDenied.DomainStatus` | Domain not in correct status | Check domain status, start if stopped |
-| `LimitExceeded.PurgeUrlsRateLimit` | Purge rate limit exceeded | Wait and retry (default: 100 URLs/minute) |
-| `FailedOperation.OriginConnectFailed` | Origin connection failed | Verify origin server is reachable and healthy |
-| `AuthFailure.Unauthorized` | Caller lacks CDN permissions | Verify QcloudCDNFullAccess policy attached |
-| `LimitExceeded.CdnDomainQuota` | Max domains reached | Request quota increase |
-| `InvalidParameter.UrlFormat` | Invalid URL format in request | Verify URL scheme (https://) and encoding |
-| `FailedOperation.CertVerifyFailed` | Certificate verification failed | Check cert domain matches CDN domain |
-| `OperationDenied.DomainInDeploy` | Domain being deployed | Wait for deployment to complete, retry |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.CdnDomain` | HALT | 0 | — | — | Verify domain name, check if added |
+| `InvalidParameter.DomainExists` | HALT | 0 | — | — | Use UpdateDomainConfig instead |
+| `OperationDenied.DomainStatus` | HALT | 0 | — | — | Check domain status, start if stopped |
+| `LimitExceeded.PurgeUrlsRateLimit` | RETRY | 0 | — | — | Wait and retry (default: 100 URLs/minute) |
+| `FailedOperation.OriginConnectFailed` | HALT | 0 | — | — | Verify origin server is reachable and healthy |
+| `AuthFailure.Unauthorized` | HALT | 0 | — | — | Verify QcloudCDNFullAccess policy attached |
+| `LimitExceeded.CdnDomainQuota` | HALT | 0 | — | — | Request quota increase |
+| `InvalidParameter.UrlFormat` | HALT | 0 | — | — | Verify URL scheme (https://) and encoding |
+| `FailedOperation.CertVerifyFailed` | HALT | 0 | — | — | Check cert domain matches CDN domain |
+| `OperationDenied.DomainInDeploy` | RETRY | 0 | — | — | Wait for deployment to complete, retry |
 
 ---
 

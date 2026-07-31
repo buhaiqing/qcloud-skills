@@ -340,6 +340,32 @@ referenced from many places and rewriting risks losing alignment markers
 **How to apply:** any edit to AGENTS.md, especially when adding a new L*-rule
 or Key Reference row.
 
+### L17 — YAML frontmatter readers must look up `metadata.*` first, fallback top-level
+The canonical skill-template places runtime fields (`cli_applicability`,
+`version`, `last_updated`) at top-level; real `qcloud-*-ops/SKILL.md` files
+nest them under `metadata.*`. Readers must try `metadata.<key>` **before**
+falling back to top-level, otherwise ~30 files report empty fields and
+downstream consumers silently misclassify. **How to apply:**
+```python
+val = (meta.get(key) if isinstance(meta, dict) else "") or fm.get(key, "")
+```
+Pair with L5: when a field can come from either source, tests should assert
+populated values, not just key presence. **Why:** Phase 1 commit 60a6cf8
+fixed `SkillRegistry` reporting empty `cli_applicability` despite
+frontmatter visibly containing the field — bug lived in lookup order.
+
+### L18 — `ruamel.yaml` round-trip preserves per-sequence indent; `yaml.dump` does not
+Bulk-mutating YAML frontmatter (e.g. adding `product_name` /
+`operation_aliases` / `param_mapping` under `metadata.*`) requires preserving
+each list sequence's existing indent style. Use `ruamel.yaml.YAML(typ="rt")`
+plus `YAML.indent(mapping=2, sequence=4, offset=2)`; do **not** substitute
+`PyYAML`'s `yaml.dump`, which re-emits everything at one uniform indent and
+inflates diffs across 30 files. **How to apply:** always run `--dry-run`
+first; a missing `indent(...)` call silently switches all sequences to the
+same width. **Why:** Phase 1 commit f764c9a kept 2-space `related_skills`
+while introducing 4-space `metadata.*` sub-keys; PyYAML would have churned
+every SKILL.md for no semantic gain.
+
 ## Adding or modifying a skill
 
 1. **New skill**: Use `qcloud-skill-generator` (enforces 2-round review).
