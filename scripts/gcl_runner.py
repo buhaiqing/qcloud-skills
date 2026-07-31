@@ -126,7 +126,7 @@ def _rubric_calibration(root: Path, skill: str):
                     f"[rubric_calibrate] Using calibrated thresholds for {skill}",
                     file=sys.stderr,
                 )
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001, S110
         pass  # non-blocking
     try:
         yield
@@ -178,6 +178,7 @@ def run_command(
             text=True,
             timeout=timeout,
             env=proc_env,
+            check=False,
         )
         combined = (proc.stdout or "") + (proc.stderr or "")
         masked = mask_secrets(combined)
@@ -236,7 +237,7 @@ def structural_critic(generator: dict[str, Any]) -> dict[str, Any]:
         try:
             out_dict = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
             has_request_id = "RequestId" in out_dict.get("Response", {})
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001, S110
             pass
     scores["traceability"] = 1.0 if has_request_id else 0.5
     if not has_request_id and (exit_code == 0 or excerpt):
@@ -248,7 +249,7 @@ def structural_critic(generator: dict[str, Any]) -> dict[str, Any]:
         try:
             out_dict = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
             has_client_token = "ClientToken" in out_dict.get("Response", {})
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001, S110
             pass
     scores["idempotency"] = 1.0 if has_client_token else 0.5
     if not has_client_token and exit_code == 0:
@@ -268,7 +269,7 @@ def structural_critic(generator: dict[str, Any]) -> dict[str, Any]:
             try:
                 out_dict = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
                 has_error_field = "Error" in out_dict.get("Response", {})
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001, S110
                 pass
         # Delete success should have Error: null or absent
         if has_error_field:
@@ -652,7 +653,7 @@ def emit_evidence_record(root: Path, trace: dict[str, Any], args: argparse.Names
                        "traceability": 1, "spec_compliance": 1},
         }
         post_record(record)
-    except Exception:  # noqa: BLE001 - Evidence side-emit must never break GCL
+    except Exception:  # noqa: BLE001, S110 - Evidence side-emit must never break GCL
         pass
 
 def _format_success_injection(entries: list[dict[str, Any]]) -> str:
@@ -726,7 +727,7 @@ def post_process(trace_path: Path, root: Path) -> None:
                         f"delta={d['delta']:.3f} [{d['alert']}]",
                         file=sys.stderr,
                     )
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001, S110
         pass  # non-blocking
 
 
@@ -888,7 +889,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                         "scores": scores,
                         "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S"),
                     })
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001, S110
                     pass  # non-blocking: success logging must not break the main return path
                 print(f"PASS (iter {iteration}) — trace: {path}")
                 if args.enable_post_process:
