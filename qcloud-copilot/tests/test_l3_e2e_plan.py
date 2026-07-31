@@ -6,13 +6,11 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from copilot.blackboard import BlackboardClient
 from copilot.engine import CopilotEngine
 from copilot.integration.skills import SkillDispatcher
-from copilot.models import StepResult
+from copilot.models import ClassifiedIntent, IntentType, StepResult
 from copilot.plan_gen import generate
-from copilot.models import ClassifiedIntent, IntentType
 from copilot.plan_schema import load_plan_file
 
 FIXTURE = Path(__file__).parent / "fixtures" / "plan-vpc-cruise-alert-report.json"

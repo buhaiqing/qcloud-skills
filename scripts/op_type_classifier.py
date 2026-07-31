@@ -61,7 +61,7 @@ def classify_operation(command: str) -> str:
     # tccli <product> <Action> ...
     # Split CamelCase BEFORE lowercasing: DeleteAccounts → ['Delete','Accounts']
     action_raw = tokens[2] if len(tokens) > 2 else ""
-    words = set(w.lower() for w in re.findall(r'[A-Z][a-z]*', action_raw))
+    words = {w.lower() for w in re.findall(r'[A-Z][a-z]*', action_raw)}
     action_lower = action_raw.lower()
     # Priority: read > delete > write
     if words & READ_KEYWORDS or action_lower in READ_KEYWORDS:

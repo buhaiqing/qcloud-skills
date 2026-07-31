@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from copilot.quality.reflexion import normalize_reflexion_key
@@ -106,10 +106,10 @@ def _recency_factor(last_seen: str) -> float:
     year, month = int(m.group(1)), int(m.group(2))
     day = int(m.group(3)) if m.group(3) else 1
     try:
-        dt = datetime(year, month, day, tzinfo=timezone.utc)
+        dt = datetime(year, month, day, tzinfo=UTC)
     except ValueError:
         return 0.6
-    days = max(0, (datetime.now(timezone.utc) - dt).days)
+    days = max(0, (datetime.now(UTC) - dt).days)
     return round(max(0.2, min(1.0, 1.0 / (1.0 + days / 60.0))), 3)
 
 

@@ -84,8 +84,8 @@ def test_legacy_audit_missing_optional_fields_yields_None_not_unknown():
 def test_legacy_records_set_observation_type_for_gcl_and_audit_distinctly():
     """GCL -> GENERATION (LLM-like output); Audit -> SPAN (skill execution)."""
     from copilot.trace_records import (
-        legacy_gcl_to_observation,
         legacy_audit_to_observation,
+        legacy_gcl_to_observation,
     )
     gcl_obs = legacy_gcl_to_observation({"generator": "G", "timestamp": "2026-07-25T00:00:00Z", "passed": True}, "t")
     audit_obs = legacy_audit_to_observation({"step_id": "s", "status": "success"}, "t")
@@ -95,10 +95,11 @@ def test_legacy_records_set_observation_type_for_gcl_and_audit_distinctly():
 
 def test_legacy_round_trip_via_observ_query_returns_observation():
     """Old Copilot audit JSONL should be readable by observ_query for cross-version queries."""
-    from copilot.observ_query import read_audit_records
     import json
     import tempfile
     from pathlib import Path
+
+    from copilot.observ_query import read_audit_records
 
     with tempfile.TemporaryDirectory() as td:
         td_path = Path(td)

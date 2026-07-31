@@ -31,7 +31,7 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-import gcl_runner  # noqa: E402
+import gcl_runner
 
 
 def quiet_cmd_run(ns) -> int:
@@ -292,7 +292,7 @@ class CmdRunEndToEndTests(unittest.TestCase):
             "suggestions": [],
             "blocking": False,
         }
-        rc, root = self._run(critic_payload=critic)
+        rc, _root = self._run(critic_payload=critic)
         self.assertEqual(rc, 0)
 
     def test_external_critic_safety_fail(self) -> None:
@@ -301,7 +301,7 @@ class CmdRunEndToEndTests(unittest.TestCase):
             "suggestions": ["fix"],
             "blocking": True,
         }
-        rc, root = self._run(critic_payload=critic)
+        rc, _root = self._run(critic_payload=critic)
         self.assertEqual(rc, 3)  # SAFETY_FAIL exit code
 
     def test_external_critic_max_iter(self) -> None:
@@ -324,7 +324,7 @@ class CmdRunEndToEndTests(unittest.TestCase):
             "scores": {"correctness": 1, "safety": 1, "idempotency": 1, "traceability": 1, "spec_compliance": 1},
             "suggestions": [],
         }
-        rc, root = self._run(critic_payload=critic)
+        rc, _root = self._run(critic_payload=critic)
         self.assertEqual(rc, 2)
 
 
@@ -346,7 +346,7 @@ class TCloudErrorHintsTests(unittest.TestCase):
     def test_load_error_code_map_has_required_fields(self) -> None:
         result = gcl_runner.load_error_code_map()
         if result:  # only test if module loaded
-            for code, info in result.items():
+            for info in result.values():
                 self.assertIn("category", info)
                 self.assertIn("fix", info)
 

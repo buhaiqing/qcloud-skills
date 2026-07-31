@@ -21,11 +21,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import re
 import glob
 import json
+import re
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -55,8 +55,8 @@ def _norm_ts(value: Any) -> str:
         return ""
     if isinstance(value, (int, float)):
         try:
-            return datetime.fromtimestamp(value, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        except Exception:
+            return datetime.fromtimestamp(value, tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
             return str(value)
     s = str(value).strip()
     if not s:
@@ -95,7 +95,7 @@ def load_bundles(pattern: str) -> list[dict[str, Any]]:
         try:
             data = json.loads(Path(fp).read_text(encoding="utf-8"))
             bundles.append(data)
-        except Exception as e:
+        except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError) as e:
             print(f"WARNING: skipped {fp}: {e}", file=sys.stderr)
     return bundles
 
@@ -284,12 +284,12 @@ def extract_events(bundles: list[dict[str, Any]]) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 ID_PATTERNS = (
-    ("instance_id", re.compile(r"ins-[a-z0-9]+", re.I)),
-    ("vpc_id",      re.compile(r"vpc-[a-z0-9]+", re.I)),
-    ("cluster_id",  re.compile(r"cls-[a-z0-9]+", re.I)),
-    ("pod_id",       re.compile(r"pod-[a-z0-9]+", re.I)),
-    ("alarm_id",     re.compile(r"alarm-[a-z0-9]+", re.I)),
-    ("lb_id",        re.compile(r"lb-[a-z0-9]+", re.I)),
+    ("instance_id", re.compile(r"ins-[a-z0-9]+", re.IGNORECASE)),
+    ("vpc_id",      re.compile(r"vpc-[a-z0-9]+", re.IGNORECASE)),
+    ("cluster_id",  re.compile(r"cls-[a-z0-9]+", re.IGNORECASE)),
+    ("pod_id",       re.compile(r"pod-[a-z0-9]+", re.IGNORECASE)),
+    ("alarm_id",     re.compile(r"alarm-[a-z0-9]+", re.IGNORECASE)),
+    ("lb_id",        re.compile(r"lb-[a-z0-9]+", re.IGNORECASE)),
 )
 
 
@@ -340,14 +340,14 @@ def align_timeline(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if not ts:
             continue
         try:
-            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            dt = datetime.fromisoformat(ts)
             sortable.append((dt, ev))
-        except Exception:
+        except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
             # Try parsing as unix timestamp
             try:
-                dt = datetime.fromtimestamp(float(ts), tz=timezone.utc)
+                dt = datetime.fromtimestamp(float(ts), tz=UTC)
                 sortable.append((dt, ev))
-            except Exception:
+            except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
                 pass
 
     sortable.sort(key=lambda x: x[0])
@@ -376,11 +376,11 @@ def build_incident_timeline(bundles: list[dict[str, Any]]) -> dict[str, Any]:
         first_change_ts = change_events[0].get("timestamp", "")
         first_trigger_ts = trigger_events[0].get("timestamp", "")
         try:
-            cdt = datetime.fromisoformat(first_change_ts.replace("Z", "+00:00"))
-            tdt = datetime.fromisoformat(first_trigger_ts.replace("Z", "+00:00"))
+            cdt = datetime.fromisoformat(first_change_ts)
+            tdt = datetime.fromisoformat(first_trigger_ts)
             if cdt < tdt:
                 likely_change = change_events[0]
-        except Exception:
+        except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
             pass
 
     # Build causal chain (consecutive events)
@@ -417,7 +417,7 @@ def build_incident_timeline(bundles: list[dict[str, Any]]) -> dict[str, Any]:
     bundle_ids = list({e.get("_bundle", "unknown") for e in events})
 
     return {
-        "timeline_id": f"tl-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}",
+        "timeline_id": f"tl-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}",
         "incident_ref": {"bundle_ids": bundle_ids},
         "diagnosis_window": diag_window,
         "narrative_summary": narrative_summary,
@@ -434,7 +434,7 @@ def build_incident_timeline(bundles: list[dict[str, Any]]) -> dict[str, Any]:
             "missing_layers": [],
             "warnings": [],
         },
-        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
 

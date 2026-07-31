@@ -55,6 +55,17 @@ SKILL_TO_PRODUCT = {
     "qcloud-apigw-ops": "apigateway",
     "qcloud-proactive-inspection": "monitor",
     "qcloud-aiops-diagnosis": "monitor",
+    # Phase 1 additions (commit f338d4d + audit fixes):
+    "qcloud-agsx-ops": "ags",
+    "qcloud-ccn-ops": "vpc",
+    "qcloud-cicd-ops": "codepipeline",
+    "qcloud-cloudbase-ops": "tcb",
+    "qcloud-dc-ops": "dc",
+    "qcloud-migration-ops": "msp",
+    "qcloud-service-mesh-ops": "tcm",
+    "qcloud-tcop-ops": "tcop",
+    "qcloud-tdmq-ops": "tdmq",
+    "qcloud-vpn-ops": "vpc",
 }
 
 # kebab-case plan op → tccli PascalCase API.

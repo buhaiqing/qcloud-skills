@@ -10,10 +10,9 @@ Priority (highest first):
 """
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from copilot.trace_records import IdentityTree
-
 
 # Fixed env-var key map (kept narrow to avoid leaking unrelated env into identity).
 ENV_KEY_MAP: dict[str, str] = {
@@ -47,11 +46,11 @@ class IdentityResolver:
 
     def __init__(
         self,
-        cli_overrides: Optional[dict[str, Any]] = None,
-        config_dict: Optional[dict[str, Any]] = None,
-        env: Optional[dict[str, str]] = None,
-        session_hint: Optional[dict[str, Any]] = None,
-        automation_hint: Optional[dict[str, Any]] = None,
+        cli_overrides: dict[str, Any] | None = None,
+        config_dict: dict[str, Any] | None = None,
+        env: dict[str, str] | None = None,
+        session_hint: dict[str, Any] | None = None,
+        automation_hint: dict[str, Any] | None = None,
     ) -> None:
         self.cli_overrides = cli_overrides or {}
         self.config_dict = config_dict or {}
@@ -59,7 +58,7 @@ class IdentityResolver:
         self.session_hint = session_hint or {}
         self.automation_hint = automation_hint or {}
 
-    def _value_for(self, field_name: str) -> tuple[Optional[str], Optional[str]]:
+    def _value_for(self, field_name: str) -> tuple[str | None, str | None]:
         """Return (value, source) for a field; source is one of cli/config/env/session/automation/fallback."""
         # CLI
         v = self.cli_overrides.get(field_name)

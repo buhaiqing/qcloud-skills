@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from copilot.models import ExecutionPlan
 
-
 MAX_STEP_BUDGET = 10
 
 

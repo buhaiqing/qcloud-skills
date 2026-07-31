@@ -33,14 +33,14 @@ def _dump(obj):
 class EvidenceSchemaTests(unittest.TestCase):
     def test_valid_record_passes(self):
         r = subprocess.run([sys.executable, str(VALIDATOR), _dump(VALID)],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, check=False)
         self.assertEqual(r.returncode, 0, r.stderr)
 
     def test_missing_provenance_fails(self):
         bad = dict(VALID)
         bad.pop("provenance")
         r = subprocess.run([sys.executable, str(VALIDATOR), _dump(bad)],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, check=False)
         self.assertNotEqual(r.returncode, 0)
 
     def test_kpi2_destructive_requires_token(self):
@@ -48,7 +48,7 @@ class EvidenceSchemaTests(unittest.TestCase):
         bad["safety"] = {"destructive": True, "token": None,
                          "plan_hash": None, "leak_checked": True}
         r = subprocess.run([sys.executable, str(VALIDATOR), _dump(bad)],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, check=False)
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("KPI#2", r.stdout)
 
@@ -57,7 +57,7 @@ class EvidenceSchemaTests(unittest.TestCase):
         bad["safety"] = {"destructive": False, "token": None,
                          "plan_hash": None, "leak_checked": False}
         r = subprocess.run([sys.executable, str(VALIDATOR), _dump(bad)],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, check=False)
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("KPI#1", r.stdout)
 

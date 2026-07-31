@@ -17,7 +17,7 @@ from pathlib import Path
 def test_with_step_recording_writes_audit_observation_usage(tmp_path: Path):
     from copilot.observ import ObservableSink
     from copilot.step_recording import with_step_recording
-    from copilot.usage_emitters import emit_llm_usage, emit_cloud_api_usage
+    from copilot.usage_emitters import emit_cloud_api_usage, emit_llm_usage
 
     sink = ObservableSink(runtime_root=tmp_path)
     with with_step_recording(

@@ -1,5 +1,5 @@
-from copilot.models import IntentType
 from copilot.classifier import classify
+from copilot.models import IntentType
 from copilot.parser import parse
 
 

@@ -1,9 +1,9 @@
 from copilot.models import (
-    ParsedRequest,
     ClassifiedIntent,
-    IntentType,
-    PlanStep,
     ExecutionPlan,
+    IntentType,
+    ParsedRequest,
+    PlanStep,
     ReportSection,
     SessionState,
 )

@@ -59,8 +59,7 @@ def _data():
 
 def test_compute_cost_actual_when_all_priced():
     from copilot.cost import compute_cost
-    from copilot.trace_records import PricingSnapshot
-    from copilot.trace_records import CostStatus
+    from copilot.trace_records import CostStatus, PricingSnapshot
 
     snap = PricingSnapshot(
         version="v1",
@@ -82,7 +81,7 @@ def test_compute_cost_actual_when_all_priced():
 
 def test_compute_cost_unpriced_when_no_price_entries():
     from copilot.cost import compute_cost
-    from copilot.trace_records import PricingSnapshot, CostStatus
+    from copilot.trace_records import CostStatus, PricingSnapshot
 
     empty = PricingSnapshot(version="v1", timestamp="2026-07-25T00:00:00Z", prices={})
     rec = compute_cost(events=[_llm()], pricing=empty)
@@ -92,7 +91,7 @@ def test_compute_cost_unpriced_when_no_price_entries():
 
 def test_compute_cost_partial_when_some_priced():
     from copilot.cost import compute_cost
-    from copilot.trace_records import PricingSnapshot, CostStatus
+    from copilot.trace_records import CostStatus, PricingSnapshot
 
     snap = PricingSnapshot(
         version="v1",
@@ -112,7 +111,7 @@ def test_compute_cost_partial_when_some_priced():
 
 def test_compute_cost_not_applicable_for_data_only():
     from copilot.cost import compute_cost
-    from copilot.trace_records import PricingSnapshot, CostStatus
+    from copilot.trace_records import CostStatus, PricingSnapshot
 
     snap = PricingSnapshot(version="v1", timestamp="2026-07-25T00:00:00Z", prices={})
     rec = compute_cost(events=[_data()], pricing=snap)
@@ -148,9 +147,9 @@ def test_assert_invariants_accepts_zero_with_unpriced():
 
 
 def test_assert_invariants_rejects_actual_with_zero():
+    import pytest
     from copilot.cost import assert_cost_invariants
     from copilot.trace_records import CostRecord, CostStatus
-    import pytest
 
     bad = CostRecord(
         id="c1", trace_id="t", usage_event_ids=["u1"],
@@ -161,9 +160,9 @@ def test_assert_invariants_rejects_actual_with_zero():
 
 
 def test_assert_invariants_rejects_unpriced_with_nonzero():
+    import pytest
     from copilot.cost import assert_cost_invariants
     from copilot.trace_records import CostRecord, CostStatus
-    import pytest
 
     bad = CostRecord(
         id="c1", trace_id="t", usage_event_ids=["u1"],
@@ -174,9 +173,9 @@ def test_assert_invariants_rejects_unpriced_with_nonzero():
 
 
 def test_assert_invariants_rejects_na_with_nonzero():
+    import pytest
     from copilot.cost import assert_cost_invariants
     from copilot.trace_records import CostRecord, CostStatus
-    import pytest
 
     ok = CostRecord(
         id="c1", trace_id="t", usage_event_ids=["u1"],
@@ -198,8 +197,8 @@ def test_assert_invariants_rejects_na_with_nonzero():
 
 
 def test_pricing_snapshot_zero_prices_treated_as_unpriced():
-    from copilot.cost import compute_cost, assert_cost_invariants
-    from copilot.trace_records import PricingSnapshot, CostStatus
+    from copilot.cost import assert_cost_invariants, compute_cost
+    from copilot.trace_records import CostStatus, PricingSnapshot
 
     snap = PricingSnapshot(
         version="v1",

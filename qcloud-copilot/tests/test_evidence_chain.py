@@ -7,7 +7,6 @@ from pathlib import Path
 
 import jsonschema
 import pytest
-
 from copilot.blackboard import BlackboardClient
 from copilot.evidence import build_evidence_chain
 from copilot.models import ClassifiedIntent, ExecutionPlan, IntentType, PlanStep, StepResult

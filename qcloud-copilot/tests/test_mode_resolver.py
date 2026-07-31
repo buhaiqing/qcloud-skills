@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from copilot.mode_resolver import (
     resolve_inspection_mode,
     strip_ci_trigger_words,

@@ -11,7 +11,7 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-import commit_hygiene_score as chs  # noqa: E402
+import commit_hygiene_score as chs
 
 
 def _rec(verdict: str, products: list[str] | None = None) -> dict:

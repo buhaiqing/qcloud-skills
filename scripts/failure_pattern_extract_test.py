@@ -2,12 +2,13 @@
 """Unit tests for failure_pattern_extract.py — stdlib only."""
 
 import json
+
+# Import from the module under test
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-# Import from the module under test
-import sys
 sys.path.insert(0, str(Path(__file__).parent))
 import failure_pattern_extract as fpe
 

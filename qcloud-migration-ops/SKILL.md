@@ -32,6 +32,7 @@ metadata:
     - TENCENTCLOUD_REGION
   gcl: required
   gcl_max_iter: 2
+  product_name: msp
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).

@@ -15,7 +15,7 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-import validate_local  # noqa: E402
+import validate_local
 
 
 class BuildStepsTests(unittest.TestCase):

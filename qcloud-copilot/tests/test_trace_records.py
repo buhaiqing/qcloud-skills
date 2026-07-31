@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +12,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "qcloud-copilot"))
 
-NOW = datetime.now(timezone.utc).isoformat()
+NOW = datetime.now(UTC).isoformat()
 
 
 @pytest.fixture
@@ -270,7 +270,7 @@ def test_trace_aggregate_root_no_span_fields():
 
 def test_trace_aiops_summary_nested():
     """TraceRecord.aiops_summary must be an AIOpsSummary dataclass instance (not a raw dict)."""
-    from copilot.trace_records import TraceRecord, AIOpsSummary
+    from copilot.trace_records import AIOpsSummary, TraceRecord
     trace = TraceRecord(
         id="trc-aiops-001",
         name="aiops-trace",
@@ -307,7 +307,7 @@ def test_trace_aiops_summary_nested():
 
 def test_trace_finops_summary_nested():
     """TraceRecord.finops_summary must be a FinOpsSummary dataclass instance (not a raw dict)."""
-    from copilot.trace_records import TraceRecord, FinOpsSummary
+    from copilot.trace_records import FinOpsSummary, TraceRecord
     trace = TraceRecord(
         id="trc-finops-001",
         name="finops-trace",
@@ -478,7 +478,7 @@ def test_skill_info_serialization_roundtrip():
 
 def test_trace_record_with_skill_and_runtime():
     """TraceRecord accepts optional skill and runtime fields."""
-    from copilot.trace_records import TraceRecord, SkillInfo, RuntimeInfo
+    from copilot.trace_records import RuntimeInfo, SkillInfo, TraceRecord
 
     trace = TraceRecord(
         id="trc-p13-001",
@@ -517,7 +517,7 @@ def test_trace_record_with_skill_and_runtime():
 
 def test_trace_record_skill_runtime_roundtrip():
     """skill and runtime fields survive to_dict / from_dict roundtrip."""
-    from copilot.trace_records import TraceRecord, SkillInfo, RuntimeInfo
+    from copilot.trace_records import RuntimeInfo, SkillInfo, TraceRecord
 
     trace = TraceRecord(
         id="trc-p13-rt",

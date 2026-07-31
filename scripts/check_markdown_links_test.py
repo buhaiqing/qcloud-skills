@@ -12,7 +12,7 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-import check_markdown_links as cml  # noqa: E402
+import check_markdown_links as cml
 
 
 def write(path: Path, text: str = "") -> Path:

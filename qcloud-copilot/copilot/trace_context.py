@@ -17,10 +17,9 @@ from __future__ import annotations
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
-from copilot.trace_records import IdentityTree, AutomationTree
+from copilot.trace_records import AutomationTree, IdentityTree
 
 
 def new_trace_id() -> str:
@@ -34,7 +33,7 @@ def new_observation_id() -> str:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 @dataclass
@@ -46,10 +45,10 @@ class TraceContext:
     """
 
     trace_id: str
-    session_id: Optional[str] = None
-    incident_id: Optional[str] = None
+    session_id: str | None = None
+    incident_id: str | None = None
     started_at: str = field(default_factory=_utc_now)
-    ended_at: Optional[str] = None
+    ended_at: str | None = None
     status: str = "success"
     # Identity (SPEC §16)
     identity: IdentityTree = field(default_factory=IdentityTree)
@@ -61,19 +60,19 @@ class TraceContext:
         if self.session_id is None:
             self.session_id = self.trace_id
 
-    def push_observation(self, obs_id: str) -> Optional[str]:
+    def push_observation(self, obs_id: str) -> str | None:
         """Push obs_id onto the parent stack; returns previous parent or None."""
         parent = self._parent_stack[-1] if self._parent_stack else None
         self._parent_stack.append(obs_id)
         return parent
 
-    def pop_observation(self) -> Optional[str]:
+    def pop_observation(self) -> str | None:
         """Pop current observation ID from stack; returns it."""
         if not self._parent_stack:
             return None
         return self._parent_stack.pop()
 
-    def current_parent(self) -> Optional[str]:
+    def current_parent(self) -> str | None:
         """Top of parent stack, or None if no active observation."""
         return self._parent_stack[-1] if self._parent_stack else None
 

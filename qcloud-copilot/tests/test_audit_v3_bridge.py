@@ -20,9 +20,10 @@ from pathlib import Path
 
 
 def test_audit_trace_v3_writes_both_audit_and_observation(tmp_path: Path):
-    from copilot.quality.audit import audit_trace_v3
-    from copilot.observ import ObservableSink
     from unittest.mock import patch
+
+    from copilot.observ import ObservableSink
+    from copilot.quality.audit import audit_trace_v3
 
     sink = ObservableSink(runtime_root=tmp_path)
     with patch("copilot.quality.audit.Path.cwd", return_value=tmp_path):
@@ -54,10 +55,11 @@ def test_audit_trace_v3_writes_both_audit_and_observation(tmp_path: Path):
 
 
 def test_audit_trace_v3_with_usage_events(tmp_path: Path):
-    from copilot.quality.audit import audit_trace_v3
-    from copilot.observ import ObservableSink
-    from copilot.usage_emitters import emit_cloud_api_usage
     from unittest.mock import patch
+
+    from copilot.observ import ObservableSink
+    from copilot.quality.audit import audit_trace_v3
+    from copilot.usage_emitters import emit_cloud_api_usage
 
     sink = ObservableSink(runtime_root=tmp_path)
     usage = emit_cloud_api_usage(
@@ -91,9 +93,10 @@ def test_audit_trace_v3_with_usage_events(tmp_path: Path):
 
 
 def test_audit_trace_v3_without_usage_writes_only_observation(tmp_path: Path):
-    from copilot.quality.audit import audit_trace_v3
-    from copilot.observ import ObservableSink
     from unittest.mock import patch
+
+    from copilot.observ import ObservableSink
+    from copilot.quality.audit import audit_trace_v3
 
     sink = ObservableSink(runtime_root=tmp_path)
     with patch("copilot.quality.audit.Path.cwd", return_value=tmp_path):
@@ -112,8 +115,9 @@ def test_audit_trace_v3_without_usage_writes_only_observation(tmp_path: Path):
 
 def test_audit_trace_v3_legacy_callers_unaffected(tmp_path: Path):
     """Plain `audit_trace()` (legacy) must still work and write only the legacy file."""
-    from copilot.quality.audit import audit_trace
     from unittest.mock import patch
+
+    from copilot.quality.audit import audit_trace
 
     with patch("copilot.quality.audit.Path.cwd", return_value=tmp_path):
         audit_trace(

@@ -15,7 +15,7 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-import te6_gcl_compress as te6  # noqa: E402
+import te6_gcl_compress as te6
 
 
 class ParseRubricRulesTests(unittest.TestCase):
@@ -72,18 +72,7 @@ class PromptCompressionTests(unittest.TestCase):
             prompt_dir = root / "qcloud-test-ops" / "references"
             prompt_dir.mkdir(parents=True)
             prompt = prompt_dir / "prompt-templates.md"
-            original = "\n\n".join(
-                [
-                    "# Test Prompts",
-                    "## 1. Generator prompt template\nold generator",
-                    "## 2. Critic prompt template\nold critic",
-                    "## 3. Orchestrator prompt template\nold orchestrator",
-                    "## 4. Per-operation variants\nold duplicated gates",
-                    "## 5. Anti-patterns\n### Test-specific anti-patterns\n- ❌ Product-only bad path",
-                    "## 6. Changelog\n| Version | Date | Change |\n|---|---|---|\n| 1.2.0 | 2026-06-18 | old |",
-                    "## 7. See also\n- links",
-                ]
-            ) + "\n"
+            original = "# Test Prompts\n\n## 1. Generator prompt template\nold generator\n\n## 2. Critic prompt template\nold critic\n\n## 3. Orchestrator prompt template\nold orchestrator\n\n## 4. Per-operation variants\nold duplicated gates\n\n## 5. Anti-patterns\n### Test-specific anti-patterns\n- ❌ Product-only bad path\n\n## 6. Changelog\n| Version | Date | Change |\n|---|---|---|\n| 1.2.0 | 2026-06-18 | old |\n\n## 7. See also\n- links" + "\n"
             prompt.write_text(original, encoding="utf-8")
 
             with patch.object(te6, "ROOT", root), patch.dict(

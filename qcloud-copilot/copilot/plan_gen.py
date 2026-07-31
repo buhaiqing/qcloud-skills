@@ -4,8 +4,8 @@ import os
 import re
 from typing import Any
 
-from copilot.models import AskOption, ClassifiedIntent, ExecutionPlan, IntentType, PlanStep
 from copilot.mode_gate import maybe_discover_regions
+from copilot.models import AskOption, ClassifiedIntent, ExecutionPlan, IntentType, PlanStep
 
 TARGET_TO_SKILL: dict[str, str] = {
     "vm": "qcloud-cvm-ops",
@@ -43,7 +43,7 @@ def _step_id(prefix: str, n: int) -> str:
 def _is_risk_assessment(text: str, intent: ClassifiedIntent) -> bool:
     has_vpc = "vpc" in text.lower() or "专有网络" in text
     has_risk = bool(re.search(r"风险|巡检|健康", text))
-    has_alert = bool(re.search(r"告警|报警|alert", text, re.I))
+    has_alert = bool(re.search(r"告警|报警|alert", text, re.IGNORECASE))
     if has_vpc and has_risk and has_alert:
         return True
     return intent.primary == IntentType.REPORT and IntentType.CRUISE in intent.secondary

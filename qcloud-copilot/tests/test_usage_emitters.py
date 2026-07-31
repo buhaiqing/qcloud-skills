@@ -143,7 +143,7 @@ def test_emit_data_usage_minimal():
 
 
 def test_emitter_returns_serializeable_dict():
-    from copilot.usage_emitters import emit_llm_usage, emit_cloud_api_usage, emit_data_usage
+    from copilot.usage_emitters import emit_cloud_api_usage, emit_data_usage, emit_llm_usage
 
     for evt in [
         emit_llm_usage(trace_id="t1", provider="p", model="m", input_tokens=1, output_tokens=1),

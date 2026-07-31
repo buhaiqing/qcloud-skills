@@ -12,16 +12,15 @@ import os
 import platform
 import subprocess
 from pathlib import Path
-from typing import Optional
 
-from copilot.trace_records import RuntimeInfo, SkillInfo
 from copilot.skill_version import SkillVersion
+from copilot.trace_records import RuntimeInfo, SkillInfo
 
 
-def _detect_tccli_version() -> Optional[str]:
+def _detect_tccli_version() -> str | None:
     """Run `tccli --version` and return stdout; None when tccli not installed."""
     try:
-        r = subprocess.run(
+        r = subprocess.run(  # noqa: PLW1510 - tccli --version is best-effort probe, returncode checked below
             ["tccli", "--version"],
             capture_output=True,
             text=True,
@@ -35,34 +34,34 @@ def _detect_tccli_version() -> Optional[str]:
                 if any(ch.isdigit() for ch in tok) and "." in tok:
                     return tok.strip(",").strip()
             return out.splitlines()[0].strip()
-    except Exception:
+    except Exception:  # noqa: BLE001 - best-effort detection, fall back to None on any subprocess error
         return None
     return None
 
 
-def _detect_sdk_version() -> tuple[Optional[str], Optional[str]]:
+def _detect_sdk_version() -> tuple[str | None, str | None]:
     """Probe tencentcloud-sdk-python; return (sdk_name, sdk_version) or (None, None)."""
     try:
         import importlib.metadata as md
-    except Exception:
+    except Exception:  # noqa: BLE001 - importlib.metadata missing only on very old Pythons
         return (None, None)
     try:
         for candidate in ("tencentcloud-sdk-python", "tencentcloud-sdk-python-sts"):
             try:
                 v = md.version(candidate)
                 return (candidate, v)
-            except Exception:
+            except Exception:  # noqa: BLE001, S112 - try next candidate when PackageNotFoundError or similar
                 continue
-    except Exception:
+    except Exception:  # noqa: BLE001 - outer fallback for any unexpected metadata API failure
         return (None, None)
     return (None, None)
 
 
-def _detect_git_commit(start: Optional[Path] = None) -> Optional[str]:
+def _detect_git_commit(start: Path | None = None) -> str | None:
     """Return short HEAD commit hash for the repo containing `start` or cwd()."""
     try:
         cwd = str(start or Path.cwd())
-        r = subprocess.run(
+        r = subprocess.run(  # noqa: PLW1510 - git rev-parse returncode checked below
             ["git", "rev-parse", "--short", "HEAD"],
             capture_output=True,
             text=True,
@@ -71,7 +70,7 @@ def _detect_git_commit(start: Optional[Path] = None) -> Optional[str]:
         )
         if r.returncode == 0:
             return r.stdout.strip() or None
-    except Exception:
+    except Exception:  # noqa: BLE001 - git may be missing, fail closed to None
         return None
     return None
 
@@ -95,12 +94,12 @@ def build_runtime_info() -> RuntimeInfo:
 
 
 def build_skill_info(
-    skill_version: Optional[SkillVersion],
+    skill_version: SkillVersion | None,
     *,
-    references: Optional[dict] = None,
-    prompt_version: Optional[str] = None,
-    rubric_version: Optional[str] = None,
-    source: Optional[str] = None,
+    references: dict | None = None,
+    prompt_version: str | None = None,
+    rubric_version: str | None = None,
+    source: str | None = None,
 ) -> SkillInfo:
     """Map SkillVersion (P1.2) → SkillInfo (P1.3)."""
     if skill_version is None:

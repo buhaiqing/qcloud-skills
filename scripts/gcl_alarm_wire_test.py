@@ -17,7 +17,7 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-import gcl_alarm_wire as gaw  # noqa: E402
+import gcl_alarm_wire as gaw
 
 
 def write_summary(root: Path, payload: dict) -> Path:

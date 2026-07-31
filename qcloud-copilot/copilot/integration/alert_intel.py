@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from copilot.blackboard import BlackboardClient
@@ -43,7 +43,7 @@ class AlertIntelRunner:
 
     def _fetch_alarm_history(self, params: dict[str, Any]) -> list[dict[str, Any]]:
         region = params.get("region_id", params.get("region", "ap-guangzhou"))
-        end = datetime.now(timezone.utc)
+        end = datetime.now(UTC)
         start = end - timedelta(hours=24)
         cmd = [
             "tccli",
@@ -61,7 +61,7 @@ class AlertIntelRunner:
             str(params.get("page_size", 100)),
         ]
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)  # noqa: PLW1510 - returncode handled below via return []
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return []
 

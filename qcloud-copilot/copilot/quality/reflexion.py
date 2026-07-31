@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
 
 DOCS_FAILURE_PATTERNS = Path("docs/failure-patterns.md")
 SCRATCH_DIR = Path.cwd() / ".runtime" / "reflexion"
@@ -37,7 +36,7 @@ def write_reflexion(
     Call aggregate_scratch() at session end to merge into the canonical file.
     """
     SCRATCH_DIR.mkdir(parents=True, exist_ok=True)
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     scratch_file = SCRATCH_DIR / f"{today}-scratch.md"
 
     if not scratch_file.exists():
@@ -90,10 +89,7 @@ def aggregate_scratch(date: str | None = None) -> int:
     for i, line in enumerate(lines):
         stripped = line.strip()
         if (
-            not stripped.startswith("|")
-            or stripped.startswith("|-")
-            or stripped.startswith("| Scenario")
-            or stripped.startswith("| Skill")
+            not stripped.startswith("|") or stripped.startswith(("|-", "| Scenario", "| Skill"))
         ):
             continue
         parts = [p.strip() for p in stripped.split("|") if p.strip()]
@@ -108,7 +104,7 @@ def aggregate_scratch(date: str | None = None) -> int:
     for sf in scratch_files:
         for line in sf.read_text().splitlines():
             line = line.strip()
-            if not line.startswith("|") or line.startswith("|-") or line.startswith("#"):
+            if not line.startswith("|") or line.startswith(("|-", "#")):
                 continue
             parts = [p.strip() for p in line.split("|") if p.strip()]
             if len(parts) < 6:

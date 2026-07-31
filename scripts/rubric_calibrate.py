@@ -3,11 +3,11 @@
 
 import argparse
 import json
-import sys
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
-from collections import defaultdict
 import statistics
+import sys
+from collections import defaultdict
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 DEFAULT_THRESHOLDS = {
     "correctness": 0.5,
@@ -82,13 +82,13 @@ def _load_traces(trace_dir: Path, since_days: int | None = None) -> list:
 
     cutoff = None
     if since_days is not None:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
+        cutoff = datetime.now(UTC) - timedelta(days=since_days)
 
     traces = []
     for f in sorted(candidates):
         try:
             ts_str = f.stem.replace("gcl-trace-", "")  # e.g. "20250710-120000"
-            ts = datetime.strptime(ts_str, "%Y%m%d-%H%M%S").replace(tzinfo=timezone.utc)
+            ts = datetime.strptime(ts_str, "%Y%m%d-%H%M%S").replace(tzinfo=UTC)
             if cutoff and ts < cutoff:
                 continue
         except ValueError:
@@ -96,7 +96,7 @@ def _load_traces(trace_dir: Path, since_days: int | None = None) -> list:
             continue
         try:
             traces.append(json.loads(f.read_text()))
-        except Exception:
+        except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
             pass
     return traces
 
@@ -168,7 +168,7 @@ def generate_report(traces_or_root, skill_filter: str | None = None,
     return {
         "skills": skills_out,
         "period_days": 90,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
     }
 
 

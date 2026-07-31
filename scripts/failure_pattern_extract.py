@@ -24,15 +24,20 @@ import argparse
 import json
 import re
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from _failure_pattern_store import (
-    parse_existing, load_all_layers,
-    HOT_PATH, WARM_PATH, COLD_PATH,
-    HOT_LIMIT, WARM_LIMIT, COLD_LIMIT,
+    COLD_LIMIT,
+    COLD_PATH,
+    HOT_LIMIT,
+    HOT_PATH,
     SILENCE_THRESHOLD_DAYS,
+    WARM_LIMIT,
+    WARM_PATH,
+    load_all_layers,
+    parse_existing,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -92,10 +97,10 @@ def collect_traces(root: Path, inputs: list[str] | None, since_hours: int | None
     paths = sorted(audit_dir.glob("gcl-trace-*.json"))
     if since_hours is None:
         return paths
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=since_hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=since_hours)
     return [
         p for p in paths
-        if datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc) >= cutoff
+        if datetime.fromtimestamp(p.stat().st_mtime, tz=UTC) >= cutoff
     ]
 
 

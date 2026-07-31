@@ -5,9 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from copilot.blackboard import BlackboardClient
-from copilot.integration.alert_intel import AlertIntelRunner, SKILL_NAME
+from copilot.integration.alert_intel import SKILL_NAME, AlertIntelRunner
 
 
 @pytest.fixture

@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from copilot.plan_schema import (
     PlanValidationError,
     execution_plan_from_dict,

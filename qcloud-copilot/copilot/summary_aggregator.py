@@ -9,7 +9,8 @@ Two functions:
 """
 from __future__ import annotations
 
-from typing import Any, Iterable, Optional
+from collections.abc import Iterable
+from typing import Any
 
 from copilot.trace_records import (
     AIOpsSummary,
@@ -17,7 +18,6 @@ from copilot.trace_records import (
     ObservationRecord,
     UsageEvent,
 )
-
 
 _SEVERITY_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
 
@@ -54,7 +54,7 @@ def _collect_topology_from_metadata(observations: Iterable[ObservationRecord]) -
 
 def _collect_rca_impact_response(
     observations: Iterable[ObservationRecord],
-) -> tuple[Optional[str], Optional[str], Optional[str]]:
+) -> tuple[str | None, str | None, str | None]:
     rca_bits: list[str] = []
     impact_bits: list[str] = []
     response_bits: list[str] = []
@@ -71,15 +71,14 @@ def _collect_rca_impact_response(
     )
 
 
-def _worst_severity(observations: Iterable[ObservationRecord]) -> Optional[str]:
-    worst: Optional[tuple[int, str]] = None
+def _worst_severity(observations: Iterable[ObservationRecord]) -> str | None:
+    worst: tuple[int, str] | None = None
     for obs in observations:
         sev = (obs.metadata or {}).get("severity")
         if isinstance(sev, str):
             rank = _SEVERITY_ORDER.get(sev.lower())
-            if rank is not None:
-                if worst is None or rank > worst[0]:
-                    worst = (rank, sev.lower())
+            if rank is not None and (worst is None or rank > worst[0]):
+                worst = (rank, sev.lower())
     return worst[1] if worst else None
 
 
@@ -95,7 +94,7 @@ def _quality_ratio(observations: Iterable[ObservationRecord]) -> float:
 
 def aggregate_aiops_summary(
     observations: Iterable[ObservationRecord],
-    trace_id: Optional[str] = None,
+    trace_id: str | None = None,
 ) -> AIOpsSummary:
     """Build an AIOpsSummary from a trace's observations (idempotent)."""
     obs_list = list(observations)
@@ -230,7 +229,7 @@ def _cost_summary() -> dict[str, Any]:
 
 def aggregate_finops_summary(
     usage_events: Iterable[UsageEvent],
-    trace_id: Optional[str] = None,
+    trace_id: str | None = None,
 ) -> FinOpsSummary:
     """Build a FinOpsSummary from a trace's usage events (idempotent)."""
     events = list(usage_events)

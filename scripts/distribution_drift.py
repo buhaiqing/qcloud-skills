@@ -3,11 +3,11 @@
 
 import argparse
 import json
+import statistics
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
-import statistics
 
 
 def load_traces(trace_dir: Path, since_days: int):
@@ -17,10 +17,10 @@ def load_traces(trace_dir: Path, since_days: int):
         try:
             t = json.loads(f.read_text())
             ts = t.get("timestamp", "")
-            if ts and datetime.fromisoformat(ts.replace("Z", "+00:00")) < cutoff:
+            if ts and datetime.fromisoformat(ts) < cutoff:
                 continue
             traces.append(t)
-        except Exception:
+        except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
             pass
     return traces
 

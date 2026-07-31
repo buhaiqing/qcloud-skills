@@ -13,7 +13,7 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-import gcl_trajectory_quality as gtq  # noqa: E402
+import gcl_trajectory_quality as gtq
 
 
 def quiet_main(argv: list[str]) -> int:

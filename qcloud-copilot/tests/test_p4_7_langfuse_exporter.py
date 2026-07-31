@@ -8,20 +8,20 @@ from __future__ import annotations
 
 
 def _trace(name="qcloud-rca-1", **kw):
-    from copilot.trace_records import TraceRecord, RuntimeInfo, SkillInfo  # noqa: F401
     from copilot.skill_version import SkillVersion  # noqa: F401
     from copilot.trace_metadata import build_runtime_info  # noqa: F401
+    from copilot.trace_records import RuntimeInfo, SkillInfo, TraceRecord  # noqa: F401
 
-    defaults = dict(
-        name=name,
-        id="trc-fake-001",
-        timestamp="2026-07-25T00:00:00Z",
-        started_at="2026-07-25T00:00:00Z",
-        ended_at="2026-07-25T00:00:05Z",
-        status="success",
-        input={"query": "demo"},
-        output={"verdict": "ok"},
-    )
+    defaults = {
+        "name": name,
+        "id": "trc-fake-001",
+        "timestamp": "2026-07-25T00:00:00Z",
+        "started_at": "2026-07-25T00:00:00Z",
+        "ended_at": "2026-07-25T00:00:05Z",
+        "status": "success",
+        "input": {"query": "demo"},
+        "output": {"verdict": "ok"},
+    }
     defaults.update(kw)
     return TraceRecord(**defaults)
 

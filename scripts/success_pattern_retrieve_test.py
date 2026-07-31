@@ -11,14 +11,16 @@ Covers:
 """
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
-import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[0]))
 from success_pattern_retrieve import (
     SuccessEntry,
-    _severity_weight, recency_decay, compute_composite,
+    _severity_weight,
+    compute_composite,
+    recency_decay,
     retrieve_success_patterns,
 )
 

@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 # Import from failure_pattern_extract for parsing existing patterns
-from failure_pattern_extract import parse_existing, enforce_line_cap
+from failure_pattern_extract import enforce_line_cap, parse_existing
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_STORE_PATH = ROOT / "docs" / "failure-patterns.md"
@@ -53,7 +53,7 @@ def parse_existing_safe(path: Path) -> dict[str, dict[str, Any]]:
             key = normalize_reflexion_key(category, p["skill"], p["command"], p["error"])
             patterns[key] = p
         return patterns
-    except Exception:
+    except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
         return {}
 
 

@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import pytest
-
-if TYPE_CHECKING:  # pragma: no cover
-    from copilot import resource_discovery as rd
-    from copilot.proactive_inspection import cruise_sniff as _sniff
+from copilot import resource_discovery as rd
+from copilot.proactive_inspection import cruise_sniff as _sniff
 
 pytest.skip(
     "Requires qcloud-proactive-inspection resource_discovery lib (Phase 2)",

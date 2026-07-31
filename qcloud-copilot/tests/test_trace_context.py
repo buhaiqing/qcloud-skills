@@ -4,13 +4,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "qcloud-copilot"))
 
 from copilot.trace_context import (
     TraceContext,
-    new_trace_id,
     new_observation_id,
+    new_trace_id,
 )
 
 

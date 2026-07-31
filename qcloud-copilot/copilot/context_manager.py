@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 CUSTOMER_ALIASES: dict[str, str] = {
     "示例客户": "demo-customer",
     "演示租户": "demo-customer",

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from copilot.blackboard import BlackboardClient
-from copilot.models import SessionState, ExecutionPlan
 
+from copilot.blackboard import BlackboardClient
+from copilot.models import ExecutionPlan, SessionState
 
 _MEMOR_DIR = Path.home() / ".omo" / "memor" / "copilot" / "sessions"
 
@@ -25,7 +25,7 @@ class SessionManager:
         session_id = f"ses-{uuid.uuid4().hex[:8]}"
         state = SessionState(
             session_id=session_id,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
             history=[],
             current_plan=None,
             context={},
@@ -53,7 +53,7 @@ class SessionManager:
             return state
         new_state = SessionState(
             session_id=session_id,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
             history=[],
             current_plan=None,
             context={},

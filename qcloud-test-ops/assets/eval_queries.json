@@ -1,0 +1,16 @@
+{
+  "queries": [
+    {
+      "intent": "M3 acceptance probe",
+      "query": "test the qcloud test ops stub"
+    },
+    {
+      "intent": "M3 stub skill validation",
+      "query": "validate M3 stub discoverability"
+    },
+    {
+      "intent": "zero-code routing acceptance",
+      "query": "test M3 zero code skill registration"
+    }
+  ]
+}

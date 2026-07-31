@@ -8,14 +8,14 @@ import os
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-import l4_metrics_tracker as l4  # noqa: E402
+import l4_metrics_tracker as l4
 
 
 def make_trace(
@@ -54,7 +54,7 @@ def make_trace(
 
     return {
         "skill": "qcloud-test-ops",
-        "timestamp": timestamp or datetime.now(timezone.utc).isoformat(),
+        "timestamp": timestamp or datetime.now(UTC).isoformat(),
         "final": {"status": status, "iter": iterations},
         "iterations": iters,
         "preflight_reflexion": {
@@ -147,13 +147,13 @@ class TestEmergingPatternLatency(unittest.TestCase):
             # Write a log 3 days ago
             old = d / "pattern-anomaly-20260716.json"
             old.write_text("[]")
-            old_time = datetime.now(timezone.utc) - timedelta(days=3)
+            old_time = datetime.now(UTC) - timedelta(days=3)
             os.utime(old, (old_time.timestamp(), old_time.timestamp()))
 
             # Write a log 1 day ago
             recent = d / "pattern-anomaly-20260718.json"
             recent.write_text("[]")
-            recent_time = datetime.now(timezone.utc) - timedelta(days=1)
+            recent_time = datetime.now(UTC) - timedelta(days=1)
             os.utime(recent, (recent_time.timestamp(), recent_time.timestamp()))
 
             latency = l4.get_emerging_pattern_latency(d)

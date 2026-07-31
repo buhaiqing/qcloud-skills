@@ -5,28 +5,30 @@ from contextlib import suppress
 
 from copilot.classifier import classify
 from copilot.dispatcher import PlanDispatcher
+from copilot.env_loader import ensure_runtime_env
+from copilot.integration.cruise import CruiseRunner
+from copilot.integration.skills import SkillDispatcher
+from copilot.mode_resolver import resolve_inspection_mode, strip_ci_trigger_words
 from copilot.models import (
     ExecutionPlan,
     ExecutionResult,
     Report,
     StepResult,
 )
+from copilot.observ import Metric, MetricKind, ObservableSink
 from copilot.parser import parse
 from copilot.plan_gen import generate as gen_plan
 from copilot.plan_schema import load_plan_file
+from copilot.quality.audit import audit_trace, audit_trace_v3
+from copilot.quality.health import record_health
 from copilot.report_gen import synthesize
-from copilot.integration.skills import SkillDispatcher
-from copilot.integration.cruise import CruiseRunner
 from copilot.safety.l0 import check_l0
 from copilot.safety.l1 import check_l1
 from copilot.safety.l2 import check_l2
 from copilot.safety.l3 import check_l3
-from copilot.quality.health import record_health
-from copilot.quality.audit import audit_trace, audit_trace_v3
-from copilot.observ import Metric, MetricKind, ObservableSink
 from copilot.session import SessionManager
-from copilot.mode_resolver import resolve_inspection_mode, strip_ci_trigger_words
-from copilot.env_loader import ensure_runtime_env
+
+
 class CopilotEngine:
     """Main orchestrator: NL → Parse → Classify → Plan → Execute → Report."""
 

@@ -11,11 +11,11 @@ import io
 from pathlib import Path
 
 import pytest
-
 from copilot.blackboard import BlackboardClient
 from copilot.dispatcher import PlanDispatcher
 from copilot.integration.cruise import CruiseRunner
 from copilot.integration.skills import SkillDispatcher
+from copilot.mode_gate import maybe_discover_regions
 from copilot.models import (
     AskOption,
     ClassifiedIntent,
@@ -24,7 +24,6 @@ from copilot.models import (
     PlanStep,
     StepResult,
 )
-from copilot.mode_gate import maybe_discover_regions
 from copilot.plan_gen import (
     _build_region_ask_options,
     _cruise_plan,
@@ -32,7 +31,6 @@ from copilot.plan_gen import (
     generate,
 )
 from copilot.region_scanner import RegionCandidate
-
 
 # ---------------------------------------------------------------------------
 # mode_gate
@@ -263,7 +261,7 @@ def test_cruise_plan_no_ask_when_region_explicit() -> None:
     plan = _cruise_plan(_INTENT, ctx)
     types = [s.type for s in plan.steps]
     assert "ask_user" not in types
-    cruise = [s for s in plan.steps if s.id == "cruise-1"][0]
+    cruise = next(s for s in plan.steps if s.id == "cruise-1")
     assert cruise.parallel_group == 0
     assert cruise.depends_on == []
 
@@ -306,7 +304,7 @@ def test_cruise_plan_inserts_ask_region_in_delivery_with_candidates() -> None:
     assert len(ask.ask_user_options) == 2
     assert {o.value for o in ask.ask_user_options} == {"ap-guangzhou", "cn-east-2"}
 
-    cruise = [s for s in plan.steps if s.id == "cruise-1"][0]
+    cruise = next(s for s in plan.steps if s.id == "cruise-1")
     assert cruise.parallel_group == 1
     assert cruise.depends_on == ["ask-region-0"]
 
@@ -457,7 +455,6 @@ def test_dispatcher_rejects_ask_user_in_ci(tmp_path: Path) -> None:
     class SpyAskRunner:
         def execute(self, *a, **kw):
             called["ask"] = True
-            return None  # never reached
 
     class SpyCruiseRunner:
         def execute(self, *a, **kw):

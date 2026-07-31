@@ -19,7 +19,6 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-
 # ---------------------------------------------------------------------------
 # Idempotency key
 # ---------------------------------------------------------------------------
@@ -144,7 +143,7 @@ def test_partial_failure_keeps_successful_emits():
 
 
 def tmp_path_for():
-    from pathlib import Path as _P
     import tempfile as _t
+    from pathlib import Path as _P
 
     return _P(_t.mkdtemp())

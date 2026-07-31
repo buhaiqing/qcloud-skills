@@ -7,7 +7,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
 from copilot.blackboard import BlackboardClient
 from copilot.integration.cruise import CruiseRunner, _apply_ci_mode_strategy
 from copilot.models import PlanStep

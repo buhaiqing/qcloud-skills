@@ -32,6 +32,7 @@ metadata:
     - qcloud-tke-ops          # 委托：TKE/CVM/SCF 计算资源
     - qcloud-finops-ops       # 反向：成本优化分析
     - qcloud-tcop-ops         # 反向：资源优化与架构评估
+  product_name: ags
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).

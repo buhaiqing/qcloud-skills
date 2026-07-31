@@ -1,4 +1,4 @@
-from copilot.models import ExecutionPlan, ClassifiedIntent, IntentType
+from copilot.models import ClassifiedIntent, ExecutionPlan, IntentType
 from copilot.session import SessionManager
 
 

@@ -18,12 +18,11 @@ Tests the three-layer hot/warm/cold storage upgrade:
 
 import sys
 import unittest
-from pathlib import Path
 from datetime import date, timedelta
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[0]))
 import failure_pattern_extract as fpe
-
 
 _TODAY = date.today().strftime("%Y-%m-%d")
 
@@ -49,7 +48,7 @@ class TestSubstitution(unittest.TestCase):
         new = [fp(skill="cvm", command="Run", error="Err", count=1)]
         hot = {("cvm", "Run", "Err"): fp(count=5, last_seen=_TODAY)}
         warm, cold = {}, {}
-        h, w, c = fpe.merge_failure_batch(new, hot, warm, cold)
+        h, _w, _c = fpe.merge_failure_batch(new, hot, warm, cold)
         self.assertEqual(h[("cvm", "Run", "Err")]["count"], 6)
         self.assertEqual(h[("cvm", "Run", "Err")]["last_seen"], _TODAY)
 
@@ -209,7 +208,7 @@ class TestEmitLayer(unittest.TestCase):
             fpe.save_layer(p, patterns, "Hot Layer")
             loaded = fpe.parse_existing(p)
             self.assertEqual(len(loaded), 1)
-            key = list(loaded.keys())[0]
+            key = next(iter(loaded.keys()))
             self.assertEqual(key[0], "cvm")
             self.assertEqual(loaded[key]["count"], 3)
 

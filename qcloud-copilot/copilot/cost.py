@@ -11,8 +11,8 @@ Invariant (P3.5):
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Iterable, Optional
+from collections.abc import Iterable
+from datetime import UTC, datetime
 
 from copilot.trace_records import (
     CostRecord,
@@ -23,34 +23,34 @@ from copilot.trace_records import (
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
-def _llm_input_key(evt: UsageEvent) -> Optional[str]:
+def _llm_input_key(evt: UsageEvent) -> str | None:
     if not (evt.provider and evt.model):
         return None
     return f"llm:{evt.provider}:{evt.model}:input_per_1k"
 
 
-def _llm_output_key(evt: UsageEvent) -> Optional[str]:
+def _llm_output_key(evt: UsageEvent) -> str | None:
     if not (evt.provider and evt.model):
         return None
     return f"llm:{evt.provider}:{evt.model}:output_per_1k"
 
 
-def _llm_cached_key(evt: UsageEvent) -> Optional[str]:
+def _llm_cached_key(evt: UsageEvent) -> str | None:
     if not (evt.provider and evt.model):
         return None
     return f"llm:{evt.provider}:{evt.model}:cached_per_1k"
 
 
-def _llm_reasoning_key(evt: UsageEvent) -> Optional[str]:
+def _llm_reasoning_key(evt: UsageEvent) -> str | None:
     if not (evt.provider and evt.model):
         return None
     return f"llm:{evt.provider}:{evt.model}:reasoning_per_1k"
 
 
-def _api_call_key(evt: UsageEvent) -> Optional[str]:
+def _api_call_key(evt: UsageEvent) -> str | None:
     if not (evt.product and evt.action):
         return None
     return f"api:{evt.product}:{evt.action}:per_call"
@@ -124,7 +124,7 @@ def compute_cost(
     events: Iterable[UsageEvent],
     pricing: PricingSnapshot,
     currency: str = "CNY",
-    trace_id: Optional[str] = None,
+    trace_id: str | None = None,
 ) -> CostRecord:
     """Compute a CostRecord from usage events and a pricing snapshot.
 

@@ -41,8 +41,8 @@ def test_build_runtime_info_handles_missing_subprocess():
     assert rt.sdk_version is None
     assert rt.git_commit is None
 def test_build_skill_info_maps_skill_version():
-    from copilot.trace_metadata import build_skill_info
     from copilot.skill_version import SkillVersion
+    from copilot.trace_metadata import build_skill_info
     from copilot.trace_records import SkillInfo
 
     sv = SkillVersion(

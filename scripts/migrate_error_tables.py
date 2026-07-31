@@ -137,7 +137,7 @@ def _parse_frontmatter(fm_text: str) -> Frontmatter | None:
         else:
             import yaml  # type: ignore
             data = yaml.safe_load(stripped)
-    except Exception:  # noqa: BLE001
+    except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
         return fm
     if isinstance(data, dict):
         fm.name = str(data.get("name") or "")

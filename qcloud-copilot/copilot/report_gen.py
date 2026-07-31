@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -132,7 +132,7 @@ def _render_final_report_markdown(report: Report) -> str:
     if report.user_request:
         lines.extend([f"> {report.user_request}", ""])
     meta = [f"**{report.summary}**"]
-    meta.append(f"生成于 {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
+    meta.append(f"生成于 {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}")
     if report.duration_ms:
         meta.append(f"耗时 {report.duration_ms // 1000}s")
     if is_summary:
@@ -186,16 +186,12 @@ def _render_final_report_markdown(report: Report) -> str:
                     lines.append("")
                     continue
                 if section.title.startswith("需处理项"):
-                    if finding.startswith("### ") or finding.startswith("- "):
+                    if finding.startswith(("### ", "- ")):
                         lines.append(finding)
                     else:
                         lines.append(f"- {finding}")
                 elif (
-                    finding.startswith("### ")
-                    or finding.startswith("| ")
-                    or finding.startswith("- ")
-                    or finding.startswith("  - ")
-                    or finding.startswith("**")
+                    finding.startswith(("### ", "| ", "- ", "  - ", "**"))
                 ):
                     lines.append(finding)
                 else:
@@ -558,7 +554,7 @@ def _parse_expiry_datetime(summary: str) -> datetime | None:
     if len(raw) == 10:
         raw = f"{raw}T00:00:00Z"
     try:
-        return datetime.strptime(raw, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        return datetime.strptime(raw, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
     except ValueError:
         return None
 
@@ -569,7 +565,7 @@ def _split_action_and_info(
     now: datetime | None = None,
 ) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     """Promote actionable INFO (e.g. expiry within 60d) into action items."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     action_items: list[dict[str, str]] = []
     info_items: list[dict[str, str]] = []
 
@@ -739,8 +735,8 @@ def _build_evidence_section(
         "本节与 Blackboard `shared_context.evidence_chain` 同源，呈现策略→计划→过程→结果的完整证据链。",
         "",
         "### 1. 巡检策略（拓扑驱动，LLM-native 就绪）",
-        f"- 决策器：**{strategy.get('decision_maker', '—')}** "
-        f"（`llm_native_target={strategy.get('llm_native_target')}`）",
+        (f"- 决策器：**{strategy.get('decision_maker', '—')}** "
+        f"（`llm_native_target={strategy.get('llm_native_target')}`）"),
         f"- 模式：**{strategy.get('mode', '—')}** / 执行路径：**{strategy.get('execution_path', '—')}**",
     ]
     if strategy.get("llm_native_note"):
@@ -860,8 +856,8 @@ def _build_resource_coverage_section(cruise: dict) -> list[str]:
         ]
 
     lines = [
-        "Copilot 层通过 **qcloud-proactive-inspection** 一次性完成拓扑内多类型资源分析；"
-        "下表为各资源类型 analyzer 的实际执行情况（非独立调用 qcloud-cvm-ops 等变更 Skill）。",
+        ("Copilot 层通过 **qcloud-proactive-inspection** 一次性完成拓扑内多类型资源分析；"
+        "下表为各资源类型 analyzer 的实际执行情况（非独立调用 qcloud-cvm-ops 等变更 Skill）。"),
         "",
         "| 资源类型 | 拓扑发现 | 深度分析 | 发现问题 | 状态 | 变更委托 Skill |",
         "|---|---:|---:|---:|---|---|",

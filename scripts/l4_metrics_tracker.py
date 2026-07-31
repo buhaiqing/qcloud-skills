@@ -21,7 +21,7 @@ import argparse
 import json
 import statistics
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -87,8 +87,8 @@ def get_emerging_pattern_latency(trace_dir: Path) -> int | None:
     )
     if not logs:
         return None
-    mtime = datetime.fromtimestamp(logs[0].stat().st_mtime, tz=timezone.utc)
-    age = datetime.now(timezone.utc) - mtime
+    mtime = datetime.fromtimestamp(logs[0].stat().st_mtime, tz=UTC)
+    age = datetime.now(UTC) - mtime
     return age.days
 
 
@@ -163,22 +163,22 @@ def _load_traces(trace_dir: Path, since_days: int | None = None) -> list[dict[st
     """Load all gcl-trace-*.json files from trace_dir."""
     cutoff: datetime | None = None
     if since_days is not None:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
+        cutoff = datetime.now(UTC) - timedelta(days=since_days)
 
     traces: list[dict[str, Any]] = []
     for path in sorted(trace_dir.glob("gcl-trace-*.json")):
         try:
             t = json.loads(path.read_text())
-        except Exception:
+        except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
             continue
         if cutoff is not None:
             ts_str = t.get("timestamp", "")
             if ts_str:
                 try:
-                    ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    ts = datetime.fromisoformat(ts_str)
                     if ts < cutoff:
                         continue
-                except Exception:
+                except (ImportError, OSError, ValueError, KeyError, AttributeError, TypeError):
                     pass
         traces.append(t)
     return traces
@@ -259,7 +259,7 @@ def main() -> int:
     reuse_note = "尚未启用" if reuse == 0 else ""
 
     result = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "metrics": {
             # lower-is-better: ≤ 1.8
             "avg_iterations": _build_metric(avg_iter, 1.8, lower_is_better=True, note="20% reduction target"),

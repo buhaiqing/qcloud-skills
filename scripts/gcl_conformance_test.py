@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-import check_gcl_conformance as gclc  # noqa: E402
+import check_gcl_conformance as gclc
 
 ROOT = Path(__file__).resolve().parents[1]
 

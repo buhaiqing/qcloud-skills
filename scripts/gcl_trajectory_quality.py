@@ -20,7 +20,7 @@ import math
 import re
 import statistics
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -42,7 +42,7 @@ def classify_op(command: str) -> str:
     tokens = command.strip().split()
     # Split CamelCase BEFORE lowercasing: DescribeInstances → ['Describe','Instances']
     action_raw = tokens[2] if len(tokens) > 2 else ""
-    words = set(w.lower() for w in re.findall(r'[A-Z][a-z]*', action_raw))
+    words = {w.lower() for w in re.findall(r'[A-Z][a-z]*', action_raw)}
     # Also check full lowercase for compound words like DescribeEx
     action_lower = action_raw.lower()
     if words & _READS or action_lower in _READS:
@@ -246,9 +246,7 @@ def compute_baselines(traces: list[dict[str, Any]], min_samples: int = 5) -> dic
     for skill, dim_vals in by_skill.items():
         dim_stats = {}
         for d, vals in dim_vals.items():
-            if len(vals) >= min_samples:
-                dim_stats[d] = (statistics.mean(vals), statistics.stdev(vals))
-            elif len(vals) > 1:
+            if len(vals) >= min_samples or len(vals) > 1:
                 dim_stats[d] = (statistics.mean(vals), statistics.stdev(vals))
         if dim_stats:
             baselines[skill] = dim_stats
@@ -415,7 +413,7 @@ def analyze_traces(traces: list[dict[str, Any]], baselines: dict[str, dict[str, 
 
     return {
         "version": "1.1",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "window": {"trace_count": n},
         "summary": {
             "avg_convergence_speed": round(statistics.mean(conv_speeds), 4) if conv_speeds else None,
@@ -447,11 +445,11 @@ def _load_traces(root: Path, since_hours: int | None) -> list[dict[str, Any]]:
     paths = sorted(audit.glob("gcl-trace-*.json"))
     if since_hours is None:
         return [json.loads(p.read_text(encoding="utf-8")) for p in paths]
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=since_hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=since_hours)
     out = []
     for p in paths:
         try:
-            ts = datetime.strptime(p.stem.replace("gcl-trace-", ""), "%Y%m%d-%H%M%S").replace(tzinfo=timezone.utc)
+            ts = datetime.strptime(p.stem.replace("gcl-trace-", ""), "%Y%m%d-%H%M%S").replace(tzinfo=UTC)
         except ValueError:
             continue
         if ts >= cutoff:
@@ -462,7 +460,7 @@ def _load_traces(root: Path, since_hours: int | None) -> list[dict[str, Any]]:
 def persist(root: Path, data: dict[str, Any]) -> Path:
     out_dir = root / "audit-results"
     out_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     path = out_dir / f"gcl-trajectory-quality-{ts}.json"
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return path

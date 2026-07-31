@@ -301,6 +301,23 @@ class SkillRegistryFromRepoTest(unittest.TestCase):
         self.assertLess(order.index("qcloud-monitor-ops"),
                         order.index("qcloud-test-ops"))
 
+    def test_m3_acceptance_stub_wins_route_for_curated_queries(self):
+        """M3 acceptance (audit fix): curated queries containing the stub's
+        intent keywords must route to qcloud-test-ops, proving that
+        zero-code, query-driven routing works for new skills.
+        """
+        # The stub has eval_queries.json with intent keywords
+        # 'M3 acceptance probe', 'M3 stub skill validation',
+        # 'zero-code routing acceptance'.
+        skill, conf = self.reg.route("M3 acceptance probe stub validation")
+        self.assertEqual(skill, "qcloud-test-ops",
+                         f"curated query should route to stub, got {skill}")
+        self.assertGreater(conf, 0.0)
+
+        skill, _ = self.reg.route("zero-code routing acceptance")
+        self.assertEqual(skill, "qcloud-test-ops",
+                         f"curated query should route to stub, got {skill}")
+
     def test_repo_real_skills_read_cli_applicability_from_metadata(self):
         """Real SKILL.md puts cli_applicability/version/last_updated under metadata.*."""
         e_cvm = self.reg.get_entry("qcloud-cvm-ops")

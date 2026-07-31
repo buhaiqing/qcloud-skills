@@ -17,8 +17,7 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-import gcl_trace_aggregate as gta  # noqa: E402
-
+import gcl_trace_aggregate as gta
 
 SCORES = {
     "correctness": 1,

@@ -103,7 +103,7 @@ def run_quality_score(root: Path, python: str = sys.executable) -> dict[str, Any
     argv = (python, "scripts/skill_quality_score.py", "score", "--json")
     print(f"$ {shlex.join(argv)}")
 
-    result = subprocess.run(argv, cwd=root, capture_output=True, text=True)
+    result = subprocess.run(argv, cwd=root, capture_output=True, text=True, check=False)
 
     if result.returncode != 0:
         return {
@@ -183,7 +183,7 @@ def build_steps(python: str = sys.executable, github_output: bool = False) -> li
 def run_step(root: Path, step: Step) -> int:
     print(f"\n==> {step.name}")
     print("$ " + shlex.join(step.argv))
-    proc = subprocess.run(step.argv, cwd=root)
+    proc = subprocess.run(step.argv, cwd=root, check=False)
     return proc.returncode
 
 
@@ -241,7 +241,7 @@ def main(argv: list[str] | None = None) -> int:
         rc = subprocess.run(
             [sys.executable, str(root / "scripts" / "aggregate_kpi.py"), *ev_files],
             capture_output=True, text=True,
-        ).returncode
+        check=False).returncode
         if rc != 0:
             print("FAIL: KPI targets unmet (see aggregate_kpi output)", file=sys.stderr)
             return 1

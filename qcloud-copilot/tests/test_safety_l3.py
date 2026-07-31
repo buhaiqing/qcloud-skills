@@ -1,7 +1,7 @@
 from copilot.models import (
-    ExecutionResult,
-    ExecutionPlan,
     ClassifiedIntent,
+    ExecutionPlan,
+    ExecutionResult,
     IntentType,
     PlanStep,
     Report,

@@ -40,6 +40,7 @@ metadata:
     - qcloud-monitor-ops       # 委托：监控告警策略
     - qcloud-cls-ops          # 委托：日志分析
     - qcloud-finops-ops       # 反向：成本优化分析
+  product_name: tcb
 ---
 <!-- TE-1: Query API for dynamic data (regions, envs) — no hardcoded tables -->
 <!-- TE-3: Error tables use 3 columns max (Code | Meaning | Action) — see troubleshooting.md -->

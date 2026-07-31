@@ -40,8 +40,11 @@ from pathlib import Path
 from typing import Any
 
 from _failure_pattern_store import (
-    parse_existing, load_all_layers,
-    HOT_PATH, WARM_PATH, COLD_PATH,
+    COLD_PATH,
+    HOT_PATH,
+    WARM_PATH,
+    load_all_layers,
+    parse_existing,
 )
 
 ROOT = Path(__file__).resolve().parents[1]

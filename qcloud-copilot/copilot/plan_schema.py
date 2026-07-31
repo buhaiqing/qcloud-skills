@@ -5,13 +5,13 @@ from pathlib import Path
 from typing import Any
 
 from copilot.models import (
+    _ASK_DEFAULT_UNSET,
+    DEFAULT_DISPATCH_CONFIG,
     AskOption,
     ClassifiedIntent,
-    DEFAULT_DISPATCH_CONFIG,
     ExecutionPlan,
     IntentType,
     PlanStep,
-    _ASK_DEFAULT_UNSET,
 )
 
 # Plan-fixture JSON cannot represent Python's `object()` sentinel, so we

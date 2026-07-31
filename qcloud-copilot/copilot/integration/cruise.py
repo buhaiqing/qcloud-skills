@@ -310,7 +310,7 @@ class CruiseRunner:
         return result
 
     def _run_script(self, cmd: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
+        return subprocess.run(  # noqa: PLW1510 - caller inspects CompletedProcess.returncode explicitly
             cmd,
             capture_output=True,
             text=True,

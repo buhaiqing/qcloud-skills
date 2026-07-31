@@ -19,7 +19,7 @@ Export never raises: missing observation ids are silently skipped.
 """
 from __future__ import annotations
 
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from copilot.trace_records import (
     ObservationRecord,
@@ -29,6 +29,7 @@ from copilot.trace_records import (
     TraceRecord,
     UsageEvent,
 )
+
 
 def _obs_to_dict(obs: ObservationRecord) -> dict:
     d = obs.to_dict() if hasattr(obs, "to_dict") else {}
@@ -90,9 +91,9 @@ def _usage_to_generation(evt: UsageEvent) -> dict:
 def export_trace_to_langfuse(
     trace: TraceRecord,
     *,
-    observations: Optional[Iterable[ObservationRecord]] = None,
-    scores: Optional[Iterable[ScoreRecord]] = None,
-    usage_events: Optional[Iterable[UsageEvent]] = None,
+    observations: Iterable[ObservationRecord] | None = None,
+    scores: Iterable[ScoreRecord] | None = None,
+    usage_events: Iterable[UsageEvent] | None = None,
 ) -> dict:
     """Convert a TraceRecord (+ optional sub-records) into Langfuse trace payload."""
     md: dict = {}

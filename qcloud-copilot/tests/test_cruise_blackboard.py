@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from copilot.blackboard import BlackboardClient
 from copilot.integration.alert_intel import AlertIntelRunner
 from copilot.integration.cruise import CruiseRunner

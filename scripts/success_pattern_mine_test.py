@@ -20,12 +20,16 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[0]))
-from success_pattern_mine import (  # noqa: F401
+from success_pattern_mine import (
+    COLD_LIMIT,
+    HOT_LIMIT,
+    WARM_LIMIT,
     SuccessEntry,
-    HOT_LIMIT, WARM_LIMIT, COLD_LIMIT,
-    merge_batch, self_verify, make_key,
-    load_pending, write_pending_with_lock,
-    full_scan,   # used by TestFullScan
+    load_pending,
+    make_key,
+    merge_batch,
+    self_verify,
+    write_pending_with_lock,
 )
 
 # Shared sig that matches from_pending("tccli cvm RunInstances")[:80]
@@ -90,7 +94,7 @@ class TestSubstitutionMerge(unittest.TestCase):
         hot, warm, cold = {}, {}, {}
         h, _, _ = merge_batch(pending, hot, warm, cold)
         self.assertEqual(len(h), 1)
-        self.assertEqual(h[list(h.keys())[0]].operation, "StopInstances")
+        self.assertEqual(h[next(iter(h.keys()))].operation, "StopInstances")
 
 
 class TestWarmRevive(unittest.TestCase):
