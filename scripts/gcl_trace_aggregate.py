@@ -17,7 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -82,7 +82,7 @@ def aggregate(traces: list[dict[str, Any]]) -> dict[str, Any]:
 
     return {
         "version": "1.0",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "window": {"trace_count": totals["total_runs"]},
         "totals": totals,
         "pass_rate": round(pass_rate, 4),
@@ -105,10 +105,10 @@ def collect_paths(root: Path, inputs: list[str] | None, since_hours: int | None)
     paths = sorted(audit.glob("gcl-trace-*.json"))
     if since_hours is None:
         return paths
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=since_hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=since_hours)
     filtered = []
     for p in paths:
-        if datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc) >= cutoff:
+        if datetime.fromtimestamp(p.stat().st_mtime, tz=UTC) >= cutoff:
             filtered.append(p)
     return filtered
 
@@ -116,10 +116,74 @@ def collect_paths(root: Path, inputs: list[str] | None, since_hours: int | None)
 def persist_summary(root: Path, summary: dict[str, Any]) -> Path:
     out_dir = root / "audit-results"
     out_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     path = out_dir / f"gcl-quality-summary-{ts}.json"
     path.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return path
+
+
+def cross_skill_chain(root: Path, run_id: str) -> dict[str, Any]:
+    """Phase 1.4 — read spans.jsonl for a run, build parent-child chain.
+
+    Output:
+
+    * ``chain``: list of nodes with parent_span_id + span_id + skill + status
+    * ``skills_invoked``: ordered skill sequence (delegation aware)
+    * ``total_duration_ms``: wall-clock duration of the run
+    * ``delegations``: list of {from_skill, to_skill, error_code}
+
+    Used by ``gcl_trace_aggregate --cross-skill --run-id X`` to surface the
+    cross-skill call DAG for an end-to-end run.
+    """
+    spans_path = root / ".runtime" / "traces" / run_id / "spans.jsonl"
+    if not spans_path.exists():
+        return {"run_id": run_id, "error": "spans.jsonl not found"}
+    spans: list[dict[str, Any]] = []
+    for line in spans_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            spans.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    # Order by start_time when available; fall back to insertion order.
+    spans.sort(key=lambda s: s.get("start_time", ""))
+    skills_invoked: list[str] = []
+    delegations: list[dict[str, Any]] = []
+    total_duration = 0
+    for s in spans:
+        skill = s.get("skill") or "?"
+        if not skills_invoked or skills_invoked[-1] != skill:
+            skills_invoked.append(skill)
+        if s.get("delegate_to"):
+            delegations.append({
+                "from_skill": skill,
+                "to_skill": s["delegate_to"],
+                "error_code": s.get("error_code"),
+                "span_id": s.get("span_id"),
+            })
+        total_duration += int(s.get("duration_ms") or 0)
+    return {
+        "run_id": run_id,
+        "span_count": len(spans),
+        "skills_invoked": skills_invoked,
+        "delegations": delegations,
+        "total_duration_ms": total_duration,
+        "chain": [
+            {
+                "span_id": s.get("span_id"),
+                "parent_span_id": s.get("parent_span_id"),
+                "skill": s.get("skill"),
+                "operation": s.get("operation"),
+                "status": s.get("status"),
+                "duration_ms": s.get("duration_ms"),
+                "error_code": s.get("error_code"),
+                "delegate_to": s.get("delegate_to"),
+            }
+            for s in spans
+        ],
+    }
 
 
 def main() -> int:
@@ -127,7 +191,20 @@ def main() -> int:
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--input", nargs="*", help="Trace file(s) or glob under --root")
     parser.add_argument("--since-hours", type=int, default=None, help="Only traces modified within N hours")
+    # Phase 1.4 — cross-skill DAG view for a specific run.
+    parser.add_argument("--cross-skill", action="store_true",
+                        help="Print the cross-skill delegation chain for --run-id")
+    parser.add_argument("--run-id", type=str, default=None,
+                        help="Run id to inspect with --cross-skill")
     args = parser.parse_args()
+
+    if args.cross_skill:
+        if not args.run_id:
+            print("ERROR: --cross-skill requires --run-id", file=sys.stderr)
+            return 2
+        chain = cross_skill_chain(args.root, args.run_id)
+        print(json.dumps(chain, indent=2, ensure_ascii=False))
+        return 0
 
     paths = collect_paths(args.root, args.input, args.since_hours)
     if not paths:

@@ -15,7 +15,7 @@ from copilot.integration.alert_intel import AlertIntelRunner
 from copilot.integration.cruise import CruiseRunner
 from copilot.integration.skills import SkillDispatcher
 from copilot.models import ExecutionPlan, PlanStep, StepResult
-from copilot.observ import ObservableSink, Span
+from copilot.observ import ObservableSink, Span, TraceSpan
 from copilot.plan_schema import resolve_blackboard_paths
 from copilot.quality.audit import audit_trace
 from copilot.quality.hallucination import check_h
@@ -511,12 +511,49 @@ class PlanDispatcher:
                 )
                 return result
             original_skill = step.skill
+            # Phase 1.4: emit a "delegated" span for the cross-skill hop.
+            # The DELEGATE marker span carries the parent_span_id so the
+            # downstream VPC/CAM/etc. spans become children of the original
+            # CVM step span. _current_parent_span_id is reset after.
+            trace_id = getattr(self, "_trace_id", None) or ""
+            parent_span_id = getattr(self, "_current_parent_span_id", None)
+            with suppress(Exception):
+                ObservableSink().emit_trace_span(
+                    TraceSpan(
+                        span_id=f"{trace_id}:{step.id}:delegate",
+                        trace_id=trace_id,
+                        parent_span_id=parent_span_id,
+                        run_id=getattr(self, "_session_id", "local"),
+                        skill="qcloud-copilot",
+                        operation="escalator.delegate",
+                        step_id=f"{step.id}.delegate",
+                        status="delegated",
+                        delegate_to=delegate_to,
+                        error_code=result.error_code,
+                    )
+                )
             step.skill = delegate_to
             try:
                 delegated = self._execute_with_timeout(
                     lambda: self._skill_dispatcher.execute(step, context),
                     step.id,
                 )
+                # Phase 1.4: emit child span for the delegated skill call.
+                with suppress(Exception):
+                    ObservableSink().emit_trace_span(
+                        TraceSpan(
+                            span_id=f"{trace_id}:{step.id}:{delegate_to}",
+                            trace_id=trace_id,
+                            parent_span_id=parent_span_id,
+                            run_id=getattr(self, "_session_id", "local"),
+                            skill=delegate_to,
+                            operation=step.operation or step.type,
+                            step_id=f"{step.id}.{delegate_to}",
+                            status=delegated.status,
+                            duration_ms=delegated.duration_ms,
+                            error_code=delegated.error_code,
+                        )
+                    )
                 result.retry_count += 1
                 if delegated.status == "success":
                     # Delegate succeeded — now retry the ORIGINAL step
@@ -615,6 +652,7 @@ class PlanDispatcher:
             )
 
     def _emit_span(self, session_id: str, step: PlanStep, result: StepResult) -> None:
+        # Legacy v1 sink (kept for backward compat with observ_query).
         error_code = None
         if result.status != "success" and result.error:
             # First token of the step error is the machine-readable failure signal
@@ -631,5 +669,24 @@ class PlanDispatcher:
                     status=result.status,
                     duration_ms=result.duration_ms,
                     error_code=error_code,
+                )
+            )
+        # Phase 1.4 — unified TraceSpan (parent-child chain; cross-skill
+        # delegation is captured via step.skill swap in _apply_escalation).
+        with suppress(Exception):
+            ObservableSink().emit_trace_span(
+                TraceSpan(
+                    span_id=f"{session_id}:{step.id}",
+                    trace_id=getattr(self, "_trace_id", None) or session_id,
+                    parent_span_id=getattr(self, "_current_parent_span_id", None),
+                    run_id=session_id,
+                    skill=step.skill or "qcloud-copilot",
+                    operation=step.operation or step.type,
+                    step_id=step.id,
+                    status=result.status,
+                    duration_ms=result.duration_ms,
+                    error_code=result.error_code or error_code,
+                    delegate_to=result.delegate_to,
+                    metadata={"destructive": step.destructive},
                 )
             )

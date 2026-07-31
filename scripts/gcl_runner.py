@@ -599,6 +599,54 @@ def extract_failure_pattern(
     return None
 
 
+def _emit_trace_span(
+    root: Path,
+    run_id: str,
+    skill: str,
+    command: str,
+    status: str,
+    scores: dict[str, float] | None = None,
+    error_code: str | None = None,
+    duration_ms: int = 0,
+    trace_id: str | None = None,
+) -> None:
+    """Phase 1.4 — side-emit a unified TraceSpan alongside persist_trace().
+
+    Best-effort: failures here never break GCL. Imports the observability
+    facade lazily so gcl_runner can run on stdlib-only environments that
+    don't ship copilot/.
+    """
+    try:
+        # Local import keeps the scripts/ tree decoupled from qcloud-copilot/.
+        import sys as _sys
+        copilot_root = str((root / "qcloud-copilot").resolve())
+        if copilot_root not in _sys.path:
+            _sys.path.insert(0, copilot_root)
+        from copilot.observ import ObservableSink, TraceSpan
+    except Exception:  # noqa: BLE001 - observability must never break GCL
+        return
+    op_match = re.search(r"tccli\s+\w+\s+(\w+)", command or "")
+    operation = op_match.group(1) if op_match else "gcl_run"
+    span = TraceSpan(
+        span_id=f"{run_id}:{skill}",
+        trace_id=trace_id or run_id,
+        parent_span_id=None,
+        run_id=run_id,
+        skill=skill,
+        operation=operation,
+        step_id="gcl.run",
+        status=status,
+        duration_ms=duration_ms,
+        error_code=error_code,
+        gcl_scores=scores,
+        metadata={"command": (command or "")[:200]},
+    )
+    try:
+        ObservableSink(runtime_root=root / ".runtime").emit_trace_span(span)
+    except Exception:  # noqa: BLE001, S110 - observability must never break GCL
+        pass
+
+
 def persist_trace(root: Path, trace: dict[str, Any], trace_id: str | None = None) -> Path:
     """Persist a GCL trace.
 
@@ -865,6 +913,13 @@ def cmd_run(args: argparse.Namespace) -> int:
                 }
                 path = persist_trace(root, trace, trace_id=args.trace_id)
                 emit_evidence_record(root, trace, args, run_id, pf)
+                _emit_trace_span(
+                    root, run_id, args.skill, command,
+                    status="halted",
+                    scores=critic.get("scores"),
+                    error_code="SAFETY_FAIL",
+                    trace_id=args.trace_id,
+                )
                 print(f"SAFETY_FAIL — trace: {path}", file=sys.stderr)
                 return 3
     
@@ -876,6 +931,12 @@ def cmd_run(args: argparse.Namespace) -> int:
                 }
                 path = persist_trace(root, trace, trace_id=args.trace_id)
                 emit_evidence_record(root, trace, args, run_id, pf)
+                _emit_trace_span(
+                    root, run_id, args.skill, command,
+                    status="success",
+                    scores=critic.get("scores"),
+                    trace_id=args.trace_id,
+                )
                 # P0-A: write success pattern to pending log
                 try:
                     scores = critic.get("scores") or {}
@@ -912,6 +973,13 @@ def cmd_run(args: argparse.Namespace) -> int:
         }
         path = persist_trace(root, trace)
         emit_evidence_record(root, trace, args, run_id, pf)
+        _emit_trace_span(
+            root, run_id, args.skill, command,
+            status="failure",
+            scores=trace["iterations"][-1]["critic"].get("scores") if trace["iterations"] else None,
+            error_code="MAX_ITER",
+            trace_id=args.trace_id,
+        )
         print(f"MAX_ITER — trace: {path}", file=sys.stderr)
         if args.enable_post_process:
             post_process(path, root)
