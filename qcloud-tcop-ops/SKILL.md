@@ -38,6 +38,7 @@ metadata:
     - qcloud-cdb-ops      # 委托：闲置 CDB 处理
     - qcloud-clb-ops      # 委托：CLB 相关优化执行
     - qcloud-well-architected-review  # 委托：卓越架构评估
+  product_name: tcop
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).
