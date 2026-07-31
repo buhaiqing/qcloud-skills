@@ -10,8 +10,9 @@ Phase 1.3 linter. Walks the repo, parses tables, and checks:
 3. **Backoff is parseable** — explicit ``"2s,4s,8s"`` lists and the
    ``"exponential"`` keyword are recognised.
 4. **Max retries is non-negative** — sanity check.
-5. **No duplicate codes per skill** — same error code twice in one
-   SKILL.md is a copy-paste bug.
+5. **Within-table duplicates** — same error code twice in one SKILL.md
+   *table* is a copy-paste bug. (Same code across *different* operation
+   tables is intentional and not flagged.)
 
 Exit code:
 
@@ -34,7 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from error_escalator import Action, ErrorRule
-from error_table_parser import parse_error_table
+from error_table_parser import _extract_tables, parse_error_table
 
 
 def _load_known_skills(repo_root: Path) -> set[str]:
@@ -60,9 +61,14 @@ def _validate_rules(
     rules: list[ErrorRule],
     known_skills: set[str],
 ) -> list[str]:
-    """Return a list of human-readable violation messages."""
+    """Return a list of human-readable violation messages.
+
+    Note: duplicates are NOT flagged here — the same error code appearing
+    under multiple operations (e.g. RunInstances + StopInstances both
+    referencing ``RequestLimitExceeded``) is intentional. Duplicates are
+    scoped within a single table only (see ``_validate_within_table_duplicates``).
+    """
     violations: list[str] = []
-    seen_codes: set[str] = set()
 
     for r in rules:
         # Action validity (already enforced by enum but assert defensively).
@@ -94,13 +100,39 @@ def _validate_rules(
                 f"[{skill}] {r.code}: backoff_strategy={r.backoff_strategy!r} "
                 f"unknown (use 'fixed' or 'exponential')"
             )
-        # Duplicate codes within the same skill.
-        if r.code in seen_codes:
-            violations.append(
-                f"[{skill}] {r.code}: duplicate row in same skill"
-            )
-        seen_codes.add(r.code)
 
+    return violations
+
+
+def _validate_within_table_duplicates(skill: str, skill_md_text: str) -> list[str]:
+    """Flag duplicate codes within a single error table only.
+
+    The same code appearing under different operations is legitimate, but
+    two identical rows in the same table is a copy-paste bug worth flagging.
+
+    Only error tables (those whose header looks like an error-code column)
+    are considered; pre-flight check tables are skipped.
+    """
+    from error_table_parser import _detect_format  # local import to avoid cycle
+    violations: list[str] = []
+    for table in _extract_tables(skill_md_text):
+        if not table:
+            continue
+        if _detect_format(table[0]) is None:
+            continue
+        seen: dict[str, int] = {}
+        for row in table[1:]:
+            if not row or not row[0].strip():
+                continue
+            code = row[0].strip().strip("`").strip()
+            if not code:
+                continue
+            seen[code] = seen.get(code, 0) + 1
+        for code, n in seen.items():
+            if n > 1:
+                violations.append(
+                    f"[{skill}] {code}: appears {n} times in same table"
+                )
     return violations
 
 
@@ -135,8 +167,12 @@ def main() -> int:
         skill_md = skill_dir / "SKILL.md"
         if not skill_md.is_file():
             continue
-        rules = parse_error_table(skill_md.read_text(encoding="utf-8"))
+        text = skill_md.read_text(encoding="utf-8")
+        rules = parse_error_table(text)
         violations = _validate_rules(skill_dir.name, rules, known_skills)
+        violations.extend(
+            _validate_within_table_duplicates(skill_dir.name, text)
+        )
         scanned.append({
             "skill": skill_dir.name,
             "rule_count": len(rules),

@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+# Phase 1.3: ErrorEscalator bridges skill errors to runtime actions
+# (HALT / RETRY / FIX / DELEGATE). Lazy-imported in _execute_step to
+# avoid forcing a scripts/ import on package init.
+import sys as _sys
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
 from contextlib import suppress
+from pathlib import Path as _Path
 
 from copilot.ask_user_runner import AskUserRunner
 from copilot.blackboard import BlackboardClient
@@ -10,13 +15,25 @@ from copilot.integration.alert_intel import AlertIntelRunner
 from copilot.integration.cruise import CruiseRunner
 from copilot.integration.skills import SkillDispatcher
 from copilot.models import ExecutionPlan, PlanStep, StepResult
+from copilot.observ import ObservableSink, Span
 from copilot.plan_schema import resolve_blackboard_paths
 from copilot.quality.audit import audit_trace
-from copilot.quality.health import record_health
 from copilot.quality.hallucination import check_h
-from copilot.observ import ObservableSink, Span
+from copilot.quality.health import record_health
 from copilot.quality.reflexion import write_reflexion
 from copilot.report_gen import synthesize_from_blackboard
+
+_SCRIPTS = str(_Path(__file__).resolve().parents[2] / "scripts")
+if _SCRIPTS not in _sys.path:
+    _sys.path.insert(0, _SCRIPTS)
+from error_escalator import Action as _EscalationAction
+from error_escalator import ErrorEscalator as _ErrorEscalator
+from tcloud_error_codes import (
+    PRODUCT_ERROR_CODES as _PRODUCT_ERROR_CODES,
+)
+from tcloud_error_codes import (
+    to_error_rule as _to_error_rule,
+)
 
 STEP_TIMEOUT = 300
 
@@ -30,11 +47,22 @@ class PlanDispatcher:
         cruise_runner: CruiseRunner | None = None,
         alert_runner: AlertIntelRunner | None = None,
         ask_user_runner: AskUserRunner | None = None,
+        error_escalator: _ErrorEscalator | None = None,
     ) -> None:
         self._skill_dispatcher = skill_dispatcher or SkillDispatcher()
         self._cruise_runner = cruise_runner or CruiseRunner()
         self._alert_runner = alert_runner or AlertIntelRunner()
         self._ask_user_runner = ask_user_runner or AskUserRunner()
+        # Phase 1.3: default ErrorEscalator is preloaded with the
+        # product-level registry (InvalidVpc.NotFound → DELEGATE etc.).
+        # Callers may inject a custom one for tests.
+        if error_escalator is not None:
+            self._error_escalator = error_escalator
+        else:
+            esc = _ErrorEscalator()
+            for rec in _PRODUCT_ERROR_CODES:
+                esc.add_rule(_to_error_rule(rec))
+            self._error_escalator = esc
 
     def execute(
         self,
@@ -224,6 +252,12 @@ class PlanDispatcher:
                     lambda: self._skill_dispatcher.execute(step, context),
                     step.id,
                 )
+                # Phase 1.3: classify failure via ErrorEscalator and act.
+                # We do NOT swallow a "success" result here; only failures
+                # get escalated. Success keeps the original output/error_code
+                # unchanged so callers downstream see no behaviour drift.
+                if result.status != "success":
+                    result = self._apply_escalation(result, step, context)
         elif step.type == "cruise_run":
             result = self._execute_with_timeout(
                 lambda: self._cruise_runner.execute(
@@ -404,6 +438,137 @@ class PlanDispatcher:
                 status="failure",
                 error=f"Step timed out after {STEP_TIMEOUT}s",
             )
+
+    # ---- Phase 1.3: ErrorEscalator integration -----------------------------
+
+    # Backticked code (e.g. `InvalidVpc.NotFound`) is the most reliable
+    # machine-readable signal in a free-text error message. Falls back to
+    # the leading word, then None.
+    _ERR_CODE_BACKTICK_RE = __import__("re").compile(r"`([A-Za-z][A-Za-z0-9_.]*)`")
+    _ERR_CODE_FIRST_WORD_RE = __import__("re").compile(r"\b([A-Z][A-Za-z0-9_.]+)\b")
+
+    def _extract_error_code(self, result: StepResult, step: PlanStep) -> str | None:
+        """Best-effort extraction of a Tencent Cloud API error code.
+
+        Sources, in priority order:
+
+        1. ``result.output["error_code"]`` — when the skill dispatcher
+           already parsed the API response and surfaced the code.
+        2. Backticked token in ``result.error`` (most reliable prose signal).
+        3. First CamelCase token in ``result.error``.
+        4. ``None`` when nothing usable was found (escalator then falls
+           back to its safe-default HALT rule).
+        """
+        out = result.output or {}
+        if isinstance(out, dict) and out.get("error_code"):
+            return str(out["error_code"])
+        if result.error:
+            m = self._ERR_CODE_BACKTICK_RE.search(result.error)
+            if m:
+                return m.group(1)
+            m = self._ERR_CODE_FIRST_WORD_RE.search(result.error)
+            if m:
+                return m.group(1)
+        return None
+
+    def _apply_escalation(
+        self,
+        result: StepResult,
+        step: PlanStep,
+        context: dict,
+    ) -> StepResult:
+        """Classify ``result`` via ErrorEscalator and branch on Action.
+
+        Behaviour:
+
+        * **HALT**       → return failure untouched (caller stops plan).
+        * **RETRY**      → re-execute ``step`` up to ``rule.max_retries``
+          times, sleeping ``compute_backoff(strategy, attempt)`` between
+          attempts. Returns the last attempt's result.
+        * **FIX**        → retry once (the skill itself is expected to
+          patch the call; we just give it another shot).
+        * **DELEGATE**   → swap ``step.skill`` for ``rule.delegate_to``,
+          re-dispatch via the skill dispatcher, then restore the original
+          skill name on the result. Up to ``max_retries`` delegate hops.
+        """
+        error_code = self._extract_error_code(result, step)
+        product = self._skill_dispatcher.get_product(step.skill or "") or ""
+        rule = self._error_escalator.resolve(error_code or "", product)
+        result.error_code = error_code or rule.code
+        result.delegate_to = rule.delegate_to
+
+        if rule.action == _EscalationAction.HALT:
+            # Caller will see the failure and stop the plan.
+            return result
+
+        if rule.action == _EscalationAction.DELEGATE and rule.delegate_to:
+            delegate_to = rule.delegate_to
+            if not self._skill_dispatcher.validate_skill(delegate_to):
+                # Misconfigured delegate target — fail safe (HALT).
+                result.error = (
+                    f"{result.error or 'unknown'}; "
+                    f"delegate_to={delegate_to!r} is not a known skill"
+                )
+                return result
+            original_skill = step.skill
+            step.skill = delegate_to
+            try:
+                delegated = self._execute_with_timeout(
+                    lambda: self._skill_dispatcher.execute(step, context),
+                    step.id,
+                )
+                result.retry_count += 1
+                if delegated.status == "success":
+                    # Delegate succeeded — now retry the ORIGINAL step
+                    # (CVM RunInstances) once. The delegation's purpose is
+                    # to fix the upstream state (VPC created), so the
+                    # original call should be retried. If it still fails,
+                    # HALT and surface the new error.
+                    step.skill = original_skill
+                    retried = self._execute_with_timeout(
+                        lambda: self._skill_dispatcher.execute(step, context),
+                        step.id,
+                    )
+                    retried.retry_count = result.retry_count
+                    retried.delegate_to = delegate_to
+                    if retried.status == "success":
+                        return retried
+                    # Original still failing — surface that result.
+                    return retried
+                # Delegated call itself failed — return that result so the
+                # caller can decide whether to halt or fall through.
+                return delegated
+            finally:
+                step.skill = original_skill
+
+        if rule.action == _EscalationAction.RETRY and rule.max_retries > 0:
+            last = result
+            for attempt in range(rule.max_retries):
+                backoff = self._error_escalator.compute_backoff(
+                    rule.backoff_strategy, attempt
+                )
+                with suppress(Exception):
+                    time.sleep(backoff)
+                last = self._execute_with_timeout(
+                    lambda: self._skill_dispatcher.execute(step, context),
+                    step.id,
+                )
+                last.retry_count = attempt + 1
+                if last.status == "success":
+                    return last
+            return last
+
+        if rule.action == _EscalationAction.FIX:
+            # FIX = skill self-corrected and asked for one more shot.
+            fixed = self._execute_with_timeout(
+                lambda: self._skill_dispatcher.execute(step, context),
+                step.id,
+            )
+            fixed.retry_count = 1
+            return fixed
+
+        # Unknown action or no-op rule — leave the failure in place.
+        return result
 
     def _emit_trace(
         self,
