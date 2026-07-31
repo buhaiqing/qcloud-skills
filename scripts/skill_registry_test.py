@@ -88,9 +88,10 @@ def _make_fixture_skill(tmp: Path, name: str, *, frontmatter_extra: str = "",
         f"name: qcloud-{name}-ops",
         "description: |",
         f"  {description}",
-        "cli_applicability: dual-path",
-        "version: 0.0.1",
-        "last_updated: 2026-08-01",
+        "metadata:",
+        "  cli_applicability: dual-path",
+        "  version: 0.0.1",
+        "  last_updated: 2026-08-01",
     ]
     if frontmatter_extra:
         lines.append(frontmatter_extra.rstrip("\n"))
@@ -279,6 +280,27 @@ class SkillRegistryFromRepoTest(unittest.TestCase):
     def test_repo_validate_known(self):
         self.assertTrue(self.reg.validate("qcloud-cvm-ops"))
         self.assertFalse(self.reg.validate("definitely-not-a-real-skill-xyz"))
+
+    def test_repo_real_skills_read_cli_applicability_from_metadata(self):
+        """Real SKILL.md puts cli_applicability/version/last_updated under metadata.*."""
+        e_cvm = self.reg.get_entry("qcloud-cvm-ops")
+        self.assertEqual(e_cvm.cli_applicability, "dual-path")
+        self.assertEqual(e_cvm.version, "1.3.0")
+        self.assertEqual(e_cvm.last_updated, "2026-07-04")
+
+    def test_repo_real_skills_intent_keywords_partially_populated(self):
+        """At least 50% of skills should have populated intent_keywords.
+
+        Skills lacking eval_queries.json AND backtick API names in description
+        will have empty intent_keywords. Step 1.2.3 will add eval_queries.json
+        fixtures for those skills; this test gates only the partially-migrated
+        state.
+        """
+        names = self.reg.discover()
+        populated = sum(1 for n in names
+                        if self.reg.get_entry(n).intent_keywords)
+        self.assertGreaterEqual(populated, len(names) // 2,
+                                f"only {populated}/{len(names)} skills have intent_keywords")
 
 
 # Late import so test module is self-contained even before SkillRegistry exists

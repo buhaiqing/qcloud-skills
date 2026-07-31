@@ -226,6 +226,7 @@ class SkillRegistry:
             name = str(fm.get("name") or sk.parent.name)
             desc = str(fm.get("description", ""))
             intent = _load_intent_keywords(sk.parent, desc)
+            meta = fm.get("metadata") if isinstance(fm.get("metadata"), dict) else {}
 
             # delegate_to: prefer structured YAML list; else prose
             d_to_raw = fm.get("delegate_to", "") or ""
@@ -251,21 +252,39 @@ class SkillRegistry:
                 if s == name:
                     pm.setdefault(op, flag)
 
-            # product_name
-            prod = str(fm.get("product_name") or products.get(name, ""))
+            # product_name: prefer frontmatter top-level, else metadata, else hardcoded
+            prod = str(
+                fm.get("product_name")
+                or (meta.get("product_name") if isinstance(meta, dict) else "")
+                or products.get(name, "")
+            )
+
+            # cli_applicability / version / last_updated: prefer metadata.*, fallback top-level
+            cli_app = str(
+                (meta.get("cli_applicability") if isinstance(meta, dict) else "")
+                or fm.get("cli_applicability", "")
+            )
+            ver = str(
+                (meta.get("version") if isinstance(meta, dict) else "")
+                or fm.get("version", "")
+            )
+            lu = str(
+                (meta.get("last_updated") if isinstance(meta, dict) else "")
+                or fm.get("last_updated", "")
+            )
 
             entries[name] = SkillEntry(
                 name=name,
                 path=sk.parent,
-                cli_applicability=str(fm.get("cli_applicability", "")),
+                cli_applicability=cli_app,
                 description=desc,
                 intent_keywords=intent,
                 delegate_to=delegate_to,
                 product_name=prod,
                 operation_aliases=op_aliases,
                 param_mapping=pm,
-                version=str(fm.get("version", "")),
-                last_updated=str(fm.get("last_updated", "")),
+                version=ver,
+                last_updated=lu,
             )
         return cls(entries)
 
