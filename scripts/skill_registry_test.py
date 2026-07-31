@@ -259,9 +259,10 @@ class SkillRegistryFromRepoTest(unittest.TestCase):
         )
 
     def test_repo_discover_count(self):
-        # Plan said 34, actual disk has 30. Assert actual value per L5 lesson.
+        # 30 production skills + 1 stub (qcloud-test-ops for M3 acceptance).
+        # Plan said 34, actual disk had 30 before stub. Assert actual value.
         names = self.reg.discover()
-        self.assertEqual(len(names), 30)
+        self.assertEqual(len(names), 31)
 
     def test_repo_known_skills_have_product_name(self):
         """Skills in the legacy hardcoded mapping must resolve via fallback.
@@ -281,6 +282,25 @@ class SkillRegistryFromRepoTest(unittest.TestCase):
         self.assertTrue(self.reg.validate("qcloud-cvm-ops"))
         self.assertFalse(self.reg.validate("definitely-not-a-real-skill-xyz"))
 
+    def test_m3_acceptance_stub_discoverable_without_code_change(self):
+        """M3 acceptance: a new qcloud-*-ops skill with only SKILL.md must be
+        discoverable by SkillRegistry with no code changes anywhere.
+        """
+        names = self.reg.discover()
+        # qcloud-test-ops exists in the repo solely to validate this gate.
+        self.assertIn("qcloud-test-ops", names,
+                      "M3 stub skill must be auto-discovered")
+        e = self.reg.get_entry("qcloud-test-ops")
+        self.assertEqual(e.product_name, "test")
+        self.assertEqual(e.cli_applicability, "cli-only")
+        # delegate_to in metadata.* must be parsed into structured list
+        deps = self.reg.get_dependencies("qcloud-test-ops")
+        self.assertEqual(deps, {"qcloud-monitor-ops"})
+        # Topological order must place dependency first
+        order = self.reg.topological_order()
+        self.assertLess(order.index("qcloud-monitor-ops"),
+                        order.index("qcloud-test-ops"))
+
     def test_repo_real_skills_read_cli_applicability_from_metadata(self):
         """Real SKILL.md puts cli_applicability/version/last_updated under metadata.*."""
         e_cvm = self.reg.get_entry("qcloud-cvm-ops")
@@ -289,18 +309,14 @@ class SkillRegistryFromRepoTest(unittest.TestCase):
         self.assertEqual(e_cvm.last_updated, "2026-07-04")
 
     def test_repo_real_skills_intent_keywords_partially_populated(self):
-        """At least 50% of skills should have populated intent_keywords.
-
-        Skills lacking eval_queries.json AND backtick API names in description
-        will have empty intent_keywords. Step 1.2.3 will add eval_queries.json
-        fixtures for those skills; this test gates only the partially-migrated
-        state.
-        """
+        """At least 50% of skills should have populated intent_keywords."""
         names = self.reg.discover()
-        populated = sum(1 for n in names
+        # Exclude the M3 stub (has no eval_queries.json or backtick API names).
+        production = [n for n in names if n != "qcloud-test-ops"]
+        populated = sum(1 for n in production
                         if self.reg.get_entry(n).intent_keywords)
-        self.assertGreaterEqual(populated, len(names) // 2,
-                                f"only {populated}/{len(names)} skills have intent_keywords")
+        self.assertGreaterEqual(populated, len(production) // 2,
+                                f"only {populated}/{len(production)} production skills have intent_keywords")
 
 
 # Late import so test module is self-contained even before SkillRegistry exists

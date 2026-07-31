@@ -228,8 +228,13 @@ class SkillRegistry:
             intent = _load_intent_keywords(sk.parent, desc)
             meta = fm.get("metadata") if isinstance(fm.get("metadata"), dict) else {}
 
-            # delegate_to: prefer structured YAML list; else prose
-            d_to_raw = fm.get("delegate_to", "") or ""
+            # delegate_to: prefer structured YAML list at top-level; else
+            # check metadata.delegate_to; else legacy prose string.
+            d_to_raw = (
+                fm.get("delegate_to")
+                or (meta.get("delegate_to") if isinstance(meta, dict) else None)
+                or ""
+            )
             if isinstance(d_to_raw, list):
                 delegate_to = [d for d in d_to_raw if isinstance(d, dict)]
             elif isinstance(d_to_raw, str) and d_to_raw.strip():
