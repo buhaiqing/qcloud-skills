@@ -49,7 +49,7 @@ See [ADR-0001 §2.2](ADR-0001-establish-adr-mechanism.md#22-lifecycle-states) fo
 | [ADR-0001](ADR-0001-establish-adr-mechanism.md) | Establish ADR mechanism | Accepted | 2026-07-28 | Meta / process |
 | [ADR-0002](ADR-0002-l3-to-l4-daemon-migration.md) | L3→L4 via `qcloud-agent-daemon/` | Accepted | 2026-07-28 | Runtime topology |
 | [ADR-0003](ADR-0003-faiops-event-driven-architecture.md) | FinOps/AIOps/SecOps event-driven | Accepted | 2026-07-28 | Business events |
-| [ADR-0004](ADR-0004-phase1-l3-adaptive-orchestration.md) | Phase 1 — L3 Adaptive Orchestration | Proposed | 2026-08-01 | Agentic AI maturity |
+| [ADR-0004](ADR-0004-phase1-l3-adaptive-orchestration.md) | Phase 1 — L3 Adaptive Orchestration | Accepted | 2026-08-01 | Agentic AI maturity |
 | [ADR-0005](ADR-0005-phase2-intent-aware-systems.md) | Phase 2 — L3→L4 Intent-Aware Systems | Proposed | 2026-08-01 | Agentic AI maturity |
 | [ADR-0006](ADR-0006-phase3-self-evolving-systems.md) | Phase 3 — L4→L5 Self-Evolving Systems | Proposed | 2026-08-01 | Agentic AI maturity |
 

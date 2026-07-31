@@ -1,6 +1,6 @@
 # Phase 1: L3 Adaptive Orchestration 补齐 — 设计文档
 
-> **Status**: Draft
+> **Status**: Accepted
 > **Date**: 2026-08-01
 > **Author**: bohaiqing
 > **ADR**: ADR-0004

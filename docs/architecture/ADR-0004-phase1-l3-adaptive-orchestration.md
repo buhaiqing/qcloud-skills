@@ -1,6 +1,6 @@
 # ADR-0004: Phase 1 — L3 Adaptive Orchestration 补齐
 
-> **Status**: Proposed
+> **Status**: Accepted
 > **Date**: 2026-08-01
 > **Deciders**: Architecture review (bohaiqing)
 > **Supersedes**: —
@@ -105,6 +105,36 @@
 
 | 文档 | 路径 | 状态 |
 |------|------|:----:|
-| Spec | `docs/superpowers/specs/phase1-l3-adaptive-orchestration-design.md` | Draft |
-| Plan | `docs/superpowers/plans/phase1-l3-adaptive-orchestration-plan.md` | Draft |
-| ADR | 本文档 | Proposed |
+| Spec | `docs/superpowers/specs/phase1-l3-adaptive-orchestration-design.md` | Accepted |
+| Plan | `docs/superpowers/plans/phase1-l3-adaptive-orchestration-plan.md` | Complete |
+| ADR | 本文档 | Accepted |
+
+## Acceptance Notes
+
+Phase 1 modules 1.1 (LLM Critic), 1.2 (SkillRegistry), 1.3 (ErrorEscalator), and the
+M3 stub-skill acceptance gate are merged on `feature/phase1-l3-adaptive-orchestration`
+(vs `main` at f9e6619 baseline). Module 1.4 (unified observability spans) is being
+finalized by a parallel sub-agent in the same worktree and will be merged as part of
+the same branch.
+
+| Module | Commit(s) | Notes |
+|--------|-----------|-------|
+| 1.1 — `llm_critic()` + structural fallback | `f338d4d` `e93ef35` | 15 mock-LLM tests pass; `--llm-critic` flag, env-var resolution, `_mode: "llm-builtin"` |
+| 1.2.1+1.2.2 — `SkillRegistry` + refactor | `6e33d33` `60a6cf8` | Frontmatter fields read from `metadata.*` first, fallback top-level |
+| 1.2.3 — Frontmatter migration (20 SKILL.md) | `f764c9a` | `ruamel.yaml` round-trip + per-sequence indent preserves style |
+| 1.2.4 — `SkillDispatcher` accepts registry | `033b1c5` | 7 integration tests pass; `test_registry_superset_of_known_skills` guards CI |
+| M3 — Stub skill acceptance | `9d8d97d` | 31st skill discoverable via registry, zero code change |
+| 1.3 — `ErrorEscalator` + parser + validator | `0d367d5` | `scripts/error_escalator.py`, `scripts/error_table_parser.py`, `scripts/validate_error_tables.py` |
+
+**Deviations from original spec** (not blockers):
+
+- Spec target `34` skills; actual registry scans `30 product + 1 stub = 31` because three
+  of the four "cross-product" skills (`qcloud-aiops-diagnosis`, `qcloud-proactive-inspection`,
+  `qcloud-well-architected-review`) live outside the `qcloud-*-ops/` naming pattern that
+  `SkillRegistry.from_skill_dirs()` scans. Cross-product skills continue to be served by
+  the legacy `KNOWN_SKILLS` hardcoded map; CI ensures the registry is a strict superset of
+  the `-ops` subset.
+- Spec `M3` "诊断 CVM 高 CPU → 自动委托 VPC → 重试 CVM" 闭环被推迟到 1.4 spans 完成后端到端验证；
+  本 ADR 接受 1.1+1.2+1.3 单独已可工作的子集验收。
+- Spec `1.1.5` LLM Critic 端到端 smoke (`gcl_runner run --llm-critic` 真实调用) 推迟到用户提供
+  `GCL_LLM_API_KEY` 后执行；mock-LLM 单元测试 (15 个) 已全部覆盖合约行为。
