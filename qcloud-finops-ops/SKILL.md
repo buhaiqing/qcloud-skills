@@ -32,6 +32,9 @@ metadata:
     - qcloud-well-architected-review
     - qcloud-cam-ops
     - 27 个产品 skill（CVM/CDB/CLB/COS/ES/Redis/VPC 等）
+  product_name: billing
+  operation_aliases:
+    describe: describe-bills
 ---
 
 # qcloud-finops-ops · FinOps 一站式

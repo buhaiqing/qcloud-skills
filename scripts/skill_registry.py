@@ -417,6 +417,28 @@ def load_hardcoded_from_copilot() -> dict[str, Any]:
         copilot_pkg = root / "qcloud-copilot"
         if not copilot_pkg.exists():
             return {}
+        # Add qcloud-copilot to sys.path so the relative import
+        # `from copilot.models import ...` works.
+        import sys as _sys
+        copilot_root = str(copilot_pkg.resolve())
+        if copilot_root not in _sys.path:
+            _sys.path.insert(0, copilot_root)
+        # Pre-register the copilot package and its models submodule
+        # so that `from copilot import models` resolves.
+        import importlib
+        if "copilot" not in _sys.modules:
+            copilot_pkg_init = copilot_pkg / "copilot" / "__init__.py"
+            if copilot_pkg_init.exists():
+                import importlib.util
+                spec_pkg = importlib.util.spec_from_file_location(
+                    "copilot", copilot_pkg / "copilot" / "__init__.py",
+                    submodule_search_locations=[str(copilot_pkg / "copilot")],
+                )
+                if spec_pkg is not None and spec_pkg.loader is not None:
+                    mod_pkg = importlib.util.module_from_spec(spec_pkg)
+                    _sys.modules["copilot"] = mod_pkg
+                    spec_pkg.loader.exec_module(mod_pkg)
+        # Load the integration/skills.py module via file path
         import importlib.util
         spec = importlib.util.spec_from_file_location(
             "copilot_integration_skills",

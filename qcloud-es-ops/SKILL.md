@@ -34,6 +34,9 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  product_name: es
+  operation_aliases:
+    describe: describe-instances
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).

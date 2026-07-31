@@ -31,6 +31,7 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  product_name: cam
 related_skills:
   - qcloud-vpc-ops
   - qcloud-cvm-ops

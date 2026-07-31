@@ -39,6 +39,11 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  product_name: cdb
+  operation_aliases:
+    describe: describe-db-instances
+  param_mapping:
+    describe-db-instance: InstanceId
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).

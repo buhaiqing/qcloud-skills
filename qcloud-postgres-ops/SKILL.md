@@ -3,8 +3,7 @@ name: qcloud-postgres-ops
 description: >-
   Use when the user needs to deploy, configure, troubleshoot, or monitor Tencent
   Cloud PostgreSQL (TencentDB for PostgreSQL / 云数据库 PostgreSQL) — instance
-  lifecycle, backup/restore, account management, parameter tuning, slow log 
-  analysis, security groups, read-only instances, data migration, and
+  lifecycle, backup/restore, account management, parameter tuning, slow log  analysis, security groups, read-only instances, data migration, and
   performance diagnostics. User mentions PostgreSQL, Postgres, PG, 云数据库
   PostgreSQL, TencentDB PostgreSQL, or describes database connection issues,
   performance degradation, backup failures, or instance
@@ -32,6 +31,11 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  product_name: postgres
+  operation_aliases:
+    describe: describe-db-instances
+  param_mapping:
+    describe-db-instance: InstanceId
 ---
 
 > This skill follows the [Agent Skill OpenSpec](https://agentskills.io/specification).

@@ -41,6 +41,7 @@ metadata:
     - qcloud-finops-ops       # 反向：成本优化分析
     - qcloud-tcop-ops         # 反向：资源优化与架构评估
     - qcloud-aiops-diagnosis  # 反向：多指标问题诊断
+  product_name: scf
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).

@@ -32,6 +32,11 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  product_name: vpc
+  operation_aliases:
+    describe: describe-vpcs
+  param_mapping:
+    describe-vpc: VpcIds.0
 related_skills:
   - qcloud-ccn-ops
   - qcloud-vpn-ops

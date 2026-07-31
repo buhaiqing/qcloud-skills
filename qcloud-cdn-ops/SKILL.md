@@ -31,6 +31,7 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  product_name: cdn
 related_skills:
   - qcloud-redis-ops
   - qcloud-clb-ops

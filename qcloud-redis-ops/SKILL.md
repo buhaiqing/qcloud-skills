@@ -30,6 +30,11 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  product_name: redis
+  operation_aliases:
+    describe: describe-cache-instances
+  param_mapping:
+    describe-cache-instance: InstanceId
 related_skills:
   - qcloud-vpc-ops
   - qcloud-monitor-ops

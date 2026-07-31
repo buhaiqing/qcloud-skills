@@ -31,6 +31,9 @@ metadata:
     - TENCENTCLOUD_SECRET_ID
     - TENCENTCLOUD_SECRET_KEY
     - TENCENTCLOUD_REGION
+  product_name: cos
+  operation_aliases:
+    describe: list-buckets
 ---
 
 # Tencent Cloud COS Operations Skill

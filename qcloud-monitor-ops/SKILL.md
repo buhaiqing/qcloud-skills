@@ -32,6 +32,11 @@ metadata:
     - TENCENTCLOUD_REGION
   related_skills:
     - qcloud-finops-ops   # 反向：监控指标 + 告警通道是 FinOps 异常检测 + 成本告警的基础
+  product_name: monitor
+  operation_aliases:
+    describe: describe-alarms
+  param_mapping:
+    describe-alarm: Module
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).
