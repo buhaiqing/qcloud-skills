@@ -283,15 +283,33 @@ Week 3-4:  1.3 (ErrorEscalator) + 1.4 (统一观测面) 串行（1.3 依赖 1.2�
 
 ### M3: Phase 1 整体验收
 
-- [x] 新增一个 skill（如 `qcloud-test-ops`）零代码修改即可被路由和调用 ✅ commit 9d8d97d
+- [x] 新增一个 skill（如 `qcloud-test-ops`）零代码修改即可被路由和调用 ✅ commit 9d8d97d + 5323c8b + b533b55
   - 验证: `SkillRegistry.from_skill_dirs()` 发现 31 个 skill (30 prod + 1 stub)
   - 验证: `reg.validate("qcloud-test-ops")` → True
   - 验证: `reg.get_dependencies("qcloud-test-ops")` → {"qcloud-monitor-ops"} (从 metadata.* 解析)
   - 验证: topological_order 中 qcloud-monitor-ops 在 qcloud-test-ops 之前
   - 验证: `test_m3_acceptance_stub_discoverable_without_code_change` 测试通过
-- [ ] 一次 "诊断 CVM 高 CPU → 发现 VPC 问题 → 修复 VPC → 验证 CVM" 完整闭环 ⏳ 需 1.3 dispatcher + 1.4 spans 提交后验收
+  - 验证: `test_m3_acceptance_stub_wins_route_for_curated_queries` 测试通过 (audit fix) — reg.route("M3 acceptance probe stub validation") → qcloud-test-ops
+- [x] 一次 "诊断 CVM 高 CPU → 发现 VPC 问题 → 修复 VPC → 验证 CVM" 完整闭环 ✅ commit 5333ba9 + e2e test
+  - scripts/cross_skill_e2e_test.py 跑完整 CVM→VPC→链路并验证 spans.jsonl + _summary.json + cross_skill_chain
 - [x] 所有新增测试通过；回归测试零 failure ✅
-  - 360+ scripts tests pass (commit f764c9a baseline)
-  - 7+ copilot integration tests pass
-  - 24 SkillRegistry tests pass (含 M3 stub 验收)
-- [x] ADR、Spec、Plan 文档状态更新为 Accepted / Complete ✅ (本 commit)
+  - 379 scripts tests pass (含 2 e2e tests + 25 SkillRegistry tests)
+  - 16 copilot integration tests pass
+  - 8 dispatcher/observ/tracing tests pass
+- [x] ADR、Spec、Plan 文档状态更新为 Accepted / Complete ✅ ff7d28a + 9102945
+
+## 阶段 1.5 (audit fixes) — 完成
+
+- [x] ruff check scripts/ 零 error ✅ commit d1ec38d (148 auto-fix + 25 manual structural)
+- [x] ruff check qcloud-copilot/ 零 error ✅ commit 5f26afe (446 auto-fix + 25 manual noqa)
+- [x] scripts/skill_quality_score.py 实现 ✅ commit 3c5f9b2 (20 tests, 4-component weighted algorithm)
+- [x] M3 stub route wins ✅ commit 5323c8b (eval_queries.json + test)
+- [x] 10 个 missing product_name 补齐 ✅ commit 5323c8b (agsx/ccn/cicd/cloudbase/dc/migration/service-mesh/tcop/tdmq/vpn)
+- [x] M3 e2e span test ✅ commit 5323c8b (cross_skill_e2e_test.py, 2 tests)
+- [x] qcloud-test-ops SKILL.md 补 license+compatibility ✅ commit b533b55
+
+## 已知残留 (超出 Phase 1 范围)
+
+- ⏳ ruff check .  剩余 64 errors 位于 qcloud-agent-daemon/, qcloud-aiops-diagnosis/, qcloud-proactive-inspection/ — 这些是 Phase 2 范围 (per ADR-0003), 不在 Phase 1 scope
+- ⏳ validate_local.py 整体依赖 ruff check . 完美通过; 需 Phase 2 完成上述 3 个目录清理后才能 green
+- ⏳ 真实 LLM API 端到端 (需用户提供 GCL_LLM_API_KEY); mock 测试已覆盖合约
