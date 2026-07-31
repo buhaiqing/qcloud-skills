@@ -495,13 +495,13 @@ ADR 记录**跨子系统**架构决策（参见 [`docs/architecture/ADR-0001-est
 
 > 本原则是本文件的最高约束之一：任何新增规则若隐含对特定 coding agent 的依赖，视为违反 P0，须在合并前解耦。
 
-## CodeGraph — code intelligence (recommended when available)
+## CodeGraph — code intelligence (P0, mandatory where available)
 
 > **Agent-Agnostic note:** CodeGraph is an optional local tool. If the current agent
-> environment provides it (`.codegraph/` + `codegraph_explore`), follow the rules below.
-> If not, the equivalent behavior is: use Read / Grep directly on the source — the
-> *expected result* (accurate, blast-radius-aware code understanding) is unchanged.
-> This rule never blocks work on environments without CodeGraph.
+> environment provides it (`.codegraph/` + `codegraph_explore`), the rules below are
+> **mandatory** and must be followed before any Grep/Read. If CodeGraph is unavailable,
+> fall back to Read / Grep directly — the *expected result* (accurate, blast-radius-aware
+> code understanding) is unchanged. This rule never blocks work on environments without CodeGraph.
 
 `.codegraph/` (SQLite KG + file watcher) pre-indexes every symbol, edge, and call
 path in THIS repo. `codegraph_explore` is the Read-equivalent: one capped call
@@ -510,10 +510,25 @@ faster and more accurate than any grep+read loop or sub-agent code-mapping.
 
 **This repo already enforces the sync half of this discipline in
 `qcloud-copilot/SKILL.md` ("改 `.py` 后 `codegraph sync`") and in the two
-`agent-inspection-prompt.md` checklists. The query-first half was missing and is
-added here as a recommended rule (mandatory only where CodeGraph is present).**
+`agent-inspection-prompt.md` checklists.**
 
-### Rule 1 — Query-first, never grep/read first (when CodeGraph available)
+### Rule 0 — CodeGraph-first, Grep-last (P0, hard rule)
+
+For ANY code-understanding task in THIS repo (reading symbols, tracing call paths,
+understanding architecture, finding definitions), the execution order is:
+
+```
+A. Execute codegraph_explore     ← MUST try first (when CodeGraph available)
+B. Fallback to Read (specific file)  ← only if CodeGraph unavailable or staleness banner
+C. Resort to Grep                  ← LAST RESORT, only for patterns CodeGraph can't answer
+```
+
+**Violation**: Using Grep or launching Explore sub-agents for code-understanding
+tasks that `codegraph_explore` can answer is a process violation. The anti-pattern
+(5 Explore sub-agents, 16–22 min, zero results vs. one `codegraph_explore` call)
+is documented in Rule 4 below.
+
+### Rule 1 — Query-first (highest frequency)
 
 Before ANY code-understanding work in THIS repo, prefer `codegraph_explore` with symbol/file
 names or a natural-language question. ONE call usually answers the whole question
@@ -525,31 +540,7 @@ and returns source you can `Edit` from directly. (If CodeGraph is unavailable, R
 - Need a flow across symbols → name the endpoints; it rides dynamic-dispatch
   hops grep can't follow and returns the path.
 
-### Rule 2 — Sync after edits (when CodeGraph available)
-
-After editing `.py` / `.ts` / `.go` / `.rs` / etc. in a CodeGraph-enabled environment, the index lags writes by
-~1s via the file watcher. Before the NEXT `codegraph_explore` that depends on the
-edit, confirm sync (the daemon auto-syncs on file change; if a query returns a
-staleness banner for a file you just wrote, `Read` that specific file).
-
-### Rule 3 — anti-pattern (from a real failure, CodeGraph environments)
-
-Do NOT fire `explore` / `librarian` sub-agents or run grep+read loops to map
-code THIS repo already indexes. In one session, 5 delegated `explore` agents for
-code-mapping hung 16–22 min and returned nothing; the same `codegraph_explore`
-call answered in one round-trip WITH blast-radius + "⚠️ no tests" coverage flags.
-Delegated agents are for UNINDEXED targets (other repos, web, docs), never for
-re-deriving the local KG. (In non-CodeGraph environments this rule is moot — just Read / Grep directly.)
-
-### Rule 4 — scope guard
-
-- CodeGraph covers THIS repo only. For an unindexed project, run `codegraph init`
-  first (don't run it yourself unprompted — it's the user's decision; only relevant where CodeGraph is present).
-- It does NOT index configs/docs as code; use Read/Grep for those.
-- It is read-only intelligence. Correctness is still the compiler/tests' job —
-  trust the returned source, but verify with LSP/tests before claiming done.
-
-### Rule 5 — API-First before writing tests or invoking external tools (P0 when CodeGraph available)
+### Rule 2 — API-First before writing tests or invoking external tools (P0 when CodeGraph available)
 
 Before writing tests for any module/class, or before calling an external tool/MCP
 that depends on a module's API, you MUST confirm the actual signature with
@@ -572,6 +563,32 @@ previous sessions or by other agents.
 `lib/selective_workflow` without confirming signatures → `TypeError` on every
 test (3 rounds of rework). After confirming signatures via `codegraph_explore`,
 all 49 tests pass in one shot.
+
+### Rule 3 — Sync after edits
+
+After editing `.py` / `.ts` / `.go` / `.rs` / etc. in a CodeGraph-enabled environment, the index lags writes by
+~1s via the file watcher. Before the NEXT `codegraph_explore` that depends on the
+edit, confirm sync (the daemon auto-syncs on file change; if a query returns a
+staleness banner for a file you just wrote, `Read` that specific file).
+
+### Rule 4 — anti-pattern: Grep/sub-agent for indexed code (CodeGraph environments)
+
+Do NOT fire `explore` / `librarian` sub-agents or run grep+read loops to map
+code THIS repo already indexes. In one session, 5 delegated `explore` agents for
+code-mapping hung 16–22 min and returned nothing; the same `codegraph_explore`
+call answered in one round-trip WITH blast-radius + "⚠️ no tests" coverage flags.
+Delegated agents are for UNINDEXED targets (other repos, web, docs), never for
+re-deriving the local KG. (In non-CodeGraph environments this rule is moot — just Read / Grep directly.)
+
+**This is the canonical evidence for Rule 0. See Rule 0 for the mandatory execution order.**
+
+### Rule 5 — scope guard
+
+- CodeGraph covers THIS repo only. For an unindexed project, run `codegraph init`
+  first (don't run it yourself unprompted — it's the user's decision; only relevant where CodeGraph is present).
+- It does NOT index configs/docs as code; use Read/Grep for those.
+- It is read-only intelligence. Correctness is still the compiler/tests' job —
+  trust the returned source, but verify with LSP/tests before claiming done.
 
 ### What to extract from each result
 

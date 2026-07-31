@@ -49,11 +49,20 @@ See [ADR-0001 §2.2](ADR-0001-establish-adr-mechanism.md#22-lifecycle-states) fo
 | [ADR-0001](ADR-0001-establish-adr-mechanism.md) | Establish ADR mechanism | Accepted | 2026-07-28 | Meta / process |
 | [ADR-0002](ADR-0002-l3-to-l4-daemon-migration.md) | L3→L4 via `qcloud-agent-daemon/` | Accepted | 2026-07-28 | Runtime topology |
 | [ADR-0003](ADR-0003-faiops-event-driven-architecture.md) | FinOps/AIOps/SecOps event-driven | Accepted | 2026-07-28 | Business events |
+| [ADR-0004](ADR-0004-phase1-l3-adaptive-orchestration.md) | Phase 1 — L3 Adaptive Orchestration | Proposed | 2026-08-01 | Agentic AI maturity |
+| [ADR-0005](ADR-0005-phase2-intent-aware-systems.md) | Phase 2 — L3→L4 Intent-Aware Systems | Proposed | 2026-08-01 | Agentic AI maturity |
+| [ADR-0006](ADR-0006-phase3-self-evolving-systems.md) | Phase 3 — L4→L5 Self-Evolving Systems | Proposed | 2026-08-01 | Agentic AI maturity |
 
 ## Related (not ADRs themselves)
 
 | Document | Purpose |
 |---|---|
+| `docs/superpowers/specs/phase1-l3-adaptive-orchestration-design.md` | Design for ADR-0004 |
+| `docs/superpowers/plans/phase1-l3-adaptive-orchestration-plan.md` | Phase 1 implementation plan |
+| `docs/superpowers/specs/phase2-intent-aware-systems-design.md` | Design for ADR-0005 |
+| `docs/superpowers/plans/phase2-intent-aware-systems-plan.md` | Phase 2 implementation plan |
+| `docs/superpowers/specs/phase3-self-evolving-systems-design.md` | Design for ADR-0006 |
+| `docs/superpowers/plans/phase3-self-evolving-systems-plan.md` | Phase 3 implementation plan |
 | `docs/superpowers/specs/qcloud-agent-daemon-design.md` | Design for ADR-0002 + ADR-0003 |
 | `docs/superpowers/plans/qcloud-agent-daemon-implementation.md` | Phase 1+2 implementation plan |
 | `../gcl-spec.md` | GCL protocol (called from daemon ExecutionPipeline) |
