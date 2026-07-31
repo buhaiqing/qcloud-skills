@@ -5,6 +5,10 @@ description: >-
   No hardcoded entries in qcloud-copilot/copilot/integration/skills.py.
   Validates Phase 1 Success criterion: new skills discoverable by
   SkillRegistry without code changes.
+license: MIT
+compatibility: >-
+  No runtime dependencies (validation-only stub). SkillRegistry reads SKILL.md
+  via the qcloud-*-ops/SKILL.md glob, no CLI/SDK required.
 metadata:
   author: phase1-acceptance
   version: "0.1.0"
