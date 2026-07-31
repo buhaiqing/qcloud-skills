@@ -214,7 +214,7 @@ delegate_to:
 | `scripts/build_skill_registry.py` | 重构: 使用 SkillRegistry 作为核心 | ±50 |
 | `qcloud-copilot/copilot/integration/skills.py` | 重构: SkillDispatcher 接受 SkillRegistry 参数 | ±30 |
 | `qcloud-copilot/copilot/engine.py` | 加载 SkillRegistry 传入 SkillDispatcher | ±10 |
-| 34 个 SKILL.md | 新增 `delegate_to` + `product_name` + `operation_aliases` + `param_mapping` YAML 字段 | 每个 ±15 |
+| 30 个 SKILL.md | 新增 `delegate_to` + `product_name` + `operation_aliases` + `param_mapping` YAML 字段 | 每个 ±15 |
 | `scripts/cross_skill_impact.py` | 优先读 `delegate_to`，fallback 到 `related_skills` | ±20 |
 | `scripts/harness_router.py` | 使用 SkillRegistry 替代直接读 JSON | ±15 |
 
@@ -224,13 +224,13 @@ delegate_to:
 |:----:|------|:--------:|
 | 1 | SkillRegistry 新增，`build_skill_registry.py` 双输出 (registry JSON + 兼容旧格式) | ✅ |
 | 2 | Copilot `SkillDispatcher` 接受可选 `SkillRegistry` 参数，默认用硬编码 | ✅ |
-| 3 | 34 个 SKILL.md 批量添加 YAML 字段（脚本化） | ✅ |
+| 3 | 30 个 SKILL.md 批量添加 YAML 字段（脚本化） | ✅ |
 | 4 | CI 验证 SkillRegistry 与硬编码注册表一致 | ✅ |
 | 5 | 移除硬编码注册表 | ❌ (breaking, 最终阶段) |
 
 ### 1.2.5 验收标准
 
-- [ ] `SkillRegistry.from_skill_dirs()` 扫描到全部 34 个 skill
+- [ ] `SkillRegistry.from_skill_dirs()` 扫描到全部 30 个 skill
 - [ ] `SkillRegistry.validate("qcloud-cvm-ops")` → True, `validate("nonexistent")` → False
 - [ ] `SkillRegistry.route("describe my cvm instances")` → `("qcloud-cvm-ops", confidence>0)`
 - [ ] `SkillRegistry.get_product("qcloud-cvm-ops")` → `"cvm"`
@@ -312,7 +312,7 @@ elif rule.action == Action.HALT:
 | `qcloud-copilot/copilot/dispatcher.py` | `_execute_step` 集成 ErrorEscalator | +40 |
 | `qcloud-copilot/copilot/models.py` | StepResult 新增 `error_code`, `retry_count`, `delegate_to` | +10 |
 | `scripts/error_table_parser.py` | 新文件: 解析新旧两种错误表格式 | +60 |
-| 34 个 SKILL.md | 错误表标准化为 6 列格式 | 每个 ±20 |
+| 30 个 SKILL.md | 错误表标准化为 6 列格式 | 每个 ±20 |
 | `scripts/validate_error_tables.py` | 新文件: CI 校验 | +50 |
 
 ### 1.3.4 验收标准
@@ -322,7 +322,7 @@ elif rule.action == Action.HALT:
 - [ ] CVM CreateInstances 遇到 `InvalidVpc.NotFound` → 自动委托 VPC skill → VPC 创建成功 → CVM 重试成功
 - [ ] `ErrorEscalator.resolve("UnknownError", "cvm")` → `Action.HALT` (safe default)
 - [ ] dispatcher 遇到 HALT 级别错误立即停止执行计划
-- [ ] `validate_error_tables.py` 通过所有 34 个 skill
+- [ ] `validate_error_tables.py` 通过所有 30 个 skill
 
 ---
 
@@ -474,6 +474,6 @@ assert any(s.parent_span_id is not None for s in spans)  # 至少有一次委托
 | `qcloud-copilot/copilot/observ.py` | 修改 | TraceSpan dataclass |
 | `qcloud-copilot/copilot/engine.py` | 修改 | SkillRegistry 传入 |
 | `.env.example` | 修改 | GCL_LLM_* |
-| 34 个 SKILL.md | 修改 | delegate_to + 错误表标准化 |
-| 34 个 `references/rubric.md` | 无需修改 | LLM Critic 直接读取现有格式 |
+| 30 个 SKILL.md | 修改 | delegate_to + 错误表标准化 |
+| 30 个 `references/rubric.md` | 无需修改 | LLM Critic 直接读取现有格式 |
 | `docs/architecture/ADR-0004-*.md` | 新增 | 本文档对应的 ADR |
