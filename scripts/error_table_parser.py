@@ -168,8 +168,14 @@ def _parse_delegate(raw: str) -> str | None:
 
 
 def _strip_code(raw: str) -> str:
-    """Drop backticks / leading backtick-pairs from error code cells."""
-    return raw.strip().strip("`").strip()
+    """Drop backticks from error code cells (anywhere in the cell).
+
+    Compound codes like `` `InvalidVpcId` / `InvalidSubnetId` `` end up
+    with stray trailing backticks after the original ``.strip("`")``
+    implementation. We strip *all* backticks here; the renderer in
+    ``migrate_error_tables`` re-wraps the code in a single pair.
+    """
+    return raw.strip().replace("`", "").strip()
 
 
 def _parse_standard_row(row: list[str]) -> ErrorRule:
@@ -236,6 +242,31 @@ def _parse_legacy_action(recovery_text: str) -> tuple[Action, str | None]:
     return (Action.HALT, None)
 
 
+def _refine_action_by_retry(
+    action: Action,
+    *,
+    max_retries: int,
+    backoff_seconds: list[int],
+    backoff_strategy: str,
+) -> Action:
+    """Upgrade HALT → RETRY when an explicit retry schedule exists.
+
+    Legacy tables often encode retries/backoff in the *Retry* column while
+    leaving the *Recovery* column as plain prose (e.g. ``"Add delay between
+    queries"``). Without this post-process the dispatcher would HALT even
+    though the operator clearly intended ``RequestLimitExceeded`` to retry
+    3 times with exponential backoff. The rule: if ``max_retries > 0`` AND
+    a backoff schedule is specified (either explicit seconds list or
+    ``exponential`` strategy), treat as RETRY.
+    """
+    if action != Action.HALT:
+        return action
+    if max_retries <= 0:
+        return action
+    has_schedule = bool(backoff_seconds) or backoff_strategy == "exponential"
+    return Action.RETRY if has_schedule else action
+
+
 def _parse_legacy_retry(retry_text: str) -> tuple[int, list[int], str]:
     """Parse the Retry column. Returns (max_retries, backoff_seconds, strategy)."""
     raw = retry_text.strip()
@@ -250,31 +281,94 @@ def _parse_legacy_retry(retry_text: str) -> tuple[int, list[int], str]:
     return (_parse_int(raw, 0), [], "fixed")
 
 
-def _parse_legacy_row(row: list[str]) -> ErrorRule | None:
+def _parse_legacy_row(row: list[str], header: list[str] | None = None) -> ErrorRule | None:
     """Parse one legacy-format row.
 
-    Column shape detection:
+    Column shape detection (per the docstring intent — Code | Retry | Recovery
+    followed by ignored columns):
 
     * 2 cells: ``Code | <single combined>`` (the trailing cell encodes
       both retry strategy and recovery prose, e.g. ``"Retry (3x, exp backoff)"``).
     * 3 cells: ``Code | Retry | Recovery``
     * 4 cells: ``Code | Retry | Recovery | <ignored>``
     * 5 cells: ``Code | Retry | Recovery | <ignored> | <ignored>``
+
+    A handful of skills (notably ``qcloud-tcop-ops``) use a *5-column layout*
+    where the columns are actually ``Code | MaxRetries | Backoff | AgentAction
+    | UXFeedback`` — the rightmost pair carries meaningful Action verbs, not
+    extra metadata to ignore. We detect this layout by header keyword match
+    (``"backoff"`` + ``"action"``) and switch to column-aware parsing.
+
+    NB: Phase 1.3.3 changed this from reading ``row[-2]/row[-1]`` (which
+    silently swapped Retry↔Recovery for the rightmost-pair layout) to honour
+    the documented ``Code | Retry | Recovery | …`` layout for the common case,
+    with header-aware fallback for the special 5-col shape.
     """
     if len(row) < 2:
         return None
     code = _strip_code(row[0])
     if not code:
         return None
-    if len(row) >= 3:
-        retry_text = row[-2] if len(row) >= 4 else row[1]
-        recovery_text = row[-1]
-    else:
-        # 2-col: trailing cell holds both retry + recovery prose.
+
+    # Special case: 5-col tables whose header has "Backoff" + "Agent Action".
+    detected_5col = (
+        len(row) == 5
+        and header is not None
+        and len(header) == 5
+        and "backoff" in header[2].lower()
+        and any(k in header[3].lower() for k in ("action", "agent"))
+        and any(k in header[4].lower() for k in ("hint", "feedback", "ux", "recovery"))
+    )
+    if detected_5col:
+        # row[1] = retries, row[2] = backoff, row[3] = agent action, row[4] = hint
+        max_retries, backoff_seconds, backoff_strategy = _parse_legacy_retry(row[1])
+        # Backoff: also try to pull an explicit list from the dedicated column.
+        _, extra_seconds, extra_strategy = _parse_legacy_retry(row[2])
+        if not backoff_seconds and extra_seconds:
+            backoff_seconds = extra_seconds
+        if backoff_strategy == "fixed" and extra_strategy == "exponential":
+            backoff_strategy = "exponential"
+        action, delegate_to = _parse_legacy_action(row[3])
+        action = _refine_action_by_retry(
+            action,
+            max_retries=max_retries,
+            backoff_seconds=backoff_seconds,
+            backoff_strategy=backoff_strategy,
+        )
+        # Recovery hint: prefer the Agent Action prose + UXFeedback appended;
+        # the dispatcher only reads this as user-facing guidance.
+        recovery_hint = (
+            f"{row[3].strip()}; {row[4].strip()}"
+            if row[4].strip() not in {"", "—", "-"}
+            else row[3].strip()
+        )
+        return ErrorRule(
+            code=code,
+            action=action,
+            max_retries=max_retries,
+            backoff_seconds=backoff_seconds,
+            backoff_strategy=backoff_strategy,
+            delegate_to=delegate_to,
+            recovery_hint=recovery_hint,
+        )
+
+    # Standard legacy layout (2-4 cells): row[1]=Retry, row[2]=Recovery.
+    if len(row) == 2:
         retry_text = row[1]
         recovery_text = row[1]
+    else:
+        retry_text = row[1]
+        recovery_text = row[2]
     max_retries, backoff_seconds, backoff_strategy = _parse_legacy_retry(retry_text)
     action, delegate_to = _parse_legacy_action(recovery_text)
+    # If the operator specified a retry schedule (retries > 0 + backoff),
+    # promote HALT → RETRY so the dispatcher actually honours the schedule.
+    action = _refine_action_by_retry(
+        action,
+        max_retries=max_retries,
+        backoff_seconds=backoff_seconds,
+        backoff_strategy=backoff_strategy,
+    )
     recovery_hint = recovery_text.strip()
     return ErrorRule(
         code=code,
@@ -310,7 +404,7 @@ def parse_error_table(markdown_text: str) -> list[ErrorRule]:
             if fmt == "standard":
                 rules.append(_parse_standard_row(row))
             else:
-                r = _parse_legacy_row(row)
+                r = _parse_legacy_row(row, header=header)
                 if r is not None:
                     rules.append(r)
     return rules

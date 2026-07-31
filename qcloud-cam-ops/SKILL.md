@@ -338,19 +338,19 @@ tccli cam CreateOIDCProvider \
 
 ## Troubleshooting
 
-| Error Code | Meaning | Recovery |
-|---|---|---|
-| `AuthFailure.Unauthorized` | Caller lacks CAM permissions | Verify caller has QcloudCamFullAccess |
-| `FailedOperation.PolicyNameAlreadyExists` | Policy name taken | Use CreatePolicyVersion instead |
-| `InvalidParameter.PolicyDocument` | Invalid policy JSON | Validate JSON syntax, check required fields |
-| `LimitExceeded.PolicyVersionLimit` | Max policy versions reached | Delete old versions first |
-| `AuthFailure.InvalidSecretId` | Invalid credentials | Verify TENCENTCLOUD_SECRET_ID |
-| `ResourceNotFound.User` | User not found | Verify user name exists |
-| `ResourceNotFound.Role` | Role not found | Verify role name exists |
-| `FailedOperation.UserAlreadyInGroup` | User already in group | Skip or use different group |
-| `AuthFailure.MFAFailure` | MFA required | User must complete MFA verification |
-| `LimitExceeded.PolicyNumberExceed` | Too many policies | Delete unused policies first |
-| `RequestLimitExceeded` | API rate limit hit | Retry with exponential backoff: 1s → 2s → 4s → 8s → 16s; if sustained, queue async |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `AuthFailure.Unauthorized` | HALT | 0 | — | — | Verify caller has QcloudCamFullAccess |
+| `FailedOperation.PolicyNameAlreadyExists` | HALT | 0 | — | — | Use CreatePolicyVersion instead |
+| `InvalidParameter.PolicyDocument` | HALT | 0 | — | — | Validate JSON syntax, check required fields |
+| `LimitExceeded.PolicyVersionLimit` | HALT | 0 | — | — | Delete old versions first |
+| `AuthFailure.InvalidSecretId` | HALT | 0 | — | — | Verify TENCENTCLOUD_SECRET_ID |
+| `ResourceNotFound.User` | HALT | 0 | — | — | Verify user name exists |
+| `ResourceNotFound.Role` | HALT | 0 | — | — | Verify role name exists |
+| `FailedOperation.UserAlreadyInGroup` | HALT | 0 | — | — | Skip or use different group |
+| `AuthFailure.MFAFailure` | HALT | 0 | — | — | User must complete MFA verification |
+| `LimitExceeded.PolicyNumberExceed` | HALT | 0 | — | — | Delete unused policies first |
+| `RequestLimitExceeded` | RETRY | 0 | — | — | Retry with exponential backoff: 1s → 2s → 4s → 8s → 16s; if sustained, queue async |
 
 ---
 

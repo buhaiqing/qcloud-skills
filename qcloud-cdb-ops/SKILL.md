@@ -243,13 +243,13 @@ Every operation: **Pre-flight → Execute (SDK/API and tccli) → Validate → R
 
 **Failure Recovery:**
 
-| Error pattern | Max retries | Agent Action |
-|--------------|-------------|--------------|
-| `InvalidParameterValue` | 0–1 | Fix parameter; retry |
-| `FailedOperation.CreateOrderFailed` | 0 | HALT; check account/payment |
-| `OperationDenied.InstanceStatusError` | 0 | HALT; check existing instance status |
-| `InternalError.DBError` | 3 | Retry; escalate if persists |
-| `LimitExceeded.ExceedMaxInstanceCount` | 0 | HALT; raise quota |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameterValue` | FIX | 0 | — | — | Fix parameter; retry |
+| `FailedOperation.CreateOrderFailed` | HALT | 0 | — | — | HALT; check account/payment |
+| `OperationDenied.InstanceStatusError` | HALT | 0 | — | — | HALT; check existing instance status |
+| `InternalError.DBError` | RETRY | 3 | — | — | Retry; escalate if persists |
+| `LimitExceeded.ExceedMaxInstanceCount` | HALT | 0 | — | — | HALT; raise quota |
 
 **Commands:** [`references/execution-flows.md#1-createdbinstance-create-mysql-instance-prepaid`](references/execution-flows.md#1-createdbinstance-create-mysql-instance-prepaid)
 
@@ -339,26 +339,26 @@ Every operation: **Pre-flight → Execute (SDK/API and tccli) → Validate → R
 
 ## Error Code Reference (≥ 12 Product-Specific Codes)
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `InvalidParameter` | Parameter validation failed | Fix parameter per API spec |
-| `InvalidParameterValue` | Parameter value out of range | Adjust value per spec |
-| `MissingParameter` | Required parameter missing | Add missing parameter |
-| `ResourceNotFound` | Resource not found | Verify instance ID via DescribeDBInstances |
-| `ResourceNotFound.NoDBInstanceFound` | DB instance not found | Verify InstanceId |
-| `ResourceInsufficient` | Resource quota insufficient | HALT; raise quota or delete resources |
-| `InvalidSecretKey` | Credential invalid | HALT; fix credentials |
-| `OperationDenied.InstanceLocked` | Instance locked by operation | Retry (3x, 30s); wait for completion |
-| `OperationDenied.InstanceStatusError` | Wrong instance status | Check status via DescribeDBInstances |
-| `FailedOperation.AsyncTaskError` | Async task execution failure | Retry (3x); check async task or escalate |
-| `FailedOperation.CreateOrderFailed` | Order creation failed | HALT; check account balance/spec validity |
-| `FailedOperation.StatusConflict` | Status conflict | Retry (2x, 10s); wait and retry |
-| `LimitExceeded.ExceedMaxInstanceCount` | Max instance count exceeded | HALT; raise instance quota |
-| `RequestLimitExceeded` | API rate limit | Retry (3x); exponential backoff |
-| `InternalError` | Internal server error | Retry (3x); escalate with RequestId |
-| `InternalError.DBError` | Database internal error | Retry (3x); escalate with RequestId |
-| `InternalError.TaskError` | Task internal error | Retry (3x); check task details |
-| `UnauthorizedOperation` | Unauthorized operation | HALT; check CAM permissions |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter` | FIX | 0 | — | — | Fix parameter per API spec |
+| `InvalidParameterValue` | HALT | 0 | — | — | Adjust value per spec |
+| `MissingParameter` | HALT | 0 | — | — | Add missing parameter |
+| `ResourceNotFound` | HALT | 0 | — | — | Verify instance ID via DescribeDBInstances |
+| `ResourceNotFound.NoDBInstanceFound` | HALT | 0 | — | — | Verify InstanceId |
+| `ResourceInsufficient` | HALT | 0 | — | — | HALT; raise quota or delete resources |
+| `InvalidSecretKey` | HALT | 0 | — | — | HALT; fix credentials |
+| `OperationDenied.InstanceLocked` | RETRY | 0 | — | — | Retry (3x, 30s); wait for completion |
+| `OperationDenied.InstanceStatusError` | HALT | 0 | — | — | Check status via DescribeDBInstances |
+| `FailedOperation.AsyncTaskError` | RETRY | 0 | — | — | Retry (3x); check async task or escalate |
+| `FailedOperation.CreateOrderFailed` | HALT | 0 | — | — | HALT; check account balance/spec validity |
+| `FailedOperation.StatusConflict` | RETRY | 0 | — | — | Retry (2x, 10s); wait and retry |
+| `LimitExceeded.ExceedMaxInstanceCount` | HALT | 0 | — | — | HALT; raise instance quota |
+| `RequestLimitExceeded` | RETRY | 0 | — | — | Retry (3x); exponential backoff |
+| `InternalError` | RETRY | 0 | — | — | Retry (3x); escalate with RequestId |
+| `InternalError.DBError` | RETRY | 0 | — | — | Retry (3x); escalate with RequestId |
+| `InternalError.TaskError` | RETRY | 0 | — | — | Retry (3x); check task details |
+| `UnauthorizedOperation` | HALT | 0 | — | — | HALT; check CAM permissions |
 
 ---
 

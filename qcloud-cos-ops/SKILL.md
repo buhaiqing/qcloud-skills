@@ -365,37 +365,37 @@ Next steps: Review references/finops-cost-optimization.md for detailed cost brea
 
 #### Failure Recovery
 
-| Error pattern | Retry Strategy | Recovery |
-|--------------|----------------|----------|
-| No COS buckets | 0 | HALT; no resources to analyze |
-| `NoSuchBucket` | 0 | Skip and continue; bucket may have been deleted |
-| CLS `TopicNotExist` | 0 | HALT; instruct user to create topic or import COS logs via `qcloud-cls-ops` |
-| `AuthFailure` | 0 | HALT; check TENCENTCLOUD_SECRET_ID/KEY |
-| CLS query empty | 1 (expand time range) | Produce API-only report (no cost breakdown) |
-| `RequestLimitExceeded` | 3, exp backoff | Add delay between queries |
-| `InternalError` | 3 (2s,4s,8s) | Skip failed query; continue with remaining |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `No COS buckets` | HALT | 0 | — | — | HALT; no resources to analyze |
+| `NoSuchBucket` | HALT | 0 | — | — | Skip and continue; bucket may have been deleted |
+| `CLS TopicNotExist` | HALT | 0 | — | — | HALT; instruct user to create topic or import COS logs via `qcloud-cls-ops` |
+| `AuthFailure` | HALT | 0 | — | — | HALT; check TENCENTCLOUD_SECRET_ID/KEY |
+| `CLS query empty` | RETRY | 1 | exponential | — | Produce API-only report (no cost breakdown) |
+| `RequestLimitExceeded` | RETRY | 3 | exponential | — | Add delay between queries |
+| `InternalError` | RETRY | 3 | 2s,4s,8s | — | Skip failed query; continue with remaining |
 
 ---
 
 ## Error Codes (COS-Specific)
 
-| Code | Meaning | Retry? | Action |
-|------|---------|--------|--------|
-| `NoSuchBucket` | Bucket not found | No | Verify bucket name |
-| `BucketAlreadyExists` | Name taken | No | Ask new name |
-| `AccessDenied` | Permission denied | No | Fix ACL/Policy |
-| `InvalidBucketName` | Name invalid | No | Use RFC 952 naming |
-| `QuotaExceeded` | Bucket quota reached | No | Request increase |
-| `EntityTooLarge` | Object >5GB simple upload | No | Use multipart |
-| `InvalidDigest` | ETag mismatch | No | Verify content |
-| `RequestTimeout` | Upload timeout | Yes (3x) | Retry with smaller chunks |
-| `SignatureDoesNotMatch` | Auth invalid | No | Fix credentials |
-| `NoSuchKey` | Object not found | No | Verify key path |
-| `InvalidStorageClass` | Unknown class | No | Use STANDARD/STANDARD_IA/ARCHIVE |
-| `MalformedXML` | Policy malformed | No | Fix JSON/XML format |
-| `BucketNotEmpty` | Cannot delete non-empty | No | Delete objects first |
-| `InvalidRegion` | Region invalid | No | Use valid region |
-| `InternalError` | Server error | Yes (3x) | Retry with RequestId |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `NoSuchBucket` | HALT | 0 | — | — | No |
+| `BucketAlreadyExists` | HALT | 0 | — | — | No |
+| `AccessDenied` | HALT | 0 | — | — | No |
+| `InvalidBucketName` | HALT | 0 | — | — | No |
+| `QuotaExceeded` | HALT | 0 | — | — | No |
+| `EntityTooLarge` | HALT | 0 | — | — | No |
+| `InvalidDigest` | HALT | 0 | — | — | No |
+| `RequestTimeout` | HALT | 0 | — | — | Yes (3x) |
+| `SignatureDoesNotMatch` | HALT | 0 | — | — | No |
+| `NoSuchKey` | HALT | 0 | — | — | No |
+| `InvalidStorageClass` | HALT | 0 | — | — | No |
+| `MalformedXML` | HALT | 0 | — | — | No |
+| `BucketNotEmpty` | HALT | 0 | — | — | No |
+| `InvalidRegion` | HALT | 0 | — | — | No |
+| `InternalError` | HALT | 0 | — | — | Yes (3x) |
 
 ## Safety Gates
 

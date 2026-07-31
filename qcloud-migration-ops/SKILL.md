@@ -199,12 +199,12 @@ tccli msp RegisterMigrationTask \
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `InvalidParameter.TaskNameExists` | Use a different name |
-| `InvalidParameterValue.SrcNode` | Check source configuration |
-| `ResourceNotFound.TargetResource` | Create target resource first |
-| `RequestLimitExceeded` | Backoff retry (2s,4s,8s) |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.TaskNameExists` | HALT | 0 | — | — | Use a different name |
+| `InvalidParameterValue.SrcNode` | HALT | 0 | — | — | Check source configuration |
+| `ResourceNotFound.TargetResource` | HALT | 0 | — | — | Create target resource first |
+| `RequestLimitExceeded` | RETRY | 3 | 2s,4s,8s | — | Backoff retry (2s,4s,8s) |
 
 ### Operation: Monitor Migration Progress
 
@@ -259,10 +259,10 @@ Poll `ListMigrationTask`; expect task absent.
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `ResourceNotFound.Task` | Already removed; treat as success |
-| `OperationDenied.TaskRunning` | Stop task first |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.Task` | HALT | 0 | — | — | Already removed; treat as success |
+| `OperationDenied.TaskRunning` | HALT | 0 | — | — | Stop task first |
 
 ### Operation: ModifyMigrationTaskStatus
 
@@ -311,12 +311,12 @@ tccli msp ModifyMigrationTaskStatus \
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `OperationDenied.TaskRunning` | Task busy; wait and retry (3x, 30s backoff) |
-| `InvalidParameter.StatusTransition` | Invalid transition for current state; HALT and show valid targets |
-| `ResourceNotFound.Task` | Verify task ID |
-| `RequestLimitExceeded` | Backoff retry (2s,4s,8s) |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `OperationDenied.TaskRunning` | HALT | 0 | — | — | Task busy; wait and retry (3x, 30s backoff) |
+| `InvalidParameter.StatusTransition` | HALT | 0 | — | — | Invalid transition for current state; HALT and show valid targets |
+| `ResourceNotFound.Task` | HALT | 0 | — | — | Verify task ID |
+| `RequestLimitExceeded` | RETRY | 3 | 2s,4s,8s | — | Backoff retry (2s,4s,8s) |
 
 ### Operation: ListMigrationProject
 
@@ -409,12 +409,12 @@ If cutover fails:
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| Sync lag > threshold | Wait; extend monitoring window; warn user |
-| Data mismatch detected | HALT cutover; investigate; re-sync affected tables |
-| Application smoke test fails | **Immediate rollback**; investigate target config/env |
-| Target resource crash | **Immediate rollback**; scale up target before retry |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `Sync lag > threshold` | HALT | 0 | — | — | Wait; extend monitoring window; warn user |
+| `Data mismatch detected` | HALT | 0 | — | — | HALT cutover; investigate; re-sync affected tables |
+| `Application smoke test fails` | HALT | 0 | — | — | **Immediate rollback**; investigate target config/env |
+| `Target resource crash` | HALT | 0 | — | — | **Immediate rollback**; scale up target before retry |
 
 ### Operation: Migration Validation
 
@@ -484,28 +484,28 @@ ab -n 100 -c 10 https://{{user.target_endpoint}}/api/baseline
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| Row count mismatch | Identify missing rows; incremental sync affected tables |
-| Checksum mismatch | Re-sync affected table; re-validate |
-| Health endpoint unreachable | Check security groups, target networking |
-| Performance degradation | Check target specs, auto-scaling config |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `Row count mismatch` | HALT | 0 | — | — | Identify missing rows; incremental sync affected tables |
+| `Checksum mismatch` | HALT | 0 | — | — | Re-sync affected table; re-validate |
+| `Health endpoint unreachable` | HALT | 0 | — | — | Check security groups, target networking |
+| `Performance degradation` | HALT | 0 | — | — | Check target specs, auto-scaling config |
 
 ## Error Code Reference (Migration-Specific)
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `InvalidParameter.TaskNameExists` | Task name already exists | Use a different name |
-| `InvalidParameterValue.SrcNode` | Source config invalid | Check source configuration |
-| `InvalidParameterValue.DstNode` | Target config invalid | Check target configuration |
-| `ResourceNotFound.Task` | Task ID not found | Verify task ID |
-| `ResourceNotFound.TargetResource` | Target resource not found | Create target first |
-| `ResourceQuotaExceeded.Task` | Task quota exceeded | HALT; request quota increase |
-| `OperationDenied.TaskRunning` | Task is running | Stop before deregister |
-| `OperationDenied.InsufficientPermissions` | Insufficient permissions | HALT; check CAM |
-| `InvalidSecretKey` | Credential invalid | HALT; fix credentials |
-| `RequestLimitExceeded` | API rate limit | Exponential backoff (3x) |
-| `InternalError` | Server error | Retry with RequestId (3x) |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.TaskNameExists` | HALT | 0 | — | — | Use a different name |
+| `InvalidParameterValue.SrcNode` | HALT | 0 | — | — | Check source configuration |
+| `InvalidParameterValue.DstNode` | HALT | 0 | — | — | Check target configuration |
+| `ResourceNotFound.Task` | HALT | 0 | — | — | Verify task ID |
+| `ResourceNotFound.TargetResource` | HALT | 0 | — | — | Create target first |
+| `ResourceQuotaExceeded.Task` | HALT | 0 | — | — | HALT; request quota increase |
+| `OperationDenied.TaskRunning` | HALT | 0 | — | — | Stop before deregister |
+| `OperationDenied.InsufficientPermissions` | HALT | 0 | — | — | HALT; check CAM |
+| `InvalidSecretKey` | HALT | 0 | — | — | HALT; fix credentials |
+| `RequestLimitExceeded` | RETRY | 0 | — | — | Exponential backoff (3x) |
+| `InternalError` | RETRY | 0 | — | — | Retry with RequestId (3x) |
 
 ## Safety Gates (Destructive Operations)
 

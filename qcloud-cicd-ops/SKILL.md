@@ -181,12 +181,12 @@ Every operation: **Pre-flight → Execute (SDK) → Validate → Recover**.
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `InvalidParameter.PipelineNameExists` | Use a different name |
-| `ResourceQuotaExceeded.Pipeline` | HALT; raise per-region pipeline quota |
-| `InvalidSecretKey` | HALT; fix credentials |
-| `RequestLimitExceeded` | Backoff retry (2s,4s,8s) |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.PipelineNameExists` | HALT | 0 | — | — | Use a different name |
+| `ResourceQuotaExceeded.Pipeline` | HALT | 0 | — | — | HALT; raise per-region pipeline quota |
+| `InvalidSecretKey` | HALT | 0 | — | — | HALT; fix credentials |
+| `RequestLimitExceeded` | RETRY | 3 | 2s,4s,8s | — | Backoff retry (2s,4s,8s) |
 
 ### Operation: Trigger Pipeline
 
@@ -208,11 +208,11 @@ Poll Describe API until build completes:
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `ResourceNotFound.Pipeline` | Verify pipeline ID |
-| `OperationDenied.PipelineRunning` | Wait for current build to complete |
-| `InvalidParameter.BranchNotFound` | Check branch exists in repo |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.Pipeline` | HALT | 0 | — | — | Verify pipeline ID |
+| `OperationDenied.PipelineRunning` | HALT | 0 | — | — | Wait for current build to complete |
+| `InvalidParameter.BranchNotFound` | HALT | 0 | — | — | Check branch exists in repo |
 
 ### Operation: Describe Pipelines
 
@@ -238,27 +238,27 @@ Poll Describe API for the ID; expect absent within 30s.
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `ResourceNotFound.Pipeline` | Already deleted; treat as success |
-| `OperationDenied.PipelineRunning` | Stop running build first |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.Pipeline` | HALT | 0 | — | — | Already deleted; treat as success |
+| `OperationDenied.PipelineRunning` | HALT | 0 | — | — | Stop running build first |
 
 ## Error Code Reference (CI/CD-Specific)
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `InvalidParameter.PipelineNameExists` | Pipeline name already exists | Use a different name |
-| `InvalidParameter.BranchNotFound` | Specified branch not found in repo | Check branch name |
-| `ResourceNotFound.Pipeline` | Pipeline ID not found | Verify pipeline ID |
-| `ResourceNotFound.Project` | Project not found | Verify project ID |
-| `ResourceQuotaExceeded.Pipeline` | Pipeline quota exceeded | HALT; raise quota |
-| `OperationDenied.PipelineRunning` | Pipeline is already running | Wait for completion |
-| `OperationDenied.PipelineSuspended` | Pipeline is suspended | Resume pipeline first |
-| `OperationDenied.NotAuthorized` | Insufficient permissions | HALT; check CAM permissions |
-| `InternalError.BuildFailed` | Build failed due to script error | Check build logs for details |
-| `InvalidSecretKey` | Credential invalid | HALT; fix credentials |
-| `RequestLimitExceeded` | API rate limit | Exponential backoff (3x) |
-| `InternalError` | Server error | Retry with RequestId (3x) |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.PipelineNameExists` | HALT | 0 | — | — | Use a different name |
+| `InvalidParameter.BranchNotFound` | HALT | 0 | — | — | Check branch name |
+| `ResourceNotFound.Pipeline` | HALT | 0 | — | — | Verify pipeline ID |
+| `ResourceNotFound.Project` | HALT | 0 | — | — | Verify project ID |
+| `ResourceQuotaExceeded.Pipeline` | HALT | 0 | — | — | HALT; raise quota |
+| `OperationDenied.PipelineRunning` | HALT | 0 | — | — | Wait for completion |
+| `OperationDenied.PipelineSuspended` | HALT | 0 | — | — | Resume pipeline first |
+| `OperationDenied.NotAuthorized` | HALT | 0 | — | — | HALT; check CAM permissions |
+| `InternalError.BuildFailed` | HALT | 0 | — | — | Check build logs for details |
+| `InvalidSecretKey` | HALT | 0 | — | — | HALT; fix credentials |
+| `RequestLimitExceeded` | RETRY | 0 | — | — | Exponential backoff (3x) |
+| `InternalError` | RETRY | 0 | — | — | Retry with RequestId (3x) |
 
 ## Safety Gates (Destructive Operations)
 

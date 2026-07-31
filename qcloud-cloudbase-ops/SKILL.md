@@ -523,18 +523,18 @@ tccli tcb DescribeCloudBaseBuildService \
 
 ## Error Code Reference
 
-| Code | Meaning | Retry? | Agent Action |
-|------|---------|--------|--------------|
-| `InvalidParameter` | Parameter validation failed | No | Fix parameter per API spec |
-| `InvalidParameterValue` | Parameter value out of range | No | Adjust value per spec |
-| `MissingParameter` | Required parameter missing | No | Add missing parameter |
-| `ResourceNotFound` | Environment or resource not found | No | Verify EnvId; list resources |
-| `ResourceInsufficient` | Quota exceeded | No | HALT; delete unused resources |
-| `InvalidSecretKey` | Credential invalid | No | HALT; fix credentials |
-| `InvalidSecretId` | Credential ID invalid | No | HALT; fix credentials |
-| `RequestLimitExceeded` | API rate limit | Yes (3x) | Exponential backoff |
-| `InternalError` | Server error | Yes (3x) | Retry; escalate with RequestId |
-| `OperationDenied` | Operation not allowed (e.g., delete in bad state) | No | Wait or check env status |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter` | HALT | 0 | — | — | No |
+| `InvalidParameterValue` | HALT | 0 | — | — | No |
+| `MissingParameter` | HALT | 0 | — | — | No |
+| `ResourceNotFound` | HALT | 0 | — | — | No |
+| `ResourceInsufficient` | HALT | 0 | — | — | No |
+| `InvalidSecretKey` | HALT | 0 | — | — | No |
+| `InvalidSecretId` | HALT | 0 | — | — | No |
+| `RequestLimitExceeded` | HALT | 0 | — | — | Yes (3x) |
+| `InternalError` | HALT | 0 | — | — | Yes (3x) |
+| `OperationDenied` | HALT | 0 | — | — | No |
 
 ---
 

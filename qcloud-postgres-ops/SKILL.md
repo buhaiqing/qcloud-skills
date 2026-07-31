@@ -263,15 +263,15 @@ done
 
 #### Failure Recovery
 
-| Error Code | Description | Recovery |
-|------------|-------------|----------|
-| InvalidParameterValue.SpecNotOnSale | 购买规格错误 | Use DescribeDBVersions and DescribeProductConfig to list available specs |
-| InvalidParameterValue.ZoneClosed | 可用区已关闭售卖 | Choose a different AZ |
-| InvalidParameterValue.PostPaidInstanceBeyondLimit | 后付费实例超限 | Delete unused instances or switch to prepaid |
-| InvalidParameterValue.PasswordRuleFailed | 密码不符合规范 | Use 8-32 chars with letters, digits, special chars |
-| InternalError.TradeError | 交易系统错误 | Retry 3x with 5s backoff; escalate if persistent |
-| LimitExceeded.TooManyRequests | 请求太过频繁 | Retry 3x with exponential backoff |
-| AuthFailure | CAM签名/鉴权错误 | HALT; check credentials and permissions |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameterValue.SpecNotOnSale` | HALT | 0 | — | — | Use DescribeDBVersions and DescribeProductConfig to list available specs |
+| `InvalidParameterValue.ZoneClosed` | HALT | 0 | — | — | Choose a different AZ |
+| `InvalidParameterValue.PostPaidInstanceBeyondLimit` | HALT | 0 | — | — | Delete unused instances or switch to prepaid |
+| `InvalidParameterValue.PasswordRuleFailed` | HALT | 0 | — | — | Use 8-32 chars with letters, digits, special chars |
+| `InternalError.TradeError` | RETRY | 0 | — | — | Retry 3x with 5s backoff; escalate if persistent |
+| `LimitExceeded.TooManyRequests` | RETRY | 0 | — | — | Retry 3x with exponential backoff |
+| `AuthFailure` | HALT | 0 | — | — | HALT; check credentials and permissions |
 
 ### Operation: Describe Instance
 
@@ -333,11 +333,11 @@ SDK fallback:
 
 #### Failure Recovery
 
-| Error Code | Recovery |
-|------------|----------|
-| InvalidParameterValue.IllegalInstanceStatus | Wait for instance to be in running state |
-| LimitExceeded.TooManyRequests | Retry 3x with exponential backoff |
-| FailedOperation.OperationNotAllowedInInstanceLocking | Wait for lock release; retry 3x with 30s backoff |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameterValue.IllegalInstanceStatus` | HALT | 0 | — | — | Wait for instance to be in running state |
+| `LimitExceeded.TooManyRequests` | RETRY | 3 | exponential | — | Retry 3x with exponential backoff |
+| `FailedOperation.OperationNotAllowedInInstanceLocking` | HALT | 0 | — | — | Wait for lock release; retry 3x with 30s backoff |
 
 ### Operation: Delete Instance (Safety Gate — High Risk)
 
@@ -370,11 +370,11 @@ tccli postgres DeleteDBInstance \
 
 #### Failure Recovery
 
-| Error Code | Recovery |
-|------------|----------|
-| InvalidParameterValue.NotFoundInstance | Verify instance ID |
-| InvalidParameterValue.IllegalInstanceStatus | Wait for instance to reach running or isolated state |
-| FailedOperation.DeletionProtectionEnabled | Disable deletion protection first |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameterValue.NotFoundInstance` | HALT | 0 | — | — | Verify instance ID |
+| `InvalidParameterValue.IllegalInstanceStatus` | HALT | 0 | — | — | Wait for instance to reach running or isolated state |
+| `FailedOperation.DeletionProtectionEnabled` | HALT | 0 | — | — | Disable deletion protection first |
 
 ### Operation: Backup Instance
 
@@ -475,10 +475,10 @@ tccli postgres DescribeAccounts \
 
 #### Failure Recovery
 
-| Error Code | Recovery |
-|------------|----------|
-| InvalidParameterValue.PasswordRuleFailed | Use 8-32 chars with letters, digits, and special characters |
-| InvalidParameterValue.NotFoundInstance | Verify instance ID |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameterValue.PasswordRuleFailed` | HALT | 8 | — | — | Use 8-32 chars with letters, digits, and special characters |
+| `InvalidParameterValue.NotFoundInstance` | HALT | 0 | — | — | Verify instance ID |
 
 ### Operation: Parameter Management
 
@@ -564,14 +564,14 @@ tccli postgres ModifyDBInstanceSecurityGroups \
 
 > See `references/troubleshooting.md` for full list. Key codes:
 
-| Code | Recovery |
-|------|----------|
-| `NotFoundInstance` | Verify instance ID via DescribeDBInstances |
-| `IllegalInstanceStatus` | Wait for running state |
-| `DeletionProtectionEnabled` | Disable deletion protection first |
-| `OperationNotAllowedInInstanceLocking` | Retry 3x with 30s backoff |
-| `RequestLimitExceeded` | Retry 3x with exponential backoff |
-| `InternalError` | Retry 3x; escalate with RequestId |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `NotFoundInstance` | HALT | 0 | — | — | Verify instance ID via DescribeDBInstances |
+| `IllegalInstanceStatus` | HALT | 0 | — | — | Wait for running state |
+| `DeletionProtectionEnabled` | HALT | 0 | — | — | Disable deletion protection first |
+| `OperationNotAllowedInInstanceLocking` | RETRY | 0 | — | — | Retry 3x with 30s backoff |
+| `RequestLimitExceeded` | RETRY | 3 | exponential | — | Retry 3x with exponential backoff |
+| `InternalError` | RETRY | 0 | — | — | Retry 3x; escalate with RequestId |
 
 ## Quality Gate (GCL)
 

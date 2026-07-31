@@ -230,13 +230,13 @@ tccli ssl DescribeCertificateDetail --CertificateId "{{output.certificate_id}}"
 
 #### Failure Recovery
 
-| Error Code | Description | Recovery |
-|------------|-------------|----------|
-| InvalidParameter.CertificateNotMatch | 证书和私钥不匹配 | Verify public/private key pair |
-| InvalidParameter.InvalidCertificate | 证书内容无效 | Check PEM format and certificate validity |
-| InvalidParameter.InvalidPrivateKey | 私钥内容无效 | Verify private key is valid PEM |
-| LimitExceeded | 证书数量超限 | Delete unused certificates first |
-| AuthFailure | CAM鉴权错误 | HALT; check credentials |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.CertificateNotMatch` | HALT | 0 | — | — | Verify public/private key pair |
+| `InvalidParameter.InvalidCertificate` | HALT | 0 | — | — | Check PEM format and certificate validity |
+| `InvalidParameter.InvalidPrivateKey` | HALT | 0 | — | — | Verify private key is valid PEM |
+| `LimitExceeded` | HALT | 0 | — | — | Delete unused certificates first |
+| `AuthFailure` | HALT | 0 | — | — | HALT; check credentials |
 
 ### Operation: List Certificates
 
@@ -413,13 +413,13 @@ tccli ssl DescribeCertificates --Limit 100 | \
 
 > See `references/troubleshooting.md` for full list. Key codes:
 
-| Code | Recovery |
-|------|----------|
-| `CertificateNotFound` | Verify certificate ID |
-| `CertificateNotMatch` | Ensure public/private key pair matches |
-| `DomainVerificationFailed` | Check DNS record or verification file |
-| `RequestLimitExceeded` | Retry with backoff |
-| `CertificateExpired` | Renew or upload new certificate |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `CertificateNotFound` | HALT | 0 | — | — | Verify certificate ID |
+| `CertificateNotMatch` | HALT | 0 | — | — | Ensure public/private key pair matches |
+| `DomainVerificationFailed` | HALT | 0 | — | — | Check DNS record or verification file |
+| `RequestLimitExceeded` | RETRY | 0 | — | — | Retry with backoff |
+| `CertificateExpired` | HALT | 0 | — | — | Renew or upload new certificate |
 
 ## Quality Gate (GCL)
 

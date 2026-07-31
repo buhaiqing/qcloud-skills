@@ -338,22 +338,22 @@ tccli tke DescribeClusters --Region {{env.TENCENTCLOUD_REGION}} --Offset 0 --Lim
 
 ## Error Code Reference (TKE-Specific)
 
-| Code | Agent Action |
-|------|-------------|
-| `InvalidParameter` | Fix param — check API spec |
-| `InvalidParameterValue` | Adjust value per spec |
-| `MissingParameter` | Add missing param |
-| `ResourceNotFound` | Verify ID; suggest Describe |
-| `ResourceNotFound.ClusterNotFound` | Verify ClusterId; list clusters |
-| `ResourceInsufficient` | HALT — request quota increase |
-| `ResourceInUse` | Use unique name/CIDR |
-| `ResourcePreRunning` | RETRY (3×, 30s) — poll status; wait |
-| `OperationConflict` | RETRY (3×, 30s) — wait for completion |
-| `InvalidSecretKey` / `InvalidSecretId` | HALT — fix credentials |
-| `RequestLimitExceeded` | RETRY (3×, exponential) — backoff |
-| `InternalError` | RETRY (3×, exponential) — escalate with RequestId |
-| `AddonConflict` | Check existing addons; resolve conflict |
-| `QuotaExceeded` | HALT — request quota increase |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter` | FIX | 0 | — | — | Fix param — check API spec |
+| `InvalidParameterValue` | HALT | 0 | — | — | Adjust value per spec |
+| `MissingParameter` | HALT | 0 | — | — | Add missing param |
+| `ResourceNotFound` | HALT | 0 | — | — | Verify ID; suggest Describe |
+| `ResourceNotFound.ClusterNotFound` | HALT | 0 | — | — | Verify ClusterId; list clusters |
+| `ResourceInsufficient` | HALT | 0 | — | — | HALT — request quota increase |
+| `ResourceInUse` | HALT | 0 | — | — | Use unique name/CIDR |
+| `ResourcePreRunning` | RETRY | 3 | — | — | RETRY (3×, 30s) — poll status; wait |
+| `OperationConflict` | RETRY | 3 | — | — | RETRY (3×, 30s) — wait for completion |
+| `InvalidSecretKey / InvalidSecretId` | HALT | 0 | — | — | HALT — fix credentials |
+| `RequestLimitExceeded` | RETRY | 3 | exponential | — | RETRY (3×, exponential) — backoff |
+| `InternalError` | RETRY | 3 | exponential | — | RETRY (3×, exponential) — escalate with RequestId |
+| `AddonConflict` | HALT | 0 | — | — | Check existing addons; resolve conflict |
+| `QuotaExceeded` | HALT | 0 | — | — | HALT — request quota increase |
 
 > **After use:** Verify each code exists in the official TKE API error documentation.
 

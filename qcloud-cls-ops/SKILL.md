@@ -631,14 +631,14 @@ Multi-step analysis of COS access logs imported into CLS. Covers troubleshooting
 
 > See `references/troubleshooting.md` and `references/failure-recovery-reference.md` for full list. Key codes:
 
-| Code | Recovery |
-|------|----------|
-| `ResourceNotFound.*` | Verify resource ID |
-| `ResourceInUse.*` | Resolve conflict first |
-| `QuotaExceeded.*` | HALT; request quota increase |
-| `RequestLimitExceeded` | Retry with exponential backoff |
-| `UnauthorizedOperation` | HALT; check CAM permissions |
-| `InternalError` | Retry 3x; escalate with RequestId |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.*` | HALT | 0 | — | — | Verify resource ID |
+| `ResourceInUse.*` | HALT | 0 | — | — | Resolve conflict first |
+| `QuotaExceeded.*` | HALT | 0 | — | — | HALT; request quota increase |
+| `RequestLimitExceeded` | RETRY | 3 | exponential | — | Retry with exponential backoff |
+| `UnauthorizedOperation` | HALT | 0 | — | — | HALT; check CAM permissions |
+| `InternalError` | RETRY | 0 | — | — | Retry 3x; escalate with RequestId |
 
 ## Quality Gate (GCL)
 

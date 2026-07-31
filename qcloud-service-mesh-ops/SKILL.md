@@ -198,12 +198,12 @@ tccli tcm CreateMesh \
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `InvalidParameter.MeshNameExists` | Use a different name |
-| `ResourceQuotaExceeded.Mesh` | HALT; raise per-region mesh quota |
-| `InvalidParameterValue.MeshVersion` | Use supported version |
-| `RequestLimitExceeded` | Backoff retry (2s,4s,8s) |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.MeshNameExists` | HALT | 0 | — | — | Use a different name |
+| `ResourceQuotaExceeded.Mesh` | HALT | 0 | — | — | HALT; raise per-region mesh quota |
+| `InvalidParameterValue.MeshVersion` | HALT | 0 | — | — | Use supported version |
+| `RequestLimitExceeded` | RETRY | 3 | 2s,4s,8s | — | Backoff retry (2s,4s,8s) |
 
 ### Operation: Link Cluster to Mesh
 
@@ -234,12 +234,12 @@ Poll `DescribeMesh` until cluster shows in `LinkedClusterSet` with status `RUNNI
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `ResourceNotFound.Mesh` | Verify mesh ID |
-| `ResourceNotFound.Cluster` | Verify cluster ID |
-| `OperationDenied.ClusterAlreadyLinked` | Already linked; treat as success |
-| `OperationDenied.ClusterStatusNotRunning` | Wait for cluster to be RUNNING |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.Mesh` | HALT | 0 | — | — | Verify mesh ID |
+| `ResourceNotFound.Cluster` | HALT | 0 | — | — | Verify cluster ID |
+| `OperationDenied.ClusterAlreadyLinked` | HALT | 0 | — | — | Already linked; treat as success |
+| `OperationDenied.ClusterStatusNotRunning` | HALT | 0 | — | — | Wait for cluster to be RUNNING |
 
 ### Operation: Enable Sidecar Injection
 
@@ -299,28 +299,28 @@ Poll `DescribeMeshList`; expect mesh absent within 60s.
 
 #### Failure Recovery
 
-| Error pattern | Recovery |
-|---|---|
-| `ResourceNotFound.Mesh` | Already deleted; treat as success |
-| `OperationDenied.MeshHasLinkedClusters` | Unlink all clusters first |
-| `OperationDenied.MeshHasResources` | Remove mesh resources first |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.Mesh` | HALT | 0 | — | — | Already deleted; treat as success |
+| `OperationDenied.MeshHasLinkedClusters` | HALT | 0 | — | — | Unlink all clusters first |
+| `OperationDenied.MeshHasResources` | HALT | 0 | — | — | Remove mesh resources first |
 
 ## Error Code Reference (TCM-Specific)
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `InvalidParameter.MeshNameExists` | Mesh name already exists | Use a different name |
-| `InvalidParameterValue.MeshVersion` | Unsupported mesh version | Check supported versions |
-| `ResourceNotFound.Mesh` | Mesh ID not found | Verify mesh ID |
-| `ResourceNotFound.Cluster` | Cluster ID not found | Verify cluster ID |
-| `ResourceQuotaExceeded.Mesh` | Mesh quota exceeded | HALT; raise quota |
-| `OperationDenied.MeshAlreadyExists` | Mesh already exists | Use existing or rename |
-| `OperationDenied.ClusterAlreadyLinked` | Cluster already linked | Treat as success |
-| `OperationDenied.ClusterStatusNotRunning` | Cluster not in RUNNING state | Wait for cluster |
-| `OperationDenied.MeshHasLinkedClusters` | Cannot delete with linked clusters | Unlink first |
-| `OperationDenied.MeshHasResources` | Mesh has active resources | Clean up first |
-| `InvalidSecretKey` | Credential invalid | HALT; fix credentials |
-| `RequestLimitExceeded` | API rate limit | Exponential backoff (3x) |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.MeshNameExists` | HALT | 0 | — | — | Use a different name |
+| `InvalidParameterValue.MeshVersion` | HALT | 0 | — | — | Check supported versions |
+| `ResourceNotFound.Mesh` | HALT | 0 | — | — | Verify mesh ID |
+| `ResourceNotFound.Cluster` | HALT | 0 | — | — | Verify cluster ID |
+| `ResourceQuotaExceeded.Mesh` | HALT | 0 | — | — | HALT; raise quota |
+| `OperationDenied.MeshAlreadyExists` | HALT | 0 | — | — | Use existing or rename |
+| `OperationDenied.ClusterAlreadyLinked` | HALT | 0 | — | — | Treat as success |
+| `OperationDenied.ClusterStatusNotRunning` | HALT | 0 | — | — | Wait for cluster |
+| `OperationDenied.MeshHasLinkedClusters` | HALT | 0 | — | — | Unlink first |
+| `OperationDenied.MeshHasResources` | HALT | 0 | — | — | Clean up first |
+| `InvalidSecretKey` | HALT | 0 | — | — | HALT; fix credentials |
+| `RequestLimitExceeded` | RETRY | 0 | — | — | Exponential backoff (3x) |
 
 ## Safety Gates (Destructive Operations)
 

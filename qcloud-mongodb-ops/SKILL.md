@@ -222,23 +222,23 @@ Every operation: **Pre-flight → Execute (CLI primary, SDK fallback) → Valida
 
 ## Error Code Reference
 
-| Code | Meaning | Recovery |
-|------|---------|----------|
-| InvalidParameterValue.NotFoundInstance | 未找到实例 | Verify instance ID; suggest DescribeDBInstances |
-| InvalidParameterValue.IllegalInstanceStatus | 实例状态不允许操作 | Check status; wait for running state |
-| InvalidParameterValue.ModifyModeError | 内存和磁盘必须同时升配或降配 | Adjust both Memory and Volume |
-| InvalidParameterValue.PasswordRuleFailed | 密码不符合规范 | 8-32 chars, letters + digits + special chars |
-| InvalidParameterValue.SpecNotOnSale | 购买规格错误 | Use DescribeSpecInfo for available specs |
-| InvalidParameterValue.ZoneClosed | 可用区已关闭售卖 | Choose different AZ |
-| InvalidParameterValue.PostPaidInstanceBeyondLimit | 后付费实例超限 | Delete unused or switch to prepaid |
-| InvalidParameterValue.SetDiskLessThanUsed | 磁盘不得低于已用1.2倍 | Increase disk size |
-| FailedOperation.DeletionProtectionEnabled | 实例开启了销毁保护 | Disable via SetDBInstanceDeletionProtection |
-| FailedOperation.OperationNotAllowedInInstanceLocking | 实例锁定中 | Retry 3x with 30s backoff |
-| InternalError.TradeError | 交易系统错误 | Retry 3x with 5s backoff; escalate with RequestId |
-| LimitExceeded.TooManyRequests | 请求太过频繁 | Retry 3x with exponential backoff |
-| UnsupportedOperation.VersionNotSupport | 版本不支持该操作 | Upgrade instance version |
-| InternalError | 内部错误 | Retry 3x (2s, 4s, 8s); escalate with RequestId |
-| AuthFailure | CAM鉴权错误 | HALT; check credentials |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameterValue.NotFoundInstance` | HALT | 0 | — | — | Verify instance ID; suggest DescribeDBInstances |
+| `InvalidParameterValue.IllegalInstanceStatus` | HALT | 0 | — | — | Check status; wait for running state |
+| `InvalidParameterValue.ModifyModeError` | HALT | 0 | — | — | Adjust both Memory and Volume |
+| `InvalidParameterValue.PasswordRuleFailed` | HALT | 0 | — | — | 8-32 chars, letters + digits + special chars |
+| `InvalidParameterValue.SpecNotOnSale` | HALT | 0 | — | — | Use DescribeSpecInfo for available specs |
+| `InvalidParameterValue.ZoneClosed` | HALT | 0 | — | — | Choose different AZ |
+| `InvalidParameterValue.PostPaidInstanceBeyondLimit` | HALT | 0 | — | — | Delete unused or switch to prepaid |
+| `InvalidParameterValue.SetDiskLessThanUsed` | HALT | 0 | — | — | Increase disk size |
+| `FailedOperation.DeletionProtectionEnabled` | HALT | 0 | — | — | Disable via SetDBInstanceDeletionProtection |
+| `FailedOperation.OperationNotAllowedInInstanceLocking` | RETRY | 0 | — | — | Retry 3x with 30s backoff |
+| `InternalError.TradeError` | RETRY | 0 | — | — | Retry 3x with 5s backoff; escalate with RequestId |
+| `LimitExceeded.TooManyRequests` | RETRY | 0 | — | — | Retry 3x with exponential backoff |
+| `UnsupportedOperation.VersionNotSupport` | HALT | 0 | — | — | Upgrade instance version |
+| `InternalError` | RETRY | 0 | — | — | Retry 3x (2s, 4s, 8s); escalate with RequestId |
+| `AuthFailure` | HALT | 0 | — | — | HALT; check credentials |
 
 ## Safety Gates (Destructive Operations)
 

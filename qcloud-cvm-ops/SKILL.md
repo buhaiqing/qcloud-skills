@@ -204,15 +204,15 @@ done
 
 #### Failure Recovery
 
-| Error pattern | Retry Strategy | Recovery |
-|--------------|----------------|----------|
-| `InvalidParameter.ImageIdMalformed` | 0 | Fix image ID format to `img-xxx`; use DescribeImages to find valid images |
-| `InvalidParameterValue.InstanceTypeUnsupported` | 0 | Check zone-instance type matrix via DescribeZoneInstanceConfigInfos |
-| `ResourceInsufficient.CvmInstanceQuotaIsFull` | 0 | HALT. Request quota increase or delete unused instances |
-| `QuotaExceeded.SecurityGroupLimit` | 0 | HALT. Use existing SG or request quota increase |
-| `InvalidVpc.NotFound` | 0 | HALT. Delegate to qcloud-vpc-ops |
-| `RequestLimitExceeded` | 3, exp backoff | Back off and retry |
-| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.ImageIdMalformed` | FIX | 0 | — | — | Fix image ID format to `img-xxx`; use DescribeImages to find valid images |
+| `InvalidParameterValue.InstanceTypeUnsupported` | HALT | 0 | — | — | Check zone-instance type matrix via DescribeZoneInstanceConfigInfos |
+| `ResourceInsufficient.CvmInstanceQuotaIsFull` | HALT | 0 | — | — | HALT. Request quota increase or delete unused instances |
+| `QuotaExceeded.SecurityGroupLimit` | HALT | 0 | — | — | HALT. Use existing SG or request quota increase |
+| `InvalidVpc.NotFound` | HALT | 0 | — | qcloud-vpc-ops | HALT. Delegate to qcloud-vpc-ops |
+| `RequestLimitExceeded` | RETRY | 3 | exponential | — | Back off and retry |
+| `InternalError` | RETRY | 3 | 2s,4s,8s | — | Retry; HALT with RequestId if persists |
 
 ### Operation: DescribeInstances
 
@@ -432,13 +432,13 @@ Poll DescribeInstances until `STOPPED` (spec change completes while stopped), th
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Recovery |
-|--------------|-------------|----------|
-| `InvalidParameterValue.InstanceTypeNotSupported` | 0 | Check zone-instance type matrix via DescribeZoneInstanceConfigInfos |
-| `InvalidInstanceState.InstanceIsRunning` | 0 | HALT; instance must be STOPPED |
-| `TradeError.PriceError` | 0 | HALT; check billing eligibility for target type |
-| `RequestLimitExceeded` | 3, exp backoff | Back off and retry |
-| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameterValue.InstanceTypeNotSupported` | HALT | 0 | — | — | Check zone-instance type matrix via DescribeZoneInstanceConfigInfos |
+| `InvalidInstanceState.InstanceIsRunning` | HALT | 0 | — | — | HALT; instance must be STOPPED |
+| `TradeError.PriceError` | HALT | 0 | — | — | HALT; check billing eligibility for target type |
+| `RequestLimitExceeded` | RETRY | 3 | exponential | — | Back off and retry |
+| `InternalError` | RETRY | 3 | 2s,4s,8s | — | Retry; HALT with RequestId if persists |
 
 ### Operation: ResizeInstanceDisk (CBS Disk Expansion)
 
@@ -543,13 +543,13 @@ Poll DescribeDisks until disk `Attached` status and `InstanceId` matches `{{user
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Recovery |
-|--------------|-------------|----------|
-| `InvalidDisk.NotSupported` | 0 | HALT; disk type not attachable to this instance |
-| `InvalidDisk.DiskAttached` | 0 | HALT; disk already attached to an instance |
-| `InvalidInstance.NotSupported` | 0 | HALT; instance does not accept more disks |
-| `RequestLimitExceeded` | 3, exp backoff | Back off and retry |
-| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidDisk.NotSupported` | HALT | 0 | — | — | HALT; disk type not attachable to this instance |
+| `InvalidDisk.DiskAttached` | HALT | 0 | — | — | HALT; disk already attached to an instance |
+| `InvalidInstance.NotSupported` | HALT | 0 | — | — | HALT; instance does not accept more disks |
+| `RequestLimitExceeded` | RETRY | 3 | exponential | — | Back off and retry |
+| `InternalError` | RETRY | 3 | 2s,4s,8s | — | Retry; HALT with RequestId if persists |
 
 ### Operation: DetachDisk (Detach CBS Disk)
 
@@ -582,13 +582,13 @@ Poll DescribeDisks until disk `NOT_ATTACHED` state and `InstanceId` is absent.
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Recovery |
-|--------------|-------------|----------|
-| `InvalidDisk.NotSupported` | 0 | HALT; disk type does not support detach |
-| `InvalidDisk.DiskBusy` | 0 | HALT; unmount filesystem, wait for I/O to drain |
-| `InvalidDisk.NotAttached` | 0 | HALT; disk not attached to specified instance |
-| `RequestLimitExceeded` | 3, exp backoff | Back off and retry |
-| `InternalError` | 3 (2s,4s,8s) | Retry; HALT with RequestId if persists |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidDisk.NotSupported` | HALT | 0 | — | — | HALT; disk type does not support detach |
+| `InvalidDisk.DiskBusy` | HALT | 0 | — | — | HALT; unmount filesystem, wait for I/O to drain |
+| `InvalidDisk.NotAttached` | HALT | 0 | — | — | HALT; disk not attached to specified instance |
+| `RequestLimitExceeded` | RETRY | 3 | exponential | — | Back off and retry |
+| `InternalError` | RETRY | 3 | 2s,4s,8s | — | Retry; HALT with RequestId if persists |
 
 
 
@@ -603,12 +603,12 @@ Optional: `references/monitoring.md`, `references/finops-analysis.md`, `referenc
 
 > See `references/troubleshooting.md` for full error list. Key codes:
 
-| Code | Recovery |
-|------|----------|
-| `ResourceNotFound.InstanceNotFound` | Verify via Describe |
-| `ResourceInsufficient.CvmInstanceQuotaIsFull` | Request quota increase |
-| `RequestLimitExceeded` | Retry (3x, exp backoff) |
-| `InternalError` | Retry (3x); escalate with RequestId |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound.InstanceNotFound` | HALT | 0 | — | — | Verify via Describe |
+| `ResourceInsufficient.CvmInstanceQuotaIsFull` | HALT | 0 | — | — | Request quota increase |
+| `RequestLimitExceeded` | RETRY | 3 | exponential | — | Retry (3x, exp backoff) |
+| `InternalError` | RETRY | 0 | — | — | Retry (3x); escalate with RequestId |
 
 ## Quality Gate (GCL)
 

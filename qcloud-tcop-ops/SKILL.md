@@ -286,12 +286,12 @@ See [references/sdk-code-examples.md](references/sdk-code-examples.md) for compl
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Backoff | Agent Action | UX Feedback |
-|---------------|-------------|---------|--------------|-------------|
-| `InvalidParameter` | 0 | -- | Fix period/region parameter | `[ERROR] InvalidParameter: Check analysis period and region.` |
-| `InvalidSecretKey` | 0 | -- | HALT | `[ERROR] Invalid credentials. Check TENCENTCLOUD_SECRET_KEY.` |
-| `RequestLimitExceeded` | 3 | exponential | Back off; retry | `Rate limit. Retrying in {backoff}s...` |
-| `InternalError` | 3 | 2s/4s/8s | Retry; escalate with RequestId | `[ERROR] InternalError: Server error. RequestId: {RequestId}` |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter` | FIX | 0 | — | — | Fix period/region parameter; `[ERROR] InvalidParameter: Check analysis period and region.` |
+| `InvalidSecretKey` | HALT | 0 | — | — | HALT; `[ERROR] Invalid credentials. Check TENCENTCLOUD_SECRET_KEY.` |
+| `RequestLimitExceeded` | RETRY | 3 | exponential | — | Back off; retry; `Rate limit. Retrying in {backoff}s...` |
+| `InternalError` | RETRY | 3 | — | — | Retry; escalate with RequestId; `[ERROR] InternalError: Server error. RequestId: {RequestId}` |
 
 ---
 
@@ -326,10 +326,10 @@ See [references/sdk-code-examples.md](references/sdk-code-examples.md) for compl
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Agent Action |
-|---------------|-------------|--------------|
-| `ResourceNotFound` | 0 | HALT; no resources found for given filter |
-| `RequestLimitExceeded` | 3 | Exponential backoff |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound` | HALT | 0 | — | — | HALT; no resources found for given filter |
+| `RequestLimitExceeded` | RETRY | 3 | — | — | Exponential backoff |
 
 ---
 
@@ -364,11 +364,11 @@ See [references/sdk-code-examples.md](references/sdk-code-examples.md) for compl
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Agent Action |
-|---------------|-------------|--------------|
-| `InvalidParameter` | 0 | Fix period parameter |
-| `MissingParameter` | 0 | Ensure product filter is set |
-| `RequestLimitExceeded` | 3 | Exponential backoff |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter` | FIX | 0 | — | — | Fix period parameter |
+| `MissingParameter` | HALT | 0 | — | — | Ensure product filter is set |
+| `RequestLimitExceeded` | RETRY | 3 | — | — | Exponential backoff |
 
 ---
 
@@ -396,10 +396,10 @@ See [references/sdk-code-examples.md](references/sdk-code-examples.md) for compl
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Agent Action |
-|---------------|-------------|--------------|
-| `ResourceNotFound` | 0 | No billing data found |
-| `RequestLimitExceeded` | 3 | Exponential backoff |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound` | HALT | 0 | — | — | No billing data found |
+| `RequestLimitExceeded` | RETRY | 3 | — | — | Exponential backoff |
 
 ---
 
@@ -419,10 +419,10 @@ See [references/sdk-code-examples.md](references/sdk-code-examples.md) for compl
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Agent Action |
-|---------------|-------------|--------------|
-| `InvalidParameter` | 0 | Check period parameter |
-| `RequestLimitExceeded` | 3 | Exponential backoff |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter` | HALT | 0 | — | — | Check period parameter |
+| `RequestLimitExceeded` | RETRY | 3 | — | — | Exponential backoff |
 
 ---
 
@@ -451,10 +451,10 @@ See [references/sdk-code-examples.md](references/sdk-code-examples.md) for compl
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Agent Action |
-|---------------|-------------|--------------|
-| `ResourceNotFound` | 0 | No resources to assess |
-| `RequestLimitExceeded` | 3 | Exponential backoff |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound` | HALT | 0 | — | — | No resources to assess |
+| `RequestLimitExceeded` | RETRY | 3 | — | — | Exponential backoff |
 
 ---
 
@@ -490,11 +490,11 @@ See [references/sdk-code-examples.md](references/sdk-code-examples.md) for compl
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Agent Action |
-|---------------|-------------|--------------|
-| `InvalidParameter` | 0 | Fix report parameters |
-| `RequestLimitExceeded` | 3 | Exponential backoff |
-| `InternalError` | 3 | Retry; escalate with RequestId |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter` | FIX | 0 | — | — | Fix report parameters |
+| `RequestLimitExceeded` | RETRY | 3 | — | — | Exponential backoff |
+| `InternalError` | RETRY | 3 | — | — | Retry; escalate with RequestId |
 
 ---
 
@@ -563,28 +563,28 @@ See [references/sdk-code-examples.md](references/sdk-code-examples.md) for compl
 
 ### Auth & Credential Errors
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `InvalidSecretKey` | Credential secret key invalid | HALT — regenerate in CAM console |
-| `InvalidSecretId` | Credential ID invalid or deleted | HALT — check CAM for active keys |
-| `OperationDenied` | Account not authorized for TCOP | HALT — enable TCOP in console |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidSecretKey` | HALT | 0 | — | — | HALT — regenerate in CAM console |
+| `InvalidSecretId` | HALT | 0 | — | — | HALT — check CAM for active keys |
+| `OperationDenied` | HALT | 0 | — | — | HALT — enable TCOP in console |
 
 ### Parameter & Resource Errors
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `InvalidParameter` | Parameter validation failed | FIX — check parameter format per spec |
-| `InvalidParameterValue` | Parameter value out of range | FIX — adjust value (e.g., period 7-365 days) |
-| `MissingParameter` | Required parameter missing | FIX — check request object fields |
-| `ResourceNotFound` | Target resource not found | FIX — verify resource ID or product filter |
-| `UnsupportedOperation` | Operation not supported in region/account | FIX — switch region or check eligibility |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter` | FIX | 0 | — | — | FIX — check parameter format per spec |
+| `InvalidParameterValue` | FIX | 0 | — | — | FIX — adjust value (e.g., period 7-365 days) |
+| `MissingParameter` | FIX | 0 | — | — | FIX — check request object fields |
+| `ResourceNotFound` | FIX | 0 | — | — | FIX — verify resource ID or product filter |
+| `UnsupportedOperation` | FIX | 0 | — | — | FIX — switch region or check eligibility |
 
 ### Rate Limit & Server Errors
 
-| Code | Description | Recovery |
-|------|-------------|----------|
-| `RequestLimitExceeded` | API rate limit exceeded | RETRY — exponential backoff |
-| `InternalError` | Server-side error | RETRY — retry 2s/4s/8s; escalate with RequestId if persists |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `RequestLimitExceeded` | RETRY | 0 | — | — | RETRY — exponential backoff |
+| `InternalError` | RETRY | 0 | — | — | RETRY — retry 2s/4s/8s; escalate with RequestId if persists |
 
 ---
 

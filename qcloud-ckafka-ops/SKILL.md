@@ -284,14 +284,14 @@ fi
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Backoff | Agent Action | UX Feedback |
-|--------------|-------------|---------|--------------|-------------|
-| `InvalidParameterValue` / invalid spec type | 0–1 | — | Fix spec type from valid list; retry once | `[ERROR] InvalidParameterValue: Spec type invalid. Use standard or professional.` |
-| `ResourceInsufficient` / quota exceeded | 0 | — | HALT | `[ERROR] ResourceInsufficient: Quota limit reached. Delete unused resources or request quota increase.` |
-| `InvalidVpcId` / `InvalidSubnetId` | 0 | — | HALT | `[ERROR] Invalid VPC or Subnet. Verify IDs via qcloud-vpc-ops.` |
-| `InvalidSecretKey` / `InvalidSecretId` | 0 | — | HALT | `[ERROR] Credential invalid. Verify TENCENTCLOUD_SECRET_ID and TENCENTCLOUD_SECRET_KEY.` |
-| `RequestLimitExceeded` / 429 | 3 | exponential | Back off; respect rate limit | `⚠️ Rate limit reached. Retrying in {backoff}s...` |
-| `InternalError` / 5xx | 3 | 2s, 4s, 8s | Retry; then HALT with RequestId | `[ERROR] InternalError. Retry or escalate with RequestId.` |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameterValue / invalid spec type` | FIX | 0 | — | — | Fix spec type from valid list; retry once; `[ERROR] InvalidParameterValue: Spec type invalid. Use standard or professional.` |
+| `ResourceInsufficient / quota exceeded` | HALT | 0 | — | — | HALT; `[ERROR] ResourceInsufficient: Quota limit reached. Delete unused resources or request quota increase.` |
+| `InvalidVpcId / InvalidSubnetId` | HALT | 0 | — | — | HALT; `[ERROR] Invalid VPC or Subnet. Verify IDs via qcloud-vpc-ops.` |
+| `InvalidSecretKey / InvalidSecretId` | HALT | 0 | — | — | HALT; `[ERROR] Credential invalid. Verify TENCENTCLOUD_SECRET_ID and TENCENTCLOUD_SECRET_KEY.` |
+| `RequestLimitExceeded / 429` | RETRY | 3 | exponential | — | Back off; respect rate limit; `⚠️ Rate limit reached. Retrying in {backoff}s...` |
+| `InternalError / 5xx` | RETRY | 3 | 2s,4s,8s | — | Retry; then HALT with RequestId; `[ERROR] InternalError. Retry or escalate with RequestId.` |
 
 ---
 
@@ -329,11 +329,11 @@ tccli ckafka DescribeTopic \
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Agent Action |
-|--------------|-------------|--------------|
-| `TopicAlreadyExists` | 0 | HALT — topic already exists |
-| `InvalidParameterValue` | 0–1 | Fix parameters; retry once |
-| `ResourceUnavailable` | 3 | Retry with backoff |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `TopicAlreadyExists` | HALT | 0 | — | — | HALT — topic already exists |
+| `InvalidParameterValue` | FIX | 0 | — | — | Fix parameters; retry once |
+| `ResourceUnavailable` | RETRY | 3 | — | — | Retry with backoff |
 
 ---
 
@@ -398,10 +398,10 @@ tccli ckafka DescribeACL \
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Agent Action |
-|--------------|-------------|--------------|
-| `ResourceNotFound` | 0 | HALT — resource doesn't exist |
-| `InvalidParameterValue` | 0–1 | Fix parameters; retry |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `ResourceNotFound` | HALT | 0 | — | — | HALT — resource doesn't exist |
+| `InvalidParameterValue` | FIX | 0 | — | — | Fix parameters; retry |
 
 ---
 
@@ -439,22 +439,22 @@ tccli ckafka FetchMessageByOffset \
 
 ### CKafka-Specific Error Codes
 
-| Error Code | Description | Recovery |
-|------------|-------------|----------|
-| `InvalidParameterValue` | Invalid parameter value | Fix and retry `Invalid parameter value. Check and correct input.` |
-| `ResourceNotFound` | Resource not found | HALT `Resource not found. Verify ID and region.` |
-| `ResourceUnavailable` | Resource temporarily unavailable | Retry with backoff `Resource temporarily unavailable. Retrying...` |
-| `ResourceInsufficient` | Quota exceeded | HALT `Quota limit reached. Request quota increase.` |
-| `ResourceInUse` | Resource in use | Wait or force `Resource in use. Wait for completion or use force flag.` |
-| `TopicAlreadyExists` | Topic already exists | Skip or use existing `Topic already exists. Use existing or choose different name.` |
-| `ConsumerGroupNotExist` | Consumer group not found | HALT `Consumer group not found. Create it first.` |
-| `InstanceNotExist` | Instance not found | HALT `Instance not found. Verify ID and region.` |
-| `OperationDenied` | Operation not allowed | HALT `Operation not permitted. Check permissions.` |
-| `FailedOperation` | Operation failed | Retry or escalate `Operation failed. Retry or contact support.` |
-| `UnauthorizedOperation` | Unauthorized operation | Check CAM `Unauthorized. Verify IAM permissions.` |
-| `LimitExceeded` | Rate limit exceeded | Backoff and retry `Rate limit exceeded. Retrying with backoff.` |
-| `InternalError` | Internal server error | Retry 3x then HALT `Internal error. Retry or escalate with RequestId.` |
-| `InvalidInstanceStatus` | Invalid instance status | Wait for ready `Instance not ready. Wait for status=1 (running).` |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameterValue` | RETRY | 0 | — | — | Fix and retry `Invalid parameter value. Check and correct input.` |
+| `ResourceNotFound` | HALT | 0 | — | — | HALT `Resource not found. Verify ID and region.` |
+| `ResourceUnavailable` | RETRY | 0 | — | — | Retry with backoff `Resource temporarily unavailable. Retrying...` |
+| `ResourceInsufficient` | HALT | 0 | — | — | HALT `Quota limit reached. Request quota increase.` |
+| `ResourceInUse` | HALT | 0 | — | — | Wait or force `Resource in use. Wait for completion or use force flag.` |
+| `TopicAlreadyExists` | HALT | 0 | — | — | Skip or use existing `Topic already exists. Use existing or choose different name.` |
+| `ConsumerGroupNotExist` | HALT | 0 | — | — | HALT `Consumer group not found. Create it first.` |
+| `InstanceNotExist` | HALT | 0 | — | — | HALT `Instance not found. Verify ID and region.` |
+| `OperationDenied` | HALT | 0 | — | — | HALT `Operation not permitted. Check permissions.` |
+| `FailedOperation` | RETRY | 0 | — | — | Retry or escalate `Operation failed. Retry or contact support.` |
+| `UnauthorizedOperation` | HALT | 0 | — | — | Check CAM `Unauthorized. Verify IAM permissions.` |
+| `LimitExceeded` | RETRY | 0 | — | — | Backoff and retry `Rate limit exceeded. Retrying with backoff.` |
+| `InternalError` | RETRY | 0 | — | — | Retry 3x then HALT `Internal error. Retry or escalate with RequestId.` |
+| `InvalidInstanceStatus` | HALT | 0 | — | — | Wait for ready `Instance not ready. Wait for status=1 (running).` |
 
 ---
 

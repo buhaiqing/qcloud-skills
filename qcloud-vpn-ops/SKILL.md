@@ -280,13 +280,13 @@ Every **DeleteVpnGateway / DeleteVpnConnection / DeleteCustomerGateway / DeleteV
 
 > Full error taxonomy with recovery strategies: See [troubleshooting.md](references/troubleshooting.md).
 
-| Code | Meaning | Action |
-|------|---------|--------|
-| `InvalidParameter.InvalidBandwidth` | Bandwidth not in supported set | Use 5/10/20/50/100/200/500/1000 Mbps |
-| `InvalidParameter.PreShareKeyFormat` | PSK length out of range (16–32 chars) | Ask user for strong key |
-| `InvalidParameter.CidrConflict` | Local and remote CIDR overlap | Pick non-overlapping ranges |
-| `ResourceInUse.VpnGateway` | Gateway still has connections | Delete connections first |
-| `InvalidSecretKey` | Credential invalid | HALT; fix credentials |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameter.InvalidBandwidth` | HALT | 0 | — | — | Use 5/10/20/50/100/200/500/1000 Mbps |
+| `InvalidParameter.PreShareKeyFormat` | HALT | 16 | — | — | Ask user for strong key |
+| `InvalidParameter.CidrConflict` | HALT | 0 | — | — | Pick non-overlapping ranges |
+| `ResourceInUse.VpnGateway` | HALT | 0 | — | — | Delete connections first |
+| `InvalidSecretKey` | HALT | 0 | — | — | HALT; fix credentials |
 
 ## Quality Gate (GCL)
 

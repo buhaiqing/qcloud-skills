@@ -219,15 +219,15 @@ See [execution-flows.md](references/execution-flows.md) §1 for CLI and SDK comm
 
 #### Failure Recovery
 
-| Error pattern | Max retries | Backoff | Agent Action | UX Feedback |
-|--------------|-------------|---------|--------------|-------------|
-| `InvalidParameterValue` / invalid node type | 0–1 | — | Fix node type from spec; retry once | `[ERROR] InvalidParameterValue: Node type invalid. Check available node types via DescribeInstance` |
-| `ResourceInsufficient` / quota exceeded | 0 | — | HALT | `[ERROR] ResourceInsufficient: Quota limit reached. Delete unused resources or request quota increase.` |
-| `FailedOperation.NoEnoughNodes` | 0 | — | HALT | `[ERROR] NoEnoughNodes: Insufficient resources in this AZ. Try a different zone.` |
-| `FailedOperation.PayFailed` | 0 | — | HALT | `[ERROR] PayFailed: Payment failed. Check account balance.` |
-| `InvalidSecretKey` / `InvalidSecretId` | 0 | — | HALT | `[ERROR] Credential invalid. Verify TENCENTCLOUD_SECRET_ID and TENCENTCLOUD_SECRET_KEY.` |
-| `RequestLimitExceeded` / 429 | 3 | exponential | Back off; respect rate limit | `⚠️ Rate limit reached. Retrying in {backoff}s...` |
-| `InternalError` / 5xx | 3 | 2s, 4s, 8s | Retry; then HALT with RequestId | `[ERROR] InternalError. Retry or escalate with RequestId.` |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameterValue / invalid node type` | FIX | 0 | — | — | Fix node type from spec; retry once; `[ERROR] InvalidParameterValue: Node type invalid. Check available node types via DescribeInstance` |
+| `ResourceInsufficient / quota exceeded` | HALT | 0 | — | — | HALT; `[ERROR] ResourceInsufficient: Quota limit reached. Delete unused resources or request quota increase.` |
+| `FailedOperation.NoEnoughNodes` | HALT | 0 | — | — | HALT; `[ERROR] NoEnoughNodes: Insufficient resources in this AZ. Try a different zone.` |
+| `FailedOperation.PayFailed` | HALT | 0 | — | — | HALT; `[ERROR] PayFailed: Payment failed. Check account balance.` |
+| `InvalidSecretKey / InvalidSecretId` | HALT | 0 | — | — | HALT; `[ERROR] Credential invalid. Verify TENCENTCLOUD_SECRET_ID and TENCENTCLOUD_SECRET_KEY.` |
+| `RequestLimitExceeded / 429` | RETRY | 3 | exponential | — | Back off; respect rate limit; `⚠️ Rate limit reached. Retrying in {backoff}s...` |
+| `InternalError / 5xx` | RETRY | 3 | 2s,4s,8s | — | Retry; then HALT with RequestId; `[ERROR] InternalError. Retry or escalate with RequestId.` |
 
 ### Operation: DescribeInstances (List ES Clusters)
 
@@ -339,22 +339,22 @@ See [execution-flows.md](references/execution-flows.md) §9 for CLI and SDK comm
 
 ## Error Code Reference (≥ 12 Product-Specific Codes)
 
-| Code | Meaning | Retry? | Agent Action |
-|------|---------|--------|--------------|
-| `InvalidParameterValue` | Parameter value invalid | No | Fix parameter per API spec |
-| `InvalidParameter.InvalidNodeType` | Node type not supported | No | Check available node types |
-| `InvalidParameter.InvalidAppId` | AppId mismatch | No | Check account configuration |
-| `MissingParameter` | Required parameter missing | No | Add missing parameter |
-| `ResourceNotFound` | ES instance not found | No | Verify InstanceId with DescribeInstances |
-| `ResourceInsufficient` | Resource quota exceeded | No | HALT; request quota increase or delete resources |
-| `AuthFailure.UnAuthDescribeInstances` | No CAM permission for describe | No | HALT; add CAM policy |
-| `FailedOperation.ClusterStateError` | Cluster in wrong state for operation | Yes (3x, 30s) | Wait for cluster stable state; retry |
-| `FailedOperation.NoEnoughNodes` | Insufficient node resources | No | Choose different AZ or node type |
-| `FailedOperation.PayFailed` | Payment failure | No | HALT; check account balance |
-| `FailedOperation.GetTagInfoError` | Tag query error | Yes (2x) | Retry; if persists, skip tag filter |
-| `OperationDenied` | Operation not allowed | No | Check instance status and permissions |
-| `RequestLimitExceeded` | API rate limit exceeded | Yes (3x) | Exponential backoff |
-| `InternalError` | Internal server error | Yes (3x) | Retry; escalate with RequestId |
+| Error Code | Action | Max Retries | Backoff | Delegate To | Recovery Hint |
+|------------|--------|-------------|---------|-------------|---------------|
+| `InvalidParameterValue` | HALT | 0 | — | — | No |
+| `InvalidParameter.InvalidNodeType` | HALT | 0 | — | — | No |
+| `InvalidParameter.InvalidAppId` | HALT | 0 | — | — | No |
+| `MissingParameter` | HALT | 0 | — | — | No |
+| `ResourceNotFound` | HALT | 0 | — | — | No |
+| `ResourceInsufficient` | HALT | 0 | — | — | No |
+| `AuthFailure.UnAuthDescribeInstances` | HALT | 0 | — | — | No |
+| `FailedOperation.ClusterStateError` | HALT | 0 | — | — | Yes (3x, 30s) |
+| `FailedOperation.NoEnoughNodes` | HALT | 0 | — | — | No |
+| `FailedOperation.PayFailed` | HALT | 0 | — | — | No |
+| `FailedOperation.GetTagInfoError` | HALT | 0 | — | — | Yes (2x) |
+| `OperationDenied` | HALT | 0 | — | — | No |
+| `RequestLimitExceeded` | HALT | 0 | — | — | Yes (3x) |
+| `InternalError` | HALT | 0 | — | — | Yes (3x) |
 
 ---
 
