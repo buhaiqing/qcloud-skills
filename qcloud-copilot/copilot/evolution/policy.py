@@ -89,5 +89,5 @@ class EvolutionPolicy:
             return 0.0
         try:
             return float(self._query.skill_success_rate(skill))
-        except Exception:
+        except Exception:  # noqa: BLE001 - intentional fallback for uninitialized query state
             return 0.0

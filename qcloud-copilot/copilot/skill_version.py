@@ -5,11 +5,9 @@ references + prompt + rubric for reproducible version identification.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import hashlib
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 try:
     import yaml
@@ -39,10 +37,10 @@ class SkillVersion:
     """Immutable skill version descriptor (SPEC P1.2)."""
 
     skill_name: str
-    version: Optional[str] = None
-    last_updated: Optional[str] = None
-    sha: Optional[str] = None  # 12-char hex of skill directory content
-    cli_applicability: Optional[str] = None
+    version: str | None = None
+    last_updated: str | None = None
+    sha: str | None = None  # 12-char hex of skill directory content
+    cli_applicability: str | None = None
 
     def is_complete(self) -> bool:
         return bool(self.version and self.sha)
@@ -96,7 +94,7 @@ def _parse_yaml_frontmatter(skill_md: Path) -> dict:
         return {}
 
 
-def _get_nested(data: dict, *keys: str) -> Optional[str]:
+def _get_nested(data: dict, *keys: str) -> str | None:
     """Safely extract a string value from nested dict; None if missing."""
     for key in keys:
         if not isinstance(data, dict):
@@ -109,7 +107,7 @@ def _get_nested(data: dict, *keys: str) -> Optional[str]:
     return None
 
 
-def _compute_skill_sha(skill_dir: Path) -> Optional[str]:
+def _compute_skill_sha(skill_dir: Path) -> str | None:
     """Compute a combined SHA over versioned files in deterministic order."""
     if yaml is None:
         return None

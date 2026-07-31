@@ -6,8 +6,8 @@ and joinable IDs (id prefixed `ue-`).
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from copilot.trace_records import UsageEvent
 
@@ -17,10 +17,10 @@ def _new_id() -> str:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
-def _base_kwargs(trace_id: str, observation_id: Optional[str], latency_ms: Optional[int], metadata: Optional[dict]) -> dict[str, Any]:
+def _base_kwargs(trace_id: str, observation_id: str | None, latency_ms: int | None, metadata: dict | None) -> dict[str, Any]:
     return {
         "id": _new_id(),
         "trace_id": trace_id,
@@ -39,17 +39,17 @@ def _base_kwargs(trace_id: str, observation_id: Optional[str], latency_ms: Optio
 def emit_llm_usage(
     *,
     trace_id: str,
-    observation_id: Optional[str] = None,
+    observation_id: str | None = None,
     provider: str,
     model: str,
-    prompt_version: Optional[str] = None,
+    prompt_version: str | None = None,
     input_tokens: int = 0,
     output_tokens: int = 0,
     cached_tokens: int = 0,
     reasoning_tokens: int = 0,
     retry_index: int = 0,
-    latency_ms: Optional[int] = None,
-    metadata: Optional[dict[str, Any]] = None,
+    latency_ms: int | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> UsageEvent:
     """Emit an LLM usage event.
 
@@ -83,21 +83,21 @@ def emit_llm_usage(
 def emit_cloud_api_usage(
     *,
     trace_id: str,
-    observation_id: Optional[str] = None,
+    observation_id: str | None = None,
     product: str,
     service: str,
     action: str,
-    api_version: Optional[str] = None,
-    region: Optional[str] = None,
-    client_type: Optional[str] = None,
-    api_request_id: Optional[str] = None,
-    request_bytes: Optional[int] = None,
-    response_bytes: Optional[int] = None,
-    resource_count: Optional[int] = None,
+    api_version: str | None = None,
+    region: str | None = None,
+    client_type: str | None = None,
+    api_request_id: str | None = None,
+    request_bytes: int | None = None,
+    response_bytes: int | None = None,
+    resource_count: int | None = None,
     retry_index: int = 0,
     rate_limited: bool = False,
-    latency_ms: Optional[int] = None,
-    metadata: Optional[dict[str, Any]] = None,
+    latency_ms: int | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> UsageEvent:
     """Emit a Cloud API usage event covering tccli / SDK invocations.
 
@@ -134,15 +134,15 @@ def emit_cloud_api_usage(
 def emit_data_usage(
     *,
     trace_id: str,
-    observation_id: Optional[str] = None,
-    metric_points: Optional[int] = None,
-    log_bytes: Optional[int] = None,
-    log_records: Optional[int] = None,
-    audit_events: Optional[int] = None,
-    topology_nodes: Optional[int] = None,
-    topology_edges: Optional[int] = None,
-    latency_ms: Optional[int] = None,
-    metadata: Optional[dict[str, Any]] = None,
+    observation_id: str | None = None,
+    metric_points: int | None = None,
+    log_bytes: int | None = None,
+    log_records: int | None = None,
+    audit_events: int | None = None,
+    topology_nodes: int | None = None,
+    topology_edges: int | None = None,
+    latency_ms: int | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> UsageEvent:
     """Emit a Data usage event covering metric/log/audit/topology reads."""
     kwargs = _base_kwargs(trace_id, observation_id, latency_ms, metadata)

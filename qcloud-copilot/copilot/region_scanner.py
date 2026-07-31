@@ -92,7 +92,7 @@ def _scan_region(
             regions=[region],
             customer_tag_key=customer_tag_key,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 - per-region failure isolated; return None signals skip
         return None
 
     raw = data.get("raw") or {}
@@ -159,7 +159,7 @@ def discover_across_regions(
         for future in as_completed(future_to_region):
             try:
                 result = future.result()
-            except Exception:
+            except Exception:  # noqa: BLE001, S112 - belt-and-suspenders: isolate any region failure
                 # Belt-and-suspenders: _scan_region already swallows internally,
                 # but if anything escapes (e.g. test doubles that bypass the
                 # inner try), still isolate that region from the result set.

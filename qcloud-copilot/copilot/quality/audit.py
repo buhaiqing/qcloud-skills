@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from copilot.observ import ObservableSink, Span
+
 
 def audit_trace(
     session_id: str,
@@ -44,7 +45,7 @@ def audit_trace(
     if runtime_info is not None:
         record["runtime"] = runtime_info.to_dict() if hasattr(runtime_info, "to_dict") else runtime_info
     filename = (
-        audit_dir / f"step-{step_id}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}.json"
+        audit_dir / f"step-{step_id}-{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}.json"
     )
     filename.write_text(json.dumps(record, ensure_ascii=False, indent=2))
 
@@ -122,8 +123,8 @@ def audit_trace_v3(
         trace_id=trace_id,
         type=obs_type,
         name=name,
-        start_time=datetime.now(timezone.utc).isoformat(),
-        end_time=datetime.now(timezone.utc).isoformat(),
+        start_time=datetime.now(UTC).isoformat(),
+        end_time=datetime.now(UTC).isoformat(),
         status=obs_status,
         metadata={"step_id": step_id, "session_id": session_id, "skill": skill} if skill else {"step_id": step_id, "session_id": session_id},
         input=dict(trace_data),
@@ -139,6 +140,5 @@ def audit_trace_v3(
             if getattr(evt, "observation_id", None) is None:
                 evt.observation_id = obs.id
             sink.emit_usage_event(evt)
-        except Exception:
-            # never let v3 emission fail legacy audit path
+        except Exception:  # noqa: BLE001, S110 - never let v3 emission fail legacy audit path
             pass

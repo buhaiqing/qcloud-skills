@@ -24,7 +24,7 @@ def run_gcl(skill: str, operation: str, params: dict, session_id: str | None = N
     # gcl-trace-<session_id>.json, copilot audit uses run_id == session_id.
     if session_id:
         cmd += ["--trace-id", session_id]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=str(find_repo_root()))
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=str(find_repo_root()))  # noqa: PLW1510 - caller checks returncode below and returns structured error
     if result.returncode != 0:
         return {"status": "error", "error": result.stderr}
     return json.loads(result.stdout)

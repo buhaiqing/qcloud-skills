@@ -9,7 +9,6 @@ from __future__ import annotations
 import inspect
 from pathlib import Path
 
-
 # --- D1 — Parser Correctness ---
 
 

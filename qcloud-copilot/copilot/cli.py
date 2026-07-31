@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from datetime import UTC
+
 import typer
+
 from copilot.engine import CopilotEngine
 from copilot.env_loader import ensure_runtime_env
 from copilot.models import Report
@@ -199,16 +202,16 @@ def _health_file():
 
 def _read_health_events(path, days):
     import json
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
     events = []
     if not path.exists():
         return events
     for line in path.open():
         try:
             ev = json.loads(line)
-            if datetime.fromisoformat(ev["ts"].replace("Z", "+00:00")) >= cutoff:
+            if datetime.fromisoformat(ev["ts"]) >= cutoff:
                 events.append(ev)
         except (json.JSONDecodeError, KeyError, ValueError):
             continue
@@ -240,14 +243,14 @@ def _top_errors(events, limit):
 
 def _sweep(health_file, days, dry_run):
     import json
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
     remaining = []
     for line in health_file.open():
         try:
             ev = json.loads(line)
-            if datetime.fromisoformat(ev["ts"].replace("Z", "+00:00")) >= cutoff:
+            if datetime.fromisoformat(ev["ts"]) >= cutoff:
                 remaining.append(ev)
         except (json.JSONDecodeError, KeyError, ValueError):
             continue

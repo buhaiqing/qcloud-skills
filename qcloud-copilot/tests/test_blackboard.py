@@ -6,7 +6,6 @@ import json
 
 import jsonschema
 import pytest
-
 from copilot.blackboard import BlackboardClient, validate_blackboard
 
 

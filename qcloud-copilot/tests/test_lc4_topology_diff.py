@@ -11,7 +11,7 @@ SCRIPTS = REASON.parent
 for path in (SCRIPTS, REASON):
     sys.path.insert(0, str(path))
 
-from analyzers.selective import resolve_analyzer_names  # noqa: E402
+from analyzers.selective import resolve_analyzer_names
 
 
 def _sniff_counts(counts: dict[str, int]) -> dict:

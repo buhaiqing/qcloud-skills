@@ -360,7 +360,7 @@ def reason_inspection_strategy_llm(
 
         validate_strategy(strategy)
         return strategy, warnings
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - intentional fallback wrapping all LLM validation errors
         warnings.append(f"llm_reasoner_failed: {exc}")
         strategy = _enhance_topology_strategy(
             base,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from copilot.observ import ObservableSink, Span
@@ -29,7 +29,7 @@ def record_health(
     """
     SKILL_HEALTH_FILE.parent.mkdir(parents=True, exist_ok=True)
     event = {
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(UTC).isoformat(),
         "skill": skill,
         "operation": operation,
         "status": status,

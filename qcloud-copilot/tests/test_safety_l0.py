@@ -1,4 +1,4 @@
-from copilot.models import ParsedRequest, ClassifiedIntent, IntentType
+from copilot.models import ClassifiedIntent, IntentType, ParsedRequest
 from copilot.safety.l0 import check_l0
 
 

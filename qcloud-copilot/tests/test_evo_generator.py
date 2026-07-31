@@ -6,9 +6,8 @@ import subprocess
 
 from copilot.evolution import EvolutionPolicy, EvolutionStore
 from copilot.evolution.guard import DriftGuard
-from copilot.models import PlanStep
 from copilot.integration.skills import SkillDispatcher
-
+from copilot.models import PlanStep
 
 # --------------------------------------------------------------------------- #
 # fixtures / helpers

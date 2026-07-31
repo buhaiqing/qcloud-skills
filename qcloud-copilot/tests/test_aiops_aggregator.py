@@ -14,18 +14,16 @@ Rules:
 
 from __future__ import annotations
 
-from typing import Optional
-
 
 def _mk_obs(
     obs_id: str,
     *,
     status: str = "success",
     obs_type: str = "SPAN",
-    signals: Optional[list[str]] = None,
-    evidence: Optional[list[str]] = None,
-    metadata: Optional[dict] = None,
-    output: Optional[dict] = None,
+    signals: list[str] | None = None,
+    evidence: list[str] | None = None,
+    metadata: dict | None = None,
+    output: dict | None = None,
 ):
     from copilot.trace_records import ObservationRecord, ObservationType
 

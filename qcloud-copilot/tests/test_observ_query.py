@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from pathlib import Path
 
 import copilot.observ_query as oq
@@ -79,9 +80,9 @@ def test_top_failed_operations_excludes_gate_rejections(tmp_path: Path, monkeypa
 def test_backward_compat_legacy_health(tmp_path: Path, monkeypatch):
     legacy = tmp_path / ".runtime" / "health" / "skill-metrics.jsonl"
     legacy.parent.mkdir(parents=True, exist_ok=True)
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     rows = [
         {"ts": now, "skill": "qcloud-cdb-ops", "status": "ok", "duration_ms": 50, "trace_id": "x", "error_code": None},
         {"ts": now, "skill": "qcloud-cdb-ops", "status": "error", "duration_ms": 70, "trace_id": "x", "error_code": "boom"},

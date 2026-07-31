@@ -8,7 +8,7 @@ breakdown of score distribution.
 """
 from __future__ import annotations
 
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from copilot.trace_records import AllocationRecord, CostRecord, CostStatus
 
@@ -38,7 +38,7 @@ def _overall(scores: list[str]) -> str:
 def quality_coverage_report(
     records: Iterable[CostRecord],
     *,
-    allocations: Optional[Iterable[AllocationRecord]] = None,
+    allocations: Iterable[AllocationRecord] | None = None,
 ) -> dict:
     by_trace: dict[str, dict] = {}
     alloc_keys_per_cost: dict[str, set[tuple[str, str]]] = {}
@@ -80,7 +80,7 @@ def quality_coverage_report(
         )
         event_total_per_trace[t] = event_total_per_trace.get(t, 0) + te
 
-    for t in priced_count_sum:
+    for t in priced_count_sum:  # noqa: PLC0206 - keep dict lookup pattern for symmetry with sibling dicts
         pc = priced_count_sum[t]
         te = total_events_sum[t]
         ratio = (pc / te) if te > 0 else 0.0

@@ -18,13 +18,13 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _new_id(prefix: str) -> str:
@@ -59,16 +59,16 @@ class CostStatus(str, Enum):
 class IdentityTree:
     """Fixed identity shape; missing values must be None (JSON null), never '' or 'unknown'."""
 
-    user_id: Optional[str] = None
-    tenant_id: Optional[str] = None
-    customer_id: Optional[str] = None
-    operator_id: Optional[str] = None
-    service_account_id: Optional[str] = None
-    account_id_hash: Optional[str] = None
-    actor_type: Optional[str] = None
-    initiator_type: Optional[str] = None
-    identity_source: Optional[str] = None
-    identity_confidence: Optional[str] = None
+    user_id: str | None = None
+    tenant_id: str | None = None
+    customer_id: str | None = None
+    operator_id: str | None = None
+    service_account_id: str | None = None
+    account_id_hash: str | None = None
+    actor_type: str | None = None
+    initiator_type: str | None = None
+    identity_source: str | None = None
+    identity_confidence: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -76,10 +76,10 @@ class IdentityTree:
 
 @dataclass
 class AutomationTree:
-    job_id: Optional[str] = None
-    schedule_id: Optional[str] = None
-    run_id: Optional[str] = None
-    agent_id: Optional[str] = None
+    job_id: str | None = None
+    schedule_id: str | None = None
+    run_id: str | None = None
+    agent_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -94,12 +94,12 @@ class AutomationTree:
 class RuntimeInfo:
     """Runtime environment version info for traceability (SPEC P1.3)."""
 
-    python_version: Optional[str] = None
-    tccli_version: Optional[str] = None
-    sdk_name: Optional[str] = None
-    sdk_version: Optional[str] = None
-    git_commit: Optional[str] = None
-    deployment_version: Optional[str] = None
+    python_version: str | None = None
+    tccli_version: str | None = None
+    sdk_name: str | None = None
+    sdk_version: str | None = None
+    git_commit: str | None = None
+    deployment_version: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -113,14 +113,14 @@ class RuntimeInfo:
 class SkillInfo:
     """Skill version info for traceability (SPEC P1.3)."""
 
-    name: Optional[str] = None
-    version: Optional[str] = None
-    source: Optional[str] = None
-    skill_file_sha256: Optional[str] = None
-    skill_commit: Optional[str] = None
-    references: Optional[dict[str, Any]] = None
-    prompt_version: Optional[str] = None
-    rubric_version: Optional[str] = None
+    name: str | None = None
+    version: str | None = None
+    source: str | None = None
+    skill_file_sha256: str | None = None
+    skill_commit: str | None = None
+    references: dict[str, Any] | None = None
+    prompt_version: str | None = None
+    rubric_version: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -147,26 +147,26 @@ class TraceRecord:
     status: str  # success|error|partial
     input: dict[str, Any] = field(default_factory=dict)
     output: dict[str, Any] = field(default_factory=dict)
-    user_id: Optional[str] = None  # JSON null when absent
-    session_id: Optional[str] = None
-    release: Optional[str] = None
-    version: Optional[str] = None
-    environment: Optional[str] = None
+    user_id: str | None = None  # JSON null when absent
+    session_id: str | None = None
+    release: str | None = None
+    version: str | None = None
+    environment: str | None = None
     tags: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     # Skill version info (P1.3)
-    skill: Optional[SkillInfo] = None
+    skill: SkillInfo | None = None
     # Runtime environment info (P1.3)
-    runtime: Optional[RuntimeInfo] = None
+    runtime: RuntimeInfo | None = None
     # AIOps Summary (nested dataclass, not raw dict)
-    aiops_summary: Optional[AIOpsSummary] = None
+    aiops_summary: AIOpsSummary | None = None
     # FinOps Summary (nested dataclass, not raw dict)
-    finops_summary: Optional[FinOpsSummary] = None
+    finops_summary: FinOpsSummary | None = None
     # Foreign keys
     observation_ids: list[str] = field(default_factory=list)
     usage_event_ids: list[str] = field(default_factory=list)
     score_ids: list[str] = field(default_factory=list)
-    summary_version: Optional[str] = None
+    summary_version: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> TraceRecord:
@@ -233,19 +233,19 @@ class ObservationRecord:
 
     id: str
     trace_id: str
-    parent_observation_id: Optional[str] = None
+    parent_observation_id: str | None = None
     type: ObservationType = ObservationType.SPAN
-    name: Optional[str] = None
-    start_time: Optional[str] = None
-    end_time: Optional[str] = None
+    name: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
     status: str = "success"  # success|error|partial|skipped
     input: dict[str, Any] = field(default_factory=dict)
     output: dict[str, Any] = field(default_factory=dict)
-    version: Optional[str] = None
+    version: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
     usage_refs: list[str] = field(default_factory=list)
     score_refs: list[str] = field(default_factory=list)
-    error: Optional[str] = None
+    error: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ObservationRecord:
@@ -296,32 +296,32 @@ class UsageEvent:
     trace_id: str
     event_type: str  # llm|cloud_api|data
     timestamp: str
-    observation_id: Optional[str] = None
+    observation_id: str | None = None
     # LLM
-    provider: Optional[str] = None
-    model: Optional[str] = None
-    prompt_version: Optional[str] = None
-    usage: Optional[dict[str, Any]] = None
+    provider: str | None = None
+    model: str | None = None
+    prompt_version: str | None = None
+    usage: dict[str, Any] | None = None
     # Cloud API
-    product: Optional[str] = None
-    action: Optional[str] = None
-    region: Optional[str] = None
-    client_type: Optional[str] = None
-    api_request_id: Optional[str] = None
-    request_bytes: Optional[int] = None
-    response_bytes: Optional[int] = None
-    resource_count: Optional[int] = None
-    retry_index: Optional[int] = None
-    rate_limited: Optional[bool] = None
+    product: str | None = None
+    action: str | None = None
+    region: str | None = None
+    client_type: str | None = None
+    api_request_id: str | None = None
+    request_bytes: int | None = None
+    response_bytes: int | None = None
+    resource_count: int | None = None
+    retry_index: int | None = None
+    rate_limited: bool | None = None
     # Data read
-    metric_points: Optional[int] = None
-    log_bytes: Optional[int] = None
-    log_records: Optional[int] = None
-    audit_events: Optional[int] = None
-    topology_nodes: Optional[int] = None
-    topology_edges: Optional[int] = None
+    metric_points: int | None = None
+    log_bytes: int | None = None
+    log_records: int | None = None
+    audit_events: int | None = None
+    topology_nodes: int | None = None
+    topology_edges: int | None = None
     # Common
-    latency_ms: Optional[int] = None
+    latency_ms: int | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -342,8 +342,8 @@ class ScoreRecord:
     score_type: str  # rca_accuracy|data_quality|verification_result|...
     value: float
     timestamp: str
-    observation_id: Optional[str] = None
-    model: Optional[str] = None
+    observation_id: str | None = None
+    model: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -365,7 +365,7 @@ class CostRecord:
     cost_status: CostStatus = CostStatus.UNPRICED
     total_cost: float = 0.0
     currency: str = "CNY"
-    pricing_snapshot_version: Optional[str] = None
+    pricing_snapshot_version: str | None = None
     allocation_keys: dict[str, str] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -400,14 +400,14 @@ class PricingSnapshot:
 class AIOpsSummary:
     """AIOps summary fields embedded in TraceRecord (SPEC §20)."""
 
-    incident_id: Optional[str] = None
-    severity: Optional[str] = None
+    incident_id: str | None = None
+    severity: str | None = None
     signals: list[str] = field(default_factory=list)
     evidence: list[str] = field(default_factory=list)
     topology: list[str] = field(default_factory=list)
-    rca: Optional[str] = None
-    impact: Optional[str] = None
-    response: Optional[str] = None
+    rca: str | None = None
+    impact: str | None = None
+    response: str | None = None
     quality: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
@@ -443,17 +443,17 @@ class SummaryRecord:
     trace_id: str
     version: str = "1.0"
     # AIOps
-    incident_id: Optional[str] = None
-    severity: Optional[str] = None
-    lifecycle_state: Optional[str] = None
-    root_cause_confidence: Optional[str] = None
+    incident_id: str | None = None
+    severity: str | None = None
+    lifecycle_state: str | None = None
+    root_cause_confidence: str | None = None
     evidence_count: int = 0
-    data_quality_status: Optional[str] = None
+    data_quality_status: str | None = None
     # FinOps
     usage_event_count: int = 0
     total_cost: float = 0.0
     currency: str = "CNY"
-    cost_status: Optional[str] = None
+    cost_status: str | None = None
     priced_usage_ratio: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
@@ -542,16 +542,16 @@ def legacy_audit_to_observation(
 class AttributionTree:
     """Fixed attribution shape; missing values must be None (JSON null)."""
 
-    tenant_id: Optional[str] = None
-    customer_id: Optional[str] = None
-    account_id_hash: Optional[str] = None
-    business_unit: Optional[str] = None
-    cost_center: Optional[str] = None
-    region: Optional[str] = None
-    service: Optional[str] = None
-    environment: Optional[str] = None
-    product: Optional[str] = None
-    resource_id: Optional[str] = None
+    tenant_id: str | None = None
+    customer_id: str | None = None
+    account_id_hash: str | None = None
+    business_unit: str | None = None
+    cost_center: str | None = None
+    region: str | None = None
+    service: str | None = None
+    environment: str | None = None
+    product: str | None = None
+    resource_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

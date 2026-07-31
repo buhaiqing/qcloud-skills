@@ -70,8 +70,8 @@ def test_classify_unknown_falls_back_to_event():
 
 
 def test_classify_returns_enum_instance():
-    from copilot.trace_records import ObservationType
     from copilot.observation_classifier import classify_observation_type
+    from copilot.trace_records import ObservationType
 
     kind = classify_observation_type(name="gcl-generator")
     assert isinstance(kind, ObservationType)

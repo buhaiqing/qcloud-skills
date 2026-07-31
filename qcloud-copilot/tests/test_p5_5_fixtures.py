@@ -23,19 +23,19 @@ from copilot.trace_records import PricingSnapshot
 def _ev(product, action, trace_id, **kw):
     from copilot.trace_records import UsageEvent
 
-    defaults = dict(
-        id=f"ue-{product}-{action}-test",
-        trace_id=trace_id,
-        event_type="cloud_api",
-        timestamp="2026-07-25T00:00:00Z",
-        product=product,
-        action=action,
-        region="ap-guangzhou",
-        client_type="tccli",
-        resource_count=1,
-        retry_index=0,
-        rate_limited=False,
-    )
+    defaults = {
+        "id": f"ue-{product}-{action}-test",
+        "trace_id": trace_id,
+        "event_type": "cloud_api",
+        "timestamp": "2026-07-25T00:00:00Z",
+        "product": product,
+        "action": action,
+        "region": "ap-guangzhou",
+        "client_type": "tccli",
+        "resource_count": 1,
+        "retry_index": 0,
+        "rate_limited": False,
+    }
     defaults.update(kw)
     return UsageEvent(**defaults)
 
@@ -82,8 +82,8 @@ def test_fixture_cvm_run_instances_rate_limited():
 
 
 def test_fixture_cvm_no_pricing():
-    from copilot.fixtures.cvm import cvm_no_pricing_set
     from copilot.cost import compute_cost
+    from copilot.fixtures.cvm import cvm_no_pricing_set
     from copilot.trace_records import PricingSnapshot
 
     events = cvm_no_pricing_set(trace_id="trc-cvm-no-price")
@@ -128,10 +128,9 @@ def test_fixture_monitor_rate_limited():
 
 
 def test_fixture_monitor_no_pricing():
+    from copilot.cost import assert_cost_invariants, compute_cost
     from copilot.fixtures.monitor import monitor_no_pricing_set
-    from copilot.cost import compute_cost
     from copilot.trace_records import PricingSnapshot
-    from copilot.cost import assert_cost_invariants
 
     events = monitor_no_pricing_set(trace_id="trc-mon-no")
     snap = PricingSnapshot(version="v1", timestamp="2026-07-25T00:00:00Z", prices={})
@@ -171,10 +170,9 @@ def test_fixture_cls_search_log_rate_limited():
 
 
 def test_fixture_cls_no_pricing():
+    from copilot.cost import assert_cost_invariants, compute_cost
     from copilot.fixtures.cls import cls_no_pricing_set
-    from copilot.cost import compute_cost
     from copilot.trace_records import PricingSnapshot
-    from copilot.cost import assert_cost_invariants
 
     events = cls_no_pricing_set(trace_id="trc-cls-no")
     snap = PricingSnapshot(version="v1", timestamp="2026-07-25T00:00:00Z", prices={})
@@ -206,7 +204,7 @@ def _fixture_pricing_snapshot() -> PricingSnapshot:
 
 
 def test_priced_cvm_success_fixture_pipeline_yields_actual():
-    from copilot.cost import compute_cost, assert_cost_invariants
+    from copilot.cost import assert_cost_invariants, compute_cost
     from copilot.fixtures.cvm import cvm_describe_instances_success
 
     events = cvm_describe_instances_success(trace_id="trc-cvm-full")
@@ -218,7 +216,7 @@ def test_priced_cvm_success_fixture_pipeline_yields_actual():
 
 def test_priced_monitor_failure_fixture_pipeline_yields_actual():
     """Failure path events still get priced (per-call counters; failures still bill)."""
-    from copilot.cost import compute_cost, assert_cost_invariants
+    from copilot.cost import assert_cost_invariants, compute_cost
     from copilot.fixtures.monitor import monitor_get_monitor_data_failure
 
     events = monitor_get_monitor_data_failure(trace_id="trc-mon-full")
@@ -228,7 +226,7 @@ def test_priced_monitor_failure_fixture_pipeline_yields_actual():
 
 
 def test_priced_cls_retry_fixture_pipeline_yields_actual():
-    from copilot.cost import compute_cost, assert_cost_invariants
+    from copilot.cost import assert_cost_invariants, compute_cost
     from copilot.fixtures.cls import cls_create_logset_retry
 
     events = cls_create_logset_retry(trace_id="trc-cls-full")
@@ -240,9 +238,9 @@ def test_priced_cls_retry_fixture_pipeline_yields_actual():
 def test_quality_report_summary_three_products():
     """Combined report across Monitor + CVM + CLS priced records."""
     from copilot.cost import compute_cost
+    from copilot.fixtures.cls import cls_search_log_success
     from copilot.fixtures.cvm import cvm_describe_instances_success
     from copilot.fixtures.monitor import monitor_describe_basic_metrics_success
-    from copilot.fixtures.cls import cls_search_log_success
     from copilot.quality_report import quality_coverage_report
 
     snap = _fixture_pricing_snapshot()
@@ -260,11 +258,11 @@ def test_quality_report_summary_three_products():
 
 def test_langfuse_export_with_three_product_fixtures():
     """Each fixture's events flow through the Langfuse exporter without raising."""
-    from copilot.langfuse_exporter import export_trace_to_langfuse
-    from copilot.trace_records import TraceRecord
+    from copilot.fixtures.cls import cls_search_log_success
     from copilot.fixtures.cvm import cvm_describe_instances_success
     from copilot.fixtures.monitor import monitor_describe_basic_metrics_success
-    from copilot.fixtures.cls import cls_search_log_success
+    from copilot.langfuse_exporter import export_trace_to_langfuse
+    from copilot.trace_records import TraceRecord
 
     base = TraceRecord(
         id="trc-export",

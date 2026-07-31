@@ -1,6 +1,6 @@
+from copilot.classifier import classify
 from copilot.engine import CopilotEngine
 from copilot.parser import parse
-from copilot.classifier import classify
 from copilot.plan_gen import generate
 
 
@@ -54,7 +54,7 @@ def test_e2e_classifier_intent_detection():
 
 
 def test_e2e_plangen_step_count():
-    from copilot.models import IntentType, ClassifiedIntent
+    from copilot.models import ClassifiedIntent, IntentType
 
     intent = ClassifiedIntent(primary=IntentType.INSPECT, targets=["vm"])
     plan = generate(intent)

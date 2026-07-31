@@ -12,10 +12,8 @@ Use:
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 from copilot.trace_records import ObservationType
-
 
 _GENERATION_TOKENS = ("generator", "critic", "summarizer")
 _SPAN_TOKENS = (
@@ -33,7 +31,7 @@ _API_ACTION_RE = re.compile(
 
 def classify_observation_type(
     name: str,
-    kind: Optional[str] = None,
+    kind: str | None = None,
 ) -> ObservationType:
     """Classify an observation by `name` (heuristic) or explicit `kind`.
 

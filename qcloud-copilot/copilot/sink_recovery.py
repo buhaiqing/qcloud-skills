@@ -10,7 +10,7 @@ not block other emits.
 """
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 
 def emit_with_recovery(sink, observations: Iterable) -> dict:
@@ -24,7 +24,7 @@ def emit_with_recovery(sink, observations: Iterable) -> dict:
         try:
             sink.emit_observation(obs)
             success += 1
-        except BaseException as exc:
+        except BaseException as exc:  # noqa: BLE001 - capture all to record failure, including KeyboardInterrupt
             failures.append({
                 "index": idx,
                 "obs_id": getattr(obs, "id", None),

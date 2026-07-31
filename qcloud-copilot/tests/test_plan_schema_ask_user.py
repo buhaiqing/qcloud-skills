@@ -5,17 +5,15 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from copilot.models import (
+    _ASK_DEFAULT_UNSET,
     AskOption,
     PlanStep,
-    _ASK_DEFAULT_UNSET,
 )
 from copilot.plan_schema import (
     load_plan_file,
     plan_step_from_dict,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures (literal JSON → plan_step_from_dict coverage)

@@ -6,7 +6,6 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from copilot.llm_reasoner import (
     _extract_json_object,
     _openai_compatible_chat,
@@ -34,7 +33,7 @@ def sniff_shuozhou() -> dict:
 
 
 def test_topology_fallback_without_api(sniff_shuozhou: dict) -> None:
-    strategy, warnings = reason_inspection_strategy_llm(
+    strategy, _warnings = reason_inspection_strategy_llm(
         customer="朔州天源",
         region="ap-guangzhou",
         user_request="[CI模式] 朔州天源 VPC 风险巡检",

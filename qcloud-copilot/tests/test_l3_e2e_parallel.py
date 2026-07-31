@@ -7,7 +7,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from copilot.blackboard import BlackboardClient
 from copilot.engine import CopilotEngine
 from copilot.integration.skills import SkillDispatcher

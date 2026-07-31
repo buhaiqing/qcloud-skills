@@ -17,14 +17,13 @@ P3.4: allocate_cost(total, attribution_keys, method, weights/shares) ->
 from __future__ import annotations
 
 import uuid
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from copilot.trace_records import (
     AllocationRecord,
     AttributionTree,
     ObservationRecord,
 )
-
 
 # ---------------------------------------------------------------------------
 # P3.3 — AttributionTree builder
@@ -78,8 +77,8 @@ def _allocate(
     total_cost: float,
     keys: list[tuple[str, str]],
     method: str,
-    weights: Optional[dict[str, float]],
-    shares: Optional[dict[tuple[str, str], float]],
+    weights: dict[str, float] | None,
+    shares: dict[tuple[str, str], float] | None,
 ) -> list[AllocationRecord]:
     cost_id = f"alloc-{uuid.uuid4().hex[:12]}"
 
@@ -165,8 +164,8 @@ def allocate_cost(
     total_cost: float,
     attribution_keys: list[tuple[str, str]],
     method: str = "shared",
-    weights: Optional[dict[str, float]] = None,
-    shares: Optional[dict[tuple[str, str], float]] = None,
+    weights: dict[str, float] | None = None,
+    shares: dict[tuple[str, str], float] | None = None,
 ) -> list[AllocationRecord]:
     """Allocate `total_cost` across `attribution_keys` per `method`.
 

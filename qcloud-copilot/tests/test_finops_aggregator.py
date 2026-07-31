@@ -11,7 +11,6 @@ Rules:
 from __future__ import annotations
 
 
-
 def _llm(provider: str = "openai", model: str = "gpt-4o", **tokens):
     from copilot.trace_records import UsageEvent
 
@@ -34,16 +33,16 @@ def _llm(provider: str = "openai", model: str = "gpt-4o", **tokens):
 def _api(product: str = "cvm", **kwargs):
     from copilot.trace_records import UsageEvent
 
-    defaults = dict(
-        id=f"ue-api-{product}",
-        trace_id="trc-fin",
-        event_type="cloud_api",
-        timestamp="2026-07-25T00:00:00Z",
-        product=product,
-        action="DescribeInstances",
-        retry_index=0,
-        rate_limited=False,
-    )
+    defaults = {
+        "id": f"ue-api-{product}",
+        "trace_id": "trc-fin",
+        "event_type": "cloud_api",
+        "timestamp": "2026-07-25T00:00:00Z",
+        "product": product,
+        "action": "DescribeInstances",
+        "retry_index": 0,
+        "rate_limited": False,
+    }
     defaults.update(kwargs)
     return UsageEvent(**defaults)
 
@@ -51,12 +50,12 @@ def _api(product: str = "cvm", **kwargs):
 def _data(**kwargs):
     from copilot.trace_records import UsageEvent
 
-    defaults = dict(
-        id="ue-data-1",
-        trace_id="trc-fin",
-        event_type="data",
-        timestamp="2026-07-25T00:00:00Z",
-    )
+    defaults = {
+        "id": "ue-data-1",
+        "trace_id": "trc-fin",
+        "event_type": "data",
+        "timestamp": "2026-07-25T00:00:00Z",
+    }
     defaults.update(kwargs)
     return UsageEvent(**defaults)
 

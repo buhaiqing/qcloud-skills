@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from copilot.blackboard import BlackboardClient
 from copilot.integration.cruise import CruiseRunner
 from copilot.models import PlanStep

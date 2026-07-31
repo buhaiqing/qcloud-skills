@@ -5,7 +5,7 @@ import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -91,7 +91,7 @@ def validate_blackboard(data: dict[str, Any], board_dir: Path | None = None) -> 
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def empty_board(session_id: str, user_request: str) -> dict[str, Any]:

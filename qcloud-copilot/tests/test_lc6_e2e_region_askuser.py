@@ -17,7 +17,6 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-
 from copilot.ask_user_runner import AskUserRunner
 from copilot.blackboard import BlackboardClient
 from copilot.dispatcher import PlanDispatcher
@@ -31,7 +30,6 @@ from copilot.models import (
     StepResult,
 )
 from copilot.plan_gen import _cruise_plan
-
 
 _INTENT = ClassifiedIntent(primary=IntentType.CRUISE, targets=["vm"])
 

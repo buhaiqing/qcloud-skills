@@ -4,12 +4,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "qcloud-copilot"))
 
 from copilot.skill_version import (
-    parse_skill_version,
     copilot_version,
+    parse_skill_version,
 )
 
 

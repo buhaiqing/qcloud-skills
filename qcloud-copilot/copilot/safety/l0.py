@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import re
-from copilot.models import ParsedRequest, ClassifiedIntent
-from copilot.integration.skills import KNOWN_SKILLS
+
 from copilot.context_manager import ContextManager
+from copilot.integration.skills import KNOWN_SKILLS
+from copilot.models import ClassifiedIntent, ParsedRequest
 
 RESOURCE_ID_PATTERN = re.compile(
     r"^(ins|cdb|cdbro|redis|mongodb|postgres|"

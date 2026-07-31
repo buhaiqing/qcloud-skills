@@ -3,14 +3,13 @@
 Pure functions. Idempotent. Returns dict-shaped reports suitable for CLI / script
 or Langfuse exporter consumption.
 """
-from typing import Iterable
+from collections.abc import Iterable
 
 from copilot.trace_records import (
     CostRecord,
     CostStatus,
     UsageEvent,
 )
-
 
 # ---------------------------------------------------------------------------
 # Dimensions supported on CostRecord
@@ -214,7 +213,7 @@ def _split_cost_by_event_type(
         for k, v in breakdown.items():
             try:
                 w = int(v)
-            except Exception:
+            except Exception:  # noqa: BLE001, S112 - skip non-integer weight values silently
                 continue
             if w <= 0:
                 continue

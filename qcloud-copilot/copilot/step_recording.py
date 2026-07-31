@@ -14,10 +14,11 @@ Usage:
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Iterator, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from copilot.observation_classifier import classify_observation_type
 from copilot.trace_records import (
@@ -28,7 +29,7 @@ from copilot.trace_records import (
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 @dataclass
@@ -39,7 +40,7 @@ class StepContext:
     sink: Any
     _usage_events: list[UsageEvent] = field(default_factory=list)
     status: str = "in_progress"
-    error: Optional[str] = None
+    error: str | None = None
 
     def add_usage(self, evt: UsageEvent) -> None:
         """Attach a UsageEvent to be flushed on context exit."""
@@ -67,10 +68,10 @@ def with_step_recording(
     trace_id: str,
     step_id: str,
     name: str,
-    kind: Optional[str] = None,
-    metadata: Optional[dict[str, Any]] = None,
-    input_data: Optional[dict[str, Any]] = None,
-    output_data: Optional[dict[str, Any]] = None,
+    kind: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    input_data: dict[str, Any] | None = None,
+    output_data: dict[str, Any] | None = None,
 ) -> Iterator[StepContext]:
     """Context manager that bundles audit + observation + usage emission.
 
@@ -108,7 +109,7 @@ def bootstrap_trace_metadata(
     trace_id: str,
     runtime_info=None,
     skill_info=None,
-) -> "ObservationRecord":
+) -> ObservationRecord:
     """P2.6.c — Emit a session-startup observation carrying RuntimeInfo + SkillInfo.
 
     Writes one ObservationRecord marked `event:session.startup` (type=EVENT)

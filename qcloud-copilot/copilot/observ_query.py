@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 METRICS_JSONL = Path.cwd() / ".runtime" / "metrics" / "metrics.jsonl"
@@ -45,8 +45,8 @@ def _within_days(ts: str | None, days: int) -> bool:
     except ValueError:
         return True
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt >= datetime.now(timezone.utc) - timedelta(days=days)
+        dt = dt.replace(tzinfo=UTC)
+    return dt >= datetime.now(UTC) - timedelta(days=days)
 
 
 def skill_success_rate(skill: str, days: int = 7, by_skill: bool = False) -> float:
@@ -135,6 +135,6 @@ def read_audit_records(
     for f in sorted(base.glob("step-*.json")):
         try:
             out.append(json.loads(f.read_text(encoding="utf-8")))
-        except Exception:
+        except Exception:  # noqa: BLE001, S112 - skip malformed step files silently
             continue
     return out

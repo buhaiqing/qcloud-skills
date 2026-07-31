@@ -26,7 +26,7 @@ billable-now-unpriced set.
 """
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from copilot.cost import _event_cost, compute_cost
 from copilot.trace_records import (

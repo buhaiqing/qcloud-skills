@@ -1,4 +1,4 @@
-from copilot.models import IntentType, ClassifiedIntent
+from copilot.models import ClassifiedIntent, IntentType
 from copilot.plan_gen import generate
 
 

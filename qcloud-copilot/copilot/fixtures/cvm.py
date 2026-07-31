@@ -1,8 +1,6 @@
 """CVM (Cloud Virtual Machine) fixtures."""
 from __future__ import annotations
 
-from typing import Optional
-
 from copilot.trace_records import UsageEvent
 
 
@@ -12,7 +10,7 @@ def _make(
     action: str,
     retry_index: int = 0,
     rate_limited: bool = False,
-    error_code: Optional[str] = None,
+    error_code: str | None = None,
     resource_count: int = 1,
 ) -> UsageEvent:
     return UsageEvent(

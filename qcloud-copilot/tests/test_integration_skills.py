@@ -1,5 +1,5 @@
-from copilot.models import PlanStep
 from copilot.integration.skills import SkillDispatcher
+from copilot.models import PlanStep
 
 
 def test_unknown_skill_returns_failure():

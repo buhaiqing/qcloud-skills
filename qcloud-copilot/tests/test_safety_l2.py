@@ -1,4 +1,4 @@
-from copilot.models import ExecutionPlan, PlanStep, ClassifiedIntent, IntentType
+from copilot.models import ClassifiedIntent, ExecutionPlan, IntentType, PlanStep
 from copilot.safety.l2 import check_l2, requires_confirmation
 
 

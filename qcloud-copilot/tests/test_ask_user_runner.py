@@ -6,7 +6,6 @@ import io
 from pathlib import Path
 
 import pytest
-
 from copilot.ask_user_runner import (
     DEFAULT_TIMEOUT_SECONDS,
     AskUserResult,
@@ -14,7 +13,6 @@ from copilot.ask_user_runner import (
 )
 from copilot.blackboard import BlackboardClient
 from copilot.models import AskOption, PlanStep
-
 
 # ---------------------------------------------------------------------------
 # Validation

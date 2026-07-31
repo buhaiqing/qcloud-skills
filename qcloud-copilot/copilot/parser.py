@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import re
-from copilot.models import ParsedRequest
+
 from copilot.context_manager import CUSTOMER_ALIASES
+from copilot.models import ParsedRequest
 
 RESOURCE_ID_PATTERNS = re.compile(
     r"(?:ins|cdb|cdbro|redis|mongodb|postgres|"

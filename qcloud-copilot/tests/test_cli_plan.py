@@ -5,10 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-from typer.testing import CliRunner
-
 from copilot.cli import app
 from copilot.models import Report, ReportSection
+from typer.testing import CliRunner
 
 FIXTURE = Path(__file__).parent / "fixtures" / "plan-vpc-cruise-alert-report.json"
 runner = CliRunner()

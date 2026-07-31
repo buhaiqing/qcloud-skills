@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: EXE001 - shebang preserved for direct invocation, file is invoked via `python3` in tests
 """Level 3 scenario runner — real cloud by default; use --mock for offline CI."""
 
 from __future__ import annotations
@@ -19,18 +20,24 @@ ROOT = Path(__file__).resolve().parents[2]
 COPILOT = ROOT / "qcloud-copilot"
 sys.path.insert(0, str(COPILOT))
 
-from copilot.blackboard import BlackboardClient  # noqa: E402
-from copilot.classifier import classify  # noqa: E402
-from copilot.dispatcher import PlanDispatcher  # noqa: E402
-from copilot.engine import CopilotEngine  # noqa: E402
-from copilot.integration.alert_intel import AlertIntelRunner  # noqa: E402
-from copilot.integration.cruise import CruiseRunner  # noqa: E402
-from copilot.integration.skills import SkillDispatcher  # noqa: E402
-from copilot.models import AskOption, ClassifiedIntent, ExecutionPlan, IntentType  # noqa: E402
-from copilot.models import PlanStep, StepResult  # noqa: E402
-from copilot.parser import parse  # noqa: E402
-from copilot.plan_gen import generate as gen_plan  # noqa: E402
-from copilot.plan_schema import load_plan_file  # noqa: E402
+from copilot.blackboard import BlackboardClient
+from copilot.classifier import classify
+from copilot.dispatcher import PlanDispatcher
+from copilot.engine import CopilotEngine
+from copilot.integration.alert_intel import AlertIntelRunner
+from copilot.integration.cruise import CruiseRunner
+from copilot.integration.skills import SkillDispatcher
+from copilot.models import (
+    AskOption,
+    ClassifiedIntent,
+    ExecutionPlan,
+    IntentType,
+    PlanStep,
+    StepResult,
+)
+from copilot.parser import parse
+from copilot.plan_gen import generate as gen_plan
+from copilot.plan_schema import load_plan_file
 
 FIXTURE = COPILOT / "tests" / "fixtures" / "plan-vpc-cruise-alert-report.json"
 SCHEMA = ROOT / ".runtime" / "blackboard" / "schema.json"

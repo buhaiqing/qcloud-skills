@@ -6,12 +6,11 @@ import json
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
-
 from copilot.blackboard import BlackboardClient
 from copilot.cli import app
 from copilot.evidence import build_evidence_chain
 from copilot.strategy import apply_strategy, load_strategy_file
+from typer.testing import CliRunner
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = REPO_ROOT / "qcloud-copilot" / "tests" / "fixtures" / "blackboard" / "strategy-agent-session.json"

@@ -6,7 +6,6 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-
 from copilot.blackboard import BlackboardClient
 from copilot.dispatcher import PlanDispatcher
 from copilot.integration.skills import SkillDispatcher
@@ -71,7 +70,7 @@ def test_missing_dependency_skipped(board_dir):
     session_id = "ses-skip-dep"
     client.create(session_id, "skip test")
 
-    from copilot.models import ExecutionPlan, ClassifiedIntent, IntentType
+    from copilot.models import ClassifiedIntent, ExecutionPlan, IntentType
 
     plan = ExecutionPlan(
         intent=ClassifiedIntent(primary=IntentType.REPORT, targets=[]),
@@ -89,7 +88,7 @@ def test_failure_skips_dependents(board_dir):
     session_id = "ses-fail-chain"
     client.create(session_id, "fail chain")
 
-    from copilot.models import ExecutionPlan, ClassifiedIntent, IntentType
+    from copilot.models import ClassifiedIntent, ExecutionPlan, IntentType
 
     skill = MagicMock(spec=SkillDispatcher)
     skill.execute.return_value = StepResult(step_id="fail-0", status="failure", error="boom")

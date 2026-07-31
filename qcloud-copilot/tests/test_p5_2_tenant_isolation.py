@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 def _trace(tenant_id=None, trace_id="trc-p5-2"):
-    from copilot.trace_records import TraceRecord, IdentityTree
+    from copilot.trace_records import IdentityTree, TraceRecord
 
     tr = TraceRecord(
         id=trace_id,
@@ -118,8 +118,8 @@ def test_assert_no_secrets_on_disk_passes_for_clean_payload_dump():
 
 
 def test_assert_no_secrets_on_disk_raises_when_secret_present():
-    from copilot.tenant_guard import assert_no_secrets_on_disk
     import pytest
+    from copilot.tenant_guard import assert_no_secrets_on_disk
     payload = "Authorization: Bearer abcdefghijklmnopqrstuvwxyz0123456789"
     with pytest.raises(AssertionError, match="secrets|secret"):
         assert_no_secrets_on_disk(payload)

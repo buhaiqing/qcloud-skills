@@ -1,6 +1,6 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from copilot.models import ExecutionResult, ExecutionPlan, ClassifiedIntent, IntentType, StepResult
+from copilot.models import ClassifiedIntent, ExecutionPlan, ExecutionResult, IntentType, StepResult
 from copilot.report_gen import render_markdown, synthesize_from_blackboard
 from copilot.safety.l3 import check_l3
 
@@ -117,7 +117,7 @@ def test_summary_audience_is_management_one_pager():
 def test_expiry_within_30_days_promoted_to_p1():
     from datetime import timedelta
 
-    expire = (datetime.now(timezone.utc) + timedelta(days=10)).strftime("%Y-%m-%dT15:59:59Z")
+    expire = (datetime.now(UTC) + timedelta(days=10)).strftime("%Y-%m-%dT15:59:59Z")
     contributions = {
         "qcloud-proactive-inspection": {
             "verdict": "WARNING",

@@ -12,7 +12,6 @@ product / region / tenant / model). Returns:
 from __future__ import annotations
 
 
-
 def _llm(provider="openai", model="gpt-4o", region=None, tenant_id=None, input_tokens=1000):
     from copilot.trace_records import UsageEvent
     md = {}

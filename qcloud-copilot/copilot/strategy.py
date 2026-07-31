@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +14,7 @@ from copilot.blackboard import BlackboardClient, default_board_dir, load_schema
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def strategy_validator(board_dir: Path | None = None) -> jsonschema.Draft7Validator:

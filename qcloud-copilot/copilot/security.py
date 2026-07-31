@@ -12,7 +12,6 @@ from __future__ import annotations
 import hashlib
 import re
 
-
 # ---------------------------------------------------------------------------
 # Secret scan patterns (compiled once)
 # ---------------------------------------------------------------------------
@@ -25,7 +24,7 @@ _API_PARAM_RE = re.compile(
     re.IGNORECASE,
 )
 
-_SECRET_PATTERNS: list[tuple[str, "re.Pattern"]] = [
+_SECRET_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("tencent_ak", _TENCENT_AK_RE),
     ("aws_access_key", _AWS_AK_RE),
     ("bearer", _BEARER_RE),
@@ -64,7 +63,7 @@ def scan_text_for_secrets(text: str) -> list[dict]:
 def hash_resource_id(resource_id: str, salt: str = "qcloud-copilot:v1") -> str:
     if resource_id is None:
         resource_id = ""
-    digest = hashlib.sha256(f"{salt}::{resource_id}".encode("utf-8")).hexdigest()[:16]
+    digest = hashlib.sha256(f"{salt}::{resource_id}".encode()).hexdigest()[:16]
     return f"sha256:{digest}"
 
 
@@ -92,7 +91,7 @@ def check_low_cardinality_labels(labels: dict[str, str]) -> list[dict]:
     issues: list[dict] = []
     if not labels:
         return issues
-    for key in labels.keys():
+    for key in labels:
         if key in _BOUNDED_KEYS:
             continue
         if key in _UNBOUNDED_KEYS:
@@ -102,7 +101,7 @@ def check_low_cardinality_labels(labels: dict[str, str]) -> list[dict]:
             })
             continue
     if len(labels) > _MAX_ALLOWED_BUCKETS:
-        for k in labels.keys():
+        for k in labels:
             if k in _BOUNDED_KEYS or k in _UNBOUNDED_KEYS:
                 continue
             issues.append({

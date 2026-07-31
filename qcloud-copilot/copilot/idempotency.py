@@ -11,7 +11,8 @@ Thread-safe: locks guard the registry of completed keys.
 from __future__ import annotations
 
 import threading
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 _LOCK = threading.Lock()
 _KEYS: dict[str, Any] = {}

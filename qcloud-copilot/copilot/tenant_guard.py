@@ -2,10 +2,9 @@
 """
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from copilot.security import scan_text_for_secrets
-
 
 REDACTED = "REDACTED"
 
@@ -69,9 +68,7 @@ def _is_sensitive_key(key: str) -> bool:
         return True
     if segments[-1] in _SENSITIVE_KEYS:
         return True
-    if len(segments) == 2 and all(seg in _SENSITIVE_KEYS for seg in segments):
-        return True
-    return False
+    return bool(len(segments) == 2 and all(seg in _SENSITIVE_KEYS for seg in segments))
 
 
 def redact_sensitive_fields(payload):

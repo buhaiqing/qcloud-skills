@@ -7,10 +7,10 @@ import os
 import sys
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, TextIO
 
-from copilot.models import AskOption, PlanStep, StepResult, _ASK_DEFAULT_UNSET
+from copilot.models import _ASK_DEFAULT_UNSET, AskOption, PlanStep, StepResult
 
 DEFAULT_TIMEOUT_SECONDS = 60
 _ASK_DEFAULT_ENV = "COPILOT_ASK_DEFAULT"
@@ -32,7 +32,7 @@ class AskUserRunner:
 
     DEFAULT_TIMEOUT_SECONDS = DEFAULT_TIMEOUT_SECONDS
 
-    def execute(  # noqa: PLR0913 — explicit injection points by design (ADR D4)
+    def execute(
         self,
         step: PlanStep,
         context: dict,
@@ -231,7 +231,7 @@ class AskUserRunner:
                 "selected_option": picked.value,
                 "selected_label": picked.label,
                 "timeout_seconds": timeout,
-                "responded_at": datetime.now(timezone.utc).isoformat(),
+                "responded_at": datetime.now(UTC).isoformat(),
             }
             blackboard.add_pending_action(session_id, pending)
 

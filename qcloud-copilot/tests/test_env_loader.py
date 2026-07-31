@@ -13,16 +13,7 @@ from copilot.mode_resolver import resolve_inspection_mode
 def test_load_project_dotenv_copilot_prefixes(tmp_path: Path, monkeypatch) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text(
-        "\n".join(
-            [
-                "COPILOT_LLM_REASONING=1",
-                "COPILOT_LLM_API_KEY=sk-from-dotenv",
-                "COPILOT_LLM_BASE_URL=https://api.deepseek.com/v1",
-                "COPILOT_LLM_MODEL=deepseek-chat",
-                "COPILOT_INSPECTION_MODE=auto",
-                "OTHER_SECRET=ignored",
-            ]
-        ),
+        "COPILOT_LLM_REASONING=1\nCOPILOT_LLM_API_KEY=sk-from-dotenv\nCOPILOT_LLM_BASE_URL=https://api.deepseek.com/v1\nCOPILOT_LLM_MODEL=deepseek-chat\nCOPILOT_INSPECTION_MODE=auto\nOTHER_SECRET=ignored",
         encoding="utf-8",
     )
     for key in (

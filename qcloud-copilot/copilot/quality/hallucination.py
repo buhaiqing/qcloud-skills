@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from contextlib import suppress
 
-from copilot.models import PlanStep
 from copilot.integration.skills import KNOWN_SKILLS
+from copilot.models import PlanStep
 
 # Each skill maps to a set of known operations.
 # Partial coverage is acceptable — when skill_ops is non-empty but incomplete,
@@ -159,8 +159,8 @@ _EVO_POLICY_CACHE = None
 def _get_evolution_policy():
     global _EVO_POLICY_CACHE
     if _EVO_POLICY_CACHE is None:
-        from copilot.evolution.store import EvolutionStore
         from copilot.evolution.policy import EvolutionPolicy
+        from copilot.evolution.store import EvolutionStore
         _EVO_POLICY_CACHE = EvolutionPolicy(EvolutionStore(), None)
     return _EVO_POLICY_CACHE
 

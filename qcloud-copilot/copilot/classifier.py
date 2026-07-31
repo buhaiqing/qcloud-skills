@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import re
-from copilot.models import ParsedRequest, ClassifiedIntent, IntentType
+
+from copilot.models import ClassifiedIntent, IntentType, ParsedRequest
 
 INTENT_PATTERNS: dict[IntentType, list[re.Pattern]] = {
     IntentType.DIAGNOSE: [
