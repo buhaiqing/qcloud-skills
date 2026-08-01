@@ -148,11 +148,11 @@ def simplified_ks_test(recent: list[float], baseline: list[float]) -> float:
 
 ## Phase 清单
 
-- [ ] **Phase 1**: `_compute_window_metrics(traces)` — 提取单个窗口的聚合指标
-- [ ] **Phase 2**: `_simplified_ks_test` — 简化 KS 检验（无 scipy）
-- [ ] **Phase 3**: `compute_drift(recent, baseline)` — 漂移计算
-- [ ] **Phase 4**: `analyze_drift(traces, since_hours)` — 入口函数 + 告警
-- [ ] **Phase 5**: 自验证 + 控制台输出格式
+- [x] **Phase 1**: `_compute_window_metrics(traces)` — 提取单个窗口的聚合指标（`scripts/distribution_drift.py:88`）
+- [x] **Phase 2**: `_simplified_ks_test` — 简化 KS 检验（无 scipy）（`scripts/distribution_drift.py:151`）
+- [x] **Phase 3**: `compute_drift(recent, baseline)` — 漂移计算（`scripts/distribution_drift.py:230`）
+- [x] **Phase 4**: `analyze_drift(traces, since_hours)` — 入口函数 + 告警（`scripts/distribution_drift.py:311`）
+- [x] **Phase 5**: 自验证 + 控制台输出格式（`self_verify` `scripts/distribution_drift.py:359`）
 
 ---
 
