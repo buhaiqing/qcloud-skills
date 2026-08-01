@@ -21,10 +21,19 @@ import json
 import shutil
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows: no cross-process lock
+    fcntl = None  # type: ignore[assignment]
 
 
 @dataclass
@@ -108,8 +117,8 @@ class ModelLoader:
             CheckpointMeta for the saved checkpoint.
 
         """
-        with self._lock:
-            index = self._load_index(model_type)
+        with self._lock, self._file_lock(model_type):
+            index = self._load_index(model_type, force_reload=True)
             version = index.max_version + 1
             index.max_version = version
             sha256 = hashlib.sha256(model_data).hexdigest()
@@ -165,8 +174,8 @@ class ModelLoader:
             ValueError: If SHA256 integrity check fails.
 
         """
-        with self._lock:
-            index = self._load_index(model_type)
+        with self._lock, self._file_lock(model_type):
+            index = self._load_index(model_type, force_reload=True)
             v = version if version is not None else index.active_version
             meta = next((m for m in index.checkpoints if m.version == v), None)
             if meta is None:
@@ -203,8 +212,8 @@ class ModelLoader:
 
         Does NOT delete newer versions; they remain available for re-activation.
         """
-        with self._lock:
-            index = self._load_index(model_type)
+        with self._lock, self._file_lock(model_type):
+            index = self._load_index(model_type, force_reload=True)
             if target_version < 1 or target_version > len(index.checkpoints):
                 raise ValueError(  # noqa: TRY003
                     f"Invalid rollback target: v{target_version} (have v1-{len(index.checkpoints)})",  # noqa: EM102, E501
@@ -215,14 +224,14 @@ class ModelLoader:
 
     def list_checkpoints(self, model_type: str) -> list[CheckpointMeta]:
         """List all checkpoints for a model type, newest first."""
-        with self._lock:
-            index = self._load_index(model_type)
+        with self._lock, self._file_lock(model_type):
+            index = self._load_index(model_type, force_reload=True)
             return list(reversed(index.checkpoints))
 
     def get_active_meta(self, model_type: str) -> CheckpointMeta | None:
         """Get metadata for the active checkpoint, or None."""
-        with self._lock:
-            index = self._load_index(model_type)
+        with self._lock, self._file_lock(model_type):
+            index = self._load_index(model_type, force_reload=True)
             if index.active_version <= 0:
                 return None
             for meta in index.checkpoints:
@@ -247,8 +256,8 @@ class ModelLoader:
             List of removed version numbers.
 
         """
-        with self._lock:
-            index = self._load_index(model_type)
+        with self._lock, self._file_lock(model_type):
+            index = self._load_index(model_type, force_reload=True)
             if len(index.checkpoints) <= keep_versions:
                 return []
 
@@ -294,6 +303,30 @@ class ModelLoader:
         """Path to a specific checkpoint version directory."""
         return self.base_dir / model_type / f"v{version}"
 
+    def _lock_path(self, model_type: str) -> Path:
+        """Path to the cross-process lock file for a model type."""
+        return self.base_dir / model_type / ".lock"
+
+    @contextmanager
+    def _file_lock(self, model_type: str) -> Iterator[None]:
+        """Cross-process exclusive lock on a model type's index.
+
+        Serializes index read-modify-write across ModelLoader instances
+        (and processes) sharing the same base_dir. No-op on platforms
+        without fcntl (Windows) — thread lock still applies.
+        """
+        lock_path = self._lock_path(model_type)
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with lock_path.open("a") as f:
+            if fcntl is not None:
+                fcntl.flock(f, fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(f, fcntl.LOCK_UN)
+            else:
+                yield
+
     @staticmethod
     def _file_extension(framework: str | None) -> str:
         """File extension for serialized model based on framework."""
@@ -307,9 +340,15 @@ class ModelLoader:
         """Path to the index file for a model type."""
         return self.base_dir / model_type / "index.json"
 
-    def _load_index(self, model_type: str) -> CheckpointIndex:
-        """Load or create the checkpoint index for a model type."""
-        if model_type in self._indexes:
+    def _load_index(
+        self, model_type: str, *, force_reload: bool = False,
+    ) -> CheckpointIndex:
+        """Load or create the checkpoint index for a model type.
+
+        force_reload bypasses the in-memory cache so cross-process updates
+        (protected by _file_lock) are always observed.
+        """
+        if not force_reload and model_type in self._indexes:
             return self._indexes[model_type]
 
         path = self._index_path(model_type)

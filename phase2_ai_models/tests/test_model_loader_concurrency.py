@@ -261,12 +261,14 @@ class TestConcurrentMultiInstance:
             loader_b = ModelLoader(base_dir=tmpdir)
             loader_a.save_checkpoint("ml", b"seed")
 
+            errors: list[Exception] = []
+
             def _save(loader: ModelLoader, prefix: str) -> None:
                 for i in range(15):
                     try:
                         loader.save_checkpoint("ml", f"{prefix}-{i}".encode())
-                    except (FileNotFoundError, OSError, PermissionError):
-                        pass  # other instance may conflict on index write
+                    except Exception as e:
+                        errors.append(e)
 
             threads = [
                 threading.Thread(target=_save, args=(loader_a, "a")),
@@ -277,11 +279,11 @@ class TestConcurrentMultiInstance:
             for t in threads:
                 t.join(timeout=15)
 
-            # Fresh instance sees versions
+            # File lock prevents lost updates: 1 seed + 15 + 15 = 31 versions
             loader_c = ModelLoader(base_dir=tmpdir)
             cps = loader_c.list_checkpoints("ml")
-            # Should have 1 seed + some from both threads
-            assert len(cps) >= 5, f"expected >= 5 checkpoints, got {len(cps)}"
+            assert errors == [], f"unexpected errors: {errors}"
+            assert len(cps) == 31, f"expected 31 checkpoints, got {len(cps)}"
             # Active should be loadable
             data, _ = loader_c.load_active("ml")
             assert data is not None
