@@ -65,6 +65,8 @@ This skill is an **operational runbook** for agents: explicit scope, credential 
 | 4 | **Complete Failure Strategies** | Error taxonomy with ≥ 10 CCN-specific codes; HALT vs retry per error type |
 | 5 | **Absolute Single Responsibility** | CCN instance + attachments + CCN routes + CCN bandwidth limits only; VPC / Subnet → `qcloud-vpc-ops`; VPN Gateway → `qcloud-vpn-ops` |
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ### Well-Architected Framework Integration (卓越架构)
 
 | Pillar | Skill Integration | Reference |

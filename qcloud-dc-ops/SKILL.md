@@ -56,6 +56,8 @@ Tencent Cloud Direct Connect (DC) provides dedicated network connections from on
 | 4 | **Complete Failure Strategies** | Error taxonomy with ≥ 10 DC-specific codes; HALT vs retry per error type |
 | 5 | **Absolute Single Responsibility** | Direct Connect lifecycle only; VPN → `qcloud-vpn-ops`; CCN → `qcloud-ccn-ops` |
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ### Well-Architected Framework Integration (卓越架构)
 
 | Pillar | Skill Integration | Reference |

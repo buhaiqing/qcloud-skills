@@ -109,6 +109,8 @@ CAM (Cloud Access Management) is Tencent Cloud's identity and access management 
 | 4 | **Complete Failure Strategies** | AuthFailure handling, rate limits, policy version conflicts |
 | 5 | **Absolute Single Responsibility** | One product (CAM), primary resource = Policy/User/Role |
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ## Changelog
 
 | Version | Date | Changes |

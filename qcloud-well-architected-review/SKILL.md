@@ -156,6 +156,8 @@ Orchestrates read-only Well-Architected assessment across products — **workers
 | 4 | **Complete Failure Strategies** | Orchestrator error table + worker errors in `product_assessment.errors` |
 | 5 | **Absolute Single Responsibility** | Cross-product assessment orchestration only |
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ## Assessment Workflow
 
 ### Pre-flight

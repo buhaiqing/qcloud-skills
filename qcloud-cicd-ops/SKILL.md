@@ -56,6 +56,8 @@ CI/CD (Continuous Integration / Continuous Deployment) pipelines automate the bu
 | 4 | **Complete Failure Strategies** | Error taxonomy with ≥ 10 CI/CD-specific codes; HALT vs retry per error type |
 | 5 | **Absolute Single Responsibility** | CI/CD pipeline + code repository + artifact repository only; K8s deploy → `qcloud-tke-ops`; Serverless → `qcloud-scf-ops` |
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ### Well-Architected Framework Integration (卓越架构)
 
 | Pillar | Skill Integration | Reference |

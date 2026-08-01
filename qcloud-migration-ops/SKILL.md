@@ -57,6 +57,8 @@ Tencent Cloud Migration Service Platform (MSP) provides tools and services for m
 | 4 | **Complete Failure Strategies** | Error taxonomy with ≥ 10 migration-specific codes; HALT vs retry per error type |
 | 5 | **Absolute Single Responsibility** | Migration lifecycle only; post-migration → product ops skills |
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ### Well-Architected Framework Integration (卓越架构)
 
 | Pillar | Skill Integration | Reference |

@@ -68,6 +68,8 @@ execution path** in `SKILL.md`.
 | 4 | **Complete Failure Strategies** | ≥ 10 API Gateway-specific error codes; HALT vs retry per error type |
 | 5 | **Absolute Single Responsibility** | API Gateway service/API/_release management only; backend compute delegated |
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ### Well-Architected Framework Integration (卓越架构)
 
 | Pillar | Skill Integration | Reference |

@@ -105,6 +105,8 @@ Every generated skill MUST satisfy these five standards:
 | 4 | **Complete Failure Strategies** | Error taxonomy ≥ 10 codes (billing API throttling, permission denied, account balance, etc.); HALT vs retry per error |
 | 5 | **Absolute Single Responsibility** | One product (FinOps), resources (billing/budget/cost); product ops delegated to respective skills |
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ## 8 大核心模块
 
 ### 模块 1：账单数据获取（基础层）

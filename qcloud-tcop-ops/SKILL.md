@@ -84,6 +84,8 @@ agent execution path**.
 | 4 | **Complete Failure Strategies** | 10+ product-specific error codes; HALT vs retry per error type |
 | 5 | **Absolute Single Responsibility** | TCOP optimization analysis only; cross-product delegation to `qcloud-cvm-ops`, `qcloud-finops-ops`, etc. |
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ### Well-Architected Framework Integration
 
 | Pillar | Skill Integration | Reference |

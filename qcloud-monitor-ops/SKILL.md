@@ -67,6 +67,8 @@ Every generated skill MUST satisfy these five standards:
 | 4 | **Complete Failure Strategies** | Error taxonomy ≥ 12 codes; HALT vs retry per error |
 | 5 | **Absolute Single Responsibility** | One product (Monitor), resources (AlarmPolicy, Metric); product ops delegated |
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ## Changelog
 
 | Version | Date | Changes |
