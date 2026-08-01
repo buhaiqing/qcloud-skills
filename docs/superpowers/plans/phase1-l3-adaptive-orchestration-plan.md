@@ -1,6 +1,6 @@
 # Plan: Phase 1 — L3 Adaptive Orchestration 补齐
 
-> **Status**: Complete (modules 1.1 / 1.2 / 1.3 / M3 accepted; 1.4 in progress on same branch)
+> **Status**: Complete (all modules 1.1–1.5 + M1/M2/M3 accepted)
 > **Date**: 2026-08-01
 > **Spec**: `docs/superpowers/specs/phase1-l3-adaptive-orchestration-design.md`
 > **ADR**: `docs/architecture/ADR-0004-phase1-l3-adaptive-orchestration.md`
