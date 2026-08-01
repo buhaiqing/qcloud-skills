@@ -209,6 +209,9 @@ mask 正则必须覆盖裸 `AKID<hex>`(无分隔符)和 `TENCENTCLOUD_SECRET_KEY
 ### L18 — `ruamel.yaml` round-trip preserves per-sequence indent; `yaml.dump` does not
 批量改 frontmatter 用 `ruamel.yaml.YAML(typ="rt")` + `YAML.indent(mapping=2, sequence=4, offset=2)`;别用 PyYAML `yaml.dump`(统一缩进会搅动 30 文件 diff,Phase 1 commit f764c9a)。先 `--dry-run`。
 
+### L19 — Cross-instance races need file locks + forced reload; weak asserts mask lost updates
+`threading.Lock` 只串行化同实例;多实例/多进程共享数据目录时用 per-resource `fcntl.flock` 锁文件包住读改写,锁内**强制重载**磁盘状态(bypass 内存缓存,如 `_load_index(force_reload=True)`),否则陈旧缓存掩盖他进程更新。Windows 无 fcntl 时降级为线程锁并注释说明。并发测试用 `>= N` + `except: pass` 容忍冲突会假绿(实测双实例 15+15 保存后断言 `>=5` 通过),修复后收紧为精确断言(如 `== 31` + `errors == []`)证明零丢失。
+
 ## Adding or modifying a skill
 
 1. **New skill**: Use `qcloud-skill-generator` (enforces 2-round review).
@@ -290,9 +293,6 @@ not only GCL-triggered ones.
 1. **Merge back**: From the `main` checkout, `git merge --no-ff feature/<feature>` (or fast-forward if linear).
 2. **Clean up**: `git worktree remove ../<repo>-<feature> --force` then `git branch -d feature/<feature>`.
 3. **Verify**: `git worktree list` shows only the `main` checkout; no orphaned worktree directories remain on disk.
-
-Do NOT leave feature branches or worktree directories around after the task is
-done. A completed worktree that is not merged+removed is an incomplete handoff.
 
 ### Exceptions
 
