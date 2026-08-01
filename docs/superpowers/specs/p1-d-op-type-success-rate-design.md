@@ -137,11 +137,11 @@ qcloud-cvm-ops:
 
 ## Phase 清单
 
-- [ ] **Phase 1**: `scripts/op_type_classifier.py` — 纯函数 `classify_operation`，TDD（10+ 测试用例覆盖边界）
-- [ ] **Phase 2**: `gcl_trajectory_quality.py` — 集成 `operation_type` 到分析输出
-- [ ] **Phase 3**: 告警逻辑（pass_rate < 阈值时标记 ⚠）
-- [ ] **Phase 4**: 单元测试（`op_type_classifier_test.py`）
-- [ ] **Phase 5**: self-verify + GCL review
+- [x] **Phase 1**: `scripts/op_type_classifier.py` — 纯函数 `classify_operation`，TDD（10+ 测试用例覆盖边界）— 证据: `classify_operation` 在 op_type_classifier.py:37;CASES 表驱动 45+ 用例(含空命令/Ex 后缀/Stop 关键词边界)
+- [x] **Phase 2**: `gcl_trajectory_quality.py` — 集成 `operation_type` 到分析输出 — 证据: `operation_type_analysis()` 在 gcl_trajectory_quality.py:298,412 调用、431 输出 `operation_type_analysis`
+- [x] **Phase 3**: 告警逻辑（pass_rate < 阈值时标记 ⚠）— 证据: gcl_trajectory_quality.py:339-348, pass_rate<0.5 → severity=high, <0.7 → medium
+- [x] **Phase 4**: 单元测试（`op_type_classifier_test.py`）— 证据: op_type_classifier_test.py 4 passed(45+ 表驱动用例);pytest 通过
+- [x] **Phase 5**: self-verify + GCL review — 证据: gcl_trajectory_quality.py __main__ 含 assert 验证块(520+ 行);代码经 GCL review 提交
 
 ---
 
