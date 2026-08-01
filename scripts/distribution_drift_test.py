@@ -9,6 +9,8 @@ Run: cd scripts && python3 -m unittest distribution_drift_test -v
 
 from __future__ import annotations
 
+import contextlib
+import io
 import subprocess
 import sys
 import unittest
@@ -111,7 +113,12 @@ class DistributionDriftTest(unittest.TestCase):
 
     # --- Criterion 6: self-verify passes (direct call + CLI entry point) ---
     def test_self_verify(self):
-        self.assertTrue(self_verify())
+        # Direct self_verify() prints the alert table to stdout; capture it so
+        # the drift alert table does not leak into validate_local's CI log.
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            ok = self_verify()
+        self.assertTrue(ok)
         proc = subprocess.run(
             [sys.executable, str(_HERE / "distribution_drift.py"), "--self-verify"],
             capture_output=True,
