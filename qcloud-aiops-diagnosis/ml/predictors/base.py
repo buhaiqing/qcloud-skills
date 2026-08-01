@@ -1,3 +1,4 @@
+# Copyright (c) 2026. All rights reserved.
 """Abstract base class for all ML predictors."""
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ class BasePredictor(ABC):
     name: str = "BasePredictor"
 
     @abstractmethod
-    def fit(self, timestamps: list[int], values: list[float]) -> "BasePredictor":
+    def fit(self, timestamps: list[int], values: list[float]) -> BasePredictor:
         """Train the predictor.
 
         Args:
@@ -27,6 +28,7 @@ class BasePredictor(ABC):
 
         Returns:
             self (for chaining).
+
         """
         raise NotImplementedError
 
@@ -39,6 +41,7 @@ class BasePredictor(ABC):
             - "predictions": list[float] — forecasted values
             - "model": str
             - "horizon": int
+
         """
         raise NotImplementedError
 

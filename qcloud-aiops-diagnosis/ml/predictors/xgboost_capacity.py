@@ -1,3 +1,4 @@
+# Copyright (c) 2026. All rights reserved.
 """XGBoost-based capacity predictor with feature engineering.
 
 Graceful degradation: if xgboost is not installed, falls back to
@@ -15,7 +16,7 @@ _HAVE_XGB = False
 _LinearPredictor: type[BasePredictor] | None = None
 
 try:
-    import xgboost as xgb  # noqa: F401
+    import xgboost as xgb
 
     _HAVE_XGB = True
 except ImportError:
@@ -47,6 +48,7 @@ class XGBoostCapacityPredictor(BasePredictor):
         horizon_steps: Number of periods ahead to forecast.
         period_seconds: Duration of one period (default 3600 s = hourly).
         n_lags: Number of lag features to use (default 3).
+
     """
 
     name = "XGBoostCapacityPredictor"
@@ -56,7 +58,15 @@ class XGBoostCapacityPredictor(BasePredictor):
         horizon_steps: int = 24,
         period_seconds: int = 3600,
         n_lags: int = 3,
-    ):
+    ) -> None:
+        """Initialize the capacity predictor.
+
+        Args:
+            horizon_steps: Number of periods ahead to forecast.
+            period_seconds: Duration of one period in seconds.
+            n_lags: Number of lag features.
+
+        """
         self.horizon_steps = horizon_steps
         self.period_seconds = period_seconds
         self.n_lags = n_lags
@@ -79,9 +89,10 @@ class XGBoostCapacityPredictor(BasePredictor):
             math.sin(2 * math.pi * dow / 7),
             math.cos(2 * math.pi * dow / 7),
             float(ts),  # trend
-        ] + list(lag_values)
+            *lag_values,
+        ]
 
-    def fit(self, timestamps: list[int], values: list[float]) -> "XGBoostCapacityPredictor":
+    def fit(self, timestamps: list[int], values: list[float]) -> XGBoostCapacityPredictor:
         """Train XGBoost on (timestamp, value) pairs."""
         self._values_history = list(values)
 
@@ -152,7 +163,7 @@ class XGBoostCapacityPredictor(BasePredictor):
         # Use training residual stddev as approximate interval
         X = np.array(
             [
-                self._build_features(0, [0.0] * self.n_lags)
+                self._build_features(0, [0.0] * self.n_lags),
             ]
             * len(self._values_history),
             dtype=float,

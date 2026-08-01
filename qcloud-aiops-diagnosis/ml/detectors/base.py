@@ -1,3 +1,4 @@
+# Copyright (c) 2026. All rights reserved.
 """Abstract base class for all ML anomaly detectors."""
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ class BaseDetector(ABC):
     name: str = "BaseDetector"
 
     @abstractmethod
-    def fit(self, data: list[float]) -> "BaseDetector":
+    def fit(self, data: list[float]) -> BaseDetector:
         """Train the detector on historical values.
 
         Args:
@@ -26,6 +27,7 @@ class BaseDetector(ABC):
 
         Returns:
             self (for chaining).
+
         """
         raise NotImplementedError
 
@@ -39,6 +41,7 @@ class BaseDetector(ABC):
             - "score": float — raw anomaly score (0=normal, 1=max anomalous)
             - "threshold": float — effective threshold used
             - "model": str — self.name
+
         """
         raise NotImplementedError
 

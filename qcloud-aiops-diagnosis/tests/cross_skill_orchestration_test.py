@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026. All rights reserved.
 """Tests for cross-skill orchestration payloads and mode selection.
 
 Validates the contracts in
@@ -12,26 +13,31 @@ import unittest
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 SKILL_DIR = Path(__file__).resolve().parents[1]  # qcloud-aiops-diagnosis/
 ASSETS = SKILL_DIR / "assets"
 
 # Optional JSON Schema validation; if jsonschema is unavailable we do structural checks.
 try:
-    import jsonschema  # type: ignore
+    import jsonschema  # type: ignore[import-untyped]
 
     HAS_JSONSCHEMA = True
-except Exception:  # pragma: no cover
+except Exception:  # noqa: BLE001  # pragma: no cover
     HAS_JSONSCHEMA = False
 
 
 def load_schema(name: str) -> dict[str, Any]:
+    """Load a JSON schema file from the assets directory."""
     path = ASSETS / name
     if not path.exists():
-        raise FileNotFoundError(f"Missing schema: {path}")
+        msg = f"Missing schema: {path}"
+        raise FileNotFoundError(msg)
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def load_json(name: str) -> dict[str, Any]:
+    """Load a JSON file from the assets directory."""
     path = ASSETS / name
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 
@@ -39,13 +45,15 @@ def load_json(name: str) -> dict[str, Any]:
 def _assert_has_keys(obj: dict[str, Any], keys: set[str], label: str) -> None:
     missing = keys - obj.keys()
     if missing:
-        raise AssertionError(f"{label} missing required keys: {sorted(missing)}")
+        msg = f"{label} missing required keys: {sorted(missing)}"
+        raise AssertionError(msg)
 
 
 class FinOpsHandoffTests(unittest.TestCase):
     """FinOps → AIOps handoff (cross-skill-orchestration.md §2.1)."""
 
     def setUp(self) -> None:
+        """Set up test fixtures for FinOps handoff tests."""
         self.schema = load_schema("finops-handoff.schema.json")
         self.sample = {
             "handoff_id": "finops-ho-20260609-001",
@@ -75,22 +83,28 @@ class FinOpsHandoffTests(unittest.TestCase):
 
     @unittest.skipUnless(HAS_JSONSCHEMA, "jsonschema not installed")
     def test_sample_against_schema(self) -> None:
+        """Verify sample data validates against the schema."""
         jsonschema.validate(self.sample, self.schema)
 
     def test_required_fields(self) -> None:
-        _assert_has_keys(self.sample, {"handoff_id", "source_skill", "anomaly", "top_products"}, "finops_handoff")
+        """Verify all required fields are present in the handoff payload."""
+        _assert_has_keys(
+            self.sample, {"handoff_id", "source_skill", "anomaly", "top_products"},
+            "finops_handoff")
         _assert_has_keys(self.sample["anomaly"], {"confidence"}, "anomaly")
         for item in self.sample["top_products"]:
             _assert_has_keys(item, {"product", "delta_cny"}, "top_products item")
 
     def test_source_skill_const(self) -> None:
-        self.assertEqual(self.sample["source_skill"], "qcloud-finops-ops")
+        """Verify source_skill field is set to qcloud-finops-ops."""
+        assert self.sample["source_skill"] == "qcloud-finops-ops"
 
     def test_invalid_source_skill_rejected(self) -> None:
+        """Verify invalid source_skill value is rejected."""
         if not HAS_JSONSCHEMA:
             self.fail("jsonschema not installed: cannot validate schema const constraint")
         bad = {**self.sample, "source_skill": "qcloud-cvm-ops"}
-        with self.assertRaises(jsonschema.ValidationError):
+        with pytest.raises(jsonschema.ValidationError):
             jsonschema.validate(bad, self.schema)
 
 
@@ -98,6 +112,7 @@ class ProactiveInspectionHandoffTests(unittest.TestCase):
     """Proactive Inspection → AIOps handoff (cross-skill-orchestration.md §2.2)."""
 
     def setUp(self) -> None:
+        """Set up test fixtures for FinOps handoff tests."""
         self.schema = load_schema("inspection-handoff.schema.json")
         self.sample = {
             "handoff_id": "insp-ho-20260609-002",
@@ -112,16 +127,18 @@ class ProactiveInspectionHandoffTests(unittest.TestCase):
                     "metric": "CpuUsage",
                     "value": "96%",
                     "detected_at": "2026-06-09T08:00:00+08:00",
-                }
+                },
             ],
             "report_path": "./audit-results/inspection-report-20260609.md",
         }
 
     @unittest.skipUnless(HAS_JSONSCHEMA, "jsonschema not installed")
     def test_sample_against_schema(self) -> None:
+        """Verify sample data validates against the schema."""
         jsonschema.validate(self.sample, self.schema)
 
     def test_required_fields(self) -> None:
+        """Verify all required fields are present in the handoff payload."""
         _assert_has_keys(
             self.sample,
             {"handoff_id", "source_skill", "inspection_id", "findings"},
@@ -135,14 +152,22 @@ class ProactiveInspectionHandoffTests(unittest.TestCase):
         )
 
     def test_findings_non_empty(self) -> None:
-        self.assertGreaterEqual(len(self.sample["findings"]), 1)
+        """Verify findings list is non-empty."""
+        assert len(self.sample["findings"]) >= 1
 
 
 class ModeSelectionTests(unittest.TestCase):
     """Orchestration mode selection (cross-skill-orchestration.md §1)."""
 
-    def select_mode(self, handoff_source: str, confidence: str, top_product_delta: bool, dispatch_inspection: bool, resolved: bool, prevention: bool, capacity_pressure: bool) -> str:
-        """Reference implementation of the mode-selection pseudocode."""
+    def select_mode(
+        self, handoff_source: str, confidence: str,
+        top_product_delta: bool,
+        dispatch_inspection: bool,
+        resolved: bool,
+        prevention: bool,
+        capacity_pressure: bool,
+    ) -> str:
+        """Return the appropriate orchestration mode based on input signals."""
         if handoff_source == "finops" and confidence == "HIGH" and dispatch_inspection:
             return "F1"
         if handoff_source == "finops" and top_product_delta:
@@ -157,28 +182,47 @@ class ModeSelectionTests(unittest.TestCase):
         return "standard"
 
     def test_f1_finops_high_with_inspection(self) -> None:
-        self.assertEqual(self.select_mode("finops", "HIGH", True, True, False, False, False), "F1")
+        """Verify F1 mode for HIGH confidence with inspection."""
+        assert self.select_mode(
+            "finops", "HIGH", True, True, False, False, False,
+        ) == "F1"
 
     def test_f2_finops_with_top_product_delta(self) -> None:
-        self.assertEqual(self.select_mode("finops", "MEDIUM", True, False, False, False, False), "F2")
+        """Verify F2 mode for finops with top product delta."""
+        assert self.select_mode(
+            "finops", "MEDIUM", True, False, False, False, False,
+        ) == "F2"
 
     def test_p1_proactive_inspection_critical(self) -> None:
-        self.assertEqual(self.select_mode("proactive_inspection", "CRITICAL", False, False, False, False, False), "P1")
+        """Verify P1 mode for proactive inspection CRITICAL."""
+        assert self.select_mode(
+            "proactive_inspection", "CRITICAL", False, False, False, False, False,
+        ) == "P1"
 
     def test_a1_prevention_after_resolution(self) -> None:
-        self.assertEqual(self.select_mode("none", "", False, False, True, True, False), "A1")
+        """Verify A1 mode for prevention after resolution."""
+        assert self.select_mode(
+            "none", "", False, False, True, True, False,
+        ) == "A1"
 
     def test_a2_capacity_pressure(self) -> None:
-        self.assertEqual(self.select_mode("none", "", False, False, False, False, True), "A2")
+        """Verify A2 mode for capacity pressure."""
+        assert self.select_mode(
+            "none", "", False, False, False, False, True,
+        ) == "A2"
 
     def test_standard_fallback(self) -> None:
-        self.assertEqual(self.select_mode("none", "", False, False, False, False, False), "standard")
+        """Verify standard fallback when no mode matches."""
+        assert self.select_mode(
+            "none", "", False, False, False, False, False,
+        ) == "standard"
 
 
 class CrossSkillBundleTests(unittest.TestCase):
     """Cross-Skill Orchestration Bundle structure (cross-skill-orchestration.md §5)."""
 
     def test_bundle_required_fields(self) -> None:
+        """Verify all required fields are present in the bundle."""
         bundle: dict[str, Any] = {
             "orchestration_id": "xskill-20260609-001",
             "mode": "F2",
@@ -203,10 +247,13 @@ class CrossSkillBundleTests(unittest.TestCase):
             "finops_advisory": None,
             "recommendations": [
                 {
-                    "action": "RECOMMENDATION (not execution): right-size CVM ins-aaa after traffic review",
+                    "action": (
+                        "RECOMMENDATION (not execution): "
+                        "right-size CVM ins-aaa after traffic review"
+                    ),
                     "delegate_to": "qcloud-finops-ops",
                     "priority": "P1",
-                }
+                },
             ],
             "data_quality": {"status": "complete", "warnings": []},
         }
@@ -226,14 +273,18 @@ class CrossSkillBundleTests(unittest.TestCase):
             },
             "cross_skill_bundle",
         )
-        _assert_has_keys(bundle["joint_hypothesis"], {"summary", "confidence", "score"}, "joint_hypothesis")
-        _assert_has_keys(bundle["artifacts"], {"rca_id"}, "artifacts")
+        _assert_has_keys(
+            bundle["joint_hypothesis"], {"summary", "confidence", "score"},
+            "joint_hypothesis")
+        _assert_has_keys(
+            bundle["artifacts"], {"rca_id"}, "artifacts")
 
 
 class PreventionAndFinOpsAdvisoryTests(unittest.TestCase):
     """AIOps outbound handoff structures (cross-skill-orchestration.md §2.3/2.4)."""
 
     def test_prevention_handoff_structure(self) -> None:
+        """Verify prevention handoff item structure."""
         item = {
             "item_id": "prev-001",
             "source_rca_id": "rca-20260609-001",
@@ -246,27 +297,34 @@ class PreventionAndFinOpsAdvisoryTests(unittest.TestCase):
         }
         _assert_has_keys(
             item,
-            {"item_id", "source_rca_id", "check_type", "resource_type", "resource_id", "delegate_to", "priority"},
+            {
+                "item_id", "source_rca_id", "check_type", "resource_type",
+                "resource_id", "delegate_to", "priority",
+            },
             "prevention_item",
         )
 
     def test_finops_advisory_structure(self) -> None:
+        """Verify FinOps advisory structure."""
         advisory = {
             "trigger": "capacity_saturation",
             "confidence": "MEDIUM",
             "affected_products": ["cvm", "cdb"],
             "resource_ids": ["ins-xxx", "cdb-yyy"],
             "signals": [
-                {"type": "baseline_anomaly", "metric": "CpuUsage", "anomaly_score": 68}
+                {"type": "baseline_anomaly", "metric": "CpuUsage", "anomaly_score": 68},
             ],
             "recommended_finops_actions": [
-                "RECOMMENDATION (not execution): run right-sizing analysis via qcloud-finops-ops"
+                "RECOMMENDATION (not execution): run right-sizing analysis via qcloud-finops-ops",
             ],
             "delegate_to": "qcloud-finops-ops",
         }
         _assert_has_keys(
             advisory,
-            {"trigger", "confidence", "affected_products", "resource_ids", "signals", "recommended_finops_actions", "delegate_to"},
+            {
+                "trigger", "confidence", "affected_products", "resource_ids",
+                "signals", "recommended_finops_actions", "delegate_to",
+            },
             "finops_advisory",
         )
 

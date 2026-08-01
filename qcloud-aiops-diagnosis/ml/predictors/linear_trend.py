@@ -1,3 +1,4 @@
+# Copyright (c) 2026. All rights reserved.
 """Linear trend predictor for capacity planning.
 
 No external dependencies. Uses ordinary least-squares (OLS) to fit a line
@@ -6,7 +7,7 @@ through (timestamp, value) points and extrapolate.
 
 from __future__ import annotations
 
-import math  # noqa: F401 — kept for public API; used in predict_interval
+import math
 from typing import Any
 
 from ml.predictors.base import BasePredictor
@@ -21,11 +22,18 @@ class LinearTrendPredictor(BasePredictor):
     Args:
         period_seconds: Duration of one "step" in the forecast horizon
             (e.g., 3600 for hourly, 86400 for daily).
+
     """
 
     name = "LinearTrendPredictor"
 
-    def __init__(self, period_seconds: int = 3600):
+    def __init__(self, period_seconds: int = 3600) -> None:
+        """Initialize the predictor.
+
+        Args:
+            period_seconds: Duration of one forecast step in seconds.
+
+        """
         self.period_seconds = period_seconds
         self._slope: float | None = None
         self._intercept: float | None = None
@@ -33,10 +41,11 @@ class LinearTrendPredictor(BasePredictor):
         self._t_mean: float | None = None
         self._y_mean: float | None = None
 
-    def fit(self, timestamps: list[int], values: list[float]) -> "LinearTrendPredictor":
+    def fit(self, timestamps: list[int], values: list[float]) -> LinearTrendPredictor:
         """Fit OLS line through (timestamp, value) pairs."""
         if len(timestamps) < 3 or len(timestamps) != len(values):
-            raise ValueError("Need at least 3 aligned (timestamps, values) pairs.")
+            msg = "Need at least 3 aligned (timestamps, values) pairs."
+            raise ValueError(msg)
 
         n = len(timestamps)
         t_arr = [float(t) for t in timestamps]
@@ -66,7 +75,8 @@ class LinearTrendPredictor(BasePredictor):
     def predict(self, steps: int) -> dict[str, Any]:
         """Extrapolate line `steps` periods ahead."""
         if self._slope is None:
-            raise RuntimeError("Model not fitted. Call fit() first.")
+            msg = "Model not fitted. Call fit() first."
+            raise RuntimeError(msg)
 
         last_ts = max(getattr(self, "_last_ts", 0), self._t_mean or 0)
         predictions = [

@@ -1,3 +1,4 @@
+# Copyright (c) 2026. All rights reserved.
 """ML predictors for qcloud-aiops-diagnosis."""
 
 from ml.predictors.base import BasePredictor

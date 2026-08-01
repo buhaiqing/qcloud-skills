@@ -1,3 +1,4 @@
+# Copyright (c) 2026. All rights reserved.
 """IsolationForest-based unsupervised anomaly detector.
 
 Graceful degradation: if sklearn is not installed, falls back to z-score
@@ -30,14 +31,22 @@ class IsolationForestDetector(BaseDetector):
     multiple instances with different random_state values.
 
     Args:
-        contamination: Expected fraction of anomalous points (0.0–1.0).
+        contamination: Expected fraction of anomalous points (0.0-1.0).
             Higher values increase sensitivity.
         n_estimators: Number of isolation trees. More trees → more stable.
+
     """
 
     name = "IsolationForestDetector"
 
-    def __init__(self, contamination: float = 0.05, n_estimators: int = 100):
+    def __init__(self, contamination: float = 0.05, n_estimators: int = 100) -> None:
+        """Initialize the detector.
+
+        Args:
+            contamination: Expected fraction of anomalous points.
+            n_estimators: Number of isolation trees.
+
+        """
         self.contamination = contamination
         self.n_estimators = n_estimators
         self._forest: Any = None
@@ -55,7 +64,7 @@ class IsolationForestDetector(BaseDetector):
             self._degraded = True
             self._fallback = _ZScoreFallback()
 
-    def fit(self, data: list[float]) -> "IsolationForestDetector":
+    def fit(self, data: list[float]) -> IsolationForestDetector:
         """Train IsolationForest on historical values."""
         if self._degraded:
             self._fallback.fit(data)
@@ -63,8 +72,8 @@ class IsolationForestDetector(BaseDetector):
             return self
 
         import numpy as np
-        X = np.array(data, dtype=float).reshape(-1, 1)
-        self._forest.fit(X)
+        x_arr = np.array(data, dtype=float).reshape(-1, 1)
+        self._forest.fit(x_arr)
         self._fitted = True
         return self
 
@@ -77,8 +86,8 @@ class IsolationForestDetector(BaseDetector):
             return result
 
         import numpy as np
-        X = np.array([[point]], dtype=float)
-        raw_score = self._forest.score_samples(X)[0]
+        x_arr = np.array([[point]], dtype=float)
+        raw_score = self._forest.score_samples(x_arr)[0]
         # sklearn: more negative = more anomalous; negate so higher = more anomalous
         score = float(-raw_score)
         threshold = self._compute_threshold()
@@ -96,8 +105,8 @@ class IsolationForestDetector(BaseDetector):
             return [self.detect(p) for p in points]
 
         import numpy as np
-        X = np.array(points, dtype=float).reshape(-1, 1)
-        raw_scores = self._forest.score_samples(X).tolist()
+        x_arr = np.array(points, dtype=float).reshape(-1, 1)
+        raw_scores = self._forest.score_samples(x_arr).tolist()
         threshold = self._compute_threshold()
         return [
             {
@@ -120,22 +129,22 @@ class IsolationForestDetector(BaseDetector):
             return 0.5
         import numpy as np
         try:
-            X = np.random.randn(500, 1).astype(float)
-            baseline_scores = self._forest.score_samples(X)
+            x_arr = np.random.default_rng().standard_normal((500, 1)).astype(float)
+            baseline_scores = self._forest.score_samples(x_arr)
             return float(np.percentile(baseline_scores, self.contamination * 100))
-        except Exception:
+        except Exception:  # noqa: BLE001  # fallback to neutral threshold on scoring failure
             return 0.5
 
 
 class _ZScoreFallback:
     """Z-score fallback when sklearn is unavailable."""
 
-    def __init__(self, z_threshold: float = 3.0):
+    def __init__(self, z_threshold: float = 3.0) -> None:
         self.z_threshold = z_threshold
         self._mean: float | None = None
         self._stdev: float | None = None
 
-    def fit(self, data: list[float]) -> "_ZScoreFallback":
+    def fit(self, data: list[float]) -> _ZScoreFallback:
         import math
         if len(data) < 2:
             self._mean = sum(data) / len(data) if data else 0.0
