@@ -53,6 +53,8 @@ CLS (Cloud Log Service) is Tencent Cloud's fully managed log service providing l
 
 > Well-Architected pillars (Reliability, Security, Cost, Efficiency): see `references/well-architected-assessment.md`.
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ## Trigger & Scope (Agent-Readable)
 
 ### SHOULD Use This Skill When

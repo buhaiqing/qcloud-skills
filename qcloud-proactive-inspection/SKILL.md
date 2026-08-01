@@ -165,6 +165,8 @@ Pass `{{user.mode}}=inspection-readonly` (implicit); product skills MUST NOT mut
 | 4 | **Complete Failure Strategies** | API rate limit handling, partial resource skip, retry logic, missing-skill delegation |
 | 5 | **Absolute Single Responsibility** | One skill = proactive inspection only |
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ## Inspection Workflow
 
 ### Step 1: Discovery (发现)

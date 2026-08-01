@@ -69,6 +69,8 @@ This skill is an **operational runbook** for agents: explicit scope, credential 
 | 4 | **Complete Failure Strategies** | Error taxonomy with ≥ 10 VPN-specific codes; HALT vs retry per error type |
 | 5 | **Absolute Single Responsibility** | VPN Gateway / IPSec Connection / Customer Gateway / SSL VPN Server / SSL VPN Client only; CCN / VPC Peering / Direct Connect → sibling skills |
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ### Well-Architected Framework Integration (卓越架构)
 
 | Pillar | Skill Integration | Reference |

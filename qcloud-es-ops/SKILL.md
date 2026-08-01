@@ -57,6 +57,8 @@ Elasticsearch Service (ES) on Tencent Cloud provides a fully managed, elasticall
 
 > See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates).
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ### Well-Architected Framework Integration (卓越架构)
 
 | Pillar | Skill Integration | Reference |

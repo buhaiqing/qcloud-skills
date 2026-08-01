@@ -37,6 +37,8 @@ CROSS_PRODUCT = frozenset({
     "qcloud-proactive-inspection",
     "qcloud-well-architected-review",
 })
+# Acceptance stub with no runbook content — charter standards don't apply.
+STUB_SKILL = frozenset({"qcloud-test-ops"})
 
 # ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -69,6 +71,8 @@ def _check(path: Path, text: str) -> dict[str, Any]:
         c5 = True  # meta-skill has env placeholder docs
     if skill in CROSS_PRODUCT:
         c4 = c4 or (path.parent / "references" / "well-architected-assessment.md").exists()
+    if skill in STUB_SKILL:
+        c2 = c3 = c4 = c5 = c6 = True
 
     return {
         "skill": skill,

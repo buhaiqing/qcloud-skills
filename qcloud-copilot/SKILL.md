@@ -68,6 +68,8 @@ Every generated skill MUST satisfy these five standards:
 | 4 | **Complete Failure Strategies** | Error taxonomy: L0/L1/L2/L3 gate failures, H gate hallucinations, timeout, schema validation; HALT on any gate failure |
 | 5 | **Absolute Single Responsibility** | One orchestrator (Copilot), delegates execution to product skills; never performs direct resource CRUD |
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ## Well-Architected Framework Integration (卓越架构)
 
 | Pillar | Skill Integration | Reference |

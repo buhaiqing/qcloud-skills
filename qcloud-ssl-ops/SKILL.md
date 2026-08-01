@@ -54,6 +54,8 @@ SSL Certificate Service (SSL 证书服务) on Tencent Cloud provides certificate
 
 > Well-Architected pillars (Reliability, Security, Cost, Efficiency): see `references/well-architected-assessment.md`.
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ## Trigger & Scope (Agent-Readable)
 
 ### SHOULD Use This Skill When

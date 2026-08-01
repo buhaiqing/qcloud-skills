@@ -52,6 +52,8 @@ COS (Cloud Object Storage) on Tencent Cloud provides scalable, secure, and highl
 
 > See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#five-core-standards-quality-gates).
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ### Well-Architected Framework
 
 | Pillar | Integration |

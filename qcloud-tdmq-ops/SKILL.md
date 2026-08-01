@@ -68,6 +68,8 @@ the web console as the primary agent execution path** in `SKILL.md`.
 | 4 | **Complete Failure Strategies** | ≥ 10 TDMQ-specific error codes; HALT vs retry per error type |
 | 5 | **Absolute Single Responsibility** | TDMQ message queue management only; Kafka → `qcloud-ckafka-ops` |
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ### Well-Architected Framework Integration (卓越架构)
 
 | Pillar | Skill Integration | Reference |

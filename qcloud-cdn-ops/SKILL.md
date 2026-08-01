@@ -111,6 +111,8 @@ CDN (Content Delivery Network) is Tencent Cloud's content delivery service provi
 | 4 | **Complete Failure Strategies** | Domain validation failures, cache purge limits, origin errors |
 | 5 | **Absolute Single Responsibility** | One product (CDN), primary resource = Domain |
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ## Changelog
 
 | Version | Date | Changes |

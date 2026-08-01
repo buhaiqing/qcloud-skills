@@ -52,6 +52,8 @@ CVM operational runbook: dual-path (`tccli` + Python SDK), explicit pre-flight/v
 
 > Well-Architected pillars: see `references/well-architected-assessment.md`.
 
+- **Token Efficiency (TE-1/TE-3/TE-4)**: API queries over hardcoded tables; error tables <=3 columns; centralized JSON paths.
+
 ## Trigger & Scope
 
 **SHOULD:** CVM instance lifecycle (CRUD/start/stop/reboot/terminate), CBS disks (attach/detach/resize), snapshots/images, SSH/migration/performance issues.
