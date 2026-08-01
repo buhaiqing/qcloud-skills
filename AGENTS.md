@@ -152,8 +152,7 @@ Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` addition
 
 ## Execution lessons (CADL — distilled, reusable)
 
-> Updated as tasks land. Each item is a machine-hardened lesson, de-duplicated against
-> the rules above. Absorb these before writing `scripts/*_test.py` or any credential-masking code.
+> Machine-hardened lessons updated as tasks land; de-duplicated against rules above. Absorb before writing test or credential-masking code.
 
 ### L1 — `unittest discover` only finds `TestCase` subclasses
 裸 `def test_*(self)` 不被 discover 发现("Ran 0 tests")。必须 `class XxxTest(unittest.TestCase)` + `unittest.main()`。
@@ -211,6 +210,9 @@ mask 正则必须覆盖裸 `AKID<hex>`(无分隔符)和 `TENCENTCLOUD_SECRET_KEY
 
 ### L19 — Cross-instance races need file locks + forced reload; weak asserts mask lost updates
 `threading.Lock` 只串行化同实例;多实例/多进程共享数据目录时用 per-resource `fcntl.flock` 锁文件包住读改写,锁内**强制重载**磁盘状态(bypass 内存缓存,如 `_load_index(force_reload=True)`),否则陈旧缓存掩盖他进程更新。Windows 无 fcntl 时降级为线程锁并注释说明。并发测试用 `>= N` + `except: pass` 容忍冲突会假绿(实测双实例 15+15 保存后断言 `>=5` 通过),修复后收紧为精确断言(如 `== 31` + `errors == []`)证明零丢失。
+
+### L20 — unittest default buffer=False: direct calls to print-capable functions leak stdout into CI logs
+`python -m unittest discover` 默认 buffer=False;测试内直接调用会打印的函数(如 self_verify→_print_alerts)会把告警表格泄漏进 validate_local 日志,伪造假告警。修复:用 `contextlib.redirect_stdout(io.StringIO())` 包裹直接调用(CLI 子进程已有 capture_output 不受影响)。诊断:日志告警与 CLI 直跑矛盾时,优先怀疑测试输出泄漏而非数据漂移。
 
 ## Adding or modifying a skill
 
