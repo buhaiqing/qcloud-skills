@@ -38,3 +38,5 @@ SkillRegistry should:
 3. Route via `reg.route("...test ops...")` → "qcloud-test-ops"
 4. Return delegate_to = [{"skill": "qcloud-monitor-ops", ...}]
 5. topological_order includes this skill
+
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。
