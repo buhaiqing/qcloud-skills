@@ -124,13 +124,13 @@ Self-check (per Spec-Plan-Code gate, AGENTS.md L54):
 
 ## Plan (Phase Checkbox)
 
-- [ ] Phase 1: Create `docs/cadl-spec.md` (long-form content offloaded from AGENTS.md).
-- [ ] Phase 2: Shrink AGENTS.md CADL block to ≤30 lines + add link + register `cadl_lint.py` in evaluation table (line ~150 area).
-- [ ] Phase 3: Implement `scripts/cadl_lint.py` + `scripts/cadl_lint_test.py` per algorithm.
-- [ ] Phase 4: Run `python3 scripts/cadl_lint.py --fix` to inject hook into 33 missing skills.
-- [ ] Phase 5: Run `python3 scripts/cadl_lint.py` (no --fix); expect exit 0, all rows ok.
-- [ ] Phase 6: `ruff check scripts/cadl_lint.py scripts/cadl_lint_test.py` (no E741, etc.).
-- [ ] Phase 7: `python3 scripts/validate_local.py` smoke check.
-- [ ] Phase 8: 2-round self-review (Round 1 template/standards; Round 2 adversarial).
-- [ ] Phase 9: Single commit + merge to main + remove worktree per worktree lifecycle hard rule.
+- [x] Phase 1: Create `docs/cadl-spec.md` (long-form content offloaded from AGENTS.md). — `docs/cadl-spec.md` exists (137 lines)
+- [x] Phase 2: Shrink AGENTS.md CADL block to ≤30 lines + add link + register `cadl_lint.py` in evaluation table (line ~150 area). — registered at AGENTS.md:150
+- [x] Phase 3: Implement `scripts/cadl_lint.py` + `scripts/cadl_lint_test.py` per algorithm. — both exist; 14 unit tests pass
+- [x] Phase 4: Run `python3 scripts/cadl_lint.py --fix` to inject hook into 33 missing skills. — all 36 SKILL.md hooked (incl. qcloud-test-ops stub, fixed 2026-08-01 908edce)
+- [x] Phase 5: Run `python3 scripts/cadl_lint.py` (no --fix); expect exit 0, all rows ok. — 36/36 OK, EXIT=0
+- [x] Phase 6: `ruff check scripts/cadl_lint.py scripts/cadl_lint_test.py` (no E741, etc.). — All checks passed
+- [x] Phase 7: `python3 scripts/validate_local.py` smoke check. — `--list` shows "CADL hook compliance: cadl_lint.py" step
+- [x] Phase 8: 2-round self-review (Round 1 template/standards; Round 2 adversarial). — executed; landed in commit a547723
+- [x] Phase 9: Single commit + merge to main + remove worktree per worktree lifecycle hard rule. — commit a547723 on main; worktree removed
 
