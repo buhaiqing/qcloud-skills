@@ -1,3 +1,28 @@
+# YAML anchor for common frontmatter (TE-5: YAML anchors)
+# This anchor is used by all 34 skills to eliminate duplicate frontmatter keys
+# Each skill frontmatter should use: `<<: *common_frontmatter`
+common_frontmatter: &common_frontmatter
+  license: MIT
+  compatibility: >-
+    Official Tencent Cloud CLI (`tccli`, Python tool, pip installable),
+    Python 3.8+ runtime (for SDK fallback with tencentcloud-sdk-python),
+    valid API credentials, network access to Tencent Cloud endpoints.
+  metadata:
+    author: qcloud
+    version: "1.0.0"
+    last_updated: "2026-08-02"
+    runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
+    python_version_minimum: "3.8"
+    api_profile: "[Paste API version or doc link]"
+    cli_applicability: "dual-path"  # Choose: cli-first / dual-path / sdk-only / cli-only
+    cli_support_evidence: >-
+      [If CLI covers this product: cite confirmation via `tccli cvm help`.
+      If CLI does NOT cover: note Python SDK fallback required.]
+    environment:
+      - TENCENTCLOUD_SECRET_ID
+      - TENCENTCLOUD_SECRET_KEY
+      - TENCENTCLOUD_REGION
+
 ---
 name: qcloud-[product-name]-ops
 description: >-
@@ -8,26 +33,7 @@ description: >-
   issues, performance degradation, resource creation failures) even without
   naming the product directly. Not for billing, CAM, or related products that
   have their own ops skills.
-license: MIT
-compatibility: >-
-  Official Tencent Cloud CLI (`tccli`, Python tool, pip installable),
-  Python 3.8+ runtime (for SDK fallback with tencentcloud-sdk-python),
-  valid API credentials, network access to Tencent Cloud endpoints.
-metadata:
-  author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-05-21"
-  runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
-  python_version_minimum: "3.8"
-  api_profile: "[Paste API version or doc link]"
-  cli_applicability: "dual-path"  # Choose: cli-first / dual-path / sdk-only / cli-only
-  cli_support_evidence: >-
-    [If CLI covers this product: cite confirmation via `tccli cvm help`.
-    If CLI does NOT cover: note Python SDK fallback required.]
-  environment:
-    - TENCENTCLOUD_SECRET_ID
-    - TENCENTCLOUD_SECRET_KEY
-    - TENCENTCLOUD_REGION
+<<: *common_frontmatter
 ---
 
 > This template follows the [Agent Skill OpenSpec](https://agentskills.io/specification).
