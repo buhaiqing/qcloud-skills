@@ -1,3 +1,4 @@
+# Copyright (c) 2026. All rights reserved.
 """qcloud-agent-daemon — Persistent event-driven scheduler (L3→L4).
 
 Per ADR-0002. Zero-invasion: this package does not modify any existing

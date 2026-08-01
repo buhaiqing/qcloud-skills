@@ -1,3 +1,4 @@
+# Copyright (c) 2026. All rights reserved.
 """ResourceLockManager — per-resource advisory locks via fcntl.flock.
 
 Per ADR-0002 D5 + Spec §5. Lock key format: `{service}:{resource_id}`.
@@ -14,10 +15,13 @@ from __future__ import annotations
 
 import fcntl
 import time
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import IO, Iterator, Literal
+from typing import IO, TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 LockMode = Literal["READ", "WRITE"]
 
@@ -29,6 +33,7 @@ class LockHandle:
     Holds an open file descriptor to keep the fcntl lock alive. Do not
     store this in a way that drops it prematurely.
     """
+
     resource_key: str
     mode: LockMode
     path: Path
@@ -37,14 +42,10 @@ class LockHandle:
     def release(self) -> None:
         """Release the lock by closing the underlying fd."""
         if self._fd is not None:
-            try:
+            with suppress(ValueError, OSError):
                 fcntl.flock(self._fd.fileno(), fcntl.LOCK_UN)
-            except (ValueError, OSError):
-                pass  # fd may already be closed
-            try:
+            with suppress(ValueError, OSError):
                 self._fd.close()
-            except (ValueError, OSError):
-                pass
             self._fd = None
 
 
@@ -56,6 +57,7 @@ class ResourceLockManager:
     """
 
     def __init__(self, lock_dir: Path | str = ".runtime/locks") -> None:
+        """Initialize with lock directory, creating it if needed."""
         self.lock_dir = Path(lock_dir)
         self.lock_dir.mkdir(parents=True, exist_ok=True)
 
@@ -98,6 +100,7 @@ class ResourceLockManager:
 
     @contextmanager
     def with_read(self, resource_key: str) -> Iterator[LockHandle | None]:
+        """Context manager that acquires a read lock for the given resource."""
         handle = self.try_acquire(resource_key, mode="READ")
         try:
             yield handle
@@ -106,6 +109,7 @@ class ResourceLockManager:
 
     @contextmanager
     def with_write(self, resource_key: str) -> Iterator[LockHandle | None]:
+        """Context manager that acquires a write lock for the given resource."""
         handle = self.try_acquire(resource_key, mode="WRITE")
         try:
             yield handle

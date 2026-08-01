@@ -1,3 +1,4 @@
+# Copyright (c) 2026. All rights reserved.
 """TransientStateFilter — whitelist of "normal transient" cloud states.
 
 Per ADR-0002 D6 + Spec §6. Filters states like RUNNING / STOPPED (stable)
@@ -30,14 +31,14 @@ class TransientStateFilter:
     """
 
     def __init__(self, whitelist_dir: Path | str) -> None:
+        """Initialize with whitelist directory path."""
         self.whitelist_dir = Path(whitelist_dir)
         self._tables: dict[str, dict[str, set[str]]] = {}
         self._loaded: set[str] = set()
         # Verify whitelist_dir exists; known_services() will inspect it.
         if not self.whitelist_dir.is_dir():
-            raise FileNotFoundError(
-                f"Whitelist directory does not exist: {self.whitelist_dir}"
-            )
+            msg = "Whitelist directory does not exist: %s"
+            raise FileNotFoundError(msg % self.whitelist_dir)
 
     def _load(self, service: str) -> bool:
         """Load fixture for a service. Returns True if loaded, False if missing."""
@@ -55,7 +56,7 @@ class TransientStateFilter:
         return True
 
     def is_transient(self, service: str, state: str) -> bool:
-        """True = filter out (do not alarm); False = real state change."""
+        """Check if the (service, state) pair is transient."""
         return self.classify(service, state) == "transient"
 
     def classify(self, service: str, state: str) -> Classification:
@@ -89,8 +90,8 @@ class TransientStateFilter:
             sorted(
                 svc for svc in KNOWN_SERVICES
                 if (self.whitelist_dir / f"{svc}.json").is_file()
-            )
+            ),
         )
 
 
-__all__ = ["Classification", "KNOWN_SERVICES", "TransientStateFilter"]
+__all__ = ["KNOWN_SERVICES", "Classification", "TransientStateFilter"]
