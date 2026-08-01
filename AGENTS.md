@@ -114,16 +114,10 @@ After modifying `SKILL.md`, `references/`, or `assets/`, MUST run 2 rounds befor
 export TENCENTCLOUD_SECRET_ID=your_secret_id
 export TENCENTCLOUD_SECRET_KEY=your_secret_key
 export TENCENTCLOUD_REGION=ap-guangzhou
+cp .env.example .env   # edit TENCENTCLOUD_SECRET_ID / TENCENTCLOUD_SECRET_KEY / TENCENTCLOUD_REGION
 ```
 
-Requires `tccli` (pip-installable) and Python 3.8+. Copy `.env.example` to `.env` for local credentials.
-
-```bash
-cp .env.example .env
-# edit TENCENTCLOUD_SECRET_ID / TENCENTCLOUD_SECRET_KEY / TENCENTCLOUD_REGION
-```
-
-`qcloud-finops-ops` additionally needs `TENCENTCLOUD_FINOPS_CONFIG` (see `.env.example`).
+Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` additionally needs `TENCENTCLOUD_FINOPS_CONFIG` (see `.env.example`).
 
 ## SKILL.md frontmatter — required fields
 
@@ -162,209 +156,58 @@ cp .env.example .env
 > the rules above. Absorb these before writing `scripts/*_test.py` or any credential-masking code.
 
 ### L1 — `unittest discover` only finds `TestCase` subclasses
-Bare `def test_*(self)` functions at module top level are **NOT** discovered by
-`cd scripts && python3 -m unittest discover -p "*_test.py"` — it reports "Ran 0 tests".
-Always wrap tests in a `class XxxTest(unittest.TestCase)` and call `unittest.main()`.
-**Why:** a plan snippet with bare functions silently passes CI with zero coverage.
-**How to apply:** every new `scripts/*_test.py` must use `unittest.TestCase`.
+裸 `def test_*(self)` 不被 discover 发现("Ran 0 tests")。必须 `class XxxTest(unittest.TestCase)` + `unittest.main()`。
 
 ### L2 — Subprocess test paths must be cwd-independent
-A test that runs `subprocess.run(["scripts/validate_x.py", ...])` fails when the test
-is executed from inside `scripts/` (resolves to `scripts/scripts/...`). Use
-`Path(__file__).resolve().parent / "validate_x.py"` so the path is cwd-independent.
-**Why:** same test passes in one cwd, fails in another — flaky CI.
-**How to apply:** any `scripts/*_test.py` that shells out to a sibling script.
+`subprocess.run(["scripts/validate_x.py", ...])` 从 scripts/ 内执行会解析成 `scripts/scripts/...`。用 `Path(__file__).resolve().parent / "validate_x.py"`。
 
 ### L3 — Credential-masking regex must cover bare secret-id suffixes
-`mask_trace`-style redaction must mask `AKID<hex>` (Tencent secret id with no
-`=`/`:`/space delimiter) and `TENCENTCLOUD_SECRET_KEY=<val>`. A pattern that only
-matches `key=value` shape leaks the bare id. Use
-`re.sub(r"(AKID|secretId|secretKey)[A-Za-z0-9]+", r"\1<masked>", text)`.
-**Why:** a brittle regex passed review but leaked `AKIDabcdef12345` verbatim.
-**How to apply:** any trace/source sanitization before persistence (KPI#1).
+mask 正则必须覆盖裸 `AKID<hex>`(无分隔符)和 `TENCENTCLOUD_SECRET_KEY=<val>`。用 `re.sub(r"(AKID|secretId|secretKey)[A-Za-z0-9]+", r"\1<masked>", text)`。
 
 ### L4 — KPI rejection paths need explicit tests
-A validator may enforce a rule correctly yet have zero tests for the rejection path
-(e.g. destructive-without-token → KPI#2, `leak_checked=false` → KPI#1). Add a test
-per rejection branch so a future regression fails CI instead of passing silently.
-**Why:** correct-but-untested logic hides regressions.
-**How to apply:** every gating validator in `scripts/`.
+每个 gating 验证器的拒绝分支都要有测试(destructive-without-token → KPI#2、`leak_checked=false` → KPI#1),否则回归静默通过。
 
 ### L5 — Tests must assert populated values, not just key presence
-A test that asserts a field *exists* (`"intent_keywords" in s`) passes even when the
-value is `[]`/empty — letting a parser/transform bug through (seen: YAML block-scalar
-`>-` broke `description`→`intent_keywords` for all 30 skills). Assert the actual
-populated value (non-empty list, real substring) for at least one representative case.
-**Why:** presence-only assertions give false confidence (green CI, broken data).
-**How to apply:** every parser/extractor test in `scripts/`; pair with L1/L4.
+断言 key 存在会在值为 `[]`/空时假绿(实测:YAML block-scalar `>-` 弄坏全部 30 个 skill 的 `intent_keywords`)。至少对一个代表性用例断言真实填充值。
 
 ### L6 — New CI gates must be proven to BOTH fire and stay silent
-An additive gate (e.g. KPI gate in `validate_local`) that only passes the
-"no trigger" path gives false confidence. Prove it two ways: (1) silent /
-exit-0 when its trigger condition is absent, AND (2) fails (non-zero exit) when
-a deliberately-bad fixture that *should* trip it is dropped in. For the KPI gate
-this meant crafting an `evidence-*.json` with `safety.leak_checked=false` and
-asserting `validate_local` exits 1 with "KPI targets unmet".
-**Why:** a gate that never rejects is a no-op wearing a green checkmark.
-**How to apply:** every additive CI/quality gate in `scripts/`; craft a negative
-fixture that must trip it and assert the non-zero exit (pairs with L4).
+新门禁双向证明:(1) 无触发条件时 exit-0 静默;(2) 故意坏的 fixture 触发时 exit≠0(如 `evidence-*.json` 带 `safety.leak_checked=false` → validate_local exit 1)。
 
 ### L7 — Re-read the live target file before writing integration specs
-A written plan's integration steps are HYPOTHESES, not instructions. Earlier or
-parallel efforts may have already implemented the piece you planned to add. On
-this branch, `gcl_runner.py` (from an unrelated prior commit) ALREADY had
-`mask_secrets()`, `run_command(timeout=...)`, and `persist_trace()` — so the
-plan's "add timeout to subprocess.run" / "replace persistence with post_record"
-snippets would have conflicted and broken the L4 metrics tracker. Re-reading the
-live file first turned a would-be regression into a clean additive integration.
-**Why:** executing plan integration snippets against a drifted target causes
-duplication or breakage the reviewer must undo.
-**How to apply:** before any task that edits an existing file, Read the current
-file (or grep its defs) and reconcile the plan step with reality; adapt the spec
-to be strictly additive when the capability already exists.
+计划中的集成步骤是假设不是指令——目标文件可能已被并行工作实现(gcl_runner.py 已有 mask_secrets/run_command/persist_trace)。编辑前 Read 当前文件,规范改为严格增量。
 
 ### L8 — Green but vacuous: assert metrics are non-vacuous, not just well-typed
-A test that checks "returns a float in [0,1]" passes even when the algorithm is
-starved of data or uses a wrong matching strategy. The router's confusion_matrix
-returned valid floats (test passed) but was 0.0 everywhere — because (a) the
-registry had 21/30 skills with EMPTY intent_keywords (L5), and (b) raw substring
-matching can't match CamelCase `DescribeInstances` against `describe my cvm
-instances`. Fix required BOTH enriching the source data AND correcting the
-algorithm (token-overlap on CamelCase-split words). For any ranking/ML-style
-component, assert the metric is MEANINGFUL (e.g. `top1_accuracy > 0` on real
-fixtures), not just well-typed. Pairs with L5/L6.
+"返回合法 float" 断言在算法饿数据/匹配策略错时也通过(confusion_matrix 全 0.0)。ranking/ML 组件断言指标 MEANINGFUL(如 `top1_accuracy > 0`)。
 
 ### L9 — Consumer quality is bounded by producer data contract
-A consumer (router) only parses what the producer (registry) emits. The router
-"passed" while the registry fed it empty keywords — the bug lived upstream. When
-a component depends on data from another module, verify the PRODUCER emits
-populated, correctly-shaped data (here: enrich `intent_keywords` from the skill's
-own curated `eval_queries.json intents`), rather than papering over the gap in
-the consumer. Trace the data contract end-to-end before declaring a feature done.
+消费方只解析生产方发出的数据;组件依赖另一模块数据时,先验证 PRODUCER 发出填充且形状正确的数据,别在消费方打补丁。端到端追踪数据契约再宣布完成。
 
 ### L10 — Convergence gates on runtime artifacts must skip gracefully, not fail
-The single-entry scripts/Makefile `all` target wires validate → registry →
-golden → kpi. The `kpi` step consumes `audit-results/evidence-*.json`, which is
-(1) generated only at runtime and (2) gitignored. A naive `python3
-aggregate_kpi.py audit-results/evidence-*.json` would explode (no match → argv
-literal → FileNotFound) on a clean checkout, turning a green pipeline red. Fix:
-guard the recipe with `if ls audit-results/evidence-*.json >/dev/null 2>&1; then
-…; else echo "skipped"; fi`. This is the COUNTERPART of L6 (prove gates fire)
-and L4 (rejection tests): gates on *optional runtime output* must be silent-skip
-when absent, while gates on *committed input* must hard-fail. Pair the skip with a
-unit/integration test that asserts the gate DOES fire when the artifact IS
-present (see aggregate_kpi rejection tests, L4/L6).
+依赖 gitignored/运行时产物(如 `audit-results/evidence-*.json`)的入口必须缺省时静默跳过(`if ls ...; then ...; else echo "skipped"; fi`);对已提交输入的门禁必须硬失败。配测试证明 artifact 存在时确实触发。
 
-**Why:** a convergence entry point that fails on a clean checkout blocks every
-dev and CI run that hasn't produced evidence yet — the pipeline becomes unc0mmittable.
-**How to apply:** any Makefile/CI step that depends on gitignored or
-runtime-generated files; make it skip-with-message when absent, and keep a
-separate test proving it rejects when present.
-
-### L11 — A KPI gate is only as real as the data it ingests (close the producer→consumer gap)
-After wiring the Evidence Kernel, `aggregate_kpi` KPIs `#2 destructive_coverage`
-and `#3 provenance` were GREEN but VACUOUS: `emit_evidence_record` HARDCODED
-`"destructive": False` and `"token": env_value` (never consulting the real
-`preflight`/`bind_token` result already computed in `cmd_run`), while `provenance`
-was scored truthy on ANY dict — so both KPIs were pinned at 1.0 and could never
-fail. The fix was two-sided (L9 again): (a) PRODUCER — thread the actual PreFlight
-`pf` into `emit_evidence_record` and emit real `destructive` + `token_bound`;
-(b) CONSUMER — require `provenance.source` ∈ a known enum, and count `token_bound`
-not raw token presence. Then add REJECTION tests proving each gate fires (a
-destructive op without a bound token → exit 1; unknown provenance source → exit 1).
-**Why:** a metric computed from hardcoded/pinned inputs is indistinguishable from
-a real one in CI but gives false assurance (repeats L8 at the data layer).
-**How to apply:** when a gate reads data emitted by another module, trace the
-PRODUCER's actual emission (don't trust the field name) AND assert the CONSUMER
-rejects malformed/empty input; ship both halves with a firing test.
+### L11 — A KPI gate is only as real as the data it ingests
+门禁读另一模块 emit 的数据时,追踪 PRODUCER 实际发射(别信字段名:曾硬编码 `"destructive": False`)且 CONSUMER 拒绝畸形/空输入;两侧都配触发测试(无 token 破坏性操作 → exit 1)。
 
 ### L12 — Stricter detection that fixes a bug can break tests relying on the bug
-A correctness fix that makes detection stricter (e.g. `is_destructive` moved from
-exact word-match to prefix-match so "deleted"/"removes" are caught) will make
-previously-passing tests fail — NOT because the fix is wrong, but because the test
-was written against the OLD, buggy behavior. In `gcl_runner_reflexion_test`, the
-command `tccli cvm TerminateInstances` had slipped past the gate under the old
-matcher; the fix correctly flags it, so `cmd_run` now returns 2 (PREFLIGHT
-BLOCKED). Resolution: update the TEST to satisfy the gate (set
-`HARNESS_CONFIRM_TOKEN = plan_hash(command)` around the call) — do NOT revert the
-fix to make the test green.
-**Why:** reverting a real correctness fix to satisfy a test reinstates the bug
-(here: a destructive-op safety gate bypass).
-**How to apply:** when a behavior fix breaks a test, first ask "was the test
-asserting the bug?" If yes, update the test to the corrected contract; only
-revert the fix if the new behavior is itself wrong.
+修复使检测更严格时旧测试会失败——先问"测试是否在断言 bug?"是 → 更新测试到修正后的契约(如设 `HARNESS_CONFIRM_TOKEN = plan_hash(command)`),不要 revert 修复。
 
 ### L13 — Destructive-verb detection must be inflection-tolerant
-`v in plan_text.lower().split()` matches only the exact token "delete"; inflected
-forms ("deleted", "removes", "removing", "stopping") slip through. Any
-destructive/risk classifier must match on a verb STEM or prefix, not exact
-word equality. Single source of truth: `harness_safety.VERBS`, reused by
-`evidence_kernel` (avoid duplicating the set — drift = one path misses a verb).
-**Why:** a single missed inflection silently disables the human-confirmation gate
-for genuinely destructive plans (highest-risk safety gap).
-**How to apply:** all destructive/sensitive keyword matchers in this repo; use
-`t == v or t.startswith(v)` over a shared verb set.
+破坏性动词匹配必须容忍屈折("deleted"/"removes"/"stopping"):用 `t == v or t.startswith(v)`,单一来源 `harness_safety.VERBS` 复用,不复制。
 
 ### L14 — Major architectural initiative: build CHECKPOINT.md FIRST
-Before writing any artifact for a multi-file initiative (>3 artifacts), create
-`.runtime/<scope>/CHECKPOINT.md` with: status table, step list, hard constraints,
-resumption log. The file is BOTH progress UI AND resume protocol — if the session
-drops mid-flight, the next session reads it and resumes cleanly. Update on each
-step flip. **Why:** the 2026-07-28 L3→L4 daemon initiative (3 ADRs + Spec + Plan
-+ AGENTS update) lost 2 exchanges to mid-session aborts before this pattern
-was applied; CHECKPOINT.md reduced restart cost from "re-read everything"
-to "read top-of-file + the last ✅ step". **How to apply:** any task with
-the word "架构决策 / migration / 重构 / 跨多个目录" — build checkpoint before
-first artifact.
+多文件倡议(>3 artifacts)先建 `.runtime/<scope>/CHECKPOINT.md`(状态表 + 步骤 + 硬约束 + 续跑日志),每步翻转时更新——断点恢复成本从"重读一切"降到"读顶部 + 最后 ✅"。
 
 ### L15 — Multi-perspective review without sub-agents: fold into artifact bodies
-When user asks for "multi-role review / 多人讨论 / 多个视角" but environment
-does not support parallel sub-agents (`spawn_agent` returns unsupported),
-fold each perspective into the relevant ADR/Spec as a dedicated section (e.g.
-"§X Architect-Perspective Risks", "§Y Domain Use Cases", "§Z Quality
-Invariants") instead of producing standalone opinion docs. **Why:** standalone
-opinion docs (2026-07-28 plan called for A1/A2/A3 + STATE-OF-UNION + 2 review
-docs = 7 files for what was actually 5 final artifacts) inflate token cost 30-50%
-and force orchestrator to re-cross-reference. Folding gives the same value
-inline. **How to apply:** any task that says "stakeholder / multi-role / multi-
-perspective" — confirm sub-agent availability FIRST; if unavailable, plan for
-fold-in rather than separate docs.
+无并行子代理时,把多角色视角折进相关 ADR/Spec 的专属小节(§Architect Risks / §Domain Use Cases / §Quality Invariants),不产独立意见文档(省 30-50% token)。
 
 ### L16 — AGENTS.md surgical edits at >500 lines
-When AGENTS.md is >500 lines, use line-anchored `sed -i.bak`
-with `a\` (append-after) for table row insertions and short section additions.
-Always `cp AGENTS.md /tmp/AGENTS.md.bak` first; verify with `diff` post-edit;
-remove `.bak` after. Never wholesale-rewrite the file. **Why:** the file is
-referenced from many places and rewriting risks losing alignment markers
-(CADL hook line references, L*-rule numbers) that downstream tools depend on.
-**How to apply:** any edit to AGENTS.md, especially when adding a new L*-rule
-or Key Reference row.
+>500 行时用行锚定 `sed -i.bak` + `a\` 追加;先 `cp AGENTS.md /tmp/AGENTS.md.bak`,diff 验证后删 .bak;绝不整体重写(会丢 CADL hook 行引用、L*-rule 编号等对齐标记)。
 
 ### L17 — YAML frontmatter readers must look up `metadata.*` first, fallback top-level
-The canonical skill-template places runtime fields (`cli_applicability`,
-`version`, `last_updated`) at top-level; real `qcloud-*-ops/SKILL.md` files
-nest them under `metadata.*`. Readers must try `metadata.<key>` **before**
-falling back to top-level, otherwise ~30 files report empty fields and
-downstream consumers silently misclassify. **How to apply:**
-```python
-val = (meta.get(key) if isinstance(meta, dict) else "") or fm.get(key, "")
-```
-Pair with L5: when a field can come from either source, tests should assert
-populated values, not just key presence. **Why:** Phase 1 commit 60a6cf8
-fixed `SkillRegistry` reporting empty `cli_applicability` despite
-frontmatter visibly containing the field — bug lived in lookup order.
+读取 SKILL.md frontmatter 先查 `metadata.<key>` 再回退顶层:`val = (meta.get(key) if isinstance(meta, dict) else "") or fm.get(key, "")`(否则 ~30 文件报空字段,Phase 1 commit 60a6cf8)。
 
 ### L18 — `ruamel.yaml` round-trip preserves per-sequence indent; `yaml.dump` does not
-Bulk-mutating YAML frontmatter (e.g. adding `product_name` /
-`operation_aliases` / `param_mapping` under `metadata.*`) requires preserving
-each list sequence's existing indent style. Use `ruamel.yaml.YAML(typ="rt")`
-plus `YAML.indent(mapping=2, sequence=4, offset=2)`; do **not** substitute
-`PyYAML`'s `yaml.dump`, which re-emits everything at one uniform indent and
-inflates diffs across 30 files. **How to apply:** always run `--dry-run`
-first; a missing `indent(...)` call silently switches all sequences to the
-same width. **Why:** Phase 1 commit f764c9a kept 2-space `related_skills`
-while introducing 4-space `metadata.*` sub-keys; PyYAML would have churned
-every SKILL.md for no semantic gain.
+批量改 frontmatter 用 `ruamel.yaml.YAML(typ="rt")` + `YAML.indent(mapping=2, sequence=4, offset=2)`;别用 PyYAML `yaml.dump`(统一缩进会搅动 30 文件 diff,Phase 1 commit f764c9a)。先 `--dry-run`。
 
 ## Adding or modifying a skill
 
@@ -404,13 +247,10 @@ Detailed specs externalized to reduce context size. Read before modifying:
 
 ### GCL hard constraints
 
-- Production GCL requires isolated Generator and Critic contexts.
-- Critic is read-only (no `tccli`/SDK calls, no resource mutation).
-- Critic sees only sanitized `{{output.operation_intent}}`, Generator output, trace, and rubric.
+- Production GCL requires isolated Generator and Critic contexts. Critic is read-only (no `tccli`/SDK calls, no resource mutation) and sees only sanitized `{{output.operation_intent}}`, Generator output, trace, and rubric.
 - Orchestrator generates `operation_intent` before Critic scoring (omits raw user wording, credentials, sensitive IDs).
 - `Safety = 0` / `SAFETY_FAIL` aborts immediately.
-- Every GCL loop bounded by `max_iterations`.
-- Every GCL run persists masked trace under `audit-results/gcl-trace-*.json`.
+- Every GCL loop bounded by `max_iterations`; persists masked trace under `audit-results/gcl-trace-*.json`.
 - Production MUST use external isolated Critic scores; `--structural-critic-only` only for CI/local smoke tests.
 - GCL prompt templates use `{{env.*}}`/`{{user.*}}`/`{{output.*}}` (no bare `{...}`).
 
@@ -418,26 +258,18 @@ Detailed specs externalized to reduce context size. Read before modifying:
 
 - Reflexion retrieval is optional hint, not mandatory gate.
 - `docs/failure-patterns.md` ≤ 200 lines.
-- Deduplicate patterns by `skill` + `command` + `error`.
-- Patterns from GCL trace `failure_pattern` or self-review findings only.
+- Deduplicate patterns by `skill` + `command` + `error`; from GCL trace `failure_pattern` or self-review findings only.
 - Promote high-frequency patterns to anti-pattern docs.
-
-### Relationship to build-time self-review
-
-Build-time 2-round self-review and runtime GCL are independent gates.
+- Independent gate from build-time 2-round self-review (build-time and runtime GCL are separate gates).
 
 ## GCL Trigger Check (MANDATORY)
 
-Before coding, check if GCL is required:
-
-### Check List
+Before coding, check if GCL is required — any YES triggers GCL Multi sub-Agent architecture:
 
 1. **Task type**: Contains 修复/新增/重构/变更/优化/测试 or fix/add/refactor/change/optimize/test? → YES
 2. **Code lines**: Expected change >5 lines? → YES
 3. **File type**: Modifying `*/SKILL.md`, `*/references/rubric.md`, `*/references/prompt-templates.md`, `AGENTS.md`, `qcloud-skill-generator/SKILL.md`, `docs/gcl-spec.md`, `docs/reflexion-memory.md`? → YES
 4. **Ops config**: Modifying YAML/JSON/TOML/HCL/Terraform/K8s/Ansible/Docker Compose? → YES (no exceptions)
-
-If any YES, trigger GCL Multi sub-Agent architecture.
 
 ### GCL Execution Steps (when triggered)
 
@@ -452,19 +284,15 @@ If any YES, trigger GCL Multi sub-Agent architecture.
 ### Hard Rule: Worktree Lifecycle (applies to ALL worktree tasks)
 
 Every feature developed in a git worktree MUST be merged back to `main` and the
-worktree cleaned up once the task is complete. This is mandatory for **every**
-worktree — not only GCL-triggered ones.
+worktree cleaned up once the task is complete — mandatory for **every** worktree,
+not only GCL-triggered ones.
 
-1. **Merge back**: From the `main` checkout, `git merge --no-ff feature/<feature>` (or
-   fast-forward if linear) so the work lands on `main`.
-2. **Clean up**: `git worktree remove ../<repo>-<feature> --force` then
-   `git branch -d feature/<feature>` to delete the stale branch.
-3. **Verify**: `git worktree list` shows only the `main` checkout; no orphaned
-   worktree directories remain on disk.
+1. **Merge back**: From the `main` checkout, `git merge --no-ff feature/<feature>` (or fast-forward if linear).
+2. **Clean up**: `git worktree remove ../<repo>-<feature> --force` then `git branch -d feature/<feature>`.
+3. **Verify**: `git worktree list` shows only the `main` checkout; no orphaned worktree directories remain on disk.
 
 Do NOT leave feature branches or worktree directories around after the task is
-done. A completed worktree that is not merged+removed is considered an incomplete
-handoff.
+done. A completed worktree that is not merged+removed is an incomplete handoff.
 
 ### Exceptions
 
@@ -525,23 +353,18 @@ ADR 记录**跨子系统**架构决策（参见 [`docs/architecture/ADR-0001-est
 
 > **Agent-Agnostic note:** CodeGraph is an optional local tool. If the current agent
 > environment provides it (`.codegraph/` + `codegraph_explore`), the rules below are
-> **mandatory** and must be followed before any Grep/Read. If CodeGraph is unavailable,
-> fall back to Read / Grep directly — the *expected result* (accurate, blast-radius-aware
-> code understanding) is unchanged. This rule never blocks work on environments without CodeGraph.
+> **mandatory**. If unavailable, fall back to Read / Grep directly — the *expected
+> result* (accurate, blast-radius-aware code understanding) is unchanged. Never blocks work.
 
 `.codegraph/` (SQLite KG + file watcher) pre-indexes every symbol, edge, and call
 path in THIS repo. `codegraph_explore` is the Read-equivalent: one capped call
-returns verbatim source PLUS caller/callee blast-radius and test-coverage flags —
-faster and more accurate than any grep+read loop or sub-agent code-mapping.
-
-**This repo already enforces the sync half of this discipline in
-`qcloud-copilot/SKILL.md` ("改 `.py` 后 `codegraph sync`") and in the two
-`agent-inspection-prompt.md` checklists.**
+returns verbatim source PLUS caller/callee blast-radius and test-coverage flags.
+Sync half already enforced in `qcloud-copilot/SKILL.md` ("改 `.py` 后 `codegraph sync`")
+and the two `agent-inspection-prompt.md` checklists.
 
 ### Rule 0 — CodeGraph-first, Grep-last (P0, hard rule)
 
-For ANY code-understanding task in THIS repo (reading symbols, tracing call paths,
-understanding architecture, finding definitions), the execution order is:
+For ANY code-understanding task in THIS repo, execution order:
 
 ```
 A. Execute codegraph_explore     ← MUST try first (when CodeGraph available)
@@ -549,80 +372,58 @@ B. Fallback to Read (specific file)  ← only if CodeGraph unavailable or stalen
 C. Resort to Grep                  ← LAST RESORT, only for patterns CodeGraph can't answer
 ```
 
-**Violation**: Using Grep or launching Explore sub-agents for code-understanding
-tasks that `codegraph_explore` can answer is a process violation. The anti-pattern
-(5 Explore sub-agents, 16–22 min, zero results vs. one `codegraph_explore` call)
-is documented in Rule 4 below.
+**Violation**: Grep or Explore sub-agents for tasks `codegraph_explore` can answer is
+a process violation (5 Explore sub-agents, 16–22 min, zero results vs one call — see Rule 4).
 
 ### Rule 1 — Query-first (highest frequency)
 
-Before ANY code-understanding work in THIS repo, prefer `codegraph_explore` with symbol/file
-names or a natural-language question. ONE call usually answers the whole question
-and returns source you can `Edit` from directly. (If CodeGraph is unavailable, Read / Grep the source directly — same expected outcome.)
-
-- "how does X work" / architecture / a bug / "where is X" → `codegraph_explore`
-- Reading/editing a named symbol → put its name in the query; treat returned
-  source as already Read.
-- Need a flow across symbols → name the endpoints; it rides dynamic-dispatch
-  hops grep can't follow and returns the path.
+Prefer `codegraph_explore` with symbol/file names or a natural-language question;
+ONE call usually answers the whole question and returns source you can `Edit` from
+directly. "how does X work" / architecture / a bug / "where is X" → `codegraph_explore`.
+Reading/editing a named symbol → put its name in the query; treat returned source as
+already Read. Need a flow across symbols → name the endpoints; it rides
+dynamic-dispatch hops grep can't follow.
 
 ### Rule 2 — API-First before writing tests or invoking external tools (P0 when CodeGraph available)
 
 Before writing tests for any module/class, or before calling an external tool/MCP
-that depends on a module's API, you MUST confirm the actual signature with
-`codegraph_explore`. Writing tests against a misread or outdated signature produces
-three costs: (1) tests that crash at import, (2) tests that pass against the wrong
-behavior, (3) rework every time the discrepancy surfaces in CI.
-
-**Workflow**:
-1. `codegraph_explore <symbol_name>` → get actual signature + field names
-2. If stale (staleness banner) → `Read` the file directly to confirm
-3. Only then write tests or call the external tool with correct arguments
-
-**Fallback** (when CodeGraph unavailable): `Read` the source file directly — same
-expected outcome, no sub-agents or grep+read loops.
-
-**This rule applies to ALL test files**, including tests for modules written in
-previous sessions or by other agents.
-
-**Evidence from this repo**: Writing unit tests for `ml/predictors/` and
-`lib/selective_workflow` without confirming signatures → `TypeError` on every
-test (3 rounds of rework). After confirming signatures via `codegraph_explore`,
-all 49 tests pass in one shot.
+that depends on a module's API, confirm the actual signature with `codegraph_explore`.
+Misread signatures cause: (1) tests that crash at import, (2) tests that pass against
+wrong behavior, (3) rework in CI. **Workflow**: `codegraph_explore <symbol_name>` →
+if stale (staleness banner) `Read` the file → only then write tests. **Fallback**
+(no CodeGraph): `Read` the source directly. Applies to ALL test files, including
+those written in previous sessions or by other agents. Evidence: `ml/predictors/` and
+`lib/selective_workflow` tests without signature confirmation → `TypeError` on every
+test (3 rounds of rework); after confirmation, all 49 tests pass in one shot.
 
 ### Rule 3 — Sync after edits
 
-After editing `.py` / `.ts` / `.go` / `.rs` / etc. in a CodeGraph-enabled environment, the index lags writes by
-~1s via the file watcher. Before the NEXT `codegraph_explore` that depends on the
-edit, confirm sync (the daemon auto-syncs on file change; if a query returns a
-staleness banner for a file you just wrote, `Read` that specific file).
+After editing code files in a CodeGraph-enabled environment, the index lags writes by
+~1s. Before the NEXT `codegraph_explore` that depends on the edit, confirm sync; if a
+query returns a staleness banner for a file you just wrote, `Read` that specific file.
 
 ### Rule 4 — anti-pattern: Grep/sub-agent for indexed code (CodeGraph environments)
 
-Do NOT fire `explore` / `librarian` sub-agents or run grep+read loops to map
-code THIS repo already indexes. In one session, 5 delegated `explore` agents for
-code-mapping hung 16–22 min and returned nothing; the same `codegraph_explore`
-call answered in one round-trip WITH blast-radius + "⚠️ no tests" coverage flags.
-Delegated agents are for UNINDEXED targets (other repos, web, docs), never for
-re-deriving the local KG. (In non-CodeGraph environments this rule is moot — just Read / Grep directly.)
-
-**This is the canonical evidence for Rule 0. See Rule 0 for the mandatory execution order.**
+Do NOT fire `explore` / `librarian` sub-agents or run grep+read loops to map code THIS
+repo already indexes (one session: 5 delegated `explore` agents hung 16–22 min and
+returned nothing; one `codegraph_explore` call answered with blast-radius + coverage
+flags). Delegated agents are for UNINDEXED targets (other repos, web, docs), never for
+re-deriving the local KG. (In non-CodeGraph environments this rule is moot — just Read / Grep.)
 
 ### Rule 5 — scope guard
 
-- CodeGraph covers THIS repo only. For an unindexed project, run `codegraph init`
-  first (don't run it yourself unprompted — it's the user's decision; only relevant where CodeGraph is present).
+- CodeGraph covers THIS repo only. For an unindexed project, run `codegraph init` first
+  (don't run it yourself unprompted — it's the user's decision).
 - It does NOT index configs/docs as code; use Read/Grep for those.
-- It is read-only intelligence. Correctness is still the compiler/tests' job —
-  trust the returned source, but verify with LSP/tests before claiming done.
+- It is read-only intelligence. Correctness is still the compiler/tests' job — trust
+  the returned source, but verify with LSP/tests before claiming done.
 
 ### What to extract from each result
 
 - **Source blocks**: safe to Edit from; do not re-Read.
-- **Blast radius** ("N callers", "⚠️ no tests found"): scope your change and
-  know what needs new tests BEFORE editing.
-- **Staleness banner**: only the listed files are pending re-index — Read those,
-  trust the rest.
+- **Blast radius** ("N callers", "⚠️ no tests found"): scope your change and know
+  what needs new tests BEFORE editing.
+- **Staleness banner**: only the listed files are pending re-index — Read those, trust the rest.
 
 ## Code Review Best Practices
 
@@ -630,32 +431,15 @@ re-deriving the local KG. (In non-CodeGraph environments this rule is moot — j
 
 ### Review 时必须检查的边界（与测试正交）
 
-**审计/日志类**：
-- `__exit__` 是否 re-raise 原始异常？静默吞异常 = 审计数据丢失（CRITICAL）
-- 写入文件时磁盘满 / 权限错误是否有 fallback？
-
-**外部调用类**：
-- `subprocess.run()` 后是否检查 `returncode`？错误信息是否可见给调用方？
-- tccli/API 失败时调用方是否一致检查 `"Error"` key？
-
-**正则类**：
-- regex 是否在 `__post_init__` 预编译（不在循环/热路径现编译）？
-- 是否有搜索长度限制（`[:10_000]`）防止 ReDoS？
-
-**Fallback/降解类**：
-- 模块级 fallback 用 `except Exception` 而非 `except ImportError`（捕获语法错误和传递依赖）
-- 外部库私有属性（`_tree_variance` 等）跨版本可能失效 → 用公共 API 替代
-
-**Docstring 类**：
-- 示例代码块 `sw = SelectiveWorkflow(...)` 是否与实际 `__init__` 签名一致？
-- 默认路径/配置是否与代码一致？
+- **审计/日志类**：`__exit__` 是否 re-raise 原始异常？（静默吞异常 = 审计数据丢失, CRITICAL）；写入文件时磁盘满 / 权限错误是否有 fallback？
+- **外部调用类**：`subprocess.run()` 后是否检查 `returncode`？错误信息是否可见给调用方？tccli/API 失败时是否一致检查 `"Error"` key？
+- **正则类**：regex 是否在 `__post_init__` 预编译（不在循环/热路径现编译）？是否有搜索长度限制（`[:10_000]`）防止 ReDoS？
+- **Fallback/降解类**：模块级 fallback 用 `except Exception` 而非 `except ImportError`（捕获语法错误和传递依赖）；外部库私有属性（`_tree_variance` 等）跨版本可能失效 → 用公共 API 替代
+- **Docstring 类**：示例代码块是否与实际 `__init__` 签名一致？默认路径/配置是否与代码一致？
 
 ### Review 产出标准
 
-每条 issue 必须包含：
-- `file:line` 精确定位
-- severity 评级（CRITICAL/HIGH/MEDIUM/LOW）
-- 修复建议（具体代码，不是方向）
+每条 issue 必须包含：`file:line` 精确定位、severity 评级（CRITICAL/HIGH/MEDIUM/LOW）、修复建议（具体代码，不是方向）。
 
 ### 子 Agent MCP 不可用时的 Fallback
 
@@ -686,28 +470,23 @@ code-reviewer 返回 403 → 直接用 `Read` 工具读文件，手动执行上�
 
 ### 范围认定
 
-进度文档包括：
-- `docs/superpowers/plans/*.md` 中的 Phase/Step checkbox 表
-- `docs/superpowers/specs/*.md` 中的 DoD/验收标准对照表
+进度文档包括：`docs/superpowers/plans/*.md` 中的 Phase/Step checkbox 表、`docs/superpowers/specs/*.md` 中的 DoD/验收标准对照表。
 
-每项勾选须注明：
-- 状态：`[x]` 完成 / `[⚠️]` 部分完成 / `[❌]` 放弃
-- 证据：commit hash（若已提交）或变更摘要
-- 说明：关键决策、遗留项、与其他 Phase 的依赖
+每项勾选须注明：状态（`[x]` 完成 / `[⚠️]` 部分完成 / `[❌]` 放弃）、证据（commit hash 或变更摘要）、说明（关键决策、遗留项、跨 Phase 依赖）。
 
 ### 最小更新单位
 
 - 单个 `[ ]` 勾选可单独更新，无需等待整个 Phase 完成
-- 跨 Phase 共用项（如身份语义）在一个 Phase 更新后，其他 Phase 同步勾注引用
+- 跨 Phase 共用项在一个 Phase 更新后，其他 Phase 同步勾注引用
 - DoD 未满足但需继续前进时，先标记 `[⚠️]` + 说明阻塞原因，再继续
 
 ### 反模式
 
 | 反模式 | 正确做法 |
 |---|---|
-| 任务完成后不更新 plan，留在 `[ ]` 状态 | 按本规范立即更新 checkbox + 证据 |
+| 任务完成后不更新 plan，留在 `[ ]` 状态 | 立即更新 checkbox + 证据 |
 | 遗留项不记录，假装已完成 | 标记 `[ ]` 保留或 `[❌]` + 说明原因 |
-| 只更新 checkbox 不写证据（commit/摘要） | 证据是必需的；无 commit 时写变更摘要 |
+| 只更新 checkbox 不写证据 | 证据是必需的；无 commit 时写变更摘要 |
 | 批量完成后一次性补更新 | 单项完成即更新，不攒批 |
 
 ### 与 CADL 的关系
