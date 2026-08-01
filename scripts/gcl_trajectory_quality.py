@@ -24,6 +24,14 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+# Drift detection is a post-run diagnostic owned by distribution_drift.py (a
+# parallel effort is rewriting it to a dict contract). Guard the import so the
+# main pipeline never crashes when analyze_drift is unavailable.
+try:
+    from distribution_drift import analyze_drift
+except ImportError:
+    analyze_drift = None
+
 # Minimal inline op_type classifier — avoids circular import
 _DELETES = frozenset({"delete", "destroy", "release", "remove",
                         "cancel", "drop", "terminate", "purge"})
@@ -580,11 +588,57 @@ def self_verify() -> bool:
     return True
 
 
+def _drift_metric_values(result: dict[str, Any], metric: str) -> dict[str, Any]:
+    """Resolve an alert metric (`skill/dimension` or `global/dimension`) to its values dict."""
+    skill, _, name = metric.partition("/")
+    if skill in ("", "global"):
+        return result.get(name, {})
+    return result.get("per_skill", {}).get(skill, {}).get(name, {})
+
+
+def _format_drift_alert(alert: dict[str, Any], values: dict[str, Any]) -> str:
+    """Format one drift alert line per the spec console format."""
+    severity = alert.get("severity")
+    direction = alert.get("direction") or values.get("direction") or "→"
+    drift = alert.get("drift", values.get("drift", 0.0))
+    icon = "⚠" if severity in ("high", "medium") else "→"
+    sev = f"⚠ {severity}" if severity in ("high", "medium") else (severity or "stable")
+    return (
+        f"{icon}  {alert['metric']}: recent={values.get('recent', 0.0):.0%}  "
+        f"baseline={values.get('baseline', 0.0):.0%}  {direction}{drift * 100:+.0f}%  {sev}"
+    )
+
+
+def _run_drift(traces: list[dict[str, Any]], since_hours: int, emit_json: bool, result: dict[str, Any]) -> None:
+    """Run distribution-drift detection; fold into result JSON or print console lines.
+
+    Post-run diagnostic — never raises, never blocks the main pipeline.
+    """
+    if analyze_drift is None:
+        print("DISTRIBUTION_DRIFT: analyze_drift unavailable (skipped)", file=sys.stderr)
+        return
+    try:
+        drift_result = analyze_drift(traces, since_hours)
+    except Exception:  # noqa: BLE001
+        print("DISTRIBUTION_DRIFT: detection failed (skipped)", file=sys.stderr)
+        return
+    if "error" in drift_result:
+        print(f"DISTRIBUTION_DRIFT: {drift_result['error']}", file=sys.stderr)
+        return
+    if emit_json:
+        result["distribution_drift"] = drift_result
+        return
+    print("\n=== 分布漂移检测 (recent=7d vs baseline=8-30d) ===")
+    for alert in drift_result.get("alerts", []):
+        print(_format_drift_alert(alert, _drift_metric_values(drift_result, alert["metric"])))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--since-hours", type=int, default=720, help="Analyze traces from last N hours (default: 720 = 30 days)")
     parser.add_argument("--json", action="store_true", help="Output JSON to stdout")
+    parser.add_argument("--drift", action="store_true", help="Run distribution-drift detection over two windows")
     parser.add_argument("--dry-run", action="store_true", help="Self-verify with synthetic data")
     args = parser.parse_args()
 
@@ -630,6 +684,9 @@ def main() -> int:
                 print(f"    ⚠  {a['skill']}/{a['op_type']}: pass_rate={a['pass_rate']:.0%} ({a['total']} traces)")
 
     print(f"\n  Output: {out_path}")
+
+    if args.drift:
+        _run_drift(traces, args.since_hours, args.json, result)
 
     if args.json:
         print(json.dumps(result, indent=2))

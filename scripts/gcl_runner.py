@@ -761,18 +761,20 @@ def post_process(trace_path: Path, root: Path) -> None:
             mid = len(all_traces) // 2
             w2 = all_traces[mid:]   # newer half
             w1 = all_traces[:mid]   # older half
-            drifts = compute_drift(w1, w2)
-            if drifts:
+            result = compute_drift(w1, w2)
+            if "error" in result:
+                print(f"DISTRIBUTION_DRIFT: {result['error']}", file=sys.stderr)
+            else:
+                alerts = result.get("alerts", [])
                 print(
-                    f"DISTRIBUTION_DRIFT: {len(drifts)} dimension(s) drifting",
+                    f"DISTRIBUTION_DRIFT: {len(alerts)} alert(s)",
                     file=sys.stderr,
                 )
-                for d in drifts:
+                for a in alerts:
                     print(
-                        f"  [{d['skill']}/{d['dimension']}] "
-                        f"w1_mean={d['window1_mean']:.3f} "
-                        f"w2_mean={d['window2_mean']:.3f} "
-                        f"delta={d['delta']:.3f} [{d['alert']}]",
+                        f"  [{a['metric']}] drift={a['drift']:.3f} "
+                        f"sigma={a['drift_sigma']:.3f} [{a['direction']}] "
+                        f"severity={a['severity']}",
                         file=sys.stderr,
                     )
     except Exception:  # noqa: BLE001, S110
