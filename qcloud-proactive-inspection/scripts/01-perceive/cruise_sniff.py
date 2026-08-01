@@ -15,9 +15,9 @@ DEFAULT_CUSTOMER_TAG_KEY = "客户"
 ALL_REGIONS = ["ap-guangzhou", "ap-shanghai", "ap-beijing", "ap-nanjing", "ap-chengdu"]
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from lib.env_loader import ensure_runtime_env  # noqa: E402
-from lib.normalize import normalize_resource  # noqa: E402
-from lib.tags import get_tag  # noqa: E402
+from lib.env_loader import ensure_runtime_env
+from lib.normalize import normalize_resource
+from lib.tags import get_tag
 
 ensure_runtime_env()
 
@@ -34,7 +34,7 @@ def _run_tccli(product: str, operation: str, region: str, extra: list[str] | Non
     cmd = ["tccli", product, operation, "--region", region, "--output", "json"]
     if extra:
         cmd.extend(extra)
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=90, check=False)
     if proc.returncode != 0 or not proc.stdout.strip():
         return {}
     try:

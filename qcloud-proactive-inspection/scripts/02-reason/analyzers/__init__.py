@@ -28,17 +28,19 @@ def list_available():
 
 
 def create_all() -> list:
-    from analyzers import clb_analyzer  # noqa: F401
-    from analyzers import eip_analyzer  # noqa: F401
-    from analyzers import es_analyzer  # noqa: F401
-    from analyzers import k8s_analyzer  # noqa: F401
-    from analyzers import mongodb_analyzer  # noqa: F401
-    from analyzers import nat_analyzer  # noqa: F401
-    from analyzers import rds_mysql_analyzer  # noqa: F401
-    from analyzers import rds_postgresql_analyzer  # noqa: F401
-    from analyzers import redis_analyzer  # noqa: F401
-    from analyzers import sg_analyzer  # noqa: F401
-    from analyzers import vm_analyzer  # noqa: F401
+    from analyzers import (
+        clb_analyzer,  # noqa: F401
+        eip_analyzer,  # noqa: F401
+        es_analyzer,  # noqa: F401
+        k8s_analyzer,  # noqa: F401
+        mongodb_analyzer,  # noqa: F401
+        nat_analyzer,  # noqa: F401
+        rds_mysql_analyzer,  # noqa: F401
+        rds_postgresql_analyzer,  # noqa: F401
+        redis_analyzer,  # noqa: F401
+        sg_analyzer,  # noqa: F401
+        vm_analyzer,  # noqa: F401
+    )
 
     return [cls() for cls in _A.values()]
 

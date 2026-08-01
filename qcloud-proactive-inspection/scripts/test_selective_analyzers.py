@@ -12,8 +12,8 @@ SCRIPTS = Path(__file__).resolve().parent
 for path in (SCRIPTS, REASON):
     sys.path.insert(0, str(path))
 
-from analyzers import create_by_names, list_available  # noqa: E402
-from analyzers.selective import list_catalog, resolve_analyzer_names  # noqa: E402
+from analyzers import create_by_names, list_available
+from analyzers.selective import list_catalog, resolve_analyzer_names
 
 
 def test_catalog_has_eleven_analyzers():

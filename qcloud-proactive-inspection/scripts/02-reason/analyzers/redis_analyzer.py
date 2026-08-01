@@ -8,16 +8,18 @@ Metrics:  memory usage, hit rate, connections, CPU (if available).
 Features: detects high-memory (OOM risk), low hit rate (cache miss / penetration).
 """
 
-from . import register
-from analyzers.base_analyzer import BaseAnalyzer
 from lib.tags import tag_dict
+
+from analyzers.base_analyzer import BaseAnalyzer
+
+from . import register
 
 
 class RedisAnalyzer(BaseAnalyzer):
     service_name = "redis"
     icon = "[缓存]"
 
-    REDIS_METRICS = ["redis.memory.usage", "redis.hit_rate", "redis.connections", "redis.cpu.util"]
+    REDIS_METRICS = ["redis.memory.usage", "redis.hit_rate", "redis.connections", "redis.cpu.util"]  # noqa: RUF012  # constant metric list, never mutated
 
     def discover(self, topology: dict) -> list:
         return self.discover_by_tag(topology, "redis")

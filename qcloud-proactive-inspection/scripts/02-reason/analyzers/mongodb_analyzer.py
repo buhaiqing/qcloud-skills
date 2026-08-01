@@ -15,16 +15,17 @@ appropriate ops skill with human confirmation.
 """
 
 
+from lib.tags import get_tag, tag_dict
+
 from analyzers import register
 from analyzers.base_analyzer import BaseAnalyzer
-from lib.tags import get_tag, tag_dict
 
 
 class MongoDBAnalyzer(BaseAnalyzer):
     service_name = "mongodb"
     icon = "[数据库]"
 
-    METRICS = [
+    METRICS = [  # noqa: RUF012  # constant metric list, never mutated
         "mongodb_cpu_utilization",
         "mongodb_memory_usage",
         "mongodb_disk_usage",
@@ -69,7 +70,7 @@ class MongoDBAnalyzer(BaseAnalyzer):
                 )
                 if pts:
                     self.metrics[rid] = pts
-            except Exception:
+            except Exception:  # noqa: BLE001, S112  # per-resource fault isolation
                 continue
         return self.metrics
 

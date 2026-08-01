@@ -12,10 +12,10 @@ Metrics:  CPU, memory, disk IOPS/usage, network bandwidth, system load, TCP conn
 Spec limits: checks against instance type and disk type upper limits.
 """
 
+from lib.tags import get_tag, tag_dict
+
 from . import register
 from .base_analyzer import BaseAnalyzer
-from lib.tags import tag_dict, get_tag
-
 
 # ── Thresholds (from references/threshold-definitions.md) ──
 
@@ -53,7 +53,7 @@ class VmAnalyzer(BaseAnalyzer):
     service_name = "vm"
     icon = "[主机]"
 
-    METRICS = [
+    METRICS = [  # noqa: RUF012  # constant metric list, never mutated
         "cpu_util",
         "memory.usage",
         "vm.disk.dev.io.read",

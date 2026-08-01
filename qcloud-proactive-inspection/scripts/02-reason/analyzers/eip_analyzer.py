@@ -9,8 +9,9 @@ Read-only output: audit findings and recommendations only; no EIP mutation.
 
 from typing import Any
 
-from . import register
 from analyzers.base_analyzer import BaseAnalyzer
+
+from . import register
 
 EIP_THRESHOLDS = {
     "bandwidth_warning_ratio": 0.80,
@@ -47,7 +48,7 @@ class EipAnalyzer(BaseAnalyzer):
                 )
                 if pts:
                     self.metrics[rid] = pts
-            except Exception:
+            except Exception:  # noqa: BLE001, S112  # per-resource fault isolation
                 continue
         return self.metrics
 

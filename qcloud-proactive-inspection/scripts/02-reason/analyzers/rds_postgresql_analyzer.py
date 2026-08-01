@@ -12,7 +12,6 @@ Delegates to qcloud-postgres-ops skill for actual DB operations.
 from . import register
 from .base_analyzer import BaseAnalyzer
 
-
 # ── Thresholds (from references/threshold-definitions.md) ──
 
 HEALTH_THRESHOLDS = {

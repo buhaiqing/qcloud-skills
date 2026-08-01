@@ -11,14 +11,7 @@ from lib.env_loader import load_project_dotenv
 def test_load_project_dotenv_tencentcloud_prefixes(tmp_path: Path, monkeypatch) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text(
-        "\n".join(
-            [
-                "TENCENTCLOUD_SECRET_ID=AKID-from-dotenv",
-                "TENCENTCLOUD_REGION=ap-shanghai",
-                "COPILOT_CUSTOMER_TAG_KEY=customer",
-                "UNRELATED=ignored",
-            ]
-        ),
+        "TENCENTCLOUD_SECRET_ID=AKID-from-dotenv\nTENCENTCLOUD_REGION=ap-shanghai\nCOPILOT_CUSTOMER_TAG_KEY=customer\nUNRELATED=ignored",
         encoding="utf-8",
     )
     for key in (

@@ -12,10 +12,12 @@ Pod-level analysis is NOT covered by this analyzer; delegate to qcloud-tke-ops
 when deeper pod/Deployment diagnostics are required.
 """
 
-from . import register
-from analyzers.base_analyzer import BaseAnalyzer
 from lib.normalize import normalize_resource
 from lib.tags import get_tag
+
+from analyzers.base_analyzer import BaseAnalyzer
+
+from . import register
 
 K8S_CLUSTER_TAG = "tke.cloud.tencent.com/cluster_id"
 
@@ -84,7 +86,7 @@ class K8sAnalyzer(BaseAnalyzer):
                     cl["cluster_info_api"] = info
                     cl["version"] = info.get("clusterVersion") or info.get("version", "N/A")
                     cl["state"] = info.get("clusterStatus") or info.get("clusterState", "N/A")
-        except Exception:
+        except Exception:  # noqa: BLE001, S110  # per-resource fault isolation
             pass
         for cl in self.resources:
             cl.setdefault("version", "N/A")

@@ -16,10 +16,10 @@ for path in (_SCRIPTS_DIR, _REASON_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from lib.env_loader import ensure_runtime_env  # noqa: E402
-from lib.tccli_client import TccliClient  # noqa: E402
-from analyzers import create_by_names  # noqa: E402
-from analyzers.selective import resolve_analyzer_names  # noqa: E402
+from analyzers import create_by_names
+from analyzers.selective import resolve_analyzer_names
+from lib.env_loader import ensure_runtime_env
+from lib.tccli_client import TccliClient
 
 ensure_runtime_env()
 
@@ -75,6 +75,7 @@ def main() -> int:
             capture_output=True,
             text=True,
             timeout=180,
+            check=False,
         )
         if proc.returncode != 0:
             print(proc.stderr or proc.stdout)
@@ -140,7 +141,7 @@ def main() -> int:
                     f"    {icon} [{finding.get('severity')}] "
                     f"{finding.get('resource')}: {finding.get('message')}"
                 )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # per-service fault isolation
             print(f"  [禁止] {svc}: 分析失败 — {exc}")
             continue
 

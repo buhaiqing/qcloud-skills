@@ -6,9 +6,11 @@ Elasticsearch analyzer.
 Checks: cluster health, version, node count, disk type, encryption status.
 """
 
-from . import register
-from analyzers.base_analyzer import BaseAnalyzer
 from lib.tags import get_tag
+
+from analyzers.base_analyzer import BaseAnalyzer
+
+from . import register
 
 
 class EsAnalyzer(BaseAnalyzer):
@@ -36,7 +38,7 @@ class EsAnalyzer(BaseAnalyzer):
                 )
                 if pts:
                     self.metrics[rid] = pts
-            except Exception:
+            except Exception:  # noqa: BLE001, S112  # per-resource fault isolation
                 continue
         return self.metrics
 

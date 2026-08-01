@@ -7,9 +7,11 @@ Checks: dangerous open ports (0.0.0.0/0 to DB/management ports),
 rule count explosion, overly permissive CIDRs.
 """
 
-from . import register
-from analyzers.base_analyzer import BaseAnalyzer
 from lib.tags import get_tag
+
+from analyzers.base_analyzer import BaseAnalyzer
+
+from . import register
 
 # Ports that should NEVER be open to 0.0.0.0/0
 DANGER_PORTS = {

@@ -12,10 +12,12 @@ Metrics: active connections, new connections, healthy host count.
 Read-only output: upgrade assessment recommendations only; no CLB mutation.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
+from lib.tags import tag_dict
+
 from analyzers import register
 from analyzers.base_analyzer import BaseAnalyzer
-from lib.tags import tag_dict
 
 K8S_CLB_TAG = "tke.cloud.tencent.com/created_by"
 
@@ -44,7 +46,7 @@ class ClbAnalyzer(BaseAnalyzer):
     service_name = "clb"
     icon = "[负载均衡]"
 
-    CLB_METRICS = [
+    CLB_METRICS = [  # noqa: RUF012  # constant metric list, never mutated
         "lb.active_connection_count",
         "lb.new_connection_count",
         "lb.backend.healthy.host_count",
@@ -136,7 +138,7 @@ class ClbAnalyzer(BaseAnalyzer):
                     if v < 2:  # less than 2 healthy backends
                         self._add_finding(
                             "critical",
-                            f"健康后端数={v:.0f} @ {datetime.fromtimestamp(t / 1000, timezone.utc).strftime('%H:%M')}",
+                            f"健康后端数={v:.0f} @ {datetime.fromtimestamp(t / 1000, UTC).strftime('%H:%M')}",
                             "只读建议：检查后端VM/容器健康状态；如需摘除/调整后端，由人工通过 qcloud-clb-ops 执行",
                             ops_skill="qcloud-clb-ops",
                             **ctx,

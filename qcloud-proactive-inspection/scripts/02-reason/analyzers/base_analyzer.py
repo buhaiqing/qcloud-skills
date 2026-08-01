@@ -56,7 +56,7 @@ class BaseAnalyzer(ABC):
                 )
                 if pts:
                     self.metrics[rid] = pts
-            except Exception:
+            except Exception:  # noqa: BLE001, S112  # per-resource fault isolation
                 continue
         return self.metrics
 

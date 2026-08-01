@@ -6,9 +6,11 @@ NAT Gateway analyzer.
 Checks: SNAT connection count, bandwidth utilization.
 """
 
-from . import register
-from analyzers.base_analyzer import BaseAnalyzer
 from lib.tags import get_tag
+
+from analyzers.base_analyzer import BaseAnalyzer
+
+from . import register
 
 
 class NatAnalyzer(BaseAnalyzer):
@@ -37,7 +39,7 @@ class NatAnalyzer(BaseAnalyzer):
                 )
                 if pts:
                     self.metrics[rid] = pts
-            except Exception:
+            except Exception:  # noqa: BLE001, S112  # per-resource fault isolation
                 continue
         return self.metrics
 
