@@ -52,6 +52,28 @@ class TccliClientGetMetricsTest(unittest.TestCase):
         # Every metric must have been fetched exactly once.
         self.assertEqual(m.call_count, 3)
 
+    def test_queue_path_preserves_order_when_metrics_exceed_workers(self):
+        # The ordering contract is most at risk in the *queued* branch: when
+        # metrics > max_workers the thread pool reuses workers and futures are
+        # awaited in input order. If the future/zip bookkeeping regressed, an
+        # out-of-order or dropped key would show up here.
+        metrics = [f"m{i:02d}" for i in range(9)]  # 9 metrics, only 3 workers
+        responses = {m: _ok_response([float(i)], [100]) for i, m in enumerate(metrics)}
+
+        def fake_run(product, operation, region, extra):
+            return responses[extra[3]]
+
+        with mock.patch.object(tccli_client, "_run_tccli", side_effect=fake_run) as m:
+            result = self.client.get_metrics_batch(
+                "ins-abc", metrics, max_workers=3
+            )
+
+        # Every metric present exactly once, in the exact input order.
+        self.assertEqual(list(result.keys()), metrics)
+        self.assertEqual(m.call_count, 9)
+        for i, metric in enumerate(metrics):
+            self.assertEqual(result[metric], [(100, float(i))])
+
     def test_error_metric_is_skipped_others_survive(self):
         responses = {
             "good": _ok_response([1.0], [100]),
