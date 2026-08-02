@@ -10,11 +10,11 @@
 
 ### P0-0 Trace v3 重构基线
 
-- [ ] 采用 Langfuse 风格 `Trace` 聚合根、`Observation` 执行树、`UsageEvent` 用量账本、`Score` 反馈和可重建 Summary。
-- [ ] 将旧 `TraceRecord v2`、GCL trace、Copilot audit 作为 legacy adapter 输入，不继续扩展为新主模型。
-- [ ] 保持 AIOps/FinOps 必需字段一等化，禁止依赖自由格式 `output` 或 `metadata` 完成核心分析。
-- [ ] 验收：可从 Observation、Score、UsageEvent 重建 AIOps/FinOps Summary，并导出 Langfuse Trace/Span/Generation/Score。
-- [ ] User ID 定义列为开放议题：本地/自动化运行不强行生成用户身份；固定身份树无值使用 JSON `null`，不阻塞主线。
+- [x] 采用 Langfuse 风格 `Trace` 聚合根、`Observation` 执行树、`UsageEvent` 用量账本、`Score` 反馈和可重建 Summary。— `qcloud-copilot/copilot/trace_records.py`（`TraceRecord:139`、`ObservationRecord:231`、`UsageEvent:292`、`ScoreRecord:337`、`AIOpsSummary:400`）
+- [x] 将旧 `TraceRecord v2`、GCL trace、Copilot audit 作为 legacy adapter 输入，不继续扩展为新主模型。— `trace_records.py:468` `legacy_gcl_to_observation()`、`:506` `legacy_audit_to_observation()`
+- [x] 保持 AIOps/FinOps 必需字段一等化，禁止依赖自由格式 `output` 或 `metadata` 完成核心分析。— v3 模型一等化 `IdentityTree`/`AutomationTree`/`CostRecord` 等；测试 `tests/test_trace_records.py:256` 断言无 legacy span 字段
+- [x] 验收：可从 Observation、Score、UsageEvent 重建 AIOps/FinOps Summary，并导出 Langfuse Trace/Span/Generation/Score。— `qcloud-copilot/copilot/langfuse_exporter.py:91` `export_trace_to_langfuse()` 导出 Trace/Span/Generation/Score
+- [x] User ID 定义列为开放议题：本地/自动化运行不强行生成用户身份；固定身份树无值使用 JSON `null`，不阻塞主线。— `IdentityTree:59` / `AutomationTree:78` 支持无值 `null`，本地运行不强制身份
 
 ### P0-1 统一 AIOps 事件模型
 
@@ -172,7 +172,7 @@
 |---|---|---|
 | OBS-1 可观测性增强 | **✅ 全部完成** | P0（基础设施）P1（health/audit改造）P2（gate可观测）P3（step埋点）P4（查询API）全部在 commit 25c480b 完成；P5 核心测试全绿、ruff零error、TE-Audit已记录；P5.4 已完成 SKILL.md 新增 `## Observability` 节 + v1.1.0 changelog；P5.5 完成 18 条 SPEC/PLAN 逐条对照（17✅+1⚠️ P4A移TRACE-1）；P4A（emit_observation/emit_usage/Summary聚合）由TRACE-1承接 |
 | EVO-1 自我进化闭环 | **✅ 全部完成** | E0记忆层/E1决策层/E2护栏层/E3 hook接入/E4反馈采集/E5闭环集成全部在 commit 357ee48 完成；test_evo_generator.py 15个测试全绿 |
-| TRACE-1 Trace v3 重构基线（P0-0） | `[ ]` 未开始 | P0-0 ~ P2 待实现；Phase 0-6 plan 已冻结 |
+| TRACE-1 Trace v3 重构基线（P0-0） | **✅ 完成**（2026-08-02 核实） | `trace_records.py` 实现 Trace/Observation/UsageEvent/ScoreRecord/AIOpsSummary + `langfuse_exporter.py` 导出 + legacy adapter（`legacy_gcl_to_observation`/`legacy_audit_to_observation`）；tests `test_trace_records.py` 通过 |
 | P0-1 统一AIOps事件模型 | `[ ]` 未开始 | |
 | P0-2 检测质量反馈闭环 | `[ ]` 未开始 | |
 | P0-3 Incident生命周期状态机 | `[ ]` 未开始 | |

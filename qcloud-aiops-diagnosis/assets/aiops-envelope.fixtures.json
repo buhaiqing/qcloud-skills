@@ -1,0 +1,72 @@
+{
+  "description": "AIOpsEnvelope fixture 集 — 覆盖正常/异常/缺失数据/权限失败/多故障场景。schema 见 aiops-envelope.schema.json",
+  "scenarios": {
+    "normal_alarm": {
+      "event_type": "alarm",
+      "trace_id": "trace-alarm-0001",
+      "incident_id": "INC-20260802-0001",
+      "tenant_id": "tenant-01",
+      "region": "ap-guangzhou",
+      "resource": { "product": "cvm", "resource_id": "ins-xxxxxx", "service_code": "cvm" },
+      "time_window": { "start": "2026-08-02T00:00:00Z", "end": "2026-08-02T01:00:00Z" },
+      "evidence": [{ "source": "cloudmonitor", "ref_id": "alarm-001", "confidence": 0.9 }],
+      "data_quality": { "status": "ok", "freshness_ms": 30000, "coverage_ratio": 1.0, "missing_sources": [] },
+      "confidence": 0.9,
+      "decision": { "maker": "aiops", "severity": "P1", "priority": 2 },
+      "action_state": "pending",
+      "payload": { "metric": "cpu_utilization", "value": 95 }
+    },
+    "anomaly_high_confidence": {
+      "event_type": "anomaly",
+      "trace_id": "trace-anomaly-0002",
+      "incident_id": "INC-20260802-0002",
+      "resource": { "product": "redis", "resource_id": "crs-zzzzzz" },
+      "time_window": { "start": "2026-08-02T02:00:00Z", "end": "2026-08-02T03:00:00Z" },
+      "data_quality": { "status": "ok", "coverage_ratio": 0.98, "missing_sources": [] },
+      "confidence": 0.85,
+      "decision": { "maker": "isolation_forest", "severity": "P2", "priority": 3 },
+      "action_state": "verifying",
+      "payload": { "metric": "memory_usage", "z_score": 3.2 }
+    },
+    "missing_data_degraded": {
+      "event_type": "inspection",
+      "trace_id": "trace-insp-0003",
+      "incident_id": null,
+      "causation_id": null,
+      "resource": { "product": "clb", "resource_id": "lb-abcde" },
+      "data_quality": { "status": "degraded", "freshness_ms": null, "coverage_ratio": 0.6, "missing_sources": ["tke-metrics"] },
+      "confidence": 0.4,
+      "decision": { "maker": "aiops", "severity": "P3", "priority": 5 },
+      "action_state": null,
+      "payload": { "rule": "clb-health-check", "findings": [] }
+    },
+    "permission_failure": {
+      "event_type": "action",
+      "trace_id": "trace-action-0004",
+      "incident_id": "INC-20260802-0003",
+      "causation_id": "caus-0004",
+      "resource": { "product": "vpc", "resource_id": "vpc-ggggg" },
+      "data_quality": { "status": "missing", "missing_sources": ["vpc-api"] },
+      "confidence": null,
+      "decision": { "maker": "aiops", "severity": "P1", "priority": 2 },
+      "action_state": "needs_human",
+      "payload": { "action": "delete_subnet", "error": "AuthFailure: not permitted" }
+    },
+    "multi_fault_causation_chain": {
+      "event_type": "rca",
+      "trace_id": "trace-rca-0005",
+      "incident_id": "INC-20260802-0004",
+      "causation_id": "caus-0001",
+      "resource": { "product": "cdb", "resource_id": "cdb-fffff" },
+      "evidence": [
+        { "source": "cloudmonitor", "ref_id": "alarm-cpu", "confidence": 0.95 },
+        { "source": "topology", "ref_id": "topo-snapshot-1", "confidence": 0.8 }
+      ],
+      "data_quality": { "status": "ok", "coverage_ratio": 1.0, "missing_sources": [] },
+      "confidence": 0.9,
+      "decision": { "maker": "topology_reasoner", "severity": "P0", "priority": 1 },
+      "action_state": "executing",
+      "payload": { "top_cause_id": "hyp-001", "correlated_alarms": ["alarm-cpu", "alarm-mem"] }
+    }
+  }
+}

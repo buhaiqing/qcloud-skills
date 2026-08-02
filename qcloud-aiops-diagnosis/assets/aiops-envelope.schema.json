@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AIOpsEnvelope",
+  "description": "统一 AIOps 事件信封 — 覆盖租户/地域/trace/incident/资源/时间窗口/证据/数据质量/置信度/决策/动作状态。设计见 docs/superpowers/specs/aiops-envelope-design.md",
+  "type": "object",
+  "required": ["schema_version", "event_id", "event_type", "trace_id", "timestamp"],
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "event_id": { "type": "string", "pattern": "^evt-[A-Za-z0-9_-]{8,}$" },
+    "event_type": {
+      "enum": ["alarm", "rca", "anomaly", "inspection", "incident", "blackboard", "action", "evidence"]
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "tenant_id": { "type": ["string", "null"] },
+    "region": { "type": ["string", "null"] },
+    "trace_id": { "type": "string" },
+    "incident_id": { "type": ["string", "null"] },
+    "causation_id": { "type": ["string", "null"] },
+    "resource": {
+      "type": ["object", "null"],
+      "properties": {
+        "product": { "type": "string" },
+        "resource_id": { "type": "string" },
+        "service_code": { "type": ["string", "null"] }
+      },
+      "required": ["product", "resource_id"]
+    },
+    "time_window": {
+      "type": ["object", "null"],
+      "properties": {
+        "start": { "type": "string", "format": "date-time" },
+        "end": { "type": "string", "format": "date-time" }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": { "type": "string" },
+          "ref_id": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+        },
+        "required": ["source"]
+      }
+    },
+    "data_quality": {
+      "type": ["object", "null"],
+      "properties": {
+        "status": { "enum": ["ok", "degraded", "missing"] },
+        "freshness_ms": { "type": ["integer", "null"] },
+        "coverage_ratio": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "missing_sources": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["status"]
+    },
+    "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+    "decision": {
+      "type": ["object", "null"],
+      "properties": {
+        "maker": { "type": "string" },
+        "severity": { "enum": ["P0", "P1", "P2", "P3", "INFO"] },
+        "priority": { "type": ["integer", "null"] }
+      }
+    },
+    "action_state": {
+      "type": ["string", "null"],
+      "enum": [null, "pending", "executing", "verifying", "resolved", "rolled_back", "needs_human"]
+    },
+    "payload": { "description": "原始事件形状（不破坏既有结构）" }
+  },
+  "additionalProperties": false
+}
