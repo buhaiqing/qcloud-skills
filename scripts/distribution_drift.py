@@ -41,8 +41,12 @@ def load_traces(trace_dir: Path, since_days: int) -> list[dict[str, Any]]:
     mtime_cutoff = datetime.now(tz=UTC) - timedelta(days=since_days)
     traces = []
     for f in sorted(trace_dir.glob("gcl-trace-*.json")):
-        # Perf: skip files whose mtime predates the cutoff before reading/parsing
-        # (JSON timestamp filtering below is preserved for exactness).
+        # Perf + semantic fix: most persisted GCL traces have NO top-level
+        # "timestamp" (only the pending-log carries one), so the JSON timestamp
+        # filter below is a no-op for them and `since_days` never actually bounded
+        # the window (it returned every trace file). Filtering by mtime here makes
+        # the window effective AND avoids reading/parsing files we'll drop anyway.
+        # Files whose mtime exactly equals the cutoff are kept (strict <).
         try:
             if datetime.fromtimestamp(f.stat().st_mtime, tz=UTC) < mtime_cutoff:
                 continue

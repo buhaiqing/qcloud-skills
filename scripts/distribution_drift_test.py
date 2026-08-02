@@ -206,6 +206,23 @@ class LoadTracesTest(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["timestamp"], new_trace["timestamp"])
 
+    def test_no_timestamp_trace_old_mtime_is_filtered(self) -> None:
+        # Production GCL traces persist WITHOUT a top-level "timestamp" field (only
+        # the pending-log does). For such traces the JSON timestamp filter is a
+        # no-op, so mtime is the sole age gate: an old-mtime production trace must
+        # be dropped so `since_days` windowing actually takes effect.
+        d = self._make_dir()
+        old = self._write(
+            d, "gcl-trace-old.json", {"skill": "qcloud-cvm-ops", "final": {"status": "PASS"}}
+        )
+        old_ts = time.time() - 90 * 24 * 3600
+        os.utime(old, (old_ts, old_ts))
+        self._write(
+            d, "gcl-trace-new.json", {"skill": "qcloud-cvm-ops", "final": {"status": "PASS"}}
+        )
+        result = load_traces(d, since_days=30)
+        self.assertEqual(len(result), 1)  # only the fresh no-timestamp trace survives
+
     def test_old_mtime_not_read_invalid_json(self) -> None:
         # If the mtime pre-filter failed, a corrupt old file would be excluded by
         # the JSON timestamp check anyway; this asserts the pre-filter path holds
