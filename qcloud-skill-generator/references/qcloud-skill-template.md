@@ -91,7 +91,7 @@ See [references/well-architected-assessment.md](references/well-architected-asse
 
 ### SHOULD NOT Use This Skill When
 
-- Task is purely billing / account management → delegate to: `qcloud-billing-ops` (when present)
+- Task is purely billing / account management → delegate to: `qcloud-finops-ops` (when present)
 - Task is CAM / permission model only → delegate to: `qcloud-cam-ops` (when present)
 - Task is about **[related product]** → delegate to: `qcloud-[other]-ops`
 - User insists on **console-only** flows with no API → state limitation; do not invent undocumented HTTP steps

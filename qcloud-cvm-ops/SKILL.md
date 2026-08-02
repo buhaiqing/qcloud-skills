@@ -16,8 +16,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.3.0"
-  last_updated: "2026-07-04"
+  version: "1.3.1"
+  last_updated: "2026-08-02"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/213"
@@ -58,11 +58,11 @@ CVM operational runbook: dual-path (`tccli` + Python SDK), explicit pre-flight/v
 
 **SHOULD:** CVM instance lifecycle (CRUD/start/stop/reboot/terminate), CBS disks (attach/detach/resize), snapshots/images, SSH/migration/performance issues.
 
-**SHOULD NOT:** billing → `qcloud-billing-ops`, CAM → `qcloud-cam-ops`, VPC-only → `qcloud-vpc-ops`, CLB → `qcloud-clb-ops`, DB → `qcloud-cdb-ops`/`qcloud-redis-ops`, WA review → `qcloud-well-architected-review`.
+**SHOULD NOT:** billing → `qcloud-finops-ops`, CAM → `qcloud-cam-ops`, VPC-only → `qcloud-vpc-ops`, CLB → `qcloud-clb-ops`, DB → `qcloud-cdb-ops`/`qcloud-redis-ops`, WA review → `qcloud-well-architected-review`.
 
 **Delegate:** VPC/SG pre-check via VPC skill before RunInstances; CLB → CLB skill; CBS within CVM scope; snapshots/images within CVM scope; multi-product → per-skill. Read-only WA assessment → see below.
 
-## Read-Only Assessment (WA delegate)
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
 
 When `{{user.mode}}=well-architected-readonly`: read-only Describe*/GetMonitorData only. Execute [well-architected-assessment.md](references/well-architected-assessment.md) Worker Output Contract; paginate → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: cvm`).
 

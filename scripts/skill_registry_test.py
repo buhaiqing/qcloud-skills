@@ -322,8 +322,8 @@ class SkillRegistryFromRepoTest(unittest.TestCase):
         """Real SKILL.md puts cli_applicability/version/last_updated under metadata.*."""
         e_cvm = self.reg.get_entry("qcloud-cvm-ops")
         self.assertEqual(e_cvm.cli_applicability, "dual-path")
-        self.assertEqual(e_cvm.version, "1.3.0")
-        self.assertEqual(e_cvm.last_updated, "2026-07-04")
+        self.assertEqual(e_cvm.version, "1.3.1")
+        self.assertEqual(e_cvm.last_updated, "2026-08-02")
 
     def test_repo_real_skills_intent_keywords_partially_populated(self):
         """At least 50% of skills should have populated intent_keywords."""

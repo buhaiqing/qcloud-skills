@@ -11,9 +11,16 @@ compatibility: >-
   via the qcloud-*-ops/SKILL.md glob, no CLI/SDK required.
 metadata:
   author: phase1-acceptance
-  version: "0.1.0"
-  last_updated: "2026-08-01"
+  version: "0.1.1"
+  last_updated: "2026-08-02"
   cli_applicability: cli-only
+  cli_support_evidence: >-
+    Validation-only acceptance stub; CLI availability verified via
+    `tccli help`. Delegated operations are exercised by qcloud-monitor-ops.
+  environment:
+    - TENCENTCLOUD_SECRET_ID
+    - TENCENTCLOUD_SECRET_KEY
+    - TENCENTCLOUD_REGION
   product_name: test
   delegate_to:
     - skill: qcloud-monitor-ops

@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-07-20"
+  version: "1.0.1"
+  last_updated: "2026-08-02"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/876/36418"
@@ -102,7 +102,7 @@ See [references/well-architected-assessment.md](references/well-architected-asse
 
 ### SHOULD NOT Use This Skill When
 
-- Task is purely billing / account management → delegate to: `qcloud-billing-ops` (when present)
+- Task is purely billing / account management → delegate to: `qcloud-finops-ops` (when present)
 - Task is CAM / permission model only → delegate to: `qcloud-cam-ops` (when present)
 - Task is **standalone SCF** (not CloudBase-hosted functions) → delegate to: `qcloud-scf-ops`
 - Task is **COS** object storage operations outside CloudBase context → delegate to: `qcloud-cos-ops`

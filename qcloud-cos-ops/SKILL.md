@@ -16,8 +16,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud COS endpoints.
 metadata:
   author: qcloud
-  version: "1.2.0"
-  last_updated: "2026-07-09"
+  version: "1.2.1"
+  last_updated: "2026-08-02"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/436"
@@ -80,7 +80,7 @@ COS (Cloud Object Storage) on Tencent Cloud provides scalable, secure, and highl
 
 - CDN operations → `qcloud-cdn-ops`
 - MySQL/PostgreSQL → `qcloud-cdb-ops` / `qcloud-postgres-ops`
-- Billing/account → `qcloud-billing-ops`
+- Billing/account → `qcloud-finops-ops`
 - COS access log analysis (audit, troubleshooting, security) → delegate to `qcloud-cls-ops`
 - Console-only → State limitation
 

@@ -21,9 +21,9 @@ qcloud-skills/
 
 All schemas, handoff contracts, and skill-specific config live under the owning skill's `assets/` (or `references/` for Markdown-only contracts).
 
-## Skills inventory (34)
+## Skills inventory (36)
 
-- Product-scoped (29): `cvm`, `cdb`, `clb`, `cos`, `es`, `redis`, `monitor`, `tke`, `vpc`, `cam`, `cdn`, `cbs`, `cls`, `ckafka`, `scf`, `mongodb`, `postgres`, `ssl`, `agsx`, `finops`, `ccn`, `vpn`, `dc`, `cicd`, `service-mesh`, `migration`, `tcop`, `tdmq`, `apigw`
+- Product-scoped (31): `cvm`, `cdb`, `clb`, `cos`, `es`, `redis`, `monitor`, `tke`, `vpc`, `cam`, `cdn`, `cbs`, `cls`, `ckafka`, `cloudbase`, `scf`, `mongodb`, `postgres`, `ssl`, `agsx`, `finops`, `ccn`, `vpn`, `dc`, `cicd`, `service-mesh`, `migration`, `tcop`, `tdmq`, `test`, `apigw`
 - Cross-product (4): `qcloud-aiops-diagnosis`, `qcloud-proactive-inspection`, `qcloud-well-architected-review`, `qcloud-copilot`
 - Meta-skill (1): `qcloud-skill-generator` (scaffolds/updates other skills)
 
@@ -168,7 +168,7 @@ Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` addition
 ## Files that do NOT exist
 
 - No repo-root `assets/` directory.
-- No repo-root `Makefile`, `package.json`, or non-stdlib test runner (except listed scripts in `scripts/` and `.github/workflows/validate-skills.yml`). A scripts/Makefile exists as the harness convergence entry point — it is NOT a repo build system.
+- No repo-root `package.json` or non-stdlib test runner (except listed scripts in `scripts/` and `.github/workflows/validate-skills.yml`). A repo-root `Makefile` exists as the harness convergence entry point (validate/registry/golden/kpi/manifest/all) — it is NOT a repo build system.
 - No agent-specific config files (e.g. `CLAUDE.md`, `opencode.json`, `.cursorrules`, and similar per-agent artifacts).
 - Agent runtime state dirs (e.g. `.omc/`, `.omo/`, `.codebuddy/`, and similar) are gitignored.
 - `docs/superpowers/plans/` contains historical notes, not runtime source.

@@ -59,6 +59,8 @@ The canonical skill inventory is the set of `qcloud-*` directories in this repos
 | `qcloud-migration-ops` | Cloud migration | Host migration (CVM online/offline), database migration (DTS), storage migration, migration assessment |
 | `qcloud-service-mesh-ops` | Service Mesh (TCM) | Istio-based service mesh, sidecar injection, traffic governance, canary deployments, mTLS, distributed tracing |
 | `qcloud-tcop-ops` | Optimization Platform (TCOP) | Cost optimization, resource optimization (right-sizing/idle), architecture review, savings plan/RI coverage, optimization reports |
+| `qcloud-cloudbase-ops` | CloudBase (TCB) | Environment lifecycle, cloud database, cloud storage, cloud functions, static hosting, auth domains, API keys |
+| `qcloud-test-ops` | Acceptance validation stub | Zero-code routing/delegate verification, SkillRegistry discovery validation; cli-only, delegates to qcloud-monitor-ops |
 
 ### Cross-product and meta skills
 

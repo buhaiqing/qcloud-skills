@@ -97,6 +97,6 @@
   {
     "query": "Check my Tencent Cloud billing",
     "should_trigger": false,
-    "delegate_to": "qcloud-billing-ops"
+    "delegate_to": "qcloud-finops-ops"
   }
 ]

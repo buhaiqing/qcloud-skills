@@ -1,16 +1,32 @@
-{
-  "queries": [
-    {
-      "intent": "M3 acceptance probe",
-      "query": "test the qcloud test ops stub"
-    },
-    {
-      "intent": "M3 stub skill validation",
-      "query": "validate M3 stub discoverability"
-    },
-    {
-      "intent": "zero-code routing acceptance",
-      "query": "test M3 zero code skill registration"
-    }
-  ]
-}
+[
+  {
+    "query": "test the qcloud test ops stub",
+    "should_trigger": true,
+    "intent": "M3 acceptance probe"
+  },
+  {
+    "query": "validate M3 stub discoverability",
+    "should_trigger": true,
+    "intent": "M3 stub skill validation"
+  },
+  {
+    "query": "test M3 zero code skill registration",
+    "should_trigger": true,
+    "intent": "zero-code routing acceptance"
+  },
+  {
+    "query": "Check my alarm policies in Cloud Monitor",
+    "should_trigger": false,
+    "intent": "monitor alarm policy query"
+  },
+  {
+    "query": "Create a CVM instance in ap-guangzhou",
+    "should_trigger": false,
+    "intent": "cvm instance creation"
+  },
+  {
+    "query": "Show me my monthly cloud billing report",
+    "should_trigger": false,
+    "intent": "billing report query"
+  }
+]

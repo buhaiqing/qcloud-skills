@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -25,7 +27,17 @@ jobs:
           args: check --output-format=github .
 
       - name: Validate SKILL.md frontmatter
-        run: python3 scripts/validate_skills_frontmatter.py
+        run: >-
+          python3 scripts/validate_skills_frontmatter.py
+          --git-diff ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || 'origin/main' }}
+
+      - name: Validate eval_queries coverage
+        run: python3 scripts/validate_eval_queries.py
+
+      - name: Affected skills regression (informational)
+        run: python3 scripts/ci_affected_skills.py --from-git
+        continue-on-error: true
+        # NOTE: signal only; lists qcloud-*-ops skills touched by the diff, never blocks merges
 
       - name: Validate Well-Architected worker JSON examples
         run: python3 scripts/validate_product_assessment.py

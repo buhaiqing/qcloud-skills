@@ -96,7 +96,7 @@
   {
     "query": "Check my Tencent Cloud bill",
     "should_trigger": false,
-    "skill": "qcloud-billing-ops",
+    "skill": "qcloud-finops-ops",
     "intent": "N/A",
     "keywords": ["billing", "bill", "invoice"],
     "negative_reason": "General billing — not CloudBase-specific operations"

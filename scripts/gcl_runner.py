@@ -35,6 +35,7 @@ import subprocess
 import sys
 import urllib.error
 import urllib.request
+import warnings
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -135,12 +136,37 @@ def _rubric_calibration(root: Path, skill: str):
         RUBRIC_THRESHOLDS.update(_saved)
 
 
+# Shared thresholds — assets/shared/thresholds.json is the single source
+# (AGENTS.md TE-4). Loaded at import time; a missing/corrupt asset degrades to
+# built-in defaults with a warning (never crashes importing tools).
+_SHARED_DIR = Path(__file__).resolve().parent.parent / "assets" / "shared"
+
+
+def _load_shared_json(name: str) -> dict[str, Any]:
+    try:
+        with open(_SHARED_DIR / name, encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except Exception:  # noqa: BLE001
+        warnings.warn(f"cannot load shared asset {_SHARED_DIR / name}; using built-in defaults")
+        return {}
+
+
+_THRESHOLDS: dict[str, Any] = _load_shared_json("thresholds.json")
+# Default minimum score for the generic rubric dimensions (correctness,
+# idempotency, traceability, spec_compliance). "safety" keeps its own
+# perfect-score gate (1.0); its abort semantics are driven by
+# SAFETY_FAIL_THRESHOLD.
+_RUBRIC_MIN_SCORE: float = float(_THRESHOLDS.get("rubric_min_score", 0.5))
+SAFETY_FAIL_THRESHOLD: float = float(_THRESHOLDS.get("safety_fail_threshold", 0.0))
+
+
 RUBRIC_THRESHOLDS: dict[str, float] = {
-    "correctness": 0.5,
+    "correctness": _RUBRIC_MIN_SCORE,
     "safety": 1.0,
-    "idempotency": 0.5,
-    "traceability": 0.5,
-    "spec_compliance": 0.5,
+    "idempotency": _RUBRIC_MIN_SCORE,
+    "traceability": _RUBRIC_MIN_SCORE,
+    "spec_compliance": _RUBRIC_MIN_SCORE,
 }
 
 SECRET_PATTERNS = [
@@ -524,7 +550,7 @@ def derive_rule_hits(
 
 
 def decide(scores: dict[str, float]) -> str:
-    if scores.get("safety", 1) == 0:
+    if scores.get("safety", 1) <= SAFETY_FAIL_THRESHOLD:
         return "SAFETY_FAIL"
     for dim, threshold in RUBRIC_THRESHOLDS.items():
         if scores.get(dim, 0) < threshold:
@@ -784,7 +810,13 @@ def post_process(trace_path: Path, root: Path) -> None:
 
 def cmd_run(args: argparse.Namespace) -> int:
     root = args.root
-    max_iter = args.max_iter or SKILL_MAX_ITER.get(args.skill, 3)
+    # Precedence: CLI flag > per-skill SKILL_MAX_ITER > shared thresholds.json > built-in fallback.
+    max_iter = (
+        args.max_iter
+        or SKILL_MAX_ITER.get(args.skill)
+        or _THRESHOLDS.get("max_iterations")
+        or 3
+    )
     with _rubric_calibration(root, args.skill):
 
         # Load failure patterns (prevention hints)

@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.5.0"
-  last_updated: "2026-07-05"
+  version: "1.5.1"
+  last_updated: "2026-08-02"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/614"
@@ -80,7 +80,7 @@ CLS (Cloud Log Service) is Tencent Cloud's fully managed log service providing l
 
 ### SHOULD NOT Use This Skill When
 
-- Task is purely billing / account management → delegate to: `qcloud-billing-ops` (when present)
+- Task is purely billing / account management → delegate to: `qcloud-finops-ops` (when present)
 - Task is CAM / permission model only → delegate to: `qcloud-cam-ops` (when present)
 - Task is **metrics monitoring** (Cloud Monitor metrics) → delegate to: `qcloud-monitor-ops`
 - Task is **COS object storage** operations (buckets, objects) → delegate to: `qcloud-cos-ops`
