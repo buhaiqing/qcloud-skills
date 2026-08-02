@@ -4,11 +4,15 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import glob
 import json
+import os
 import shlex
 import subprocess
 import sys
+import tempfile
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -18,6 +22,22 @@ from typing import Any
 class Step:
     name: str
     argv: tuple[str, ...]
+    # Steps that shell out to `tccli` need a stub on PATH; gcl_runner refuses to
+    # execute anything else, so a plain `echo ...` command can no longer be used.
+    needs_tccli_stub: bool = False
+
+
+TCCLI_STUB_BODY = '#!/bin/sh\necho \'{"Response":{"RequestId":"ci-smoke"}}\'\n'
+
+
+@contextlib.contextmanager
+def tccli_stub_env() -> Iterator[dict[str, str]]:
+    """Yield an environment whose PATH front-loads a fake `tccli`."""
+    with tempfile.TemporaryDirectory(prefix="validate-local-tccli-") as tmp:
+        stub = Path(tmp) / "tccli"
+        stub.write_text(TCCLI_STUB_BODY, encoding="utf-8")
+        stub.chmod(0o755)
+        yield {**os.environ, "PATH": f"{tmp}{os.pathsep}{os.environ.get('PATH', '')}"}
 
 
 def _compute_quality_score(report: dict[str, Any]) -> float:
@@ -155,11 +175,12 @@ def build_steps(python: str = sys.executable, github_output: bool = False) -> li
                 "--request",
                 "CI smoke test",
                 "--command",
-                'echo {"Response":{"RequestId":"ci-smoke"}}',
+                "tccli cvm DescribeInstances --Limit 1",
                 "--max-iter",
                 "1",
                 "--structural-critic-only",
             ),
+            needs_tccli_stub=True,
         ),
         Step("GCL trace aggregate", (python, "scripts/gcl_trace_aggregate.py", "--since-hours", "168")),
         Step(
@@ -186,8 +207,10 @@ def build_steps(python: str = sys.executable, github_output: bool = False) -> li
 def run_step(root: Path, step: Step) -> int:
     print(f"\n==> {step.name}")
     print("$ " + shlex.join(step.argv))
-    proc = subprocess.run(step.argv, cwd=root, check=False)
-    return proc.returncode
+    if not step.needs_tccli_stub:
+        return subprocess.run(step.argv, cwd=root, check=False).returncode
+    with tccli_stub_env() as env:
+        return subprocess.run(step.argv, cwd=root, env=env, check=False).returncode
 
 
 def run_eval_queries(root: Path, python: str = sys.executable) -> int:

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
 from copilot.observ import ObservableSink, Span
+
+logger = logging.getLogger(__name__)
 
 
 def audit_trace(
@@ -140,5 +143,7 @@ def audit_trace_v3(
             if getattr(evt, "observation_id", None) is None:
                 evt.observation_id = obs.id
             sink.emit_usage_event(evt)
-        except Exception:  # noqa: BLE001, S110 - never let v3 emission fail legacy audit path
-            pass
+        except Exception:
+            # Swallowing is deliberate, but silence made dropped usage events
+            # indistinguishable from "no events emitted".
+            logger.warning("usage_event emit failed obs_id=%s", obs.id, exc_info=True)
