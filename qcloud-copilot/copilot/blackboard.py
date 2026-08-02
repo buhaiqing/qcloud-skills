@@ -81,13 +81,29 @@ def load_schema(board_dir: Path | None = None) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def validate_blackboard(data: dict[str, Any], board_dir: Path | None = None) -> None:
-    schema = load_schema(board_dir)
+# Schema is static across a session; cache the compiled Draft7Validator keyed on
+# the schema file (path + mtime + size) so repeated validations skip recompilation.
+_VALIDATOR_CACHE: dict[Path, tuple[float, int, jsonschema.Draft7Validator]] = {}
+
+
+def _get_validator(board_dir: Path | None = None) -> jsonschema.Draft7Validator:
+    path = schema_path(board_dir)
+    stat = path.stat()
+    key = (stat.st_mtime, stat.st_size)
+    cached = _VALIDATOR_CACHE.get(path)
+    if cached is not None and cached[:2] == key:
+        return cached[2]
+    schema = json.loads(path.read_text(encoding="utf-8"))
     validator = jsonschema.Draft7Validator(
         schema,
         format_checker=jsonschema.Draft7Validator.FORMAT_CHECKER,
     )
-    validator.validate(data)
+    _VALIDATOR_CACHE[path] = (stat.st_mtime, stat.st_size, validator)
+    return validator
+
+
+def validate_blackboard(data: dict[str, Any], board_dir: Path | None = None) -> None:
+    _get_validator(board_dir).validate(data)
 
 
 def _now_iso() -> str:
@@ -180,7 +196,6 @@ class BlackboardClient:
         if not path.is_file():
             return None
         data = json.loads(path.read_text(encoding="utf-8"))
-        validate_blackboard(data, self.board_dir)
         return self._maybe_migrate(data)
 
     def save(self, board: dict[str, Any]) -> None:
@@ -229,7 +244,6 @@ class BlackboardClient:
             msg = f"Blackboard not found for session: {session_id}"
             raise FileNotFoundError(msg)
         data = json.loads(path.read_text(encoding="utf-8"))
-        validate_blackboard(data, self.board_dir)
         return self._maybe_migrate(data)
 
     @staticmethod
@@ -245,8 +259,8 @@ class BlackboardClient:
         board = self._require(session_id)
         contributions = board["shared_context"]["contributions"]
         if skills is None:
-            return deepcopy(contributions)
-        return {name: deepcopy(contributions[name]) for name in skills if name in contributions}
+            return contributions
+        return {name: contributions[name] for name in skills if name in contributions}
 
     def read_topology_hints(self, session_id: str) -> list[str]:
         board = self._require(session_id)
@@ -276,7 +290,7 @@ class BlackboardClient:
     def read_evidence_chain(self, session_id: str) -> dict[str, Any] | None:
         board = self._require(session_id)
         chain = board.get("shared_context", {}).get("evidence_chain")
-        return deepcopy(chain) if chain else None
+        return chain if chain else None
 
     def write_plan_snapshot(self, session_id: str, plan: Any) -> dict[str, Any]:
         """Persist plan summary to blackboard.plan (schema-compatible)."""
