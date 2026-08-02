@@ -541,6 +541,54 @@ class TCloudErrorHintsTests(unittest.TestCase):
         # Should be markdown-formatted with backtick code spans and category/fix
         self.assertIn("`", result)  # backtick code span is in the output
 
+    def test_error_hint_loaders_called_once_across_iterations(self) -> None:
+        # Perf regression: load_tcloud_error_hints / load_error_code_map must be
+        # computed once (hoisted out of the iteration loop), not once per round.
+        # Use an external critic that never passes so cmd_run runs the full
+        # max_iter=2 loop, then assert each loader was invoked exactly once.
+        tmp = Path(tempfile.mkdtemp())
+        stub = tmp / "tccli"
+        stub.write_text('#!/bin/sh\necho \'{"Response":{"RequestId":"x"}}\'\n')
+        stub.chmod(0o755)
+        self.enterContext(
+            unittest.mock.patch.dict(
+                os.environ, {"PATH": f"{tmp}{os.pathsep}{os.environ['PATH']}"}
+            )
+        )
+        critic = tmp / "critic.json"
+        critic.write_text(
+            json.dumps(
+                {
+                    "scores": {"correctness": 1, "safety": 1, "idempotency": 0, "traceability": 1, "spec_compliance": 1},
+                    "suggestions": ["set ClientToken"],
+                    "blocking": True,
+                }
+            )
+        )
+        ns = gcl_runner.build_parser().parse_args(
+            [
+                "run",
+                "--root", str(tmp),
+                "--skill", "qcloud-test-ops",
+                "--request", "test",
+                "--command", "tccli cvm DescribeInstances",
+                "--max-iter", "2",
+                "--critic-json", str(critic),
+            ]
+        )
+        with (
+            unittest.mock.patch.object(
+                gcl_runner, "load_tcloud_error_hints", wraps=gcl_runner.load_tcloud_error_hints
+            ) as hints_mock,
+            unittest.mock.patch.object(
+                gcl_runner, "load_error_code_map", wraps=gcl_runner.load_error_code_map
+            ) as map_mock,
+        ):
+            rc = quiet_cmd_run(ns)
+        self.assertEqual(rc, 1)  # MAX_ITER, loop ran both iterations
+        self.assertEqual(hints_mock.call_count, 1)
+        self.assertEqual(map_mock.call_count, 1)
+
 
 class StructuralCriticErrorCodeTests(unittest.TestCase):
     """Tests for structural_critic error-code awareness."""

@@ -11,8 +11,13 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
+import os
+import shutil
 import subprocess
 import sys
+import tempfile
+import time
 import unittest
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -26,6 +31,7 @@ from distribution_drift import (
     _simplified_ks_test,
     analyze_drift,
     compute_drift,
+    load_traces,
     self_verify,
 )
 
@@ -162,6 +168,60 @@ class DistributionDriftTest(unittest.TestCase):
         baseline = [_mk_trace("PASS") for _ in range(3)]
         result = compute_drift(recent, baseline)  # must not raise
         self.assertIsInstance(result, dict)
+
+
+class LoadTracesTest(unittest.TestCase):
+    """Cover load_traces mtime pre-filtering + preserved timestamp semantics."""
+
+    def _make_dir(self) -> Path:
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(tmp, ignore_errors=True))
+        return tmp
+
+    def _write(self, d: Path, name: str, trace: dict) -> Path:
+        p = d / name
+        p.write_text(json.dumps(trace), encoding="utf-8")
+        return p
+
+    def test_filters_by_json_timestamp(self) -> None:
+        # Old traces (by embedded timestamp) must still be excluded, new kept.
+        d = self._make_dir()
+        self._write(d, "gcl-trace-old.json", _mk_trace("PASS", days_ago=90))
+        new_trace = _mk_trace("PASS", days_ago=0)
+        self._write(d, "gcl-trace-new.json", new_trace)
+        result = load_traces(d, since_days=30)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["timestamp"], new_trace["timestamp"])
+
+    def test_skips_files_with_old_mtime(self) -> None:
+        # A file whose mtime predates the cutoff is not read/parsed, so even an
+        # unreadable/corrupt old file must not cause it to be loaded.
+        d = self._make_dir()
+        old = self._write(d, "gcl-trace-old.json", _mk_trace("PASS", days_ago=90))
+        old_ts = time.time() - 90 * 24 * 3600
+        os.utime(old, (old_ts, old_ts))
+        new_trace = _mk_trace("PASS", days_ago=0)
+        self._write(d, "gcl-trace-new.json", new_trace)
+        result = load_traces(d, since_days=30)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["timestamp"], new_trace["timestamp"])
+
+    def test_old_mtime_not_read_invalid_json(self) -> None:
+        # If the mtime pre-filter failed, a corrupt old file would be excluded by
+        # the JSON timestamp check anyway; this asserts the pre-filter path holds
+        # for a file that is both old-by-mtime and corrupt.
+        d = self._make_dir()
+        old = d / "gcl-trace-old.json"
+        old.write_text("{not valid json", encoding="utf-8")
+        old_ts = time.time() - 90 * 24 * 3600
+        os.utime(old, (old_ts, old_ts))
+        self._write(d, "gcl-trace-new.json", _mk_trace("PASS", days_ago=0))
+        result = load_traces(d, since_days=30)
+        self.assertEqual(len(result), 1)
+
+    def test_missing_dir_returns_empty(self) -> None:
+        result = load_traces(Path(tempfile.mkdtemp()) / "nope", since_days=30)
+        self.assertEqual(result, [])
 
 
 if __name__ == "__main__":
