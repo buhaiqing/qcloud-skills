@@ -215,3 +215,90 @@ def test_critical_triggers_l3_gate():
     )
     assert check_l3(result, reviewed=False)["passed"] is False
     assert check_l3(result, reviewed=True)["passed"] is True
+
+
+def test_shared_context_renders_identical_to_public_wrapper():
+    """Engine-style single precompute + two renders must byte-match the public API."""
+    from copilot.report_gen import (
+        _precompute_blackboard_context,
+        _synthesize_with_context,
+    )
+
+    contributions = {
+        "qcloud-proactive-inspection": {
+            "verdict": "WARNING",
+            "findings": [
+                {"severity": "P1", "summary": "数据盘 test-disk 未加密", "resource_id": "i-abc"},
+                {"severity": "P2", "summary": "磁盘 IOPS 偏低", "resource_id": "i-abc"},
+                {"severity": "P0", "summary": "磁盘接近打满", "resource_id": "i-abc"},
+            ],
+            "topology_hints": ["i-abc"],
+            "metadata": {"customer": "朔州天源", "mode": "full"},
+        },
+        "qcloud-monitor-ops": {
+            "verdict": "PASS",
+            "findings": [],
+            "metadata": {"time_window": "最近24h", "alarm_count": 0},
+        },
+    }
+    common = {
+        "user_request": "朔州天源 VPC 风险巡检",
+        "plan": None,
+        "step_results": None,
+        "evidence_chain": None,
+    }
+    # Public wrapper path (single precompute per audience call)
+    detailed_wrap = synthesize_from_blackboard(
+        contributions, audience="detailed", customer="朔州天源", **common
+    )
+    summary_wrap = synthesize_from_blackboard(
+        contributions, audience="summary", customer="朔州天源", **common
+    )
+    # Shared-context fast path (one precompute, two renders — engine style)
+    ctx = _precompute_blackboard_context(contributions, "朔州天源", None)
+    detailed_shared = _synthesize_with_context(
+        ctx, "detailed", contributions=contributions, **common
+    )
+    summary_shared = _synthesize_with_context(
+        ctx, "summary", contributions=contributions, **common
+    )
+
+    assert render_markdown(detailed_shared) == render_markdown(detailed_wrap)
+    assert render_markdown(summary_shared) == render_markdown(summary_wrap)
+    # P0/P1/P2 statistics surfaced in the conclusion must match the fixture.
+    conclusion = next(s for s in detailed_wrap.sections if s.title == "巡检结论")
+    blob = "\n".join(conclusion.findings)
+    assert "P0 1 / P1 1 / P2 1" in blob
+
+
+def test_engine_style_pair_uses_single_precompute():
+    """detailed+summary pair from one shared context is identical to two public calls."""
+    from copilot.report_gen import (
+        _precompute_blackboard_context,
+        _synthesize_with_context,
+    )
+
+    contributions = {
+        "qcloud-proactive-inspection": {
+            "verdict": "WARNING",
+            "findings": [
+                {"severity": "P1", "summary": "数据盘 test-disk 未加密", "resource_id": "i-abc"}
+            ],
+            "topology_hints": ["i-abc"],
+            "metadata": {"customer": "朔州天源"},
+        },
+    }
+    common = {
+        "user_request": "",
+        "plan": None,
+        "step_results": None,
+        "evidence_chain": None,
+    }
+    expected = {
+        aud: synthesize_from_blackboard(contributions, audience=aud, **common)
+        for aud in ("detailed", "summary")
+    }
+    ctx = _precompute_blackboard_context(contributions, None, None)
+    for aud in ("detailed", "summary"):
+        got = _synthesize_with_context(ctx, aud, contributions=contributions, **common)
+        assert render_markdown(got) == render_markdown(expected[aud])

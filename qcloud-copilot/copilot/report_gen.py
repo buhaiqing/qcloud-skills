@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -471,6 +472,7 @@ def _build_conclusion_findings(
     alert: dict,
     alarm_count: int | None,
     time_window: str,
+    bucket_counts: Counter,
 ) -> list[str]:
     """结论先行：文档开头展示的明确巡检结论。"""
     headline = _VERDICT_HEADLINE.get(overall, overall)
@@ -482,9 +484,9 @@ def _build_conclusion_findings(
     else:
         sub = "未发现需处理的必修项"
 
-    p0_n = sum(1 for i in action_items if _action_bucket(i["severity"]) == "P0")
-    p1_n = sum(1 for i in action_items if _action_bucket(i["severity"]) == "P1")
-    p2_n = sum(1 for i in action_items if _action_bucket(i["severity"]) == "P2")
+    p0_n = bucket_counts["P0"]
+    p1_n = bucket_counts["P1"]
+    p2_n = bucket_counts["P2"]
     if count:
         breakdown = f"（P0 {p0_n} / P1 {p1_n} / P2 {p2_n}）"
     else:
@@ -1141,17 +1143,16 @@ def _derive_recommendations(
     return recs[:5]
 
 
-def synthesize_from_blackboard(
+def _precompute_blackboard_context(
     contributions: dict[str, dict],
-    audience: str = "detailed",
-    *,
-    customer: str | None = None,
-    user_request: str = "",
-    plan: ExecutionPlan | None = None,
-    step_results: list[StepResult] | None = None,
-    evidence_chain: dict[str, Any] | None = None,
-) -> Report:
-    """Aggregate skill contributions into a comprehensive human-facing Final Report."""
+    customer: str | None,
+    plan: ExecutionPlan | None,
+) -> dict[str, Any]:
+    """Compute the audience-independent aggregation once, shared by detailed/summary.
+
+    All values here are identical across audiences; only the rendering (sections,
+    title) differs. Returns a dict consumed by ``_synthesize_with_context``.
+    """
     customer_name = _resolve_customer(contributions, customer)
     region = (plan.context.get("region") if plan else None) or "ap-guangzhou"
     normalized = _dedupe_findings(_collect_normalized_findings(contributions))
@@ -1173,6 +1174,53 @@ def synthesize_from_blackboard(
     if alarm_count is None and alert:
         alarm_count = len(alert.get("findings") or [])
     time_window = alert_meta.get("time_window", "最近24h")
+
+    # Single pass buckets P0/P1/P2 (reused by conclusion + summary instead of
+    # re-traversing action_items per priority level).
+    bucket_counts: Counter = Counter(
+        _action_bucket(item["severity"]) for item in action_items
+    )
+
+    return {
+        "customer_name": customer_name,
+        "region": region,
+        "action_items": action_items,
+        "info_items": info_items,
+        "issue_groups": issue_groups,
+        "overall": overall,
+        "cruise": cruise,
+        "alert": alert,
+        "resources_checked": resources_checked,
+        "cruise_mode": cruise_mode,
+        "alarm_count": alarm_count,
+        "time_window": time_window,
+        "bucket_counts": bucket_counts,
+    }
+
+
+def _synthesize_with_context(
+    ctx: dict[str, Any],
+    audience: str,
+    user_request: str,
+    plan: ExecutionPlan | None,
+    step_results: list[StepResult] | None,
+    evidence_chain: dict[str, Any] | None,
+    contributions: dict[str, dict],
+) -> Report:
+    """Render a Report from a precomputed blackboard context (audience-specific only)."""
+    customer_name = ctx["customer_name"]
+    region = ctx["region"]
+    action_items = ctx["action_items"]
+    info_items = ctx["info_items"]
+    issue_groups = ctx["issue_groups"]
+    overall = ctx["overall"]
+    cruise = ctx["cruise"]
+    alert = ctx["alert"]
+    resources_checked = ctx["resources_checked"]
+    cruise_mode = ctx["cruise_mode"]
+    alarm_count = ctx["alarm_count"]
+    time_window = ctx["time_window"]
+    bucket_counts = ctx["bucket_counts"]
 
     sections: list[ReportSection] = []
 
@@ -1197,6 +1245,7 @@ def synthesize_from_blackboard(
                 alert=alert,
                 alarm_count=alarm_count,
                 time_window=time_window,
+                bucket_counts=bucket_counts,
             ),
         )
     )
@@ -1342,8 +1391,8 @@ def synthesize_from_blackboard(
                 )
             )
 
-    p0_n = sum(1 for i in action_items if _action_bucket(i["severity"]) == "P0")
-    p1_n = sum(1 for i in action_items if _action_bucket(i["severity"]) == "P1")
+    p0_n = bucket_counts["P0"]
+    p1_n = bucket_counts["P1"]
     summary = (
         f"整体 {overall}：{len(action_items)} 项需处理（P0 {p0_n} / P1 {p1_n}）"
         if action_items
@@ -1362,4 +1411,33 @@ def synthesize_from_blackboard(
         customer=customer_name,
         user_request=user_request,
         audience=audience,
+    )
+
+
+def synthesize_from_blackboard(
+    contributions: dict[str, dict],
+    audience: str = "detailed",
+    *,
+    customer: str | None = None,
+    user_request: str = "",
+    plan: ExecutionPlan | None = None,
+    step_results: list[StepResult] | None = None,
+    evidence_chain: dict[str, Any] | None = None,
+) -> Report:
+    """Aggregate skill contributions into a comprehensive human-facing Final Report.
+
+    Public signature is stable. For repeated detailed/summary synthesis on the same
+    contributions, callers may compute the shared context once via
+    ``_precompute_blackboard_context`` and render each audience via
+    ``_synthesize_with_context`` to avoid re-running the common precompute.
+    """
+    ctx = _precompute_blackboard_context(contributions, customer, plan)
+    return _synthesize_with_context(
+        ctx,
+        audience=audience,
+        user_request=user_request,
+        plan=plan,
+        step_results=step_results,
+        evidence_chain=evidence_chain,
+        contributions=contributions,
     )
