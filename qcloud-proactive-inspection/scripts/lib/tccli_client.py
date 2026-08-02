@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import logging
 import subprocess
@@ -70,6 +71,7 @@ class TccliClient:
         hours: int = 6,
         region: str | None = None,
         service_code: str = "vm",
+        max_workers: int = 8,
     ) -> dict[str, list[tuple[int, float]]]:
         region = region or self.region
         end = datetime.now(UTC)
@@ -79,8 +81,8 @@ class TccliClient:
             [{"Dimensions": [{"Name": "InstanceId", "Value": resource_id}]}],
             ensure_ascii=False,
         )
-        result: dict[str, list[tuple[int, float]]] = {}
-        for metric in metrics:
+
+        def _fetch(metric: str) -> tuple[str, list[tuple[int, float]]] | None:
             resp = _run_tccli(
                 "monitor",
                 "GetMonitorData",
@@ -106,9 +108,22 @@ class TccliClient:
                 points = self._parse_data_points(resp)
             except RuntimeError as exc:
                 logger.warning("metric %s unavailable for %s: %s", metric, resource_id, exc)
-                continue
-            if points:
-                result[metric] = points
+                return None
+            return (metric, points) if points else None
+
+        # Parallelize the subprocess-bound metric queries with a bounded thread
+        # pool. subprocess.run releases the GIL while waiting, so this yields real
+        # I/O concurrency. Non-RuntimeError failures (e.g. subprocess timeout) still
+        # propagate, matching the original serial abort-on-failure semantics.
+        result: dict[str, list[tuple[int, float]]] = {}
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = [pool.submit(_fetch, metric) for metric in metrics]
+            # Await futures in input order so the returned dict preserves the
+            # caller-visible metric ordering exactly as the serial loop did.
+            for metric, future in zip(metrics, futures):
+                outcome = future.result()
+                if outcome is not None:
+                    result[outcome[0]] = outcome[1]
         return result
 
     def list_clusters(self) -> list[dict[str, Any]]:
