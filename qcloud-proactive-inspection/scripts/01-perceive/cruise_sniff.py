@@ -5,11 +5,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_CUSTOMER_TAG_KEY = "客户"
 ALL_REGIONS = ["ap-guangzhou", "ap-shanghai", "ap-beijing", "ap-nanjing", "ap-chengdu"]
@@ -31,19 +34,40 @@ def _repo_root() -> Path:
 
 
 def _run_tccli(product: str, operation: str, region: str, extra: list[str] | None = None) -> dict:
+    """Run a tccli query. Failures return ``{"_error": ...}`` instead of ``{}``.
+
+    An empty dict is indistinguishable from "no resources", so auth failures and
+    throttling used to look like healthy empty inventories.
+    """
     cmd = ["tccli", product, operation, "--region", region, "--output", "json"]
     if extra:
         cmd.extend(extra)
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=90, check=False)
-    if proc.returncode != 0 or not proc.stdout.strip():
+    if proc.returncode != 0:
+        logger.warning(
+            "tccli %s %s failed (rc=%s): %s", product, operation, proc.returncode,
+            (proc.stderr or "").strip()[:200],
+        )
+        return {"_error": f"rc={proc.returncode}", "_stderr": (proc.stderr or "")[:200]}
+    if not proc.stdout.strip():
         return {}
     try:
-        return json.loads(proc.stdout).get("Response", {})
+        resp = json.loads(proc.stdout).get("Response", {})
     except json.JSONDecodeError:
-        return {}
+        logger.warning("tccli %s %s returned non-JSON output", product, operation)
+        return {"_error": "InvalidJSON"}
+    if "Error" in resp:
+        code = resp["Error"].get("Code", "Unknown")
+        logger.warning("tccli %s %s API error: %s", product, operation, code)
+        return {"_error": code, "_stderr": (proc.stderr or "")[:200]}
+    return resp
 
 
 def _list_items(resp: dict, *keys: str) -> list[dict]:
+    # A failed query must not be reported as an empty inventory: an operator
+    # acting on "0 resources found" would draw the opposite conclusion.
+    if "_error" in resp:
+        raise RuntimeError(f"tccli failed: {resp['_error']}")
     for key in keys:
         items = resp.get(key)
         if isinstance(items, list):
@@ -146,4 +170,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # Without a handler the tccli failure warnings are swallowed by the
+    # "no handlers" fallback, which is how the silent-empty-inventory bug hid.
+    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     sys.exit(main())

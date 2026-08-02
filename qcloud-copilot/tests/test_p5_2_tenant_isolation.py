@@ -52,6 +52,62 @@ def test_enforce_tenant_isolation_empty_records():
     assert enforce_tenant_isolation([], current_tenant_id="t1") == []
 
 
+# --- require_tenant_isolation: fail-closed gate ------------------------------
+
+
+def test_require_tenant_isolation_returns_records_when_all_match():
+    from copilot.tenant_guard import require_tenant_isolation
+    records = [_trace(tenant_id="t1"), _trace(tenant_id="t1")]
+    assert require_tenant_isolation(records, current_tenant_id="t1") == records
+
+
+def test_require_tenant_isolation_empty_records_allowed():
+    from copilot.tenant_guard import require_tenant_isolation
+    assert require_tenant_isolation([], current_tenant_id="t1") == []
+
+
+def test_require_tenant_isolation_raises_without_current_tenant():
+    import pytest
+    from copilot.tenant_guard import require_tenant_isolation
+    with pytest.raises(PermissionError, match="no current_tenant_id"):
+        require_tenant_isolation([_trace(tenant_id="t1")], current_tenant_id="")
+
+
+def test_require_tenant_isolation_raises_on_untagged_record():
+    import pytest
+    from copilot.tenant_guard import require_tenant_isolation
+    # Unlike the advisory variant, an untagged record cannot be proven to
+    # belong to the caller, so it is denied instead of passed through.
+    records = [_trace(tenant_id=None, trace_id="trc-untagged")]
+    with pytest.raises(PermissionError, match="trc-untagged.*no tenant_id"):
+        require_tenant_isolation(records, current_tenant_id="t1")
+
+
+def test_require_tenant_isolation_raises_on_cross_tenant_record():
+    import pytest
+    from copilot.tenant_guard import require_tenant_isolation
+    records = [_trace(tenant_id="t1"), _trace(tenant_id="t2", trace_id="trc-bad")]
+    with pytest.raises(PermissionError, match="trc-bad.*belongs to tenant 't2'"):
+        require_tenant_isolation(records, current_tenant_id="t1")
+
+
+def test_require_tenant_isolation_does_not_consume_iterator_twice():
+    from copilot.tenant_guard import require_tenant_isolation
+    # A generator must survive validation so callers can still use the result.
+    records = (t for t in [_trace(tenant_id="t1"), _trace(tenant_id="t1")])
+    assert len(require_tenant_isolation(records, current_tenant_id="t1")) == 2
+
+
+def test_enforce_tenant_isolation_emits_deprecation_warning():
+    import warnings
+
+    from copilot.tenant_guard import enforce_tenant_isolation
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        enforce_tenant_isolation([], current_tenant_id="t1")
+    assert any(issubclass(w.category, DeprecationWarning) for w in caught)
+
+
 def test_redact_sensitive_fields_strips_password_token_secret():
     from copilot.tenant_guard import redact_sensitive_fields
     payload = {

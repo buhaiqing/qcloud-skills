@@ -5,6 +5,7 @@ import json
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -15,7 +16,12 @@ from lib.cruise_logger import CruiseLogger, Phase
 from lib.finding_filters import FindingFilterSet, finops_cost_filter, reliability_filter
 from lib.finding_fingerprint import FindingFingerprint, FingerprintRegistry
 from lib.selective_workflow import SelectiveWorkflow
-from lib.topology_discovery import NodeType, TopologyGraph, TopologyNode
+from lib.topology_discovery import (
+    NodeType,
+    TopologyDiscovery,
+    TopologyGraph,
+    TopologyNode,
+)
 
 
 class TestFindingFingerprint(unittest.TestCase):
@@ -278,6 +284,87 @@ class TestSelectiveWorkflow(unittest.TestCase):
             assert hasattr(step, "enabled")
             assert hasattr(step, "name")
             assert hasattr(step, "reason")
+
+
+class TestTopologyDiscoveryRegionValidation(unittest.TestCase):
+    """Region is validated by shape, not by a hardcoded allowlist (M5)."""
+
+    def test_accepts_regions_outside_the_old_allowlist(self) -> None:
+        """Verify valid regions the 13-entry allowlist used to reject now pass."""
+        for region in ("ap-mumbai", "ap-guangzhou", "eu-frankfurt", "ap-shanghai-fsi"):
+            with self.subTest(region=region):
+                assert TopologyDiscovery(region=region, dry_run=True).region == region
+
+    def test_rejects_malformed_regions(self) -> None:
+        """Verify injection-shaped and malformed regions are still refused.
+
+        Shape validation accepts any well-formed region name, so it cannot tell
+        an unknown-but-valid region from a real one; it only has to reject
+        strings that could not be a region at all. A bogus-but-well-formed name
+        is harmless because tccli rejects it and argv is never shell-parsed.
+        """
+        for region in ("-evil", "ap-guangzhou;rm -rf /", "AP-GUANGZHOU", "", "ap_guangzhou",
+                       "ap-guangzhou --profile evil", "ap-guangzhou-a-b"):
+            with self.subTest(region=region):
+                with self.assertRaises(ValueError):
+                    TopologyDiscovery(region=region, dry_run=True)
+
+
+class TestTopologyDiscoveryArgKeys(unittest.TestCase):
+    """Dotted tccli argument keys must survive validation (B3)."""
+
+    @staticmethod
+    def _stub_run(captured: list[list[str]]):
+        class _Result:
+            returncode = 0
+            stdout = '{"Response": {}}'
+            stderr = ""
+
+        def _run(args, **_kwargs):
+            captured.append(args)
+            return _Result()
+
+        return _run
+
+    def test_dotted_filter_keys_accepted(self) -> None:
+        """Verify `Filters.0.Name` style keys are not rejected as invalid."""
+        captured: list[list[str]] = []
+        td = TopologyDiscovery(region="ap-guangzhou", vpc_id="vpc-abc123")
+        with unittest.mock.patch(
+            "lib.topology_discovery.subprocess.run", self._stub_run(captured)
+        ):
+            td._tccli(
+                "cvm",
+                "DescribeInstances",
+                **{"Filters.0.Name": "vpc-id", "Filters.0.Values.0": "vpc-abc123"},
+            )
+        assert "--Filters.0.Name" in captured[0]
+        assert "--Filters.0.Values.0" in captured[0]
+
+    def test_vpc_scoped_discovery_does_not_raise(self) -> None:
+        """Regression: vpc_id set used to raise ValueError on the dotted filter key."""
+        captured: list[list[str]] = []
+        td = TopologyDiscovery(region="ap-guangzhou", vpc_id="vpc-abc123")
+        with unittest.mock.patch(
+            "lib.topology_discovery.subprocess.run", self._stub_run(captured)
+        ):
+            td.discover_cvm_instances()
+            td.discover_eni()
+        assert captured, "expected tccli to be invoked"
+
+    def test_still_rejects_injection_shaped_keys(self) -> None:
+        """Verify the relaxed regex did not open a hole for flag injection."""
+        td = TopologyDiscovery(region="ap-guangzhou")
+        for bad in ("Filters.0.Name --evil", "Filters..Name", ".Leading", "Trailing."):
+            with self.subTest(key=bad):
+                with self.assertRaises(ValueError):
+                    td._tccli("cvm", "DescribeInstances", **{bad: "x"})
+
+    def test_still_rejects_dash_leading_values(self) -> None:
+        """Verify a value that looks like a flag is still refused."""
+        td = TopologyDiscovery(region="ap-guangzhou")
+        with self.assertRaises(ValueError):
+            td._tccli("cvm", "DescribeInstances", **{"Filters.0.Name": "--evil"})
 
 
 if __name__ == "__main__":

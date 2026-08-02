@@ -1,1 +1,1 @@
-["cleanup", "delete", "deregister", "destroy", "detach", "disable", "drop", "purge", "remove", "reset", "revoke", "stop", "terminate", "truncate", "uninstall", "wipe"]
+["cleanup", "delete", "deregister", "destroy", "detach", "disable", "drop", "expire", "format", "isolate", "kill", "overwrite", "purge", "release", "remove", "reset", "revoke", "rollback", "shutdown", "stop", "terminate", "truncate", "unbind", "uninstall", "wipe"]
