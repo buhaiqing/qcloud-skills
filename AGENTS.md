@@ -68,28 +68,9 @@ Run `ls qcloud-*-ops/` for canonical list.
   - `thresholds.json` — GCL/Reflexion/AGENTS.md thresholds
   - `validation_commands.yaml` — all validation command strings
 
-## Coding Discipline (Karpathy Guidelines)
+## Coding Discipline
 
-### 1. Think Before Coding
-- Explicitly state assumptions; ask if uncertain.
-- Present multiple interpretations if they exist.
-- Suggest simpler approaches when warranted.
-
-### 2. Simplicity First
-- No features beyond what was asked.
-- No single-use abstractions.
-- No unrequested flexibility/configurability.
-- Rewrite 200-line solutions that could be 50 lines.
-
-### 3. Surgical Changes
-- Touch only what you must.
-- Match existing style.
-- Don't refactor working code.
-- Remove only your own unused imports/variables/functions.
-
-### 4. Goal-Driven Execution
-- Define verifiable success criteria.
-- For multi-step tasks, state a brief plan with verify checkpoints.
+通用行为准则详见 `~/.pi/agent/AGENTS.md §行为准则`（中英等价权威源）。本仓库仅需遵循，不重复定义。
 
 ## Mandatory rule: 2-round self-review after every skill update
 
