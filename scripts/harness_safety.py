@@ -34,12 +34,28 @@ def _load_verbs(path: Path | None = None) -> set[str]:
 VERBS = _load_verbs()
 
 
+# Inflections a destructive verb may legitimately carry. Matching these
+# explicitly keeps "deleted"/"removes"/"stopping" destructive while refusing
+# open-ended prefix matches, which previously flagged "resettable" (reset),
+# "release notes" (release) and "formatting" (format) as destructive. Every
+# false positive trains operators to rubber-stamp the confirmation gate, so
+# over-matching is a safety regression rather than a conservative default.
+_INFLECTIONS = ("", "s", "es", "d", "ed", "ing")
+
+
 def is_destructive(plan_text: str) -> bool:
-    # Prefix-match so inflected forms ("deleted", "removes", "removing") are
-    # caught — a bare substring/split match would let "the instance will be
-    # deleted" bypass the mandatory human-confirmation token.
-    tokens = plan_text.lower().split()
-    return any(t == v or t.startswith(v) for t in tokens for v in VERBS)
+    tokens = {t.strip(".,;:!?()[]{}\"'`") for t in plan_text.lower().split()}
+    return any(_matches(t, v) for t in tokens for v in VERBS)
+
+
+def _matches(token: str, verb: str) -> bool:
+    if len(verb) < 3:
+        # A 2-char stem collides with too much benign vocabulary to inflect.
+        return token == verb
+    # "delete" + "d" -> "deleted"; also handle stems that drop a trailing "e"
+    # ("terminate" -> "terminating") and consonant doubling ("stop" -> "stopping").
+    stems = {verb, verb.rstrip("e"), verb + verb[-1]}
+    return any(token == stem + suffix for stem in stems for suffix in _INFLECTIONS)
 
 
 def plan_hash(plan_text: str) -> str:

@@ -2,6 +2,7 @@
 """
 from __future__ import annotations
 
+import warnings
 from collections.abc import Iterable
 
 from copilot.security import scan_text_for_secrets
@@ -9,13 +10,63 @@ from copilot.security import scan_text_for_secrets
 REDACTED = "REDACTED"
 
 
+# STAGED API — `require_tenant_isolation` has no production call site yet.
+# It is the fail-closed replacement for `enforce_tenant_isolation` (advisory,
+# fail-open). Both are kept during migration so existing advisory consumers
+# keep working; the cutover is tracked in docs/superpowers/plans/ as the
+# "tenant isolation fail-closed cutover" item. Removing `enforce_*` before
+# every caller is migrated would silently drop the only isolation check that
+# exists today, so it must stay until the tracked cutover lands.
+
+
+def _tenant_of(rec) -> str | None:
+    identity = getattr(rec, "identity", None)
+    return getattr(identity, "tenant_id", None) if identity else None
+
+
+def require_tenant_isolation(records: Iterable, *, current_tenant_id: str) -> list:
+    """Fail-closed tenant isolation gate. Returns the records on success.
+
+    Raises ``PermissionError`` when the caller has no tenant identity, when a
+    record carries no tenant tag, or when a record belongs to another tenant.
+    An untagged record cannot be proven to belong to the caller, so it is
+    denied rather than passed through — the advisory variant treated both of
+    those cases as "allowed", which let cross-tenant data escape.
+    """
+    if not current_tenant_id:
+        raise PermissionError("tenant isolation: no current_tenant_id supplied")
+    checked = list(records)
+    for rec in checked:
+        tenant = _tenant_of(rec)
+        record_id = getattr(rec, "id", "?")
+        if tenant is None:
+            raise PermissionError(
+                f"tenant isolation: record {record_id!r} has no tenant_id"
+            )
+        if tenant != current_tenant_id:
+            raise PermissionError(
+                f"tenant isolation: record {record_id!r} belongs to tenant "
+                f"{tenant!r}, caller is {current_tenant_id!r}"
+            )
+    return checked
+
+
 def enforce_tenant_isolation(records: Iterable, *, current_tenant_id: str) -> list[dict]:
+    """Deprecated advisory check — returns issues instead of blocking.
+
+    Use :func:`require_tenant_isolation` for an enforcing, fail-closed gate.
+    """
+    warnings.warn(
+        "enforce_tenant_isolation is advisory and fail-open; "
+        "use require_tenant_isolation for a fail-closed gate",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     issues: list[dict] = []
     if not current_tenant_id:
         return issues
     for rec in records:
-        identity = getattr(rec, "identity", None)
-        tenant = getattr(identity, "tenant_id", None) if identity else None
+        tenant = _tenant_of(rec)
         if tenant and tenant != current_tenant_id:
             issues.append({
                 "record_id": getattr(rec, "id", "?"),

@@ -21,12 +21,18 @@ ROOT = Path(__file__).resolve().parents[1]
 AUDIT = ROOT / "audit-results"
 AUDIT.mkdir(exist_ok=True)
 
-SENSITIVE_KEY_RE = re.compile(r"(AKID|secretId|secretKey)[A-Za-z0-9]+")
+# The value is usually separated from the key by quotes, colons, `=` or spaces
+# (`--secretKey abc`, `"secretKey": "abc"`); requiring it to be concatenated
+# meant those forms were never redacted.
+SENSITIVE_KEY_RE = re.compile(
+    r'((?:AKID|secretId|secretKey)["\s:=]*)([A-Za-z0-9_\-]{8,})', re.IGNORECASE
+)
 SECRET_VAL_RE = re.compile(r"(TENCENTCLOUD_SECRET_KEY=)[A-Za-z0-9_-]+")
 
-# Canonical destructive-verb set lives in harness_safety (Phase 3 owner); reuse it
-# so the two detection paths can never drift.
-from harness_safety import VERBS as DESTRUCTIVE_VERBS
+# Canonical destructive-verb set AND matching rule live in harness_safety
+# (Phase 3 owner); reuse both so the two detection paths can never drift.
+from harness_safety import VERBS as DESTRUCTIVE_VERBS  # noqa: F401  re-export for callers
+from harness_safety import is_destructive as _harness_is_destructive
 
 
 def plan_hash(plan_text: str) -> str:
@@ -34,8 +40,7 @@ def plan_hash(plan_text: str) -> str:
 
 
 def is_destructive(plan_text: str) -> bool:
-    tokens = plan_text.lower().split()
-    return any(t == v or t.startswith(v) for t in tokens for v in DESTRUCTIVE_VERBS)
+    return _harness_is_destructive(plan_text)
 
 
 def preflight(plan_text: str, human_token: str | None) -> dict:

@@ -12,10 +12,21 @@ Usage:
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, ClassVar
+
+# tccli treats any argv element starting with `-` as a flag, so an unvalidated
+# region or kwarg value can inject extra options into the invocation.
+# Validate the *shape* of a region rather than enumerating them: Tencent Cloud
+# adds regions (ap-mumbai, ap-jakarta, na-toronto, ap-shanghai-fsi, …) faster
+# than a hardcoded allowlist can track, and a stale list rejects valid input.
+_REGION_RE = re.compile(r"^[a-z]{2}-[a-z]+(-[a-z]+)?$")
+# tccli list/struct parameters are dotted (`Filters.0.Name`, `Filters.0.Values.0`),
+# so the key grammar must allow dot-separated segments.
+_ARG_KEY_RE = re.compile(r"[A-Za-z][A-Za-z0-9]*(\.[A-Za-z0-9]+)*")
 
 
 class NodeType(str, Enum):
@@ -131,6 +142,10 @@ class TopologyDiscovery:
         vpc_id: str | None = None,
         dry_run: bool = False,
     ):
+        if not _REGION_RE.fullmatch(region):
+            raise ValueError(
+                f"malformed region {region!r}; expected e.g. 'ap-guangzhou' or 'ap-shanghai-fsi'"
+            )
         self.region = region
         self.vpc_id = vpc_id
         self.dry_run = dry_run
@@ -149,10 +164,17 @@ class TopologyDiscovery:
             "--output", "json",
         ]
         for k, v in kwargs.items():
-            # Quote values to prevent tccli argument misparsing on special chars.
-            # subprocess.run with a list (no shell=True) is safe; tccli receives
-            # each arg as a separate argv element so no shell injection risk here.
-            args.extend([f"--{k}", str(v)])
+            # subprocess.run with a list (no shell=True) blocks shell injection,
+            # but a caller-controlled key or a value starting with `-` still
+            # lands in argv as an extra tccli flag.
+            if not _ARG_KEY_RE.fullmatch(k):
+                raise ValueError(f"invalid tccli argument name: {k!r}")
+            value = str(v)
+            if value.startswith("-"):
+                raise ValueError(
+                    f"tccli argument --{k} value may not start with '-': {value!r}"
+                )
+            args.extend([f"--{k}", value])
 
         result = subprocess.run(args, capture_output=True, text=True, check=False)
         if result.returncode != 0:

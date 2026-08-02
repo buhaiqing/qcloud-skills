@@ -80,6 +80,64 @@ class HarnessSafetyTest(unittest.TestCase):
         self.assertIn("ok", res.stdout)
 
 
+class HarnessSafetyFalsePositiveTest(unittest.TestCase):
+    """Benign read-only plans must NOT trip the destructive gate.
+
+    Every false positive forces a human to issue a confirmation token for a
+    harmless plan, which trains operators to rubber-stamp the gate.
+    """
+
+    def test_benign_plans_are_not_destructive(self) -> None:
+        for plan in (
+            # Words that merely *start with* a destructive verb but are not
+            # inflections of it — the old prefix match flagged all of these.
+            "list resettable configs",
+            "rmap the topology",
+            "review the formatter output",
+            "collect killswitch metrics",
+            "describe instances",
+            "list all buckets",
+            "get metrics for the cluster",
+        ):
+            with self.subTest(plan=plan):
+                self.assertFalse(harness_safety.is_destructive(plan))
+
+    def test_inflected_verbs_are_still_destructive(self) -> None:
+        # Inflection tolerance (L13) must survive the false-positive fix.
+        for plan in (
+            "the instances were stopped",
+            "killing the runaway process",
+            "formatting the attached volume",
+            "deleting the snapshot",
+            "terminated the cluster",
+            "removes the disk",
+        ):
+            with self.subTest(plan=plan):
+                self.assertTrue(harness_safety.is_destructive(plan))
+
+    def test_new_verbs_still_destructive(self) -> None:
+        for plan in (
+            "isolate the compromised instance",
+            "release the elastic IP",
+            "shutdown the cluster",
+            "expire the stale cache keys",
+            "kill the runaway process",
+            "unbind the security group",
+            "rollback the deployment",
+            "overwrite the bucket object",
+            "format the attached volume",
+        ):
+            with self.subTest(plan=plan):
+                self.assertTrue(harness_safety.is_destructive(plan))
+
+    def test_short_verbs_require_exact_match(self) -> None:
+        # A hypothetical 2-char verb must not prefix-match benign vocabulary.
+        self.assertTrue(harness_safety._matches("rm", "rm"))
+        self.assertFalse(harness_safety._matches("rmap", "rm"))
+        # 3+ char verbs keep inflection tolerance.
+        self.assertTrue(harness_safety._matches("deleted", "delete"))
+
+
 class HarnessSafetyVerbsSourceTest(unittest.TestCase):
     """VERBS must come from assets/shared/destructive_verbs.json (single source)."""
 
