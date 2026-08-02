@@ -167,7 +167,7 @@
   {
     "query": "Check my account billing details",
     "should_trigger": false,
-    "delegate_to": "qcloud-billing-ops"
+    "delegate_to": "qcloud-finops-ops"
   },
   {
     "query": "Grant CAM permissions to a user",

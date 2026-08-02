@@ -137,7 +137,10 @@ def build_steps(python: str = sys.executable, github_output: bool = False) -> li
 
     return [
         Step("Ruff Python lint", ruff_args),
-        Step("Validate SKILL.md frontmatter", (python, "scripts/validate_skills_frontmatter.py")),
+        Step(
+            "Validate SKILL.md frontmatter",
+            (python, "scripts/validate_skills_frontmatter.py", "--git-diff", "HEAD"),
+        ),
         Step("Validate Well-Architected worker JSON examples", (python, "scripts/validate_product_assessment.py")),
         Step("Validate Markdown local links", (python, "scripts/check_markdown_links.py")),
         Step("Lint Python in Markdown", (python, "scripts/check_markdown_python.py", "--root", ".")),
@@ -187,6 +190,45 @@ def run_step(root: Path, step: Step) -> int:
     return proc.returncode
 
 
+def run_eval_queries(root: Path, python: str = sys.executable) -> int:
+    """Validate eval_queries.json coverage; skip gracefully if script absent (L10)."""
+    script = root / "scripts" / "validate_eval_queries.py"
+    if not script.exists():
+        print(f"$ scripts/validate_eval_queries.py — SKIPPED (not found yet at {script})")
+        return 0
+    argv = (python, "scripts/validate_eval_queries.py")
+    print(f"$ {shlex.join(argv)}")
+    return subprocess.run(argv, cwd=root, check=False).returncode
+
+
+def run_affected_skills(root: Path, python: str = sys.executable) -> None:
+    """Informational: print qcloud-*-ops skill names touched by the current diff.
+
+    Runs ci_affected_skills.py in its git-diff aware mode (--from-git). It is a
+    signal, not a hard gate — failures are reported but never fail the suite.
+    """
+    script = root / "scripts" / "ci_affected_skills.py"
+    if not script.exists():
+        print(f"$ scripts/ci_affected_skills.py — SKIPPED (not found at {script})")
+        return
+    argv = (python, "scripts/ci_affected_skills.py", "--from-git")
+    print(f"$ {shlex.join(argv)}")
+    result = subprocess.run(argv, cwd=root, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        print(
+            "note: ci_affected_skills.py failed — informational, not a gate",
+            file=sys.stderr,
+        )
+        return
+    affected = result.stdout.strip()
+    if affected:
+        print("affected qcloud-*-ops skills in diff:")
+        for line in affected.splitlines():
+            print(f"  - {line}")
+    else:
+        print("no qcloud-*-ops skills affected in diff (informational)")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
@@ -227,6 +269,12 @@ def main(argv: list[str] | None = None) -> int:
         if rc != 0:
             print(f"\nFAILED: {step.name} exited with {rc}", file=sys.stderr)
             return rc
+
+    rc = run_eval_queries(root)
+    if rc != 0:
+        print(f"\nFAILED: eval_queries coverage exited with {rc}", file=sys.stderr)
+        return rc
+    run_affected_skills(root)
 
     quality_result = run_quality_score(root)
     _print_quality_summary(quality_result)

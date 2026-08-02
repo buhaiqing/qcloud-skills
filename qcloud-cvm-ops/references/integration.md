@@ -251,7 +251,7 @@ TENCENTCLOUD_REGION=ap-guangzhou
 | MySQL deployment | `qcloud-cdb-ops` | Separate skill for DB |
 | Redis deployment | `qcloud-redis-ops` | Separate skill for cache |
 | CAM permissions | `qcloud-cam-ops` | Grant CVM API permissions |
-| Billing queries | `qcloud-billing-ops` | Cost analysis, price inquiry |
+| Billing queries | `qcloud-finops-ops` | Cost analysis, price inquiry |
 
 ### Delegation Pattern
 

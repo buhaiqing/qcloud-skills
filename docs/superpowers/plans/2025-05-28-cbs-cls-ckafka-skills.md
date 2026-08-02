@@ -126,7 +126,7 @@ CBS (Cloud Block Storage) is Tencent Cloud's high-performance block storage serv
 
 ### SHOULD NOT Use This Skill When
 
-- Task is billing / account management → delegate to: `qcloud-billing-ops`
+- Task is billing / account management → delegate to: `qcloud-finops-ops`
 - Task is CAM / permission only → delegate to: `qcloud-cam-ops`
 - Task is **COS object storage** → delegate to: `qcloud-cos-ops`
 - Task is **CVM instance management** (lifecycle) → delegate to: `qcloud-cvm-ops`

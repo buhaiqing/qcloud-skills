@@ -18,8 +18,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.3.0"
-  last_updated: "2026-07-09"
+  version: "1.3.1"
+  last_updated: "2026-08-02"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/215"
@@ -85,7 +85,7 @@ VPC (Virtual Private Cloud) on Tencent Cloud provides isolated network environme
 
 ### SHOULD NOT Use This Skill When
 
-- Task is purely billing / account management → delegate to: `qcloud-billing-ops`
+- Task is purely billing / account management → delegate to: `qcloud-finops-ops`
 - Task is CAM / permission model only → delegate to: `qcloud-cam-ops`
 - Task is about **CVM instances** → delegate to: `qcloud-cvm-ops`
 - Task is about **CBS disks** → delegate to: `qcloud-cbs-ops`

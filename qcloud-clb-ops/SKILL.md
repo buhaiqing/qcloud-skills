@@ -16,8 +16,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.3.0"
-  last_updated: "2026-07-09"
+  version: "1.3.1"
+  last_updated: "2026-08-02"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/214"
@@ -78,7 +78,7 @@ See [shared-boilerplate.md](../qcloud-skill-generator/SKILL.md#five-core-standar
 
 ### SHOULD NOT Use This Skill When
 
-- Billing / account management → `qcloud-billing-ops` · CAM only → `qcloud-cam-ops` · VPC-only → `qcloud-vpc-ops`
+- Billing / account management → `qcloud-finops-ops` · CAM only → `qcloud-cam-ops` · VPC-only → `qcloud-vpc-ops`
 - CVM instance management → `qcloud-cvm-ops` · SSL-only → `qcloud-ssl-ops` · Architecture review → `qcloud-well-architected-review`
 
 ### Delegation Rules

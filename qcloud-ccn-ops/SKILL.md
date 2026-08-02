@@ -19,8 +19,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.0.0"
-  last_updated: "2026-07-03"
+  version: "1.0.1"
+  last_updated: "2026-08-02"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/215/19200"
@@ -90,13 +90,28 @@ This skill is an **operational runbook** for agents: explicit scope, credential 
 - Task is **same-region same-account cross-VPC** connectivity → delegate to `qcloud-vpc-ops` (VPC Peering is cheaper and lower latency than CCN for this case)
 - Task is **IPSec / SSL VPN to on-prem** → delegate to `qcloud-vpn-ops`
 - Task is **physical dedicated line** (Direct Connect gateway attachment) — only the *CCN attachment* part of DC is in scope; full DC lifecycle lives in a future `qcloud-dc-ops` skill
-- Task is purely billing / account management → delegate to `qcloud-billing-ops`
+- Task is purely billing / account management → delegate to `qcloud-finops-ops`
 - Task is CAM / permission model only → delegate to `qcloud-cam-ops`
 
 ### Delegation Rules
 
 - For each attached VPC, the **VPC's route table** must contain a route pointing at the CCN (next-hop type `CCN`); if the agent is asked to verify a CCN-attached VPC end-to-end, hand off the route-table work to `qcloud-vpc-ops`.
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs into one ambiguous flow.
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Read-only Well-Architected assessment for **CCN (Cloud Connect Network)**; return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | reliability / security / cost / efficiency (or `all`) |
+| `{{user.scope}}` | `single-resource` or `account-wide` |
+
+**Allowed:** `Describe*` only — **no** Create/Delete/Modify CCN instances, attachments, routes, or bandwidth limits.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: ccn`).
 
 ## Variable Convention (Agent-Readable)
 

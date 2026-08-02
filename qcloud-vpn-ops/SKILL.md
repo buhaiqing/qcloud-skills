@@ -18,8 +18,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.4.0"
-  last_updated: "2026-07-09"
+  version: "1.4.1"
+  last_updated: "2026-08-02"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/215/30691"
@@ -94,7 +94,7 @@ This skill is an **operational runbook** for agents: explicit scope, credential 
 - Task is **multi-region VPC-to-VPC** interconnect (public internet backbone) → delegate to `qcloud-ccn-ops`
 - Task is **same-region same-account cross-VPC** connectivity → delegate to `qcloud-vpc-ops` (VPC Peering is cheaper and lower latency than VPN for this case)
 - Task is **physical dedicated line** (Direct Connect) — out of scope; raise a follow-up `qcloud-dc-ops` skill
-- Task is purely billing / account management → delegate to `qcloud-billing-ops`
+- Task is purely billing / account management → delegate to `qcloud-finops-ops`
 - Task is CAM / permission model only → delegate to `qcloud-cam-ops`
 
 ### Delegation Rules
@@ -102,6 +102,21 @@ This skill is an **operational runbook** for agents: explicit scope, credential 
 - A VPN Gateway must be attached to a VPC; **VPC/Subnet/Route Table** CRUD belongs to `qcloud-vpc-ops`. After a VPN Connection is created, the **VPC route table** needs a route with `NextType=VPNGW` pointing at the gateway; that route work belongs to `qcloud-vpc-ops`.
 - For a multi-region VPN mesh, the VPN Gateways are independent and connect via the public internet; CCN is **not** required for VPN.
 - Multi-product requests: handle each product with its skill; do not merge unrelated APIs.
+- Well-Architected assessment (read-only) → invoked by `qcloud-well-architected-review`; see **Read-Only Assessment Mode** below
+
+## Read-Only Assessment Mode (delegate-from: qcloud-well-architected-review)
+
+> **delegate-to marker:** Read-only Well-Architected assessment for **VPN (hybrid cloud)**; return `{{output.product_assessment}}`.
+
+| Input from orchestrator | Value |
+|---|---|
+| `{{user.mode}}` | `well-architected-readonly` |
+| `{{user.pillars}}` | reliability / security / cost / efficiency (or `all`) |
+| `{{user.scope}}` | `single-resource` or `account-wide` |
+
+**Allowed:** `Describe*` only — **no** Create/Delete/Modify VPN Gateways, tunnels, or customer gateways.
+
+**Execute:** [well-architected-assessment.md](references/well-architected-assessment.md) § **Worker Output Contract** → [worker-output-schema.md](../qcloud-well-architected-review/references/worker-output-schema.md) (`product: vpn`).
 
 ## Variable Convention (Agent-Readable)
 

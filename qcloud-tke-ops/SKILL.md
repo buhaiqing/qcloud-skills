@@ -15,8 +15,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.2.0"
-  last_updated: "2026-06-04"
+  version: "1.2.1"
+  last_updated: "2026-08-02"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/457"
@@ -80,7 +80,7 @@ TKE (Tencent Kubernetes Engine) is Tencent Cloud's managed Kubernetes service pr
 
 ### SHOULD NOT Use This Skill When
 
-- Task is purely billing / account management → delegate to: `qcloud-billing-ops` (when present)
+- Task is purely billing / account management → delegate to: `qcloud-finops-ops` (when present)
 - Task is CAM / permission model only → delegate to: `qcloud-cam-ops` (when present)
 - Task is **VPC network only** (subnet, route table, NAT gateway) → delegate to: `qcloud-vpc-ops`
 - Task is **CLB load balancing** configuration → delegate to: `qcloud-clb-ops`

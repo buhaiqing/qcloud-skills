@@ -7,8 +7,31 @@ binds/verifies the human-issued token against the plan hash; it never generates 
 from __future__ import annotations
 
 import hashlib
+import json
+import warnings
+from pathlib import Path
 
-VERBS = {"delete", "terminate", "destroy", "drop", "reset", "remove", "stop"}
+# Canonical destructive-verb list lives in assets/shared/destructive_verbs.json
+# (single source — AGENTS.md TE-4/L13). Loaded at import time via an absolute
+# path derived from __file__, so it is robust to the caller's cwd. If the asset
+# is missing/corrupt, fall back to the previous inline set (never crash the
+# importing tool) with a visible warning.
+_SHARED_JSON = Path(__file__).resolve().parent.parent / "assets" / "shared" / "destructive_verbs.json"
+_FALLBACK_VERBS = {"delete", "terminate", "destroy", "drop", "reset", "remove", "stop"}
+
+
+def _load_verbs(path: Path | None = None) -> set[str]:
+    """Load the destructive-verb set from a shared JSON asset (or the fallback)."""
+    target = path or _SHARED_JSON
+    try:
+        with open(target, encoding="utf-8") as fh:
+            return set(json.load(fh))
+    except Exception:  # noqa: BLE001
+        warnings.warn(f"cannot load {target}; falling back to built-in VERBS")
+        return set(_FALLBACK_VERBS)
+
+
+VERBS = _load_verbs()
 
 
 def is_destructive(plan_text: str) -> bool:

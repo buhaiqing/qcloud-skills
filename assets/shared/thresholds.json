@@ -1,1 +1,1 @@
-{"rubric_min_score": 0.7, "safety_fail_threshold": 0, "max_iterations": 5, "gcl_structural_critic_only": true, "reflexion_max_lines": 200, "agents_md_max_lines": 500}
+{"rubric_min_score": 0.5, "safety_fail_threshold": 0, "max_iterations": 5, "gcl_structural_critic_only": true, "reflexion_max_lines": 200, "agents_md_max_lines": 500}

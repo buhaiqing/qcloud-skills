@@ -59,6 +59,8 @@ Canonical 技能清单以仓库中的 `qcloud-*` 目录和 `AGENTS.md` 为准。
 | `qcloud-migration-ops` | 云迁移 | 主机迁移（CVM 在线/离线）、数据库迁移（DTS）、存储迁移、迁移评估 |
 | `qcloud-service-mesh-ops` | 服务网格 TCM | Istio 服务网格、Sidecar 注入、流量治理、灰度发布、mTLS、链路追踪 |
 | `qcloud-tcop-ops` | 优化平台 TCOP | 成本优化、资源优化（规格调整/闲置）、架构审查、预留实例/ Savings Plan 覆盖率、优化报告 |
+| `qcloud-cloudbase-ops` | 云开发 CloudBase (TCB) | 环境生命周期、云数据库、云存储、云函数、静态托管、鉴权域名、API 密钥 |
+| `qcloud-test-ops` | 验收验证 stub | 零代码路由/委派验证、SkillRegistry 发现校验；cli-only，委派 qcloud-monitor-ops |
 
 ### 跨产品与元技能
 

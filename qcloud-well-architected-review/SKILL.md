@@ -21,8 +21,8 @@ compatibility:
   - tencentcloud-api-credentials
 metadata:
   author: qcloud
-  version: "1.3.5"
-  last_updated: "2026-07-03"
+  version: "1.3.6"
+  last_updated: "2026-08-02"
   type: cross-cutting-assessment
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   tags:
@@ -298,6 +298,7 @@ Pillar orchestration guides (worker mapping only — no inline CLI):
 | `clb` | `qcloud-clb-ops` |同上 |
 | `cdb` | `qcloud-cdb-ops` |同上 |
 | `redis` | `qcloud-redis-ops` |同上 |
+| `tcop` | `qcloud-tcop-ops` |同上 |
 | `tke` | `qcloud-tke-ops` |同上 |
 | `vpc` | `qcloud-vpc-ops` |同上 |
 | `cos` | `qcloud-cos-ops` |同上 |

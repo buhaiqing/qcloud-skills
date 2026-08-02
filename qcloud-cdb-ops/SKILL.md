@@ -17,8 +17,8 @@ compatibility: >-
   valid API credentials, network access to Tencent Cloud endpoints.
 metadata:
   author: qcloud
-  version: "1.3.0"
-  last_updated: "2026-07-04"
+  version: "1.3.1"
+  last_updated: "2026-08-02"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "https://cloud.tencent.com/document/api/236"
@@ -93,13 +93,12 @@ TencentDB for MySQL (CDB) on Tencent Cloud provides a stable, reliable, and elas
 
 ### SHOULD NOT Use This Skill When
 
-- Task is purely billing / account management → delegate to: `qcloud-billing-ops` (when present)
+- Task is purely billing / account management → delegate to: `qcloud-finops-ops` (when present)
 - Task is CAM / permission model only → delegate to: `qcloud-cam-ops` (when present)
 - Task is **VPC network only** (subnet, route table, NAT gateway) → delegate to: `qcloud-vpc-ops`
 - Task is **Elasticsearch Service** → delegate to: `qcloud-es-ops`
 - Task is **Redis / memcached** → delegate to: `qcloud-redis-ops` (when present)
 - Task is **PostgreSQL** → delegate to: `qcloud-postgres-ops` (when present)
-- Task is **SQL Server** → delegate to: `qcloud-sqlserver-ops` (when present)
 - Task is **MongoDB** → delegate to: `qcloud-mongodb-ops` (when present)
 - Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`
 

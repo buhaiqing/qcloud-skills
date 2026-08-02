@@ -8,8 +8,8 @@ compatibility: >-
   valid API credentials, network access to ags.tencentcloudapi.com.
 metadata:
   author: qcloud
-  version: "1.5.0"
-  last_updated: "2026-07-09"
+  version: "1.5.1"
+  last_updated: "2026-08-02"
   runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
   python_version_minimum: "3.8"
   api_profile: "2025-09-20"
@@ -77,7 +77,7 @@ This skill is an **operational runbook** for agents: explicit scope, credential 
 
 ### SHOULD NOT Use This Skill When
 
-- Task is purely billing / account management → delegate to: `qcloud-billing-ops`
+- Task is purely billing / account management → delegate to: `qcloud-finops-ops`
 - Task is CAM / permission model only → delegate to: `qcloud-cam-ops`
 - Task is about TKE / CVM / SCF compute → delegate to: `qcloud-tke-ops`
 - Task is **architecture design review** / four-pillar Well-Architected assessment → delegate to: `qcloud-well-architected-review`

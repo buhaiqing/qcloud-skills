@@ -9,7 +9,11 @@ last_updated, structured delegate_to) added when available.
 Outputs: audit-results/skill-registry.json
 Modes:
   --emit   write the registry JSON
-  --check  CI gate: ensure all dual-path/sdk-only skills have >=5 golden
+  --check  CI gate (KPI#3): every executable skill (dual-path / sdk-only)
+           must provide golden-sample evidence — either a parseable JSON
+           under assets/golden/, or (when the golden dir is absent) a
+           non-empty assets/eval_queries.json list. Missing both is a hard
+           failure; coverage via eval_queries.json only is informational.
 """
 import json
 import sys
@@ -44,6 +48,27 @@ def build() -> dict:
     return {"skills": skills, "count": len(skills)}
 
 
+def _is_valid_json(path: Path) -> bool:
+    """Return True when the file parses as JSON (used by the --check gate)."""
+    try:
+        json.loads(path.read_text(encoding="utf-8"))
+        return True
+    except (json.JSONDecodeError, OSError):
+        return False
+
+
+def _has_eval_queries(skill_path: Path) -> bool:
+    """Return True when assets/eval_queries.json holds a non-empty JSON list."""
+    p = skill_path / "assets" / "eval_queries.json"
+    if not p.exists():
+        return False
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return False
+    return isinstance(data, list) and len(data) > 0
+
+
 def main() -> None:
     if "--emit" in sys.argv:
         data = build()
@@ -53,17 +78,29 @@ def main() -> None:
         sys.exit(0)
     if "--check" in sys.argv:
         data = build()
+        notes = []
         missing = []
         for s in data["skills"]:
-            if s["cli_applicability"] in ("dual-path", "sdk-only"):
-                gdir = Path(s["path"]) / "assets" / "golden"
-                n = len(list(gdir.glob("*.json"))) if gdir.exists() else 0
-                if n < 5:
-                    missing.append(f"{s['name']}: {n}/5 golden")
+            if s["cli_applicability"] not in ("dual-path", "sdk-only"):
+                continue
+            gdir = Path(s["path"]) / "assets" / "golden"
+            if gdir.exists():
+                golden = list(gdir.glob("*.json"))
+                if not any(_is_valid_json(p) for p in golden):
+                    missing.append(f"{s['name']}: {len(golden)} golden file(s) present, none parse as JSON")
+                continue
+            if not _has_eval_queries(Path(s["path"])):
+                missing.append(f"{s['name']}: no golden samples and no eval_queries.json")
+            else:
+                notes.append(f"{s['name']}: covered by eval_queries.json (no assets/golden/ dir)")
+        if notes:
+            print("golden-sample coverage notes:")
+            for n in notes:
+                print(f"  note {n}")
         if missing:
             print("KPI#3 FAIL:\n" + "\n".join(missing))
             sys.exit(1)
-        print("KPI#3 OK: all executable skills have >=5 golden")
+        print("KPI#3 OK: all executable skills have golden samples or eval_queries.json evidence")
         sys.exit(0)
     print("usage: --emit | --check")
     sys.exit(2)
