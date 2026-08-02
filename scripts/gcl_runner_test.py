@@ -21,9 +21,11 @@ import argparse
 import contextlib
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 # Ensure scripts/ is on sys.path when invoked as `python3 scripts/gcl_runner_test.py`
@@ -59,32 +61,195 @@ class SecretMaskingTests(unittest.TestCase):
     def test_no_leak_when_already_masked(self) -> None:
         self.assertFalse(gcl_runner.has_credential_leak("SecretKey=<masked>"))
 
+    def test_leak_detected_alongside_masked_text(self) -> None:
+        # A `<masked>` marker elsewhere must not suppress a real leak.
+        self.assertTrue(
+            gcl_runner.has_credential_leak("SecretKey=<masked> AKIDABCDEFGHIJKLMNOPQRSTUV")
+        )
+
+    def test_mask_bare_akid(self) -> None:
+        out = gcl_runner.mask_secrets("token AKIDABCDEFGHIJKLMNOPQRSTUV here")
+        self.assertNotIn("AKIDABCDEFGHIJKLMNOPQRSTUV", out)
+        self.assertIn("AKID<masked>", out)
+
+    def test_mask_secret_id(self) -> None:
+        out = gcl_runner.mask_secrets("secretId=abcdef1234567890")
+        self.assertIn("secretId=<masked>", out)
+        self.assertNotIn("abcdef1234567890", out)
+
+    def test_mask_json_style_secret_key(self) -> None:
+        # M1: gcl_runner used to miss the JSON spelling that evidence_kernel caught.
+        out = gcl_runner.mask_secrets('{"secretKey":"abcd1234efgh"}')
+        self.assertNotIn("abcd1234efgh", out)
+        self.assertIn("<masked>", out)
+
+    def test_mask_flag_style_secret_key(self) -> None:
+        out = gcl_runner.mask_secrets("--secretKey mysecretvalue123")
+        self.assertNotIn("mysecretvalue123", out)
+        self.assertIn("<masked>", out)
+
+    def test_has_credential_leak_json_and_flag_styles(self) -> None:
+        self.assertTrue(gcl_runner.has_credential_leak('{"secretKey":"abcd1234efgh"}'))
+        self.assertTrue(gcl_runner.has_credential_leak("--secretKey mysecretvalue123"))
+
+    def test_masking_clears_leak_for_every_secret_shape(self) -> None:
+        # N1: the detector must not re-flag its own `<masked>` placeholder —
+        # otherwise a correctly masked payload pins the run at SAFETY_FAIL
+        # forever, because no retry can ever remove the marker.
+        shapes = [
+            "SecretKey=realvalue1234567890",
+            "TENCENTCLOUD_SECRET_KEY=realvalue1234567890",
+            "secretId=realvalue1234567890",
+            '{"secretKey":"realvalue1234567890"}',
+            "--secretKey realvalue1234567890",
+            "AKIDrealvalue1234567890",
+        ]
+        for raw in shapes:
+            with self.subTest(raw=raw):
+                self.assertTrue(gcl_runner.has_credential_leak(raw))
+                masked = gcl_runner.mask_secrets(raw)
+                self.assertIn("<masked>", masked)
+                self.assertNotIn("realvalue1234567890", masked)
+                self.assertFalse(gcl_runner.has_credential_leak(masked))
+
+    def test_masking_matches_evidence_kernel(self) -> None:
+        # TE-4: one pattern, one source of truth — the two masks must not drift.
+        import evidence_kernel
+        self.assertIs(gcl_runner.SENSITIVE_KEY_RE, evidence_kernel.SENSITIVE_KEY_RE)
+
+
+class ParseGeneratorCommandTests(unittest.TestCase):
+    def test_accepts_tccli(self) -> None:
+        argv = gcl_runner.parse_generator_command("tccli cvm DescribeInstances --Region ap-guangzhou")
+        self.assertEqual(argv[0], "tccli")
+        self.assertIn("DescribeInstances", argv)
+
+    def test_rejects_non_tccli(self) -> None:
+        for bad in ("echo hi", "sleep 5", "/bin/sh -c whoami"):
+            with self.assertRaises(ValueError):
+                gcl_runner.parse_generator_command(bad)
+
+    def test_shell_metacharacters_are_inert(self) -> None:
+        argv = gcl_runner.parse_generator_command("tccli cvm DescribeInstances; rm -rf /")
+        # `;` survives only as literal argv text — it is never interpreted.
+        self.assertEqual(argv[0], "tccli")
+        self.assertIn("DescribeInstances;", argv)
+
+    def test_rejects_empty(self) -> None:
+        with self.assertRaises(ValueError):
+            gcl_runner.parse_generator_command("   ")
+
 
 class RunCommandTests(unittest.TestCase):
+    """Exercise run_command against a stub `tccli` placed on PATH."""
+
+    def _with_stub(self, body: str):
+        tmp = Path(tempfile.mkdtemp())
+        stub = tmp / "tccli"
+        stub.write_text("#!/bin/sh\n" + body)
+        stub.chmod(0o755)
+        return tmp, {**os.environ, "PATH": f"{tmp}{os.pathsep}{os.environ['PATH']}"}
+
     def test_success(self) -> None:
-        result = gcl_runner.run_command('echo "hello world"')
+        _tmp, env = self._with_stub('echo "hello world"\n')
+        result = gcl_runner.run_command("tccli cvm DescribeInstances", env=env)
         self.assertEqual(result["exit_code"], 0)
         self.assertIn("hello world", result["result_excerpt"])
         self.assertEqual(result["stdout_len"], len("hello world\n"))
 
     def test_failure_exit_code(self) -> None:
-        result = gcl_runner.run_command("exit 7")
+        _tmp, env = self._with_stub("exit 7\n")
+        result = gcl_runner.run_command("tccli cvm DescribeInstances", env=env)
         self.assertEqual(result["exit_code"], 7)
 
     def test_stderr_captured(self) -> None:
-        result = gcl_runner.run_command('echo "err" 1>&2')
+        _tmp, env = self._with_stub('echo "err" 1>&2\n')
+        result = gcl_runner.run_command("tccli cvm DescribeInstances", env=env)
         self.assertEqual(result["exit_code"], 0)
         self.assertIn("err", result["result_excerpt"])
 
     def test_timeout(self) -> None:
-        result = gcl_runner.run_command("sleep 5", timeout=1)
+        _tmp, env = self._with_stub("sleep 5\n")
+        result = gcl_runner.run_command("tccli cvm DescribeInstances", timeout=1, env=env)
         self.assertEqual(result["exit_code"], -1)
         self.assertIn("TIMEOUT", result["result_excerpt"])
 
+    def test_non_tccli_command_rejected(self) -> None:
+        result = gcl_runner.run_command('echo "hello world"')
+        self.assertEqual(result["exit_code"], -2)
+        self.assertIn("COMMAND REJECTED", result["result_excerpt"])
+
     def test_command_secret_masked(self) -> None:
-        result = gcl_runner.run_command('echo "TENCENTCLOUD_SECRET_KEY=shouldnotappear"')
+        result = gcl_runner.run_command(
+            "tccli cvm DescribeInstances --TENCENTCLOUD_SECRET_KEY=shouldnotappear"
+        )
         self.assertIn("<masked>", result["command"])
         self.assertNotIn("shouldnotappear", result["command"])
+
+
+class StructuralCriticParseTests(unittest.TestCase):
+    """F-011: unparseable output must score 0, not silently look like 'field absent'."""
+
+    def _critic(self, raw_output):
+        return gcl_runner.structural_critic({
+            "exit_code": 0,
+            "result_excerpt": "ok",
+            "command": "tccli cvm DescribeInstances",
+            "raw_output": raw_output,
+        })
+
+    def test_unparseable_output_scores_zero(self) -> None:
+        for bad in ("not json at all", '{"Response": [1,2,3]}', "{unclosed"):
+            with self.subTest(raw=bad):
+                c = self._critic(bad)
+                self.assertEqual(c["scores"]["traceability"], 0.0)
+                self.assertEqual(c["scores"]["idempotency"], 0.0)
+                self.assertIn("raw_output unparseable — scores unverifiable", c["suggestions"])
+
+    def test_absent_output_is_not_treated_as_unparseable(self) -> None:
+        c = self._critic("")
+        self.assertEqual(c["scores"]["traceability"], 0.5)
+        self.assertNotIn("raw_output unparseable — scores unverifiable", c["suggestions"])
+
+    def test_parseable_output_still_scored(self) -> None:
+        c = self._critic('{"Response":{"RequestId":"r","ClientToken":"t"}}')
+        self.assertEqual(c["scores"]["traceability"], 1.0)
+        self.assertEqual(c["scores"]["idempotency"], 1.0)
+
+    def test_delete_error_field_uses_shared_parse(self) -> None:
+        c = gcl_runner.structural_critic({
+            "exit_code": 0,
+            "result_excerpt": "ok",
+            "command": "tccli cvm TerminateInstances",
+            "raw_output": '{"Response":{"RequestId":"r","Error":{"Code":"X"}}}',
+        })
+        self.assertEqual(c["scores"]["spec_compliance"], 0.0)
+
+
+class FinalScoresTests(unittest.TestCase):
+    """F-010: evidence record must carry real Critic scores, not hardcoded 1s."""
+
+    def test_uses_last_iteration_scores(self) -> None:
+        trace = {"iterations": [
+            {"critic": {"scores": {"correctness": 1.0, "traceability": 1.0}}},
+            {"critic": {"scores": {"correctness": 0.5, "traceability": 0.0}}},
+        ]}
+        self.assertEqual(
+            gcl_runner._final_scores(trace),
+            {"correctness": 0.5, "traceability": 0.0},
+        )
+
+    def test_falls_back_to_last_scored_iteration(self) -> None:
+        trace = {"iterations": [
+            {"critic": {"scores": {"correctness": 0.5}}},
+            {"critic": {}},
+        ]}
+        self.assertEqual(gcl_runner._final_scores(trace), {"correctness": 0.5})
+
+    def test_no_scores_yields_zeros_not_ones(self) -> None:
+        scores = gcl_runner._final_scores({"iterations": []})
+        self.assertTrue(scores, "expected rubric dimensions to be present")
+        self.assertTrue(all(v == 0.0 for v in scores.values()), scores)
 
 
 class StructuralCriticTests(unittest.TestCase):
@@ -259,13 +424,22 @@ class CmdRunEndToEndTests(unittest.TestCase):
     def _run(self, critic_payload: dict | None, structural: bool = False, max_iter: int = 2) -> tuple[int, Path]:
         """Helper to invoke cmd_run with a temp root."""
         tmp = Path(tempfile.mkdtemp())
+        # run_command only executes `tccli`, so put a stub of that name on PATH.
+        stub = tmp / "tccli"
+        stub.write_text('#!/bin/sh\necho \'{"Response":{"RequestId":"x"}}\'\n')
+        stub.chmod(0o755)
+        self.enterContext(
+            unittest.mock.patch.dict(
+                os.environ, {"PATH": f"{tmp}{os.pathsep}{os.environ['PATH']}"}
+            )
+        )
         critic_file: Path | None = None
         args = [
             "run",
             "--root", str(tmp),
             "--skill", "qcloud-test-ops",
             "--request", "test",
-            "--command", 'echo "ok"',
+            "--command", "tccli cvm DescribeInstances",
             "--max-iter", str(max_iter),
         ]
         if structural:

@@ -31,6 +31,7 @@ import contextlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import urllib.error
@@ -42,7 +43,7 @@ from typing import Any
 
 from distribution_drift import compute_drift
 from distribution_drift import load_traces as _load_traces_dd
-from evidence_kernel import mask_trace, post_record, preflight
+from evidence_kernel import SENSITIVE_KEY_RE, mask_trace, post_record, preflight
 from gcl_trajectory_quality import classify_op
 from hallucination_detection import detect_hallucinations
 from reflexion_retrieve import format_for_injection as ff_fail
@@ -169,24 +170,60 @@ RUBRIC_THRESHOLDS: dict[str, float] = {
     "spec_compliance": _RUBRIC_MIN_SCORE,
 }
 
+# Single source for credential shapes (TE-4): evidence_kernel.SENSITIVE_KEY_RE
+# already tolerates `--secretKey x`, `"secretKey":"x"` and `SecretKey=x`. Two
+# divergent maskers meant a payload masked here still leaked past the Evidence
+# gate (and vice-versa), so both paths now share one pattern.
+# The `(?!<masked>)` guard keeps the detector from re-flagging its own
+# placeholder: without it, masking a leak produced `...=<masked>`, which still
+# matched and pinned the run at SAFETY_FAIL with no retry able to clear it.
+# (`SENSITIVE_KEY_RE`'s value class excludes `<`/`>`, so it needs no guard.)
 SECRET_PATTERNS = [
-    re.compile(r"SecretKey\s*=\s*[^<\s][^\s\"']+", re.IGNORECASE),
-    re.compile(r"TENCENTCLOUD_SECRET_KEY\s*=\s*[^\s\"']+", re.IGNORECASE),
-    re.compile(r"AKID[A-Za-z0-9]{20,}"),
+    SENSITIVE_KEY_RE,
+    re.compile(
+        r"TENCENTCLOUD_SECRET_KEY\s*[:=\s]\s*(?!<masked>)[^\s\"']+", re.IGNORECASE
+    ),
 ]
 
 
 def mask_secrets(text: str) -> str:
-    out = text
-    out = re.sub(r"(SecretKey\s*=\s*)([^\s\"']+)", r"\1<masked>", out, flags=re.IGNORECASE)
-    out = re.sub(r"(TENCENTCLOUD_SECRET_KEY\s*=\s*)([^\s\"']+)", r"\1<masked>", out, flags=re.IGNORECASE)
-    return out
+    out = SENSITIVE_KEY_RE.sub(r"\1<masked>", text)
+    return re.sub(
+        r"(TENCENTCLOUD_SECRET_KEY\s*[:=\s]\s*)([^\s\"']+)",
+        r"\1<masked>",
+        out,
+        flags=re.IGNORECASE,
+    )
 
 
 def has_credential_leak(text: str) -> bool:
-    if "<masked>" in text:
-        return False
+    # No `<masked>` early-return: a partially masked blob can still carry an
+    # unmasked secret, and the kill-switch made that leak invisible.
     return any(p.search(text) for p in SECRET_PATTERNS)
+
+
+ALLOWED_EXECUTABLES = frozenset({"tccli"})
+
+
+def parse_generator_command(command: str) -> list[str]:
+    """Split a Generator command into argv, rejecting anything but ``tccli``.
+
+    The Generator command reaches us as an operator/LLM-supplied string. Running
+    it through a shell would make `;`, backticks and `$(...)` executable, so we
+    tokenize with shlex and run with ``shell=False``; metacharacters then survive
+    only as inert argv text.
+    """
+    try:
+        argv = shlex.split(command)
+    except ValueError as e:
+        raise ValueError(f"unparsable command: {e}") from e
+    if not argv:
+        raise ValueError("empty command")
+    if argv[0] not in ALLOWED_EXECUTABLES:
+        raise ValueError(
+            f"only tccli invocations permitted (got {argv[0]!r})"
+        )
+    return argv
 
 
 def run_command(
@@ -194,12 +231,22 @@ def run_command(
 ) -> dict[str, Any]:
     """Execute generator command; capture exit code and masked output."""
     try:
+        argv = parse_generator_command(command)
+    except ValueError as e:
+        return {
+            "command": mask_secrets(command),
+            "exit_code": -2,
+            "result_excerpt": f"COMMAND REJECTED: {e}",
+            "stdout_len": 0,
+            "stderr_len": 0,
+            "op_type": classify_op(command),
+        }
+    try:
         proc_env = dict(os.environ)
         if env:
             proc_env.update(env)
         proc = subprocess.run(
-            command,
-            shell=True,
+            argv,
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -257,28 +304,32 @@ def structural_critic(generator: dict[str, Any]) -> dict[str, Any]:
     if leak:
         suggestions.append("Credential leak in trace — mask SecretKey and re-run")
 
-    # P1-B: Check Response has RequestId
-    has_request_id = False
+    # Parse the generator output once; every structural check below reads it.
+    # `unparseable` is distinct from `absent`: if output was produced but cannot
+    # be read, the structural checks prove nothing and must not score as 0.5.
+    response: dict[str, Any] = {}
+    unparseable = False
     if raw_output:
         try:
             out_dict = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
-            has_request_id = "RequestId" in out_dict.get("Response", {})
-        except Exception:  # noqa: BLE001, S110
-            pass
-    scores["traceability"] = 1.0 if has_request_id else 0.5
-    if not has_request_id and (exit_code == 0 or excerpt):
+            response = out_dict.get("Response", {})
+            if not isinstance(response, dict):
+                raise TypeError("Response is not an object")
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            unparseable = True
+            response = {}
+            suggestions.append("raw_output unparseable — scores unverifiable")
+
+    # P1-B: Check Response has RequestId
+    has_request_id = "RequestId" in response
+    scores["traceability"] = 0.0 if unparseable else (1.0 if has_request_id else 0.5)
+    if not has_request_id and not unparseable and (exit_code == 0 or excerpt):
         suggestions.append("Response missing RequestId — traceability degraded")
 
     # P1-B: Check ClientToken (idempotency key)
-    has_client_token = False
-    if raw_output:
-        try:
-            out_dict = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
-            has_client_token = "ClientToken" in out_dict.get("Response", {})
-        except Exception:  # noqa: BLE001, S110
-            pass
-    scores["idempotency"] = 1.0 if has_client_token else 0.5
-    if not has_client_token and exit_code == 0:
+    has_client_token = "ClientToken" in response
+    scores["idempotency"] = 0.0 if unparseable else (1.0 if has_client_token else 0.5)
+    if not has_client_token and not unparseable and exit_code == 0:
         suggestions.append("Response missing ClientToken — idempotency cannot be verified")
 
     scores["spec_compliance"] = 1.0 if exit_code == 0 else 0.0
@@ -288,19 +339,10 @@ def structural_critic(generator: dict[str, Any]) -> dict[str, Any]:
     # P1-B: Check required fields based on operation type
     cmd_lower = cmd.lower()
     is_delete = any(k in cmd_lower for k in ["delete", "destroy", "release", "terminate", "drop"])
-    if is_delete and exit_code == 0:
-        # For delete operations, absence of error in Response is the required field
-        has_error_field = False
-        if raw_output:
-            try:
-                out_dict = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
-                has_error_field = "Error" in out_dict.get("Response", {})
-            except Exception:  # noqa: BLE001, S110
-                pass
-        # Delete success should have Error: null or absent
-        if has_error_field:
-            suggestions.append("Delete operation returned Error field — operation may have failed")
-            scores["spec_compliance"] = 0.0
+    # A successful delete must not carry an Error field in its Response.
+    if is_delete and exit_code == 0 and "Error" in response:
+        suggestions.append("Delete operation returned Error field — operation may have failed")
+        scores["spec_compliance"] = 0.0
 
     blocking = scores["safety"] == 0.0 or scores["correctness"] == 0.0
     return {
@@ -723,12 +765,26 @@ def emit_evidence_record(root: Path, trace: dict[str, Any], args: argparse.Names
             "budgets": {"context_tokens": 0, "tool_calls": len(trace.get("iterations", [])),
                         "wall_clock_ms": 0},
             "cost": {"tokens": 0, "usd": None},
-            "scores": {"correctness": 1, "safety": 1, "idempotency": 1,
-                       "traceability": 1, "spec_compliance": 1},
+            "scores": _final_scores(trace),
         }
         post_record(record)
-    except Exception:  # noqa: BLE001, S110 - Evidence side-emit must never break GCL
-        pass
+    except Exception as exc:  # noqa: BLE001 - Evidence side-emit must never break GCL
+        # Still non-fatal, but no longer silent: a permanently broken KPI
+        # pipeline used to look identical to a healthy one.
+        print(f"WARN: evidence side-emit failed: {exc}", file=sys.stderr)
+
+
+def _final_scores(trace: dict[str, Any]) -> dict[str, float]:
+    """Real Critic scores from the last iteration.
+
+    Previously hardcoded to all-1, which made the KPI feed vacuous: every run
+    reported a perfect score regardless of what the Critic actually returned.
+    """
+    for iteration in reversed(trace.get("iterations") or []):
+        scores = (iteration.get("critic") or {}).get("scores")
+        if isinstance(scores, dict) and scores:
+            return {k: float(v) for k, v in scores.items()}
+    return dict.fromkeys(RUBRIC_THRESHOLDS, 0.0)
 
 def _format_success_injection(entries: list[dict[str, Any]]) -> str:
     """Format success patterns for Generator context injection.
