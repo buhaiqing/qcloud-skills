@@ -138,6 +138,30 @@ def _by_skill(traces: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     return bucket
 
 
+def _load_pattern_counts(root: Path) -> dict[str, int]:
+    """Parse docs/failure-patterns.md once into {skill: recurring_count}.
+
+    Counts rows whose first column equals a skill and sums its `Count`
+    field (cell index 5). Returns an empty dict when the file is missing.
+    """
+    path = root / "docs" / "failure-patterns.md"
+    if not path.is_file():
+        return {}
+    counts: dict[str, int] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip().strip("`") for c in line.strip().strip("|").split("|")]
+        if len(cells) < 6:
+            continue
+        try:
+            value = int(cells[5])
+        except ValueError:
+            continue
+        counts[cells[0]] = counts.get(cells[0], 0) + value
+    return counts
+
+
 def _recurring_pattern_count(skill: str, root: Path) -> int:
     """Count failure-pattern rows in docs/failure-patterns.md that target `skill`.
 
@@ -145,23 +169,7 @@ def _recurring_pattern_count(skill: str, root: Path) -> int:
     is > 0 (recurring == active). Returns 0 when the file is missing or
     has no rows for this skill.
     """
-    path = root / "docs" / "failure-patterns.md"
-    if not path.is_file():
-        return 0
-    total = 0
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.startswith("|"):
-            continue
-        cells = [c.strip().strip("`") for c in line.strip().strip("|").split("|")]
-        if len(cells) < 6:
-            continue
-        if cells[0] != skill:
-            continue
-        try:
-            total += int(cells[5])
-        except ValueError:
-            continue
-    return total
+    return _load_pattern_counts(root).get(skill, 0)
 
 
 def _drift_summary(traces: list[dict[str, Any]]) -> dict[str, int]:
@@ -268,6 +276,8 @@ def aggregate_skill_scores(
     traces = read_traces(root, since_hours=since_hours)
     all_evidence = read_evidence_records(root, since_hours=since_hours)
     drift_map = _drift_summary(traces)
+    # Read + parse failure-patterns.md once; lookups below are O(1) dict hits.
+    pattern_counts = _load_pattern_counts(root)
 
     by_skill_traces = _by_skill(traces)
     by_skill_evidence: dict[str, list[dict[str, Any]]] = {}
@@ -288,7 +298,7 @@ def aggregate_skill_scores(
         components = compute_components(
             traces=skill_traces,
             evidence=by_skill_evidence.get(skill, []),
-            patterns={skill: _recurring_pattern_count(skill, root)},
+            patterns={skill: pattern_counts.get(skill, 0)},
             drift={skill: drift_map.get(skill, 0)},
         )
         score = quality_score_from_components(components)
@@ -317,7 +327,7 @@ def aggregate_skill_scores(
         components = compute_components(
             traces=[],
             evidence=ev_list,
-            patterns={skill: _recurring_pattern_count(skill, root)},
+            patterns={skill: pattern_counts.get(skill, 0)},
             drift={skill: drift_map.get(skill, 0)},
         )
         score = quality_score_from_components(components)

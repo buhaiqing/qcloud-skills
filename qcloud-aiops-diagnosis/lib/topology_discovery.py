@@ -82,17 +82,22 @@ class TopologyEdge:
 class TopologyGraph:
     nodes: list[TopologyNode] = field(default_factory=list)
     edges: list[TopologyEdge] = field(default_factory=list)
+    # O(1) dedup indexes: node ids and (source, target) edge keys. Kept in
+    # sync with the ordered lists; ordering semantics unchanged.
+    node_ids: set[str] = field(default_factory=set)
+    edge_keys: set[tuple[str, str]] = field(default_factory=set)
 
     def add_node(self, node: TopologyNode) -> None:
-        if not any(n.id == node.id for n in self.nodes):
+        if node.id not in self.node_ids:
+            self.node_ids.add(node.id)
             self.nodes.append(node)
 
     def add_edge(self, edge: TopologyEdge) -> None:
         self.add_node(self._node_by_id(edge.source))
         self.add_node(self._node_by_id(edge.target))
-        if not any(
-            e.source == edge.source and e.target == edge.target for e in self.edges
-        ):
+        key = (edge.source, edge.target)
+        if key not in self.edge_keys:
+            self.edge_keys.add(key)
             self.edges.append(edge)
 
     def _node_by_id(self, node_id: str) -> TopologyNode:
