@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -82,23 +83,28 @@ def load_schema(board_dir: Path | None = None) -> dict[str, Any]:
 
 
 # Schema is static across a session; cache the compiled Draft7Validator keyed on
-# the schema file (path + mtime + size) so repeated validations skip recompilation.
-_VALIDATOR_CACHE: dict[Path, tuple[float, int, jsonschema.Draft7Validator]] = {}
+# the schema file content so repeated validations skip recompilation. The key
+# combines mtime + size + a content hash: mtime/size alone are not collision-safe
+# (a schema replaced with different content but identical length and preserved
+# mtime would silently reuse a stale validator).
+_VALIDATOR_CACHE: dict[Path, tuple[float, int, str, jsonschema.Draft7Validator]] = {}
 
 
 def _get_validator(board_dir: Path | None = None) -> jsonschema.Draft7Validator:
     path = schema_path(board_dir)
     stat = path.stat()
-    key = (stat.st_mtime, stat.st_size)
+    text = path.read_text(encoding="utf-8")
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    key = (stat.st_mtime, stat.st_size, digest)
     cached = _VALIDATOR_CACHE.get(path)
-    if cached is not None and cached[:2] == key:
-        return cached[2]
-    schema = json.loads(path.read_text(encoding="utf-8"))
+    if cached is not None and cached[:3] == key:
+        return cached[3]
+    schema = json.loads(text)
     validator = jsonschema.Draft7Validator(
         schema,
         format_checker=jsonschema.Draft7Validator.FORMAT_CHECKER,
     )
-    _VALIDATOR_CACHE[path] = (stat.st_mtime, stat.st_size, validator)
+    _VALIDATOR_CACHE[path] = (stat.st_mtime, stat.st_size, digest, validator)
     return validator
 
 
