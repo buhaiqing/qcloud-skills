@@ -19,6 +19,7 @@ from lib.selective_workflow import SelectiveWorkflow
 from lib.topology_discovery import (
     NodeType,
     TopologyDiscovery,
+    TopologyEdge,
     TopologyGraph,
     TopologyNode,
 )
@@ -284,6 +285,46 @@ class TestSelectiveWorkflow(unittest.TestCase):
             assert hasattr(step, "enabled")
             assert hasattr(step, "name")
             assert hasattr(step, "reason")
+
+
+class TestTopologyGraphDedup(unittest.TestCase):
+    """O(1) set-index dedup in TopologyGraph preserves add_node/add_edge semantics."""
+
+    def test_add_node_dedups_by_id_preserving_order(self) -> None:
+        """Same id added twice yields one node; first-seen order kept."""
+        tg = TopologyGraph()
+        tg.add_node(TopologyNode(id="ins-1", type=NodeType.CVM, region="ap-guangzhou"))
+        tg.add_node(TopologyNode(id="ins-2", type=NodeType.CVM, region="ap-guangzhou"))
+        tg.add_node(TopologyNode(id="ins-1", type=NodeType.CVM, region="ap-guangzhou"))
+        assert len(tg.nodes) == 2
+        assert [n.id for n in tg.nodes] == ["ins-1", "ins-2"]
+
+    def test_add_edge_dedups_by_source_target(self) -> None:
+        """Same (source, target) pair added twice yields one edge."""
+        tg = TopologyGraph()
+        for _ in range(2):
+            tg.add_edge(TopologyEdge(source="vpc-1", target="ins-1", rel="contains"))
+        assert len(tg.edges) == 1
+        assert len(tg.nodes) == 2  # source + target placeholder UNKNOWN nodes
+        assert {n.id for n in tg.nodes} == {"vpc-1", "ins-1"}
+
+    def test_add_edge_distinct_pairs_are_all_kept(self) -> None:
+        """Distinct edge keys are all preserved (ordering intact)."""
+        tg = TopologyGraph()
+        tg.add_edge(TopologyEdge(source="vpc-1", target="ins-1", rel="contains"))
+        tg.add_edge(TopologyEdge(source="vpc-1", target="ins-2", rel="contains"))
+        assert len(tg.edges) == 2
+        assert [(e.source, e.target) for e in tg.edges] == [("vpc-1", "ins-1"), ("vpc-1", "ins-2")]
+
+    def test_node_ids_index_tracks_placeholders_from_edges(self) -> None:
+        """node_ids set stays in sync after add_edge auto-creates nodes."""
+        tg = TopologyGraph()
+        tg.add_edge(TopologyEdge(source="vpc-1", target="ins-1", rel="contains"))
+        assert "vpc-1" in tg.node_ids
+        assert "ins-1" in tg.node_ids
+        # Re-adding an edge with the same endpoint reuses existing node (no dup).
+        tg.add_edge(TopologyEdge(source="vpc-1", target="ins-9", rel="contains"))
+        assert len(tg.nodes) == 3
 
 
 class TestTopologyDiscoveryRegionValidation(unittest.TestCase):

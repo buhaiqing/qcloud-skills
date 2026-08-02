@@ -23,6 +23,8 @@ if str(_HERE) not in sys.path:
 
 from skill_quality_score import (
     UPGRADE_THRESHOLD,
+    _load_pattern_counts,
+    _recurring_pattern_count,
     aggregate_skill_scores,
     build_report,
     compute_components,
@@ -74,6 +76,22 @@ def _write_evidence(root: Path, skill: str, source: str = "gcl_runner",
     }
     p = audit / f"evidence-test-{skill}-{_next_seq()}.json"
     p.write_text(json.dumps(body), encoding="utf-8")
+    return p
+
+
+def _write_patterns(root: Path, rows: list[tuple[str, int]]) -> Path:
+    """Write a docs/failure-patterns.md fixture. rows = [(skill, count), ...]."""
+    docs = root / "docs"
+    docs.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# Failure Patterns — Reflexion Memory\n",
+        "| Skill | Command | Error Pattern | Root Cause | Fix | Count | LastSeen | Severity |",
+        "|-------|---------|---------------|------------|-----|-------|----------|----------|",
+    ]
+    for skill, count in rows:
+        lines.append(f"| `{skill}` | `cmd` | `pat` | `root` | `fix` | {count} | — | minor |")
+    p = docs / "failure-patterns.md"
+    p.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return p
 
 
@@ -332,6 +350,46 @@ class SummaryTests(unittest.TestCase):
             report = build_report(root)
             self.assertEqual(report["summary"]["skill_count"], 3)
             self.assertEqual(report["summary"]["upgrade_skill_count"], 1)
+
+
+class RecurrencePatternTests(unittest.TestCase):
+    """_load_pattern_counts caches failure-patterns.md; recurrence impacts score."""
+
+    def test_load_pattern_counts_aggregates_by_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            _write_patterns(root, [("qcloud-cvm-ops", 2), ("qcloud-cvm-ops", 3),
+                                   ("qcloud-cdb-ops", 1), ("qcloud-redis-ops", 0)])
+            counts = _load_pattern_counts(root)
+            self.assertEqual(counts, {"qcloud-cvm-ops": 5, "qcloud-cdb-ops": 1,
+                                      "qcloud-redis-ops": 0})
+
+    def test_recurring_pattern_count_matches_load_map(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            _write_patterns(root, [("qcloud-cvm-ops", 2), ("qcloud-cdb-ops", 1)])
+            self.assertEqual(_recurring_pattern_count("qcloud-cvm-ops", root), 2)
+            self.assertEqual(_recurring_pattern_count("qcloud-cdb-ops", root), 1)
+            # Skill with no rows → 0
+            self.assertEqual(_recurring_pattern_count("qcloud-unknown-ops", root), 0)
+
+    def test_recurring_pattern_count_missing_file_returns_zero(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self.assertEqual(_recurring_pattern_count("qcloud-cvm-ops", root), 0)
+            self.assertEqual(_load_pattern_counts(root), {})
+
+    def test_recurrence_drags_score_down_in_aggregate(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            _write_trace(root, "qcloud-cvm-ops", "PASS")
+            _write_evidence(root, "qcloud-cvm-ops", source="gcl_runner")
+            # High recurring count saturates the recurrence component → score < 1
+            _write_patterns(root, [("qcloud-cvm-ops", 10)])
+            report = build_report(root)
+            comp = report["by_skill"]["qcloud-cvm-ops"]["components"]
+            self.assertEqual(comp["reflexion_failure_recurrence"], 0.0)
+            self.assertLess(report["by_skill"]["qcloud-cvm-ops"]["quality_score"], 1.0)
 
 
 if __name__ == "__main__":
