@@ -62,7 +62,7 @@ def test_fixture_cvm_describe_instances_failure():
     events = cvm_describe_instances_failure(trace_id="trc-cvm-fail")
     assert len(events) >= 1
     # At least one event carries an error_code marker in metadata
-    assert any(getattr(e, "error_code", None) for e in events)
+    assert any((e.metadata or {}).get("error_code") for e in events)
 
 
 def test_fixture_cvm_describe_instances_retry_then_success():
