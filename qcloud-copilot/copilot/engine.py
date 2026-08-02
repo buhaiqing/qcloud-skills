@@ -381,7 +381,6 @@ class CopilotEngine:
 
         if contributions:
             from copilot.evidence import build_evidence_chain, load_sniff_for_session
-            from copilot.report_gen import synthesize_from_blackboard
 
             sniff_data = load_sniff_for_session(contributions)
             preset_strategy = None
@@ -412,8 +411,32 @@ class CopilotEngine:
                 "step_results": step_results,
                 "evidence_chain": evidence_chain,
             }
-            detailed = synthesize_from_blackboard(contributions, audience="detailed", **common)
-            summary = synthesize_from_blackboard(contributions, audience="summary", **common)
+            from copilot.report_gen import (
+                _precompute_blackboard_context,
+                _synthesize_with_context,
+            )
+
+            ctx = _precompute_blackboard_context(
+                contributions, common["customer"], plan
+            )
+            detailed = _synthesize_with_context(
+                ctx,
+                audience="detailed",
+                user_request=common["user_request"],
+                plan=common["plan"],
+                step_results=common["step_results"],
+                evidence_chain=common["evidence_chain"],
+                contributions=contributions,
+            )
+            summary = _synthesize_with_context(
+                ctx,
+                audience="summary",
+                user_request=common["user_request"],
+                plan=common["plan"],
+                step_results=common["step_results"],
+                evidence_chain=common["evidence_chain"],
+                contributions=contributions,
+            )
             self._report_pair = (detailed, summary)
             report = summary if audience == "summary" else detailed
         elif synth and synth.output and synth.output.get("report") is not None:
