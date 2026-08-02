@@ -173,8 +173,8 @@
 | OBS-1 可观测性增强 | **✅ 全部完成** | P0（基础设施）P1（health/audit改造）P2（gate可观测）P3（step埋点）P4（查询API）全部在 commit 25c480b 完成；P5 核心测试全绿、ruff零error、TE-Audit已记录；P5.4 已完成 SKILL.md 新增 `## Observability` 节 + v1.1.0 changelog；P5.5 完成 18 条 SPEC/PLAN 逐条对照（17✅+1⚠️ P4A移TRACE-1）；P4A（emit_observation/emit_usage/Summary聚合）由TRACE-1承接 |
 | EVO-1 自我进化闭环 | **✅ 全部完成** | E0记忆层/E1决策层/E2护栏层/E3 hook接入/E4反馈采集/E5闭环集成全部在 commit 357ee48 完成；test_evo_generator.py 15个测试全绿 |
 | TRACE-1 Trace v3 重构基线（P0-0） | **✅ 完成**（2026-08-02 核实） | `trace_records.py` 实现 Trace/Observation/UsageEvent/ScoreRecord/AIOpsSummary + `langfuse_exporter.py` 导出 + legacy adapter（`legacy_gcl_to_observation`/`legacy_audit_to_observation`）；tests `test_trace_records.py` 通过 |
-| P0-1 统一AIOps事件模型 | `[ ]` 未开始 | |
-| P0-2 检测质量反馈闭环 | `[ ]` 未开始 | |
+| P0-1 统一AIOps事件模型 | **✅ 完成**（2026-08-02） | `AIOpsEnvelope` 包装层落地（`abb0252`）：schema v0.1 + fixtures + `qcloud-copilot/copilot/aiops_envelope.py`(wrap/validate/new_causation_id) + `scripts/validate_aiops_envelope.py`(校验+破坏性检测) + 15 tests。设计：`docs/superpowers/specs/aiops-envelope-design.md` |
+| P0-2 检测质量反馈闭环 | **✅ 完成**（2026-08-02） | `qcloud-copilot/copilot/quality/feedback.py`(ReviewOutcome/record_outcome/compute_metrics/tune_recommendation/apply_recommendation) + `scripts/quality_feedback_aggregate.py` + 19 tests（GCL 3 轮：tz-mix/token fail-closed/path traversal/masking/atomic/spec drift 全部关闭）。设计：`docs/superpowers/specs/detection-quality-feedback-design.md` |
 | P0-3 Incident生命周期状态机 | `[ ]` 未开始 | |
 | P0-4 修复后验证闭环 | `[ ]` 未开始 | |
 | P0-5 SLO/业务影响驱动根因排序 | `[ ]` 未开始 | |
