@@ -175,7 +175,7 @@
 | TRACE-1 Trace v3 重构基线（P0-0） | **✅ 完成**（2026-08-02 核实） | `trace_records.py` 实现 Trace/Observation/UsageEvent/ScoreRecord/AIOpsSummary + `langfuse_exporter.py` 导出 + legacy adapter（`legacy_gcl_to_observation`/`legacy_audit_to_observation`）；tests `test_trace_records.py` 通过 |
 | P0-1 统一AIOps事件模型 | **✅ 完成**（2026-08-02） | `AIOpsEnvelope` 包装层落地（`abb0252`）：schema v0.1 + fixtures + `qcloud-copilot/copilot/aiops_envelope.py`(wrap/validate/new_causation_id) + `scripts/validate_aiops_envelope.py`(校验+破坏性检测) + 15 tests。设计：`docs/superpowers/specs/aiops-envelope-design.md` |
 | P0-2 检测质量反馈闭环 | **✅ 完成**（2026-08-02） | `qcloud-copilot/copilot/quality/feedback.py`(ReviewOutcome/record_outcome/compute_metrics/tune_recommendation/apply_recommendation) + `scripts/quality_feedback_aggregate.py` + 19 tests（GCL 3 轮：tz-mix/token fail-closed/path traversal/masking/atomic/spec drift 全部关闭）。设计：`docs/superpowers/specs/detection-quality-feedback-design.md` |
-| P0-3 Incident生命周期状态机 | `[ ]` 未开始 | |
+| P0-3 Incident生命周期状态机 | **✅ 完成**（2026-08-02） | `qcloud-copilot/copilot/incident_state.py`(IncidentState/IncidentEvent/IncidentRecord/IncidentStateMachine/transition/replay/dwell_stats/sla_breached) + `scripts/incident_state_aggregate.py` + 28 tests（GCL 2 Critics：转移表完备/不可变/StaleState/SLA/replay 幂等/dwell 精确；修复 reopen 负 dwell、replay 缺 event 报错、sla_breached 计时）。设计：`docs/superpowers/specs/incident-state-machine-design.md` |
 | P0-4 修复后验证闭环 | `[ ]` 未开始 | |
 | P0-5 SLO/业务影响驱动根因排序 | `[ ]` 未开始 | |
 | P1-1 ~ P1-5 | `[ ]` 未开始 | |
