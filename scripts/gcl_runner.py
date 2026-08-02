@@ -916,6 +916,11 @@ def cmd_run(args: argparse.Namespace) -> int:
         # Evidence Kernel PreFlight + Phase 3 human-token binding (additive gates)
         from harness_safety import bind_token, is_destructive  # local import to keep top clean
         token = os.environ.get("HARNESS_CONFIRM_TOKEN")
+
+        # Perf: error-code hints/map are constant across iterations (the loop only
+        # assigns them to each fresh generator dict). Build once, reuse every round.
+        error_code_hints = load_tcloud_error_hints()
+        error_code_map = load_error_code_map()
         pf = preflight(args.command, token)
         pf["token_bound"] = False
         if not pf["allowed"]:
@@ -932,8 +937,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         for iteration in range(1, max_iter + 1):
             generator = run_command(command, timeout=args.timeout, env=gen_env)
             generator["args"] = {"iter": iteration, "critic_feedback": critic_feedback or None}
-            generator["error_code_hints"] = load_tcloud_error_hints()
-            generator["_error_code_map"] = load_error_code_map()
+            generator["error_code_hints"] = error_code_hints
+            generator["_error_code_map"] = error_code_map
     
             if args.structural_critic_only:
                 critic = structural_critic(generator)
