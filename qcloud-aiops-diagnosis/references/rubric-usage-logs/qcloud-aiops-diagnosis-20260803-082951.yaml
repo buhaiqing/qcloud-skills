@@ -1,0 +1,79 @@
+schema_version: "1.0"
+template_id: qcloud-aiops-diagnosis
+task_id: gcl-aiops-review-20260803
+rubric_instance: references/rubric.md
+started_at: "2026-08-03T08:17:51+08:00"
+ended_at: "2026-08-03T08:29:25+08:00"
+outcome: satisfied
+rounds_used: 2
+failed_rubric_ids: []
+max_iterations: 3
+project: qcloud-skills
+risk_tier: standard
+critic_subagent: multi-agent (4 critics: data_quality, safety, spec_compliance, token_efficiency)
+stop_reason: all_blockers_resolved
+session_id: "~/.pi/sessions/2026-08-03T08-17-51"   # approximate, subagent sessions
+user_id: "~USER_ID@"                                 # from env/pi-session metadata
+files_modified:
+  - qcloud-aiops-diagnosis/SKILL.md
+  - qcloud-aiops-diagnosis/references/rubric.md
+  - qcloud-aiops-diagnosis/references/multi-agent-gcl-architecture.md
+  - qcloud-aiops-diagnosis/references/product-rca-rules.md
+round_summary:
+  - round: 1
+    generator_blockers: 3
+    generator_majors: 3
+    generator_minors: 3
+    critics:
+      - name: aiops-critic-safety
+        safety_score: 0.75
+        spec_compliance_score: 0.5
+        verdict: NEEDS_CHANGES
+      - name: aiops-critic-te
+        score: 0.5
+        findings:
+          - TE-6 duplicate FinOps thresholds
+          - TE-4 MTTR fields missing
+      - name: aiops-critic-data
+        score: 0.91
+        blocking: false
+        findings:
+          - CVM reference missing
+          - TKE Pod reference missing
+    decision: needs_revision
+  - round: 2
+    generator_fixed:
+      - P0-1 YAML frontmatter corrupted
+      - P0-2 Changelog missing v2.6.0
+      - P0-3 Workflow Router missing Workflow 12
+      - P1-1 Safety rules Rule 6-8 confirmed
+      - P1-2 rubric.md Critic mapping added
+      - P1-3 Anti-Patterns REFERENCE ONLY prefix added
+      - P1-4 architecture doc max_iter unified to 5
+      - TE-6 product-rca-rules §12 duplicate table removed
+    critics:
+      - name: aiops-critic-r2-verification
+        verdict: PASS
+        all_verified: true
+    decision: PASS
+final_scores:
+  correctness: 0.75
+  safety: 1.0
+  idempotency: 1.0
+  traceability: 0.75
+  spec_compliance: 0.75
+  overall: 0.85
+minor_issues_remaining:
+  - id: MINOR-1
+    desc: CVM performance diagnosis reference missing
+    suggestion: create references/cvm-performance-diagnosis-optimized.md
+  - id: MINOR-2
+    desc: TKE Pod RCA fastpath reference missing
+    suggestion: create references/tke-pod-rca-fastpath.md
+  - id: MINOR-3
+    desc: Rule M evidence table missing Baseline row
+    suggestion: append Baseline row to references/product-rca-rules.md §7
+  - id: MINOR-4
+    desc: output-schemas.md bundle tables have ~8-line duplication
+    suggestion: consolidate to shared sub-objects reference
+trace_path: audit-results/gcl-aiops-review/gcl-trace-20260803-083000.json

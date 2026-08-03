@@ -52,6 +52,8 @@
 
 ### 2.2 Critic Agents
 
+> **Footnote:** The 5 Critic types below apply to **module-level GCL** (AIOps model training). For **diagnosis-level GCL** (per-incident RCA), only 4 Critics participate: `data_quality`, `safety_rules`, `token_efficiency`, and 1 structural critic. The `prediction` and `knowledge_graph` Critics are module-optional and excluded from per-diagnosis rubric scoring (see [`rubric.md`](rubric.md) §5).
+
 **Role**: Validate specific aspects of Generator output
 
 **Types**:
@@ -127,7 +129,7 @@ Phase 6: Persistence
 
 ```yaml
 gcl_config:
-  max_iterations: 3
+  max_iterations: 5  # per rubric.md §5; module-level GCL may override
   agents:
     generator:
       type: "prediction_generator"  # or "knowledge_graph_generator"
@@ -324,7 +326,7 @@ Multi-Agent GCL is **backward compatible** with existing single-agent GCL:
 
 ```yaml
 prediction_gcl:
-  max_iterations: 3
+  max_iterations: 5  # unified per rubric.md §5
   agents:
     generator:
       type: "prediction_generator"
@@ -352,7 +354,7 @@ prediction_gcl:
 
 ```yaml
 knowledge_graph_gcl:
-  max_iterations: 3
+  max_iterations: 5  # unified per rubric.md §5
   agents:
     generator:
       type: "knowledge_graph_generator"

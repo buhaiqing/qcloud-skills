@@ -53,19 +53,7 @@ metadata:
     - qcloud-scf-ops
     - qcloud-cdn-ops
 ---
-Rule O SCF 错误/超时/限流诊断委托
-    - qcloud-cdn-ops       # 反向：Rule P CDN 源站5xx/缓存/延迟诊断委托
----
-   - qcloud-cdb-ops       # 反向：Rule H CDB 慢查询/连接链只读证据与修复委托
-    - qcloud-redis-ops     # 反向：Rule I Redis 内存/连接风暴诊断委托
-    - qcloud-es-ops        # 反向：Rule J ES 集群红黄/索引延迟诊断委托
-    - qcloud-cos-ops       # 反向：Rule K COS 4xx/5xx/延迟诊断委托
-    - qcloud-ckafka-ops    # 反向：Rule L CKafka lag/磁盘/吞吐诊断委托
-    - qcloud-mongodb-ops   # 反向：Rule M MongoDB 连接/复制/CPU 诊断委托
-    - qcloud-postgres-ops  # 反向：Rule N Postgres 慢查询/连接/复制诊断委托
-    - qcloud-scf-ops       # 反向：Rule O SCF 错误/超时/限流诊断委托
-    - qcloud-cdn-ops       # 反向：Rule P CDN 源站5xx/缓存/延迟诊断委托
----
+
 
 # Tencent Cloud AIOps Diagnosis Skill
 
@@ -104,6 +92,7 @@ Read-only cross-product diagnosis: correlate metrics, logs, alarms, and changes 
 | SCF / CDN | RCA Bundle | [`product-rca-rules.md`](references/product-rca-rules.md) O–P |
 | Impact + historical cases | KB record | [`incident-knowledge.md`](references/incident-knowledge.md) |
 | FinOps / inspection handoff | Cross-Skill Bundle | [`cross-skill-orchestration.md`](references/cross-skill-orchestration.md) |
+| Active inspection / cruise | Event Bundle + RCA | [`diagnostic-workflows.md`](references/diagnostic-workflows.md) Workflow 12 |
 
 ### 快速诊断场景
 
@@ -111,8 +100,8 @@ Read-only cross-product diagnosis: correlate metrics, logs, alarms, and changes 
 |------|-----------|--------------|------|
 | SLB 5xx 故障 | < 30 分钟 | [SLB 快速诊断](../qcloud-clb-ops/references/slb-5xx-diagnosis-optimized.md) | ✅ 已优化 (~10分钟) |
 | RDS MySQL 慢查询 | < 30 分钟 | [MySQL 快速诊断](../qcloud-cdb-ops/references/cdb-slow-query-diagnosis-optimized.md) | ✅ 已优化 (~10分钟) |
-| CVM 性能问题 | < 45 分钟 | 标准诊断框架 | 🔄 待优化 |
-| TKE Pod 问题 | < 30 分钟 | [TKE 诊断](../qcloud-tke-ops/references/troubleshooting.md) | 🔄 待优化 |
+| CVM 性能问题 | < 45 分钟 | [cvm-performance-diagnosis-optimized.md](references/cvm-performance-diagnosis-optimized.md) | ✅ 已优化 (~30分钟) |
+| TKE Pod 问题 | < 30 分钟 | [tke-pod-rca-fastpath.md](references/tke-pod-rca-fastpath.md) | ✅ 已优化 (~25分钟) |
 
 ### Prerequisites
 - [ ] `tccli` available for read-only Monitor/TKE/CLS queries
@@ -240,6 +229,7 @@ ELIF CDB/Redis/ES/COS/CKafka/MongoDB/Postgres/SCF/CDN primary symptom → Workfl
 ELIF connection timeout + instance healthy → Workflow 9 Rule G
 ELIF impact / similar cases / KB feedback → Workflow 10
 ELIF post-incident prevention OR capacity→FinOps → Workflow 11 (A1/A2)
+ELIF cruise / 巡检 / 主动巡检 / active inspection → Workflow 12 (Active Inspection/Cruise)
 ELSE → Steps 1–5 below by symptom category (Workflows 1–4)
 ```
 
@@ -328,7 +318,7 @@ After diagnosis completes, record incident time metrics for MTTR tracking per [`
 | Single-layer root cause | Attributing CLB 5xx only to CLB config, or OOMKilled only to app bug | Run Multi-Source RCA ([multi-source-rca.md](references/multi-source-rca.md)) across Pod/Node/CLB/CVM; add product rules ([product-rca-rules.md](references/product-rca-rules.md)) or Rule G ([network-rca.md](references/network-rca.md)) when datastore/network involved |
 | Network blind spot | Node/CDB healthy but connection timeout | Run Rule G ([network-rca.md](references/network-rca.md)) before blaming application |
 | Over-aggregation | Bundling unrelated alarms from different clusters | Use composite grouping keys per §1 TKE Grouping Keys; do not merge across `cluster_id` |
-| History overrides evidence | Auto-applying past incident fix without re-verification | `similar_incidents` are REFERENCE ONLY; always re-run current evidence collection |
+| History overrides evidence | Auto-applying past incident fix without re-verification | `similar_incidents` advisory 字段必须前缀 "REFERENCE ONLY" — historical cases do not override current evidence; always re-run current evidence collection |
 | Skill boundary blur | Running DescribeBill* during RCA or skipping FinOps on pure bill asks | Bill primary → finops; joint RCA → [`cross-skill-orchestration.md`](references/cross-skill-orchestration.md) F2 only |
 
 ---
@@ -337,7 +327,7 @@ After diagnosis completes, record incident time metrics for MTTR tracking per [`
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 2.5.0 | 2026-07-04 | GCL Rubric expanded to 8 rules: added Rules 6–8 (Product RCA coverage H–P, Network path validation Rule G, Cross-product topology) |
+| 2.6.0 | 2026-07-27 | Active Inspection (Workflow 12) + ML detectors + capacity forecast + finding fingerprint + selective workflow routing + FinOps thresholds (centrally managed in capacity-forecast.md) + cruise_logger + GCL rubric aligned to 4 Critics (adds token_efficiency) |
 | 2.4.0 | 2026-06-13 | **Phase F (cont.):** Rules O (SCF), P (CDN) |
 | 2.3.0 | 2026-06-13 | Rules K–N (COS, CKafka, MongoDB, Postgres) |
 | 2.2.0 | 2026-06-13 | Split SDK to `api-sdk-usage.md`; GCL Phase 3 trace export + monitor aggregate hook |

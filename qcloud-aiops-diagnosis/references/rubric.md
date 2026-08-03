@@ -38,6 +38,16 @@ Each dimension is scored `0`, `0.5`, or `1`. Thresholds from [AGENTS.md §3](../
 trigger `SAFETY_FAIL` cloud abort, but the Orchestrator MUST NOT return partial
 recommendations that imply execution occurred.
 
+**Critic Agent Mapping** (diagnosis-level GCL):
+
+| Dimension | Primary Critic | Secondary Critic |
+|---|---|---|
+| Correctness | data_quality | — |
+| Safety | safety_rules | — |
+| Idempotency | data_quality | — |
+| Traceability | data_quality | — |
+| Spec Compliance | safety_rules | token_efficiency |
+
 ---
 
 ## 3. Per-dimension scoring checklist
@@ -133,6 +143,8 @@ recommendations that imply execution occurred.
 ---
 
 ## 5. Output schema (returned by Critic)
+
+> **max_iterations = 5** (per SKILL.md Quality Gate + AGENTS.md §8). At diagnosis-level GCL, 4 Critics run: `data_quality`, `safety_rules`, `token_efficiency`, and 1 structural critic. The `prediction` and `knowledge_graph` Critics are module-level (AIOps model training); they do not participate in per-diagnosis GCL unless the skill is used to train AIOps models.
 
 Strict JSON per [AGENTS.md §7](../../AGENTS.md#7-prompt-templates-mandatory-per-skill):
 

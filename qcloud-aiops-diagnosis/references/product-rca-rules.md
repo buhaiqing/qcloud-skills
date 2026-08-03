@@ -431,16 +431,8 @@ When `resource_type` is `cdb`, `redis`, `es`, `cos`, `ckafka`, `mongodb`, `postg
 Cross-link to CLB/VPC/origin layers when user supplies `{{user.load_balancer_id}}`, `{{user.vpc_id}}`, or origin domain from `DescribeDomainsConfig`.
 ## 12. FinOps Capacity Thresholds
 
-Capacity utilization thresholds used for proactive capacity alerts in RCA and cruise inspection.
-Managed centrally in [`capacity-forecast.md`](capacity-forecast.md) §Default FinOps Thresholds.
-
-| Metric | Warning | Critical | Product |
-|--------|---------|----------|---------|
-| `cpu_util` | 75% | 90% | CVM, CDB, Redis, ES, CKafka, MongoDB, Postgres, SCF |
-| `mem_util` | 80% | 95% | CVM, CDB, Redis, ES, CKafka, MongoDB, Postgres |
-| `disk_util` | 85% | 95% | CVM, CDB, CKafka, MongoDB, Postgres |
-| `cpu_allocated` | 80% | 95% | TKE cluster |
-| `mem_allocated` | 85% | 98% | TKE cluster |
+Capacity utilization thresholds for proactive capacity alerts in RCA and cruise inspection.
+**Managed centrally in [`capacity-forecast.md`](capacity-forecast.md) §Default FinOps Thresholds — do not duplicate inline.**
 
 These thresholds trigger `CapacityAlert` in `lib/capacity_forecaster.py` and feed into Cross-Skill Bundles for A2 FinOps advisories.
 
