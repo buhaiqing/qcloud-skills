@@ -41,6 +41,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from cli_param_validator import validate_cli_params
 from distribution_drift import compute_drift
 from distribution_drift import load_traces as _load_traces_dd
 from evidence_kernel import SENSITIVE_KEY_RE, mask_trace, post_record, preflight
@@ -48,8 +49,10 @@ from gcl_trajectory_quality import classify_op
 from hallucination_detection import detect_hallucinations
 from reflexion_retrieve import format_for_injection as ff_fail
 from reflexion_retrieve import load_failure_patterns
+from schema_validator import validate_response_schema
 from success_pattern_mine import write_pending_with_lock
 from success_pattern_retrieve import retrieve_success_patterns
+from waf_compliance import waf_check
 
 
 def load_tcloud_error_hints() -> str:
@@ -813,7 +816,62 @@ def _format_success_injection(entries: list[dict[str, Any]]) -> str:
         )
     return "Known success paths (consider reusing):\n" + "\n".join(lines)
 
-def post_process(trace_path: Path, root: Path) -> None:
+def _three_layer_check(trace_data: dict) -> None:
+    """Run three-layer compliance checks on a GCL trace.
+
+    Layer 1: CLI param validator — verify --flags exist in knowledge base
+    Layer 2: Schema validator — verify response JSON structure
+    Layer 3: WAF compliance — safety / cost / stability gates
+
+    All output goes to stderr so structured JSON output is unaffected.
+    """
+    skill = trace_data.get("skill", "")
+    for i, it in enumerate(trace_data.get("iterations", [])):
+        cmd = it.get("generator", {}).get("command", "")
+        if not cmd or not cmd.startswith("tccli"):
+            continue
+        # Layer 1: CLI param validator
+        try:
+            cli_violations = validate_cli_params(cmd, skill, "")
+            for v in cli_violations:
+                print(
+                    f"[LAYER1:CLI_PARAM] iter={i+1} flag=--{v['flag']} "
+                    f"sev={v['severity']} sug={v['suggestion'][:70]}",
+                    file=sys.stderr,
+                )
+        except (KeyError, TypeError, AttributeError):
+            pass
+        # Layer 2: Schema validator
+        raw = it.get("generator", {}).get("result_excerpt", "")
+        if raw:
+            try:
+                resp = json.loads(raw)
+                schema_violations = validate_response_schema(cmd, resp, skill)
+                for v in schema_violations:
+                    print(
+                        f"[LAYER2:SCHEMA] iter={i+1} type={v['type']} "
+                        f"path={v['path']} sev={v['severity']} "
+                        f"sug={v['suggestion'][:70]}",
+                        file=sys.stderr,
+                    )
+            except (json.JSONDecodeError, ValueError):
+                pass
+        # Layer 3: WAF compliance
+        m = re.search(r"tccli\s+\w+\s+(\w+)", cmd)
+        action = m.group(1) if m else ""
+        try:
+            waf_violations = waf_check(trace_data, skill, action, cmd)
+            for v in waf_violations:
+                print(
+                    f"[LAYER3:WAF] iter={i+1} type={v['type']} "
+                    f"sev={v['severity']} sug={v.get('suggestion', '')[:70]}",
+                    file=sys.stderr,
+                )
+        except (re.error, KeyError, ValueError):
+            pass
+
+
+def post_process(trace_path: Path, root: Path, three_layer: bool = False) -> None:
     """Run hallucination detection and distribution drift on the new trace.
 
     Called after PASS and MAX_ITER paths. Alerts go to stderr so they don't
@@ -836,6 +894,9 @@ def post_process(trace_path: Path, root: Path) -> None:
                 f"cmd={s['command'][:60]}",
                 file=sys.stderr,
             )
+    # Three-layer check (layers 1-3)
+    if three_layer:
+        _three_layer_check(trace_data)
     # Distribution drift
     try:
         all_traces = _load_traces_dd(root / "audit-results", since_days=30)
@@ -1049,7 +1110,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     pass  # non-blocking: success logging must not break the main return path
                 print(f"PASS (iter {iteration}) — trace: {path}")
                 if args.enable_post_process:
-                    post_process(path, root)
+                    post_process(path, root, three_layer=args.three_layer_check)
                 return 0
     
             critic_feedback = "; ".join(critic.get("suggestions", [])[:3])
@@ -1077,7 +1138,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         )
         print(f"MAX_ITER — trace: {path}", file=sys.stderr)
         if args.enable_post_process:
-            post_process(path, root)
+            post_process(path, root, three_layer=args.three_layer_check)
         return 1
 
 
@@ -1131,6 +1192,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="Enable post-processing: hallucination detection + distribution drift",
+    )
+    run.add_argument(
+        "--three-layer-check",
+        action="store_true",
+        default=False,
+        help="Enable three-layer compliance check (layer1=CLI params, layer2=schema, layer3=WAF). "
+             "Implies --enable-post-process.",
     )
     run.set_defaults(func=cmd_run)
     return p

@@ -128,6 +128,18 @@ Every GCL run MUST persist a JSON trace:
 }
 ```
 
+### 6b. Three-Layer Compliance Check (Hallucination Detection)
+
+Post-processing optional gate via `--three-layer-check` flag (default False). All output to stderr; never blocks the JSON result path.
+
+| Layer | Script | What it checks |
+|---|---|---|
+| **Layer 1** | `cli_param_validator.py` | CLI `--flag` existence vs tccli knowledge base (13 skills covered). Invalid flags → `low`/`high` severity. Extensible via `TCLOUD_OPERATIONS` env var (JSON). |
+| **Layer 2** | `schema_validator.py` | Response JSON structure: required fields, RequestId presence, data field consistency for list queries, error-without-RequestId (hallucination). 13 skills × actions covered. |
+| **Layer 3** | `waf_compliance.py` | Safety (destructive without `--confirmed`), cost (monthly estimate vs thresholds), batch size (≥5 warn / ≥20 fail), idempotency (missing ClientToken on writes), slow convergence. Thresholds overridable via `WAF_*` env vars. |
+
+All three layers are **non-blocking** in v1.6.0 — they emit alerts but do not abort execution. Future versions may promote Layer 3 safety violations to `SAFETY_FAIL`.
+
 Path: `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` — unified with the existing
 `audit-results/` directory (e.g. `qcloud-finops-ops` reports, `qcloud-proactive-inspection` traces).
 
@@ -243,6 +255,7 @@ does not exempt a sloppy skill update.
 | 1.3.0 | 2026-06-19 | **Phase 4.1 Tier A conformance:** `scripts/check_gcl_conformance.py` (CI gate); 19 skills fleshed out to 8-section rubric + 7-section prompt-templates + Tier A SKILL.md `## Quality Gate (GCL)` chapter; `qcloud-skill-generator` (Tier D) gained full GCL artifacts |
 | 1.4.0 | 2026-06-19 | **Spec extraction and roadmap compression:** detailed GCL and Reflexion specs moved from `AGENTS.md` to `docs/gcl-spec.md` and `docs/reflexion-memory.md`; `AGENTS.md` now keeps only hard constraints, read triggers, and validation pointers; Roadmap compressed to a status table while detailed phase changes remain in this unified changelog |
 | 1.5.0 | 2026-07-19 | **P0/P1 runtime quality improvements:** (1) `scripts/predictive_analyzer.py` — capacity prediction engine with OLS, Holt's ES, anomaly alerting per `prediction-engine.md` schema; (2) `scripts/cross_skill_impact.py` — dependency graph, BFS propagation, Kahn topo sort; (3) `scripts/incident_timeline_aggregator.py` — RCA/Event bundle aggregation, topology linking, causal chain; (4) Success pattern retrieval integrated into `gcl_runner.py` pre-flight (`success_pattern_retrieve`, `success_pattern_mine`); `format_for_injection` renamed `ff_fail` to avoid conflict; combined `REFLEXION_PATTERNS` env var with success first; `matched_successes` field added to `preflight_reflexion` trace; (5) Hallucination detection + distribution drift integrated into `gcl_runner.py` post-processing via `--enable-post-process` flag (default False); `post_process()` calls `detect_hallucinations()` and `compute_drift()` after PASS and MAX_ITER paths |
+| 1.6.0 | 2026-07-20 | **Three-layer compliance check (Hallucination Detection):** `--three-layer-check` flag enables: layer1=`cli_param_validator.py` (CLI flag existence vs tccli knowledge base, 13 skill coverage); layer2=`schema_validator.py` (response JSON schema vs OpenAPI-style KB: required fields, RequestId, data field consistency); layer3=`waf_compliance.py` (offline safety/cost/stability: destructive confirmation, batch size thresholds, cost estimation, idempotency). All output to stderr; non-blocking.
 
 ## 13. See also
 
