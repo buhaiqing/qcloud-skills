@@ -1,4 +1,4 @@
-.PHONY: validate registry golden kpi manifest all
+.PHONY: validate registry golden kpi manifest all reflexion-update
 
 validate:
 	python3 scripts/validate_local.py
@@ -16,8 +16,11 @@ kpi:
 		echo "no evidence files — KPI gate skipped"; \
 	fi
 
+reflexion-update:
+	python3 scripts/reflexion_auto_writer.py
+
 manifest: registry golden kpi
 	@echo "Capability manifest emitted via build_skill_registry --emit + aggregate_kpi"
 
-all: validate registry golden kpi manifest
+all: validate registry golden kpi manifest reflexion-update
 	@echo "Harness Evidence gates passed"

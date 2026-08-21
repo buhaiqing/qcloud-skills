@@ -47,6 +47,7 @@ from distribution_drift import load_traces as _load_traces_dd
 from evidence_kernel import SENSITIVE_KEY_RE, mask_trace, post_record, preflight
 from gcl_trajectory_quality import classify_op
 from hallucination_detection import detect_hallucinations
+from reflexion_auto_writer import write_trace as _reflexion_write_trace
 from reflexion_retrieve import format_for_injection as ff_fail
 from reflexion_retrieve import load_failure_patterns
 from schema_validator import validate_response_schema
@@ -667,7 +668,34 @@ def extract_failure_pattern(
             "reusable": category in {"cli_parameter", "runtime"},
             "severity": severity,  # P0-C
         }
+    # Fallback: score-based pattern when no regex matches.
+    # Captures near-misses (e.g. low idempotency score even on PASS retry).
+    for dim, threshold in RUBRIC_THRESHOLDS.items():
+        if scores.get(dim, 1.0) < threshold:
+            fix = (critic.get("suggestions") or ["Investigate failure pattern and add fix"])[0]
+            return {
+                "category": "runtime",
+                "skill": skill,
+                "command": command[:200] if command else None,
+                "error": f"{dim}={scores.get(dim, 0):.2f}<{threshold}",
+                "fix": fix[:200],
+                "count": 1,
+                "reusable": True,
+                "severity": severity,
+            }
     return None
+
+
+def _post_persist_reflexion(root: Path, trace: dict[str, Any], path: Path) -> None:
+    """Phase Reflexion-A: auto-write failure_pattern to docs/failure-patterns.md.
+
+    Best-effort — any exception is swallowed. Reflexion failures must never
+    break the GCL caller (mirrors _emit_trace_span error policy).
+    """
+    try:
+        _reflexion_write_trace(trace, path)
+    except Exception:  # noqa: BLE001, S110 - reflexion must never break GCL
+        pass
 
 
 def _emit_trace_span(
@@ -1076,6 +1104,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     error_code="SAFETY_FAIL",
                     trace_id=args.trace_id,
                 )
+                _post_persist_reflexion(root, trace, path)
                 print(f"SAFETY_FAIL — trace: {path}", file=sys.stderr)
                 return 3
     
@@ -1093,6 +1122,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     scores=critic.get("scores"),
                     trace_id=args.trace_id,
                 )
+                _post_persist_reflexion(root, trace, path)
                 # P0-A: write success pattern to pending log
                 try:
                     scores = critic.get("scores") or {}
@@ -1136,6 +1166,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             error_code="MAX_ITER",
             trace_id=args.trace_id,
         )
+        _post_persist_reflexion(root, trace, path)
         print(f"MAX_ITER — trace: {path}", file=sys.stderr)
         if args.enable_post_process:
             post_process(path, root, three_layer=args.three_layer_check)
