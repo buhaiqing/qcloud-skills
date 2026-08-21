@@ -166,7 +166,7 @@ def _get_evolution_policy():
     return _EVO_POLICY_CACHE
 
 
-def check_h(step: PlanStep) -> dict:
+def check_h(step: PlanStep, *, use_evolution: bool = False) -> dict:
     issues = []
 
     if not step.skill:
@@ -177,8 +177,11 @@ def check_h(step: PlanStep) -> dict:
             issues.append(f"Unknown skill: {step.skill}")
 
         allow = set(KNOWN_OPERATIONS.get(step.skill, set()))
-        with suppress(Exception):
-            allow |= _get_evolution_policy().op_allowlist(step.skill)
+        # Evolution-derived allowlist widening is gated behind DriftGuard shadow
+        # (default off) so unproven mined ops never silently loosen the H-gate.
+        if use_evolution:
+            with suppress(Exception):
+                allow |= _get_evolution_policy().op_allowlist(step.skill)
         op = normalize_op(step.params.get("operation", ""))
         if allow and op and op not in allow:
             issues.append(f"Unknown operation '{op}' for skill {step.skill}")

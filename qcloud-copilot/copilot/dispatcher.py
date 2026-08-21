@@ -11,6 +11,7 @@ from pathlib import Path as _Path
 
 from copilot.ask_user_runner import AskUserRunner
 from copilot.blackboard import BlackboardClient
+from copilot.evolution.guard import DriftGuard
 from copilot.integration.alert_intel import AlertIntelRunner
 from copilot.integration.cruise import CruiseRunner
 from copilot.integration.skills import SkillDispatcher
@@ -20,7 +21,6 @@ from copilot.plan_schema import resolve_blackboard_paths
 from copilot.quality.audit import audit_trace
 from copilot.quality.hallucination import check_h
 from copilot.quality.health import record_health
-from copilot.quality.reflexion import write_reflexion
 from copilot.report_gen import synthesize_from_blackboard
 
 _SCRIPTS = str(_Path(__file__).resolve().parents[2] / "scripts")
@@ -240,7 +240,8 @@ class PlanDispatcher:
                             else "destructive op executed without L2 confirmation",
                         },
                     )
-            h_result = check_h(step)
+            use_evolution = bool(session_id) and DriftGuard().should_use_evolution(session_id)
+            h_result = check_h(step, use_evolution=use_evolution)
             if not h_result["passed"]:
                 result = StepResult(
                     step_id=step.id,
@@ -359,16 +360,6 @@ class PlanDispatcher:
         self._emit_trace(session_id, step, result, provenance=provenance)
         self._emit_health(step, result, session_id)
         self._emit_span(session_id, step, result)
-
-        if result.status == "failure":
-            with suppress(Exception):
-                write_reflexion(
-                    category="engine_step",
-                    skill=step.skill or step.type,
-                    command=f"{step.type}:{step.id}",
-                    error=result.error or "unknown",
-                    fix="See step trace",
-                )
 
         return result
 

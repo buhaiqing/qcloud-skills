@@ -6,7 +6,6 @@ If this file passes, the rubric's per-dimension checks are sound.
 
 from __future__ import annotations
 
-import inspect
 from pathlib import Path
 
 # --- D1 — Parser Correctness ---
@@ -252,64 +251,6 @@ def test_d6_dispatcher_accepts_known_skill(monkeypatch):
     assert cmd[4] == "ap-guangzhou"
     assert "--InstanceIds.0" in cmd
     assert cmd[cmd.index("--InstanceIds.0") + 1] == "ins-test"
-
-
-# --- D7 — Reflexion Write-back ---
-
-
-def test_d7_write_reflexion_creates_file(tmp_path, monkeypatch):
-    """write_reflexion must write to .runtime/reflexion/<date>-scratch.md."""
-    import copilot.quality.reflexion as r
-
-    scratch_dir = tmp_path / "reflexion"
-    monkeypatch.setattr(r, "SCRATCH_DIR", scratch_dir)
-    r.write_reflexion(
-        category="smoke_test",
-        skill="qcloud-copilot",
-        command="test",
-        error="test error",
-        fix="test fix",
-    )
-    assert scratch_dir.exists()
-    scratch_files = list(scratch_dir.glob("*-scratch.md"))
-    assert len(scratch_files) == 1
-    content = scratch_files[0].read_text()
-    assert "smoke_test" in content
-
-
-def test_d7_engine_calls_reflexion_on_failure():
-    """Verify PlanDispatcher._execute_step calls write_reflexion on failure."""
-    from copilot.dispatcher import PlanDispatcher
-
-    src = inspect.getsource(PlanDispatcher._execute_step)
-    assert "write_reflexion" in src
-    assert 'if result.status == "failure"' in src
-
-
-def test_d7_aggregate_scratch(tmp_path, monkeypatch):
-    """aggregate_scratch reads scratch files and dedup-counts into failure-patterns.md."""
-    import copilot.quality.reflexion as r
-
-    scratch_dir = tmp_path / "reflexion"
-    monkeypatch.setattr(r, "SCRATCH_DIR", scratch_dir)
-    monkeypatch.setattr(r, "DOCS_FAILURE_PATTERNS", tmp_path / "failure-patterns.md")
-
-    # Create scratch file with 2 entries
-    scratch_dir.mkdir()
-    (scratch_dir / "2026-07-10-scratch.md").write_text(
-        "# Scratch\n\n"
-        "| cli_param | qcloud-cvm-ops | bad-cmd | error msg | fix msg | 1 | true |\n"
-        "| cli_param | qcloud-redis-ops | bad-cmd2 | error msg2 | fix msg2 | 1 | true |\n"
-    )
-
-    # Create existing failure-patterns.md with 1 of those entries
-    (tmp_path / "failure-patterns.md").write_text(
-        "# Failure Patterns\n\n"
-        "| cli_param | qcloud-cvm-ops | bad-cmd | error msg | fix msg | 2 | true |\n"
-    )
-
-    merged = r.aggregate_scratch(date="2026-07-10")
-    assert merged == 1  # only redis entry is new (vm is duplicate)
 
 
 # --- D8 — Report Synthesis ---

@@ -264,7 +264,7 @@ def test_check_h_merges_op_allowlist(tmp_path, monkeypatch):
         skill="qcloud-cvm-ops",
         params={"operation": "describe-special-thing"},
     )
-    assert h.check_h(ok)["passed"] is True
+    assert h.check_h(ok, use_evolution=True)["passed"] is True
 
     # a genuinely unknown op is still flagged
     bad = PlanStep(
@@ -273,7 +273,7 @@ def test_check_h_merges_op_allowlist(tmp_path, monkeypatch):
         skill="qcloud-cvm-ops",
         params={"operation": "nuke-everything"},
     )
-    assert h.check_h(bad)["passed"] is False
+    assert h.check_h(bad, use_evolution=True)["passed"] is False
 
 
 def test_dispatcher_injects_evolution_warning(tmp_path, monkeypatch):
