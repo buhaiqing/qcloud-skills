@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from datetime import UTC, datetime, timedelta
 
 from copilot.evolution import EvolutionPolicy, EvolutionStore
 from copilot.evolution.guard import DriftGuard
@@ -35,6 +36,11 @@ def _write_success(path):
     )
 
 
+def _recent(days_ago: int = 0) -> str:
+    """Return a recent LastSeen date so recency-decay tests don't rot over time."""
+    return (datetime.now(UTC) - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+
+
 class FakeQuery:
     def __init__(self, rates):
         self._rates = rates
@@ -53,7 +59,7 @@ def test_store_parses_failure_patterns(tmp_path):
     _write_failure(
         fp,
         [
-            "| `qcloud-cvm-ops` | `DescribeInstances` | `InvalidParameter` | bad | fix | 12 | 2026-07-10 | critical |",
+            f"| `qcloud-cvm-ops` | `DescribeInstances` | `InvalidParameter` | bad | fix | 12 | {_recent(0)} | critical |",
         ],
     )
     store = EvolutionStore(failure_path=fp)
@@ -168,9 +174,9 @@ def test_policy_route_hint_flags_high_failure(tmp_path):
     _write_failure(
         fp,
         [
-            "| `qcloud-cvm-ops` | `DescribeInstances` | `InvalidParameter` | bad | fix | 12 | 2026-07-10 | critical |",
-            "| `qcloud-cvm-ops` | `StopInstances` | `MissingParameter` | bad | fix | 11 | 2026-07-09 | critical |",
-            "| `qcloud-cvm-ops` | `TerminateInstances` | `AuthFailure` | bad | fix | 10 | 2026-07-08 | critical |",
+            f"| `qcloud-cvm-ops` | `DescribeInstances` | `InvalidParameter` | bad | fix | 12 | {_recent(0)} | critical |",
+            f"| `qcloud-cvm-ops` | `StopInstances` | `MissingParameter` | bad | fix | 11 | {_recent(1)} | critical |",
+            f"| `qcloud-cvm-ops` | `TerminateInstances` | `AuthFailure` | bad | fix | 10 | {_recent(2)} | critical |",
         ],
     )
     pol = EvolutionPolicy(EvolutionStore(failure_path=fp), None)
@@ -185,9 +191,9 @@ def test_policy_route_hint_accepts_intent_object(tmp_path):
     _write_failure(
         fp,
         [
-            "| `qcloud-cvm-ops` | `DescribeInstances` | `InvalidParameter` | bad | fix | 12 | 2026-07-10 | critical |",
-            "| `qcloud-cvm-ops` | `StopInstances` | `MissingParameter` | bad | fix | 11 | 2026-07-09 | critical |",
-            "| `qcloud-cvm-ops` | `TerminateInstances` | `AuthFailure` | bad | fix | 10 | 2026-07-08 | critical |",
+            f"| `qcloud-cvm-ops` | `DescribeInstances` | `InvalidParameter` | bad | fix | 12 | {_recent(0)} | critical |",
+            f"| `qcloud-cvm-ops` | `StopInstances` | `MissingParameter` | bad | fix | 11 | {_recent(1)} | critical |",
+            f"| `qcloud-cvm-ops` | `TerminateInstances` | `AuthFailure` | bad | fix | 10 | {_recent(2)} | critical |",
         ],
     )
 
