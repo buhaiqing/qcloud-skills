@@ -100,6 +100,31 @@ def gate_decision_rate(gate: str) -> dict[str, float]:
     return rates
 
 
+def feedback_adoption_rate(days: int = 7) -> dict[str, float]:
+    """Adoption/override rate from the EVO-1 user-feedback counters.
+
+    Consumes the ``copilot_user_adopt`` / ``copilot_report_override`` metric
+    counters emitted by ``CopilotEngine.record_feedback``, so the evolution loop
+    can gauge whether delivered reports are adopted or overridden in practice.
+    """
+    adopt = override = 0
+    for r in _load_records():
+        if r.get("kind") != "metric" or not _within_days(r.get("ts"), days):
+            continue
+        if r.get("name") == "copilot_user_adopt":
+            adopt += 1
+        elif r.get("name") == "copilot_report_override":
+            override += 1
+    total = adopt + override
+    if total == 0:
+        return {"adopt_rate": 0.0, "override_rate": 0.0, "n": 0}
+    return {
+        "adopt_rate": round(adopt / total, 4),
+        "override_rate": round(override / total, 4),
+        "n": total,
+    }
+
+
 def top_failed_operations(days: int = 7, limit: int = 10) -> list[tuple[str, int]]:
     counts: dict[str, int] = {}
     for r in _load_records():

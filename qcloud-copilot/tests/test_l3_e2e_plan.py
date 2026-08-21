@@ -10,6 +10,7 @@ from copilot.blackboard import BlackboardClient
 from copilot.engine import CopilotEngine
 from copilot.integration.skills import SkillDispatcher
 from copilot.models import ClassifiedIntent, IntentType, StepResult
+from copilot.observ import ObservableSink
 from copilot.plan_gen import generate
 from copilot.plan_schema import load_plan_file
 
@@ -211,3 +212,43 @@ def test_critical_awaiting_confirmation(board_dir):
             report_ok = engine.run_plan(plan, session_id=session_id, l3_reviewed=True)
 
     assert "L3 gate failed" not in report_ok.summary
+
+
+def test_l3_pass_emits_gate_trace(board_dir):
+    """L3 PASS must emit a gate record (mirrors the FAIL branch) so approval
+    is traceable, not just the failure path."""
+    plan = load_plan_file(FIXTURE)
+    session_id = "ses-l3-pass-gate"
+    client = BlackboardClient(board_dir=board_dir)
+    client.create(session_id, "pass gate")
+
+    skill = MagicMock(spec=SkillDispatcher)
+    skill.execute.return_value = StepResult(step_id="vpc-0", status="success", output={})
+
+    gates = []
+    with patch("copilot.engine.SessionManager") as sm_mock:
+        sm = sm_mock.return_value
+        sm.blackboard_client.return_value = client
+        sm.init_blackboard.return_value = client.create(session_id, "pass")
+        with patch.object(ObservableSink, "emit_gate") as emit_gate:
+            engine = CopilotEngine()
+            engine._plan_dispatcher._skill_dispatcher = skill
+            cruise = MagicMock()
+            cruise.execute.return_value = StepResult(
+                step_id="cruise-1", status="success", output={"inspected": []}
+            )
+            engine._plan_dispatcher._cruise_runner = cruise
+            alert = MagicMock()
+            alert.analyze.return_value = {
+                "version": "0.4.0",
+                "verdict": "PASS",
+                "findings": [],
+                "topology_hints": [],
+                "metadata": {},
+            }
+            engine._plan_dispatcher._alert_runner = alert
+            engine.run_plan(plan, session_id=session_id, l3_reviewed=True)
+
+    # emit_gate(run_id, gate, decision, reason) — args[1]=gate, args[2]=decision
+    gates = [(c.args[1], c.args[2]) for c in emit_gate.call_args_list]
+    assert ("l3", "pass") in gates

@@ -344,6 +344,16 @@ class CopilotEngine:
                 duration_ms=0,
                 audience=audience,
             )
+        else:
+            # Record the PASS decision too so critical-finding approval is
+            # traceable (mirrors L2, which emits both pass and fail traces).
+            with suppress(Exception):
+                ObservableSink().emit_gate(
+                    session_id,
+                    "l3",
+                    "pass",
+                    "reviewed" if l3_reviewed else "no_critical_or_approved",
+                )
 
         return exec_result
 

@@ -5,7 +5,7 @@ from datetime import UTC
 from pathlib import Path
 
 import copilot.observ_query as oq
-from copilot.observ import ObservableSink, Span
+from copilot.observ import Metric, MetricKind, ObservableSink, Span
 
 
 def _seed(tmp_path: Path) -> None:
@@ -51,6 +51,19 @@ def test_gate_decision_rate(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(oq, "METRICS_JSONL", tmp_path / ".runtime" / "metrics" / "metrics.jsonl")
     rate = oq.gate_decision_rate("l0")
     assert rate == {"fail": 0.5, "pass": 0.5}
+
+
+def test_feedback_adoption_rate(tmp_path: Path, monkeypatch):
+    sink = ObservableSink(runtime_root=tmp_path / ".runtime")
+    for _ in range(3):
+        sink.emit_metric(Metric(name="copilot_user_adopt", kind=MetricKind.COUNTER, value=1.0, tags={}))
+    sink.emit_metric(Metric(name="copilot_report_override", kind=MetricKind.COUNTER, value=1.0, tags={}))
+    monkeypatch.setattr(oq, "METRICS_JSONL", tmp_path / ".runtime" / "metrics" / "metrics.jsonl")
+
+    assert oq.feedback_adoption_rate() == {"adopt_rate": 0.75, "override_rate": 0.25, "n": 4}
+    # empty -> zeros, not div-by-zero
+    monkeypatch.setattr(oq, "METRICS_JSONL", tmp_path / ".runtime" / "metrics" / "none.jsonl")
+    assert oq.feedback_adoption_rate() == {"adopt_rate": 0.0, "override_rate": 0.0, "n": 0}
 
 
 def test_top_failed_operations(tmp_path: Path, monkeypatch):
