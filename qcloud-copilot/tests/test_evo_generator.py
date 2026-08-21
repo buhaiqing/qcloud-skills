@@ -103,6 +103,61 @@ def test_store_success_op_allowlist(tmp_path):
     assert "—" not in allow
 
 
+def test_op_allowlist_filters_low_confidence_success(tmp_path):
+    sp = tmp_path / "success-patterns.md"
+    sp.write_text(
+        "## 1. 高频成功操作（可转化为 allowlist）\n\n"
+        "| Skill | Operation | Pattern | success_rate | last_verified |\n"
+        "|-------|-----------|---------|--------------|---------------|\n"
+        "| `qcloud-cvm-ops` | `describe-special-thing` | works | 0.5 | 2026-06 |\n",
+        encoding="utf-8",
+    )
+    pol = EvolutionPolicy(EvolutionStore(success_path=sp), None)
+    assert pol.op_allowlist("qcloud-cvm-ops") == set()
+
+
+def test_op_allowlist_normalizes_camelcase_to_kebab(tmp_path):
+    sp = tmp_path / "success-patterns.md"
+    sp.write_text(
+        "## 1. 高频成功操作（可转化为 allowlist）\n\n"
+        "| Skill | Operation | Pattern | success_rate | last_verified |\n"
+        "|-------|-----------|---------|--------------|---------------|\n"
+        "| `qcloud-cvm-ops` | `DescribeInstances` | works | 0.97 | 2026-06 |\n",
+        encoding="utf-8",
+    )
+    pol = EvolutionPolicy(EvolutionStore(success_path=sp), None)
+    allow = pol.op_allowlist("qcloud-cvm-ops")
+    assert "describe-instances" in allow
+
+
+def test_op_allowlist_uses_count_for_mining_shape(tmp_path):
+    # scripts/success_pattern_mine.py emits Count/LastHit, no success_rate/Severity.
+    sp = tmp_path / "success-patterns.md"
+    sp.write_text(
+        "## 1. Winning CLI Operation Patterns\n\n"
+        "| Skill | Operation | CommandSignature | FullCommand | Iter | Count | FirstHit | LastHit | Scores | AvgIter |\n"
+        "|-------|-----------|------------------|-------------|------|-------|----------|---------|--------|---------|\n"
+        "| `qcloud-cvm-ops` | `DescribeInstances` | tccli cvm DescribeInstances | — | 1 | 3 | 2026-08-01 | 2026-08-20 | {} | 1.0 |\n"
+        "| `qcloud-cvm-ops` | `TerminateInstances` | tccli cvm TerminateInstances | — | 1 | 1 | 2026-08-20 | 2026-08-20 | {} | 1.0 |\n",
+        encoding="utf-8",
+    )
+    pol = EvolutionPolicy(EvolutionStore(success_path=sp), None)
+    allow = pol.op_allowlist("qcloud-cvm-ops")
+    # count>=2 -> existence-proven; count==1 -> below floor (fluke)
+    assert "describe-instances" in allow
+    assert "terminate-instances" not in allow
+
+
+def test_normalize_op_preserves_digits():
+    from copilot.evolution.policy import normalize_op
+
+    assert normalize_op("DescribeInstances") == "describe-instances"
+    assert normalize_op("DescribeInstances2") == "describe-instances-2"
+    assert normalize_op("GetObjectV1") == "get-object-v-1"
+    assert normalize_op("GetObjectV2") == "get-object-v-2"
+    assert normalize_op("describe-special-thing") == "describe-special-thing"
+
+
 # --------------------------------------------------------------------------- #
 # Phase 1 — Decision layer (policy)
 # --------------------------------------------------------------------------- #

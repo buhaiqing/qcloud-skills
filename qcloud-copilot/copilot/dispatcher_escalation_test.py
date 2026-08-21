@@ -62,7 +62,8 @@ class _RecordingSkillDispatcher(SkillDispatcher):
 
 
 def _make_step(*, step_id: str = "s1", skill: str = "qcloud-cvm-ops",
-               operation: str = "describe-instances") -> PlanStep:
+               operation: str = "describe-instances",
+               destructive: bool = False) -> PlanStep:
     # Use a whitelisted (SAFE_OPERATIONS) operation so the h-check passes
     # and the skill dispatcher is actually called.
     return PlanStep(
@@ -71,6 +72,7 @@ def _make_step(*, step_id: str = "s1", skill: str = "qcloud-cvm-ops",
         skill=skill,
         operation=operation,
         params={"operation": operation},
+        destructive=destructive,
     )
 
 
@@ -261,6 +263,74 @@ class EscalatorFixTests(unittest.TestCase):
         self.assertEqual(len(skill_disp.calls), 2,
                          "FIX should retry exactly once")
         self.assertEqual(result.retry_count, 1)
+
+
+class EscalatorDestructiveRetryGuardTests(unittest.TestCase):
+    """BLOCKER-2: destructive ops must NOT be re-executed on RETRY/FIX
+    without a fresh L2 confirmation (double-apply of non-idempotent
+    delete-instance / release-eip / delete-bucket style actions)."""
+
+    def test_destructive_retry_halts_without_l2(self):
+        esc = ErrorEscalator()
+        esc.add_rule(ErrorRule(
+            code="Flaky", action=Action.RETRY,
+            max_retries=3, backoff_strategy="fixed",
+        ))
+        skill_disp = _RecordingSkillDispatcher({
+            "qcloud-cvm-ops": [_failure("Flaky timeout")],
+        })
+        d = PlanDispatcher(skill_dispatcher=skill_disp, error_escalator=esc)
+        step = _make_step(destructive=True)
+        result = d._apply_escalation(
+            _failure("Flaky timeout"), step, {}, l2_confirmed=False,
+        )
+        self.assertNotEqual(result.status, "success",
+                            "destructive retry without L2 must not succeed")
+        self.assertEqual(result.retry_count, 0,
+                         "destructive step must not be re-executed on retry")
+        self.assertIn("destructive", result.error or "")
+        # No retry/dispatch call beyond the original failure.
+        self.assertEqual(len(skill_disp.calls), 0,
+                         "no skill dispatch should happen on guarded retry")
+
+    def test_destructive_fix_halts_without_l2(self):
+        esc = ErrorEscalator()
+        esc.add_rule(ErrorRule(
+            code="ImageIdMalformed", action=Action.FIX, max_retries=1,
+        ))
+        skill_disp = _RecordingSkillDispatcher({
+            "qcloud-cvm-ops": [_failure("ImageIdMalformed")],
+        })
+        d = PlanDispatcher(skill_dispatcher=skill_disp, error_escalator=esc)
+        step = _make_step(destructive=True)
+        result = d._apply_escalation(
+            _failure("ImageIdMalformed"), step, {}, l2_confirmed=False,
+        )
+        self.assertNotEqual(result.status, "success")
+        self.assertEqual(result.retry_count, 0,
+                         "destructive FIX must not fire a second call")
+        self.assertIn("destructive", result.error or "")
+        self.assertEqual(len(skill_disp.calls), 0)
+
+    def test_destructive_retry_allowed_with_l2(self):
+        """With l2_confirmed=True the normal RETRY path still runs."""
+        esc = ErrorEscalator()
+        esc.add_rule(ErrorRule(
+            code="Flaky", action=Action.RETRY,
+            max_retries=3, backoff_strategy="fixed",
+        ))
+        skill_disp = _RecordingSkillDispatcher({
+            "qcloud-cvm-ops": [_success()],
+        })
+        d = PlanDispatcher(skill_dispatcher=skill_disp, error_escalator=esc)
+        step = _make_step(destructive=True)
+        result = d._apply_escalation(
+            _failure("Flaky timeout"), step, {}, l2_confirmed=True,
+        )
+        self.assertEqual(result.status, "success",
+                         "L2-confirmed destructive retry may proceed")
+        self.assertEqual(result.retry_count, 1)
+        self.assertEqual(len(skill_disp.calls), 1)
 
 
 class EscalatorErrorCodeExtractionTests(unittest.TestCase):

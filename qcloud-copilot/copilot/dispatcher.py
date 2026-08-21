@@ -257,7 +257,9 @@ class PlanDispatcher:
                 # get escalated. Success keeps the original output/error_code
                 # unchanged so callers downstream see no behaviour drift.
                 if result.status != "success":
-                    result = self._apply_escalation(result, step, context)
+                    result = self._apply_escalation(
+                        result, step, context, l2_confirmed=l2_confirmed
+                    )
         elif step.type == "cruise_run":
             result = self._execute_with_timeout(
                 lambda: self._cruise_runner.execute(
@@ -476,6 +478,8 @@ class PlanDispatcher:
         result: StepResult,
         step: PlanStep,
         context: dict,
+        *,
+        l2_confirmed: bool = False,
     ) -> StepResult:
         """Classify ``result`` via ErrorEscalator and branch on Action.
 
@@ -577,6 +581,21 @@ class PlanDispatcher:
                 return delegated
             finally:
                 step.skill = original_skill
+
+        # Destructive steps must not be silently re-executed on retry: the L2
+        # confirmation ran once before the first attempt; a RETRY/FIX re-fires
+        # the op with no fresh confirmation and can double-apply non-idempotent
+        # actions (delete-instance / release-eip / delete-bucket). HALT instead.
+        if (
+            rule.action in (_EscalationAction.RETRY, _EscalationAction.FIX)
+            and step.destructive
+            and not l2_confirmed
+        ):
+            result.error = (
+                f"{result.error or 'unknown'}; destructive op not re-executed "
+                "without L2 confirmation"
+            )
+            return result
 
         if rule.action == _EscalationAction.RETRY and rule.max_retries > 0:
             last = result

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import suppress
 
+from copilot.evolution.policy import normalize_op
 from copilot.integration.skills import KNOWN_SKILLS
 from copilot.models import PlanStep
 
@@ -178,7 +179,7 @@ def check_h(step: PlanStep) -> dict:
         allow = set(KNOWN_OPERATIONS.get(step.skill, set()))
         with suppress(Exception):
             allow |= _get_evolution_policy().op_allowlist(step.skill)
-        op = step.params.get("operation", "")
+        op = normalize_op(step.params.get("operation", ""))
         if allow and op and op not in allow:
             issues.append(f"Unknown operation '{op}' for skill {step.skill}")
 

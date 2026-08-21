@@ -44,6 +44,9 @@ HEADER_SEMANTIC = {
     "fix pattern": "fix",
     "resolution": "fix",
     "prevention": "fix",
+    "success_rate": "success_rate",
+    "success rate": "success_rate",
+    "last_verified": "last_seen",
     "count": "count",
     "frequency": "count",
     "severity": "severity",
@@ -119,6 +122,23 @@ def _confidence(count: int, severity: str, last_seen: str) -> float:
     return round(min(1.0, count_factor * sev_weight * _recency_factor(last_seen)), 3)
 
 
+def _success_rate_confidence(cell: str) -> float:
+    """Success patterns trust their recorded success_rate over count/recency."""
+    try:
+        v = float(_clean(cell))
+    except ValueError:
+        return 0.0
+    return round(min(max(v, 0.0), 1.0), 3)
+
+
+def _success_confidence(count: int) -> float:
+    """Success patterns are existence-proof (anti-hallucination): confidence
+    tracks how often an op was observed, not severity-weighted reliability.
+    Two successful observations reach the 0.7 allowlist floor; a single fluke
+    observation stays below it."""
+    return round(min(1.0, count / 2.0), 3)
+
+
 def _norm_header(cell: str) -> str:
     return _clean(cell).lower()
 
@@ -165,6 +185,14 @@ def _row_to_pattern(
     count = _to_int(cells[hmap["count"]]) if "count" in hmap else 0
     severity = _clean(cells[hmap["severity"]]) if "severity" in hmap else "minor"
     last_seen = _clean(cells[hmap["last_seen"]]) if "last_seen" in hmap else ""
+    conf = _confidence(count, severity, last_seen)
+    if kind == "success":
+        if "success_rate" in hmap:
+            conf = _success_rate_confidence(cells[hmap["success_rate"]])
+        else:
+            # Mining-shaped tables (scripts/success_pattern_mine.py) have no
+            # success_rate/Severity; fall back to count-based existence evidence.
+            conf = _success_confidence(count)
     return Pattern(
         category=category,
         skill=skill,
@@ -172,7 +200,7 @@ def _row_to_pattern(
         error=error,
         fix=fix,
         count=count,
-        confidence=_confidence(count, severity, last_seen),
+        confidence=conf,
         kind=kind,
     )
 

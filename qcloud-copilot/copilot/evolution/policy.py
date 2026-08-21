@@ -14,6 +14,8 @@ every method degrades gracefully when it is ``None`` or raises.
 
 from __future__ import annotations
 
+import re
+
 from copilot.evolution.store import EvolutionStore
 
 FAIL_COUNT_THRESHOLD = 3
@@ -30,6 +32,22 @@ def _as_skill(intent) -> str | None:
     if primary is None:
         return None
     return str(primary)
+
+
+_OP_TOKEN_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+")
+
+
+def normalize_op(op: str) -> str:
+    """折叠 operation token 到 kebab-case 小写（修复 E3.1 大小写漂移）。
+
+    mining 出的 ``Operation`` 是 CamelCase tccli 动作名（``DescribeInstances``），
+    而 planner 与 ``KNOWN_OPERATIONS`` 用 kebab-case（``describe-instances``）。
+    两侧都折叠到 kebab-case 后白名单比较才成立；对已是 kebab 的输入幂等。
+
+    数字被保留为独立 token（``DescribeInstances2`` → ``describe-instances-2``），
+    使近变体幻觉（数字后缀）仍与真实 op 区分，避免被错误放行。
+    """
+    return "-".join(p.lower() for p in _OP_TOKEN_RE.findall(op) if p)
 
 
 class EvolutionPolicy:
@@ -60,9 +78,9 @@ class EvolutionPolicy:
 
     def op_allowlist(self, skill: str) -> set[str]:
         return {
-            p.command
-            for p in self._store.load()
-            if p.kind == "success" and p.skill == skill and p.command
+            normalize_op(p.command)
+            for p in self._store.high_confidence("success", min_conf=0.7)
+            if p.skill == skill and p.command
         }
 
     # -- threshold recommendation ---------------------------------------
