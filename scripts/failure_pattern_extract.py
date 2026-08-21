@@ -120,6 +120,14 @@ def extract_failure_patterns(traces: list[Path]) -> list[dict[str, Any]]:
             fp["_source"] = p.name
             found.append(fp)
 
+        # final status block (canonical location per gcl_runner.py)
+        final_block = data.get("final") or {}
+        if isinstance(final_block, dict):
+            fp = final_block.get("failure_pattern")
+            if fp:
+                fp["_source"] = p.name
+                found.append(fp)
+
         # per-iteration
         for i, iteration in enumerate(data.get("iterations") or []):
             fp = iteration.get("failure_pattern")
