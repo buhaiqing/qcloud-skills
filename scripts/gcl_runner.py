@@ -1231,6 +1231,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Enable three-layer compliance check (layer1=CLI params, layer2=schema, layer3=WAF). "
              "Implies --enable-post-process.",
     )
+    run.add_argument(
+        "--no-reflexion",
+        action="store_true",
+        default=False,
+        help="Skip preflight reflexion retrieval. For A/B testing with eval_e2e.py mode=ab.",
+    )
     run.set_defaults(func=cmd_run)
     return p
 
