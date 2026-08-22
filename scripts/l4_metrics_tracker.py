@@ -245,6 +245,23 @@ def main() -> int:
         type=Path,
         help="Write output to this path instead of audit-results/l4-metrics.json",
     )
+    parser.add_argument(
+        "--gate",
+        action="store_true",
+        help="Gate mode: exit 1 when any metric fails its target (CI gate, L6)",
+    )
+    parser.add_argument(
+        "--min-traces",
+        type=int,
+        default=5,
+        help="Minimum trace count before gate is enforced; fewer traces -> skip with exit 0 (L10)",
+    )
+    parser.add_argument(
+        "--gate-report",
+        type=Path,
+        default=None,
+        help="Write gate JSON to this path (default: <trace-dir>/l4-gate.json when --gate)",
+    )
     args = parser.parse_args()
 
     traces = _load_traces(args.trace_dir, since_days=args.since_days)
@@ -278,6 +295,58 @@ def main() -> int:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(result, indent=2, ensure_ascii=False))
     print(f"Wrote {output_path}")
+
+    if not args.gate:
+        return 0
+
+    # Gate mode: evaluate thresholds, respect min-traces guard (L10)
+    trace_count = len(traces)
+    gate_path: Path = args.gate_report or (Path(args.trace_dir) / "l4-gate.json")
+
+    if trace_count < args.min_traces:
+        gate_result = {
+            "generated_at": datetime.now(UTC).isoformat(),
+            "status": "skipped",
+            "reason": f"insufficient traces: {trace_count} < min-traces {args.min_traces}",
+            "trace_count": trace_count,
+            "min_traces": args.min_traces,
+            "metrics": result["metrics"],
+        }
+        gate_path.parent.mkdir(parents=True, exist_ok=True)
+        gate_path.write_text(json.dumps(gate_result, indent=2, ensure_ascii=False))
+        print(f"Gate skipped ({trace_count} < {args.min_traces}): wrote {gate_path}")
+        return 0
+
+    failures: list[str] = []
+    for name, metric in result["metrics"].items():
+        # None current means no data for that dimension — treat as failure when gate is enforced
+        if metric.get("current") is None:
+            failures.append(f"{name}: no data")
+        elif metric.get("status") == "❌":
+            failures.append(f"{name}: {metric.get('current')} vs target {metric.get('target')}")
+
+    if failures:
+        gate_result = {
+            "generated_at": datetime.now(UTC).isoformat(),
+            "status": "failed",
+            "failures": failures,
+            "trace_count": trace_count,
+            "metrics": result["metrics"],
+        }
+        gate_path.parent.mkdir(parents=True, exist_ok=True)
+        gate_path.write_text(json.dumps(gate_result, indent=2, ensure_ascii=False))
+        print(f"Gate FAILED: {'; '.join(failures)} — wrote {gate_path}", file=sys.stderr)
+        return 1
+
+    gate_result = {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "status": "passed",
+        "trace_count": trace_count,
+        "metrics": result["metrics"],
+    }
+    gate_path.parent.mkdir(parents=True, exist_ok=True)
+    gate_path.write_text(json.dumps(gate_result, indent=2, ensure_ascii=False))
+    print(f"Gate passed ({trace_count} traces): wrote {gate_path}")
     return 0
 
 

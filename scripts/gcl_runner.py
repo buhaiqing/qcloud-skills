@@ -1157,7 +1157,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                 args.skill, command, trace["iterations"][-1]["generator"], trace["iterations"][-1]["critic"]
             ),
         }
-        path = persist_trace(root, trace)
+        path = persist_trace(root, trace, trace_id=args.trace_id)
         emit_evidence_record(root, trace, args, run_id, pf)
         _emit_trace_span(
             root, run_id, args.skill, command,
