@@ -69,3 +69,35 @@ def bind_token(plan_text: str, human_token: str) -> str:
     if human_token != expected:
         raise PermissionError("confirmation token does not match plan_hash")
     return human_token
+
+
+# ----------------------------------------------------------------------
+# Phase 3.4.3 — AutonomyPolicy integration
+# ----------------------------------------------------------------------
+try:
+    from autonomy_policy import LEVEL_0, LEVEL_1, LEVEL_2, LEVEL_3
+
+    def evaluate_autonomy(
+        operation: str,
+        risk_level: str,
+        is_destructive: bool,
+        is_cross_system: bool,
+        level: int = 0,
+    ) -> str:
+        """Evaluate which action to take for an operation given autonomy level.
+        Returns action string: 'auto_confirm' | 'critic_review' | 'human_token' | 'human_approval'"""
+        policies = {0: LEVEL_0, 1: LEVEL_1, 2: LEVEL_2, 3: LEVEL_3}
+        policy = policies.get(level, LEVEL_0)
+        return policy.evaluate(operation, risk_level, is_destructive, is_cross_system).action_taken
+
+except ImportError:
+    # autonomy_policy.py not yet available — provide a safe stub
+    def evaluate_autonomy(
+        operation: str,
+        risk_level: str,
+        is_destructive: bool,
+        is_cross_system: bool,
+        level: int = 0,
+    ) -> str:
+        """Fallback when AutonomyPolicy is not yet available."""
+        return "human_token"
