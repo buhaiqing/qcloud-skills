@@ -343,5 +343,132 @@ def main() -> int:
     return args.func(args)
 
 
+def get_high_frequency_patterns(
+    min_occurrences: int = 5,
+    days: int = 30,
+    failure_patterns_path: str = "docs/failure-patterns.md",
+    traces_dir: str = ".runtime/traces",
+) -> list[dict]:
+    """Return patterns meeting frequency threshold.
+
+    Returns list of dicts:
+    [
+        {
+            "skill": "qcloud-cvm-ops",
+            "error_code": "InvalidInstanceId",
+            "count": 7,
+            "first_seen": "2026-08-01",
+            "last_seen": "2026-08-20",
+            "fix_type": "L1",
+            "recovery_hint": "Check instance state before operation"
+        },
+        ...
+    ]
+
+    Logic:
+    1. Parse failure-patterns.md for (skill, error_code) pairs with occurrence counts
+    2. Filter by count >= min_occurrences
+    3. Optionally enrich with trace data (read .runtime/traces/*.jsonl)
+    4. Return sorted by count descending
+    """
+    from datetime import datetime, timedelta
+
+    fp_path = ROOT / failure_patterns_path
+    if not fp_path.exists():
+        return []
+
+    patterns = parse_existing(fp_path)
+
+    cutoff = datetime.now() - timedelta(days=days)
+    results: list[dict] = []
+
+    for key, p in patterns.items():
+        count = p.get("count", 0)
+        if count < min_occurrences:
+            continue
+
+        first_seen = p.get("first_seen", "")
+        last_seen = p.get("last_seen", "")
+
+        # Filter by days window if dates are available
+        if last_seen:
+            try:
+                seen_dt: datetime
+                if len(last_seen) >= 10:
+                    seen_dt = datetime.strptime(last_seen[:10], "%Y-%m-%d")
+                else:
+                    seen_dt = datetime.strptime(last_seen, "%Y-%m")
+                if seen_dt < cutoff:
+                    continue
+            except ValueError:
+                pass
+
+        # Determine fix_type from category or severity
+        category = p.get("category", "")
+        severity = p.get("severity", "minor")
+        if severity == "critical" or "credential" in (p.get("error") or "").lower():
+            fix_type = "L3"
+        elif severity == "major" or category == "skill_generation":
+            fix_type = "L2"
+        else:
+            fix_type = "L1"
+
+        results.append({
+            "skill": p.get("skill", key[0] if len(key) > 0 else ""),
+            "error_code": key[2] if len(key) > 2 else p.get("error", ""),
+            "count": count,
+            "first_seen": first_seen,
+            "last_seen": last_seen,
+            "fix_type": fix_type,
+            "recovery_hint": p.get("fix", ""),
+        })
+
+    # Sort by count descending
+    results.sort(key=lambda x: -x["count"])
+
+    # Optional: enrich with trace data
+    td = ROOT / traces_dir
+    if td.exists() and td.is_dir():
+        _enrich_from_traces(results, td)
+
+    return results
+
+
+def _enrich_from_traces(results: list[dict], traces_dir: Path) -> None:
+    """Optionally enrich results with trace data from .runtime/traces/*.jsonl."""
+    import json
+
+    skill_error_counts: dict[tuple[str, str], int] = {}
+
+    for trace_file in traces_dir.glob("*/spans.jsonl"):
+        try:
+            for line in trace_file.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    span = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                failure = span.get("failure_pattern")
+                if not failure:
+                    continue
+                skill = failure.get("skill", "")
+                error = failure.get("error", "")
+                if skill and error:
+                    key = (skill, error)
+                    skill_error_counts[key] = skill_error_counts.get(key, 0) + 1
+        except (OSError, json.JSONDecodeError):
+            continue
+
+    if not skill_error_counts:
+        return
+
+    for r in results:
+        key = (r["skill"], r["error_code"])
+        if key in skill_error_counts:
+            r["trace_hits"] = skill_error_counts[key]
+
+
 if __name__ == "__main__":
     sys.exit(main())
