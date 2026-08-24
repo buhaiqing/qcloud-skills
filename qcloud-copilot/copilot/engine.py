@@ -79,6 +79,8 @@ class CopilotEngine:
         from copilot.models import EvolutionSignals
 
         policy = self._evolution_policy
+        # EVO-1: pass policy into SkillDispatcher so route_advice() can use it
+        self._skill_dispatcher._evolution_policy = policy
         default_dims = ["correctness", "safety", "idempotency", "traceability", "spec_compliance"]
 
         with ThreadPoolExecutor(max_workers=3) as pool:
@@ -316,7 +318,10 @@ class CopilotEngine:
             if context_updates:
                 sm.update_context(session_id, context_updates)
 
-        return self._deliver_report(exec_result.final_report)
+        report = self._deliver_report(exec_result.final_report)
+        if session_id:
+            self.record_feedback(session_id=session_id, adopted=True)
+        return report
 
     def run_plan(
         self,
@@ -338,12 +343,14 @@ class CopilotEngine:
         skill = (plan.intent.targets or ["qcloud-copilot"])[0]
         evo_signals = self._query_evolution(skill, plan.intent)
         self._apply_evo_signals(evo_signals)
-        return self._deliver_report(
+        report = self._deliver_report(
             self._run_execution(
                 plan, audience=audience, l3_reviewed=l3_reviewed, l2_confirmed=l2_confirmed,
                 evo_signals=evo_signals,
             ).final_report
         )
+        self.record_feedback(session_id=session_id, adopted=l3_reviewed)
+        return report
 
     def _dry_run_plan(self, plan: ExecutionPlan, session_id: str) -> dict:
         order = [step.id for step in plan.steps]

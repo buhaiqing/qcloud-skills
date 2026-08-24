@@ -1,9 +1,8 @@
-"""Tests for the EVO-1 self-evolution Generator (memory / decision / guard / hooks)."""
-
 from __future__ import annotations
 
 import subprocess
 from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock
 
 from copilot.evolution import EvolutionPolicy, EvolutionStore
 from copilot.evolution.guard import DriftGuard
@@ -314,10 +313,8 @@ def test_dispatcher_without_policy_has_no_warning():
 
 # --------------------------------------------------------------------------- #
 # Phase 4 — Feedback signal (engine)
-# --------------------------------------------------------------------------- #
-
-
 def test_engine_record_feedback_emits_adopt(tmp_path, monkeypatch):
+    """E4a: record_feedback(adopted=True) emits copilot_user_adopt metric."""
     import copilot.engine as engine_mod
     from copilot.observ import ObservableSink as RealSink
 
@@ -331,3 +328,107 @@ def test_engine_record_feedback_emits_adopt(tmp_path, monkeypatch):
     text = metrics.read_text()
     assert "copilot_user_adopt" in text
     assert "sess-1" in text
+
+
+
+
+def test_record_feedback_emits_override(tmp_path, monkeypatch):
+    """E4b: record_feedback(overridden=True) emits copilot_report_override metric."""
+    import copilot.engine as engine_mod
+    from copilot.observ import ObservableSink as RealSink
+
+    metrics = tmp_path / ".runtime" / "metrics" / "metrics.jsonl"
+    sink = RealSink(runtime_root=tmp_path / ".runtime")
+    monkeypatch.setattr(engine_mod, "ObservableSink", lambda: sink)
+
+    engine = engine_mod.CopilotEngine()
+    engine.record_feedback("sess-2", adopted=False, overridden=True)
+    assert metrics.exists()
+    text = metrics.read_text()
+    assert "copilot_report_override" in text
+    assert "sess-2" in text
+
+
+def test_route_hint_called_in_skill_dispatcher(tmp_path, monkeypatch):
+    """Verify route_hint is called with the right skill when SkillDispatcher.execute runs."""
+    from copilot.integration.skills import SkillDispatcher
+    from copilot.models import PlanStep
+
+    mock_policy = MagicMock()
+    mock_policy.route_hint.return_value = "WARN: risky skill"
+
+    disp = SkillDispatcher(evolution_policy=mock_policy)
+    step = PlanStep(
+        id="s1",
+        type="skill_call",
+        skill="qcloud-cvm-ops",
+        params={"operation": "describe"},
+    )
+    # intercept the subprocess call so execute() doesn't actually run tccli
+    class _FakeProc:
+        stdout = '{"Response": {"InstanceSet": []}}'
+        stderr = ""
+        returncode = 0
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: _FakeProc())
+    result = disp.execute(step, {})
+    assert result.status == "success"
+    mock_policy.route_hint.assert_called_once_with("qcloud-cvm-ops")
+
+
+def test_op_allowlist_merged_in_check_h(tmp_path, monkeypatch):
+    """Verify check_h(use_evolution=True) merges allowlist from policy."""
+    import copilot.quality.hallucination as h
+    from copilot.models import PlanStep
+
+    sp = tmp_path / "success-patterns.md"
+    _write_success(sp)
+    pol = EvolutionPolicy(EvolutionStore(success_path=sp), None)
+    monkeypatch.setattr(h, "_get_evolution_policy", lambda: pol)
+
+    # "describe-special-thing" is in success-patterns.md allowlist → passes
+    ok = PlanStep(
+        id="s1",
+        type="skill_call",
+        skill="qcloud-cvm-ops",
+        params={"operation": "describe-special-thing"},
+    )
+    assert h.check_h(ok, use_evolution=True)["passed"] is True
+
+    # "nuke-everything" is NOT in allowlist → flagged
+    bad = PlanStep(
+        id="s2",
+        type="skill_call",
+        skill="qcloud-cvm-ops",
+        params={"operation": "nuke-everything"},
+    )
+    assert h.check_h(bad, use_evolution=True)["passed"] is False
+
+def test_engine_query_evolution_wires_policy(tmp_path, monkeypatch):
+    """Verify _query_evolution() wires EvolutionPolicy into SkillDispatcher."""
+    import copilot.engine as engine_mod
+    from copilot.observ import ObservableSink as RealSink
+
+    # Provide a real store so EvolutionPolicy initialises cleanly
+    fp = tmp_path / "failure-patterns.md"
+    sp = tmp_path / "success-patterns.md"
+    _write_failure(fp, [])
+    _write_success(sp)
+
+    sink = RealSink(runtime_root=tmp_path / ".runtime")
+    monkeypatch.setattr(engine_mod, "ObservableSink", lambda: sink)
+
+    engine = engine_mod.CopilotEngine()
+    engine._init_evolution_policy()
+    assert engine._evolution_policy is not None
+
+    # Before _query_evolution: SkillDispatcher has no policy yet
+    assert engine._skill_dispatcher._evolution_policy is None
+
+    # Fake an intent object for _query_evolution
+    fake_intent = MagicMock()
+    fake_intent.targets = ["qcloud-cvm-ops"]
+
+    engine._query_evolution("qcloud-cvm-ops", fake_intent)
+
+    # After _query_evolution: SkillDispatcher now has the policy wired
+    assert engine._skill_dispatcher._evolution_policy is engine._evolution_policy
