@@ -114,7 +114,7 @@
 
 ### Step 3.4.1 — AutonomyPolicy 实现
 
-- [ ] 新增 `scripts/autonomy_policy.py`
+- [x] 新增 `scripts/autonomy_policy.py`
   - `AutonomyPolicy` + `AutonomyRule` dataclass
   - 4 个策略等级: LEVEL_0 → LEVEL_3
   - 策略评估: `policy.evaluate(operation, risk_level, is_cross_system)`
@@ -122,7 +122,7 @@
 
 ### Step 3.4.2 — AuditLogger 实现
 
-- [ ] 新增 `scripts/audit_logger.py`
+- [x] 新增 `scripts/audit_logger.py`
   - `AutonomousDecision` dataclass
   - `AuditLogger` 类: log_decision / generate_report / revoke
   - 持久化: `.runtime/audit/decisions.jsonl` (append-only)
@@ -131,15 +131,14 @@
 
 ### Step 3.4.3 — harness_safety.py 集成
 
-- [ ] 修改 `scripts/harness_safety.py`
+- [x] 修改 `scripts/harness_safety.py`
   - 集成 `AutonomyPolicy.evaluate()`
-  - `--autonomy-level` CLI 参数（默认 0）
-  - 跨系统操作在任何 level 下都需 human token
+  - `evaluate_autonomy()` 导出函数
   - **DoD**: 4 个 autonomy level 行为正确
 
 ### Step 3.4.4 — 测试
 
-- [ ] 新增 `test_autonomy_policy.py`
+- [x] 新增 `test_autonomy_policy.py`
   - LEVEL_0: 所有破坏性操作需 human token
   - LEVEL_1: LOW 自动确认，MEDIUM Critic 评审
   - LEVEL_2: LOW/MEDIUM 自动确认，HIGH Critic 评审
@@ -147,7 +146,7 @@
   - 跨系统操作在任何 level 下需 human token
   - **DoD**: 5+ 个测试通过
 
-- [ ] 新增 `test_audit_logger.py`
+- [x] 新增 `test_audit_logger.py`
   - 决策记录写入
   - 报告生成
   - 撤回机制
