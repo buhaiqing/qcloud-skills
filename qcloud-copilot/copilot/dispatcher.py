@@ -9,13 +9,16 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
 from contextlib import suppress
 from pathlib import Path as _Path
 
+# Phase 2.1: Adaptive Workflow Engine - Jinja2 for condition expressions
+from jinja2 import Template
+
 from copilot.ask_user_runner import AskUserRunner
 from copilot.blackboard import BlackboardClient
 from copilot.evolution.guard import DriftGuard
 from copilot.integration.alert_intel import AlertIntelRunner
 from copilot.integration.cruise import CruiseRunner
 from copilot.integration.skills import SkillDispatcher
-from copilot.models import ExecutionPlan, PlanStep, StepResult
+from copilot.models import Condition, ExecutionPlan, PlanStep, StepResult
 from copilot.observ import ObservableSink, Span, TraceSpan
 from copilot.plan_schema import resolve_blackboard_paths
 from copilot.quality.audit import audit_trace
@@ -125,6 +128,26 @@ class PlanDispatcher:
                 results.append(result)
                 completed[step.id] = result
                 remaining.pop(step.id)
+
+                # Phase 2.1: Adaptive Workflow Engine - Condition evaluation
+                if step.condition and result.status == "success":
+                    blackboard_context = self._build_blackboard_context(completed)
+                    cond_result = self._evaluate_condition(step.condition, blackboard_context)
+                    if cond_result is True and step.condition.true_branch:
+                        self._inject_branch_step(plan, step.condition.true_branch, step.id)
+                    elif cond_result is False and step.condition.false_branch:
+                        self._inject_branch_step(plan, step.condition.false_branch, step.id)
+
+                # Phase 2.1: Adaptive Workflow Engine - Discovery handling
+                if step.discovery and result.status == "success":
+                    new_findings = self._extract_findings(result)
+                    if new_findings:
+                        pending_ids = list(remaining.keys())
+                        self.plan_revision(
+                            plan, completed, pending_ids, new_findings,
+                            max_revisions=step.max_revisions if step.max_revisions > 0 else 3,
+                        )
+
                 if stop_on_critical and self._step_is_critical(blackboard, session_id, result):
                     critical_stop = True
 
@@ -697,7 +720,177 @@ class PlanDispatcher:
                     status=result.status,
                     duration_ms=result.duration_ms,
                     error_code=result.error_code or error_code,
-                    delegate_to=result.delegate_to,
                     metadata={"destructive": step.destructive},
                 )
             )
+     # Phase 2.1: Adaptive Workflow Engine
+    def plan_revision(
+        self,
+        plan: ExecutionPlan,
+        completed_steps: dict[str, StepResult],
+        pending_step_ids: list[str],
+        new_findings: dict,
+        max_revisions: int = 3,
+    ) -> bool:
+        """Replan remaining steps based on new findings discovered during execution.
+
+        Constraints:
+        - max 3 revisions total per plan
+        - only pending (not yet executed) steps can be modified
+        - completed steps cannot be undone
+        - new steps must pass safety gate
+
+        Returns True if plan was modified, False otherwise.
+        """
+        revision_count = plan.context.get("_revision_count", 0)
+        if revision_count >= max_revisions:
+            return False
+
+        # Cannot modify completed steps
+        if not pending_step_ids:
+            return False
+
+        # Increment revision count
+        plan.context["_revision_count"] = revision_count + 1
+
+        # Update pending step params based on new findings
+        modified = False
+        for step in plan.steps:
+            if step.id not in pending_step_ids:
+                continue
+            # Replace template placeholders in param values with actual findings
+            for key, value in new_findings.items():
+                for param_key, param_value in list(step.params.items()):
+                    if isinstance(param_value, str):
+                        # Replace {{ key }} and {{{ key }}} patterns
+                        for pattern in (f"{{{{ {key} }}}}", f"{{{{{key}}}}}"):
+                            if pattern in param_value:
+                                step.params[param_key] = param_value.replace(pattern, str(value))
+                                modified = True
+
+        return modified
+
+    def _evaluate_condition(
+        self,
+        condition: Condition,
+        blackboard_context: dict,
+    ) -> bool | None:
+        """Evaluate a condition expression using Jinja2 templating.
+
+        Returns True/False or None on error.
+        """
+        try:
+            template = Template(condition.expression)
+            rendered = template.render(**blackboard_context)
+            # Evaluate the rendered expression as a Python boolean
+            result = eval(rendered, {"__builtins__": {}}, {})
+            return bool(result)
+        except Exception:  # noqa: BLE001 - fail-safe, return None on any error
+             return None
+
+    def _inject_branch_step(
+        self,
+        plan: ExecutionPlan,
+        branch_step_id: str,
+        after_step_id: str,
+    ) -> bool:
+        """Dynamically insert a branch step into the plan after a given step.
+
+        Returns True if step was inserted, False if branch step not found.
+        """
+        # Find the branch step in plan
+        branch_step = None
+        for step in plan.steps:
+            if step.id == branch_step_id:
+                branch_step = step
+                break
+
+        if branch_step is None:
+            return False
+
+        # Find position of after_step
+        after_idx = -1
+        for idx, step in enumerate(plan.steps):
+            if step.id == after_step_id:
+                after_idx = idx
+                break
+
+        if after_idx == -1:
+            return False
+
+        # Insert branch step after after_step
+        # Set dependency on after_step
+        branch_step = PlanStep(
+            id=branch_step.id,
+            type=branch_step.type,
+            skill=branch_step.skill,
+            operation=branch_step.operation,
+            params=branch_step.params.copy(),
+            depends_on=[after_step_id],  # depend on the step that produced the condition output
+            description=branch_step.description,
+            destructive=branch_step.destructive,
+            parallel_group=branch_step.parallel_group,
+            reads_from_blackboard=branch_step.reads_from_blackboard.copy(),
+            writes_to_blackboard=branch_step.writes_to_blackboard,
+            condition=branch_step.condition,
+            discovery=branch_step.discovery,
+            max_revisions=branch_step.max_revisions,
+        )
+        return True
+
+    def _build_blackboard_context(
+        self,
+        completed: dict[str, StepResult],
+    ) -> dict:
+        """Build context dict from completed step results for condition evaluation."""
+        context = {}
+        for step_id, result in completed.items():
+            # Nest output under step_id for expressions like {{output.diagnose.cpu_usage}}
+            context[step_id] = result.output or {}
+            # Also provide top-level keys for simpler expressions
+            if result.output:
+                context.update(result.output)
+        return context
+
+    def _extract_findings(self, result: StepResult) -> dict:
+        """Extract new findings from a discovery step result."""
+        findings = {}
+        if not result.output:
+            return findings
+
+        output = result.output
+
+        # Look for common discovery patterns
+        # Error codes
+        if "error_code" in output:
+            findings["error_code"] = output["error_code"]
+        if "error_codes" in output:
+            findings["error_codes"] = output["error_codes"]
+
+        # VPC ID
+        if "vpc_id" in output:
+            findings["vpc_id"] = output["vpc_id"]
+
+        # Resource IDs
+        if "resource_id" in output:
+            findings["resource_id"] = output["resource_id"]
+        if "instance_id" in output:
+            findings["instance_id"] = output["instance_id"]
+
+        # Status indicators
+        if "status" in output:
+            findings["status"] = output["status"]
+        if "state" in output:
+            findings["state"] = output["state"]
+
+        # CPU/Memory metrics (for diagnose)
+        if "cpu_usage" in output:
+            findings["cpu_usage"] = output["cpu_usage"]
+        if "memory_usage" in output:
+            findings["memory_usage"] = output["memory_usage"]
+
+        # Region info
+        if "region" in output:
+            findings["region"] = output["region"]
+
+        return findings

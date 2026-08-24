@@ -45,6 +45,14 @@ class AskOption:
 
 
 @dataclass
+class Condition:
+    """Branching condition for adaptive plan execution."""
+    expression: str  # Jinja2 template: "{{output.diagnose.cpu_usage}} > 80"
+    true_branch: str  # step id to execute if true
+    false_branch: str | None = None  # step id to execute if false (optional)
+
+
+@dataclass
 class PlanStep:
     id: str
     type: str  # skill_call | cruise_run | alert_analyze | synthesize_report | report | ask_user
@@ -66,6 +74,53 @@ class PlanStep:
     # via `is _ASK_DEFAULT_UNSET` to decide whether to consult the env.
     # Explicit values: "first" (auto-select first option), None (fail-fast).
     ask_default_on_timeout: str | None = _ASK_DEFAULT_UNSET  # type: ignore[assignment]
+    # Phase 2.1: Adaptive Workflow Engine
+    condition: Condition | None = None  # branching condition
+    discovery: bool = False  # True = this step may discover new info
+    max_revisions: int = 0  # max plan revisions allowed (default 0 = disabled)
+
+
+# Phase 2.2: Intent-Driven Goal Inference
+
+
+
+@dataclass
+class SkillChain:
+    """One candidate skill chain for GoalInference."""
+
+    skills: list[str]  # ["qcloud-cvm-ops", "qcloud-monitor-ops"]
+    description: str  # "快速诊断 (CVM + Monitor)"
+    estimated_duration: str  # "约 2 分钟"
+    risk: str  # "low" | "medium" | "high"
+    reads_only: bool  # True = only read operations
+
+
+@dataclass
+class InferredGoal:
+    """Result of GoalInference.infer()."""
+
+    goal: str  # "diagnose_performance"
+    description: str  # "诊断 CVM ins-xxx 的性能问题"
+    confidence: float  # 0.0-1.0
+    candidate_chains: list[SkillChain]  # 2+ candidate skill chains
+    clarifying_questions: list[str]  # asked when confidence < 0.7
+
+
+# Phase 2.3: Cross-Skill Autonomous Orchestration
+
+
+@dataclass
+class OrchestrationPattern:
+    """One pre-defined cross-skill orchestration pattern."""
+
+    name: str  # "F1" | "F2" | "P1" | "A1" | "A2"
+    description: str
+    trigger_conditions: list[Condition]  # all must be true to match
+    skill_chain: list[str]  # ordered list of skills to invoke
+    handoff_schema: str  # path to JSON Schema for context handoff
+    fallback_pattern: str | None = None  # pattern name to fall back on failure
+
+
 
 
 DEFAULT_DISPATCH_CONFIG: dict[str, Any] = {
