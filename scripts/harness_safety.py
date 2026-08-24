@@ -101,3 +101,73 @@ except ImportError:
     ) -> str:
         """Fallback when AutonomyPolicy is not yet available."""
         return "human_token"
+
+
+# ----------------------------------------------------------------------
+# Phase 2.4 — Predictive Safety Gate: ImpactAnalyzer integration
+# ----------------------------------------------------------------------
+try:
+    from copilot.impact_analyzer import ImpactAnalyzer
+    _IMPACT_ANALYZER = ImpactAnalyzer()
+except ImportError:
+    _IMPACT_ANALYZER = None
+
+
+def evaluate_impact(
+    operation: str,
+    resource_ids: list[str],
+    autonomy_level: int = 0,
+) -> dict:
+    """Assess blast radius and return risk metadata for a destructive operation.
+
+    Returns a dict with keys:
+        risk_level      — "low" | "medium" | "high" | "critical"
+        affected_resources — list of dicts with resource_type, resource_id,
+                            relationship, impact
+        blast_radius     — int count of affected resources
+        recommendation   — Chinese-language action suggestion
+        action_taken     — "auto_confirm" | "critic_review" | "human_token"
+    """
+    if _IMPACT_ANALYZER is None or not resource_ids:
+        return {
+            "risk_level": "low",
+            "affected_resources": [],
+            "blast_radius": 0,
+            "recommendation": "ImpactAnalyzer unavailable or no resources — defaulting to human_token.",
+            "action_taken": "human_token",
+        }
+
+    assessment = _IMPACT_ANALYZER.assess(operation, resource_ids)
+    risk_str = assessment.risk_level.value
+
+    # Map RiskLevel → confirmation action based on autonomy level
+    action = _risk_to_action(risk_str, autonomy_level)
+
+    return {
+        "risk_level": risk_str,
+        "affected_resources": [
+            {
+                "resource_type": r.resource_type,
+                "resource_id": r.resource_id,
+                "relationship": r.relationship,
+                "impact": r.impact,
+            }
+            for r in assessment.affected_resources
+        ],
+        "blast_radius": assessment.blast_radius,
+        "recommendation": assessment.recommendation,
+        "action_taken": action,
+    }
+
+
+def _risk_to_action(risk_level: str, autonomy_level: int) -> str:
+    """Convert risk_level string + autonomy level to confirmation action."""
+    if risk_level == "critical":
+        return "human_token"
+    if risk_level == "high":
+        return "human_token"
+    if autonomy_level >= 3 and risk_level == "medium":
+        return "auto_confirm"
+    if risk_level == "medium":
+        return "critic_review"
+    return "auto_confirm"
