@@ -342,6 +342,46 @@ def generate(
     return builder(intent, ctx)
 
 
+def replan(pending_steps: list[PlanStep], context: dict) -> list[PlanStep]:
+    """Re-plan pending steps based on new context/findings.
+
+    Simple implementation: for each pending step, update params based on context.
+    For example, if context has {'vpc_id': 'vpc-xxx'}, update steps that need VPC ID.
+    """
+    updated_steps = []
+    for step in pending_steps:
+        updated_params = dict(step.params)
+        # Update params based on context findings
+        for key, value in context.items():
+            # Check if the param string references this key as a template variable
+            for param_key, param_value in updated_params.items():
+                if isinstance(param_value, str):
+                    # Replace {{key}} or {{{key}}} patterns with context value
+                    if f"{{{{ {key} }}}}" in param_value:
+                        updated_params[param_key] = param_value.replace(f"{{{{ {key} }}}}", str(value))
+                    elif f"{{{{{key}}}}}" in param_value:
+                        updated_params[param_key] = param_value.replace(f"{{{{{key}}}}}", str(value))
+
+        # Create updated step with new params
+        updated_step = PlanStep(
+            id=step.id,
+            type=step.type,
+            skill=step.skill,
+            operation=step.operation,
+            params=updated_params,
+            depends_on=step.depends_on.copy(),
+            description=step.description,
+            destructive=step.destructive,
+            parallel_group=step.parallel_group,
+            reads_from_blackboard=step.reads_from_blackboard.copy(),
+            writes_to_blackboard=step.writes_to_blackboard,
+            condition=step.condition,
+            discovery=step.discovery,
+            max_revisions=step.max_revisions,
+        )
+        updated_steps.append(updated_step)
+    return updated_steps
+
 def _populate_region_candidates(
     intent: ClassifiedIntent,
     ctx: dict,
