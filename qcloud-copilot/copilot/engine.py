@@ -5,16 +5,19 @@ from contextlib import suppress
 
 from copilot.classifier import classify
 from copilot.dispatcher import PlanDispatcher
+from copilot.goal_inference import GoalInference
 from copilot.integration.cruise import CruiseRunner
 from copilot.integration.skills import SkillDispatcher
 from copilot.mode_resolver import resolve_inspection_mode, strip_ci_trigger_words
 from copilot.models import (
     ExecutionPlan,
     ExecutionResult,
+    InferredGoal,
     Report,
     StepResult,
 )
 from copilot.observ import Metric, MetricKind, ObservableSink
+from copilot.orchestration import OrchestrationSelector
 from copilot.parser import parse
 from copilot.plan_gen import generate as gen_plan
 from copilot.plan_schema import load_plan_file
@@ -38,9 +41,9 @@ class CopilotEngine:
             skill_dispatcher=self._skill_dispatcher,
             cruise_runner=self._cruise_runner,
         )
+        self._goal_inference = GoalInference(skill_registry=self._skill_dispatcher)
+        self._orchestration_selector = OrchestrationSelector()
         # EVO-1: lazy-init EvolutionPolicy so it does not force a
-        # docs/ dependency when the copilot is imported as a library.
-        self._evolution_policy = None  # type: ignore[assignment]
 
     def _init_evolution_policy(self) -> None:
         """Lazily bootstrap EvolutionPolicy (EVO-1 Generator component)."""
@@ -179,6 +182,19 @@ class CopilotEngine:
         parsed = parse(parse_query)
         intent = classify(parsed)
 
+        # Phase 2.2: Intent-Driven Goal Inference — enhance low-confidence results
+        _inferred_goal: InferredGoal | None = None  # stored for _present_goal_options() in Phase 2.3
+        if intent.confidence < 0.6 and self._goal_inference is not None:
+            inferred = self._goal_inference.infer(
+                query,
+                context={
+                    "parsed_entities": parsed.entities,
+                    "prior_context": prior_context,
+                },
+            )
+            if inferred.confidence > intent.confidence:
+                _inferred_goal = inferred
+
         l0_result = check_l0(parsed, intent)
         if not l0_result["passed"]:
             with suppress(Exception):
@@ -202,9 +218,11 @@ class CopilotEngine:
                     intent,
                     duration_ms=0,
                     audience=audience,
-                )
+                ),
             )
-
+        # Phase 2.3: Cross-Skill Autonomous Orchestration — selector goes here
+        # selected_pattern = self._orchestration_selector.select(...)
+        # self._selected_pattern = selected_pattern
         plan = gen_plan(
             intent,
             context={
@@ -216,7 +234,6 @@ class CopilotEngine:
                 **{k: (v[0] if len(v) == 1 else v) for k, v in parsed.entities.items() if v},
             },
         )
-
         self._plan_context = plan.context
 
         l1_result = check_l1(plan)

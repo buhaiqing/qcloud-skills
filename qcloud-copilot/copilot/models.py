@@ -48,8 +48,8 @@ class AskOption:
 class Condition:
     """Branching condition for adaptive plan execution."""
     expression: str  # Jinja2 template: "{{output.diagnose.cpu_usage}} > 80"
-    true_branch: str  # step id to execute if true
-    false_branch: str | None = None  # step id to execute if false (optional)
+    true_branch: str = ""  # step id if true; empty = always-true in orchestration patterns
+    false_branch: str | None = None  # step id if false (optional)
 
 
 @dataclass
@@ -103,8 +103,8 @@ class InferredGoal:
     description: str  # "诊断 CVM ins-xxx 的性能问题"
     confidence: float  # 0.0-1.0
     candidate_chains: list[SkillChain]  # 2+ candidate skill chains
+    risk_level: str  # "low" | "medium" | "high"
     clarifying_questions: list[str]  # asked when confidence < 0.7
-
 
 # Phase 2.3: Cross-Skill Autonomous Orchestration
 
