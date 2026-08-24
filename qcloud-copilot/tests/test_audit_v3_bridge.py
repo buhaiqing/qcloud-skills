@@ -20,27 +20,24 @@ from pathlib import Path
 
 
 def test_audit_trace_v3_writes_both_audit_and_observation(tmp_path: Path):
-    from unittest.mock import patch
-
     from copilot.observ import ObservableSink
     from copilot.quality.audit import audit_trace_v3
 
     sink = ObservableSink(runtime_root=tmp_path)
-    with patch("copilot.quality.audit.Path.cwd", return_value=tmp_path):
-        audit_trace_v3(
-            sink=sink,
-            session_id="ses-bridge-001",
-            trace_id="trc-bridge-001",
-            step_id="step.l2",
-            trace_data={"status": "pass", "duration_ms": 5, "skill": "qcloud-cvm-ops"},
-            skill="qcloud-cvm-ops",
-            observation_name="skill_call:qcloud-cvm-ops",
-        )
+    audit_trace_v3(
+        sink=sink,
+        session_id="ses-bridge-001",
+        trace_id="trc-bridge-001",
+        step_id="step.l2",
+        trace_data={"status": "pass", "duration_ms": 5, "skill": "qcloud-cvm-ops"},
+        skill="qcloud-cvm-ops",
+        observation_name="skill_call:qcloud-cvm-ops",
+        runtime_root=tmp_path,
+    )
 
     # Legacy audit file path
     legacy_dir = tmp_path / ".runtime" / "gcl" / "copilot" / "audit" / "trc-bridge-001"
-    legacy_files = sorted(legacy_dir.glob("step-*.json"))
-    assert legacy_files, "legacy audit not written"
+    assert (legacy_dir / "_index.jsonl").is_file(), "legacy audit not written"
 
     # v3 observation/usage paths
     obs_dir = tmp_path / "audit" / "trc-bridge-001"
@@ -119,14 +116,19 @@ def test_audit_trace_v3_legacy_callers_unaffected(tmp_path: Path):
 
     from copilot.quality.audit import audit_trace
 
-    with patch("copilot.quality.audit.Path.cwd", return_value=tmp_path):
-        audit_trace(
-            session_id="ses-legacy",
-            step_id="s1",
-            trace_data={"status": "pass", "duration_ms": 5},
-        )
     legacy_dir = tmp_path / ".runtime" / "gcl" / "copilot" / "audit" / "ses-legacy"
-    assert any(legacy_dir.glob("step-*.json"))
+    audit_trace(
+        session_id="ses-legacy",
+        step_id="s1",
+        trace_data={"status": "pass", "duration_ms": 5},
+        runtime_root=tmp_path,
+    )
+    assert (legacy_dir / "_index.jsonl").is_file()
+    # Idempotent: calling twice appends two lines, does not overwrite.
+    audit_trace(session_id="ses-legacy", step_id="s2", trace_data={"status": "pass", "duration_ms": 3}, runtime_root=tmp_path)
+    lines = [json.loads(l) for l in (legacy_dir / "_index.jsonl").read_text().splitlines() if l]
+    assert len(lines) == 2, "idempotent: second call appended, not overwrote"
+    assert [l["step_id"] for l in lines] == ["s1", "s2"]
     # No v3 audit dir at .runtime root because no sink touched
     v3_dir = tmp_path / "audit" / "ses-legacy"
     assert not v3_dir.exists()

@@ -43,7 +43,7 @@ def test_dispatcher_serial_order(board_dir):
     order: list[str] = []
 
     class TrackingDispatcher(PlanDispatcher):
-        def _execute_step(self, step, plan, blackboard, session_id, *, l2_confirmed=False):
+        def _execute_step(self, step, plan, blackboard, session_id, *, l2_confirmed=False, evolution_context=None):
             order.append(step.id)
             if step.type == "skill_call":
                 return skill.execute(step, plan.context)

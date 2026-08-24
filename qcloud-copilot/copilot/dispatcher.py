@@ -72,6 +72,7 @@ class PlanDispatcher:
         *,
         parallel: bool | None = None,
         l2_confirmed: bool = False,
+        evolution_context: dict | None = None,
     ) -> list[StepResult]:
         if plan.plan_id:
             blackboard.write_plan_snapshot(session_id, plan)
@@ -115,6 +116,7 @@ class PlanDispatcher:
                 completed,
                 parallel=use_parallel,
                 l2_confirmed=l2_confirmed,
+                evolution_context=evolution_context,
             )
             batch_outcomes.sort(key=lambda item: step_index[item[0].id])
 
@@ -137,7 +139,6 @@ class PlanDispatcher:
                     )
                     remaining.pop(pending.id)
                 break
-
         return results
 
     def _execute_batch(
@@ -150,6 +151,7 @@ class PlanDispatcher:
         *,
         parallel: bool,
         l2_confirmed: bool = False,
+        evolution_context: dict | None = None,
     ) -> list[tuple[PlanStep, StepResult]]:
         outcomes: list[tuple[PlanStep, StepResult]] = []
 
@@ -168,7 +170,8 @@ class PlanDispatcher:
                     ),
                 )
             return step, self._execute_step(
-                step, plan, blackboard, session_id, l2_confirmed=l2_confirmed
+                step, plan, blackboard, session_id, l2_confirmed=l2_confirmed,
+                evolution_context=evolution_context,
             )
 
         runnable = list(batch)
@@ -194,8 +197,6 @@ class PlanDispatcher:
         with suppress(Exception):
             contributions = blackboard.read_contributions(session_id)
             return any(c.get("verdict") == "CRITICAL" for c in contributions.values())
-        return False
-
     def _execute_step(
         self,
         step: PlanStep,
@@ -204,6 +205,7 @@ class PlanDispatcher:
         session_id: str,
         *,
         l2_confirmed: bool = False,
+        evolution_context: dict | None = None,
     ) -> StepResult:
         start = time.time()
         context = dict(plan.context)
@@ -250,7 +252,7 @@ class PlanDispatcher:
                 )
             else:
                 result = self._execute_with_timeout(
-                    lambda: self._skill_dispatcher.execute(step, context),
+                    lambda ec=evolution_context: self._skill_dispatcher.execute(step, context, ec),
                     step.id,
                 )
                 # Phase 1.3: classify failure via ErrorEscalator and act.
@@ -507,11 +509,11 @@ class PlanDispatcher:
                 return result
             original_skill = step.skill
             # Phase 1.4: emit a "delegated" span for the cross-skill hop.
-            # The DELEGATE marker span carries the parent_span_id so the
-            # downstream VPC/CAM/etc. spans become children of the original
-            # CVM step span. _current_parent_span_id is reset after.
+            # DELEGATE marker spans have no parent (they are top-level markers
+            # tracking the delegation event itself; the delegated skill's span
+            # carries the original step's span_id as its parent).
             trace_id = getattr(self, "_trace_id", None) or ""
-            parent_span_id = getattr(self, "_current_parent_span_id", None)
+            parent_span_id = None
             with suppress(Exception):
                 ObservableSink().emit_trace_span(
                     TraceSpan(
@@ -687,8 +689,7 @@ class PlanDispatcher:
             ObservableSink().emit_trace_span(
                 TraceSpan(
                     span_id=f"{session_id}:{step.id}",
-                    trace_id=getattr(self, "_trace_id", None) or session_id,
-                    parent_span_id=getattr(self, "_current_parent_span_id", None),
+                    parent_span_id=None,
                     run_id=session_id,
                     skill=step.skill or "qcloud-copilot",
                     operation=step.operation or step.type,

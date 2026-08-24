@@ -195,7 +195,7 @@ class SkillDispatcher:
             return self._registry.resolve_param(skill, operation)
         return None
 
-    def execute(self, step: PlanStep, context: dict) -> StepResult:
+    def execute(self, step: PlanStep, context: dict, evolution_context: dict | None = None) -> StepResult:
         skill = step.skill or ""
         if not self.validate_skill(skill):
             return StepResult(
@@ -287,15 +287,25 @@ class SkillDispatcher:
             )
 
         response = parsed.get("Response", parsed)
+        # EVO-1: register calibrated thresholds (read by gcl_runner)
+        advice = self.route_advice(skill)  # default: from policy
+        if evolution_context:
+            thresholds = evolution_context.get("evolution_thresholds")
+            if thresholds:
+                from copilot.evolution import set_calibration_for_skill
+                set_calibration_for_skill(skill, thresholds)
+            if evolution_context.get("evolution_warning"):
+                advice = evolution_context["evolution_warning"]
         output = {
             "command_invoked": cmd,
             "skill": skill,
             "operation": operation,
             "data": response,
         }
-        advice = self.route_advice(skill)
         if advice:
             output["evolution_warning"] = advice
+        if evolution_context and evolution_context.get("evolution_source"):
+            output["evolution_source"] = evolution_context["evolution_source"]
         return StepResult(
             step_id=step.id,
             status="success",

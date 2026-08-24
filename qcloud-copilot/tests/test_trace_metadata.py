@@ -81,7 +81,7 @@ def test_audit_trace_persists_skill_and_runtime(tmp_path: Path):
     )
     runtime = RuntimeInfo(python_version="3.12.1", git_commit="deadbeef")
     session_id = "ses-p14-001"
-
+    audit_dir = tmp_path / ".runtime" / "gcl" / "copilot" / "audit" / session_id
     with patch("copilot.quality.audit.Path.cwd", return_value=tmp_path):
         audit_trace(
             session_id=session_id,
@@ -90,11 +90,13 @@ def test_audit_trace_persists_skill_and_runtime(tmp_path: Path):
             skill="qcloud-test-ops",
             skill_info=skill,
             runtime_info=runtime,
+            runtime_root=tmp_path,
         )
-    audit_dir = tmp_path / ".runtime" / "gcl" / "copilot" / "audit" / session_id
-    files = sorted(audit_dir.glob("step-*.json"))
-    assert files, "audit file not written"
-    payload = json.loads(files[-1].read_text())
+    index_path = audit_dir / "_index.jsonl"
+    assert index_path.is_file(), "audit file not written"
+    lines = [json.loads(l) for l in index_path.read_text().splitlines() if l]
+    assert lines, "_index.jsonl empty"
+    payload = lines[-1]
     assert payload["skill"]["name"] == "qcloud-test-ops"
     assert payload["skill"]["version"] == "1.0.0"
     assert payload["skill"]["skill_file_sha256"] == "abc123"
@@ -107,15 +109,18 @@ def test_audit_trace_backward_compat_no_skill_runtime(tmp_path: Path):
     from copilot.quality.audit import audit_trace
 
     session_id = "ses-p14-002"
+    audit_dir = tmp_path / ".runtime" / "gcl" / "copilot" / "audit" / session_id
     with patch("copilot.quality.audit.Path.cwd", return_value=tmp_path):
         audit_trace(
             session_id=session_id,
             step_id="s1",
             trace_data={"status": "pass", "duration_ms": 7},
+            runtime_root=tmp_path,
         )
-    audit_dir = tmp_path / ".runtime" / "gcl" / "copilot" / "audit" / session_id
-    files = sorted(audit_dir.glob("step-*.json"))
-    assert files
-    payload = json.loads(files[-1].read_text())
+    index_path = audit_dir / "_index.jsonl"
+    assert index_path.is_file()
+    lines = [json.loads(l) for l in index_path.read_text().splitlines() if l]
+    assert lines
+    payload = lines[-1]
     assert "skill" not in payload
     assert "runtime" not in payload

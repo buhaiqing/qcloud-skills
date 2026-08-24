@@ -228,6 +228,59 @@ class GclScoresTests(unittest.TestCase):
         self.assertEqual(record["gcl_scores"]["correctness"], 1.0)
         self.assertEqual(record["gcl_scores"]["safety"], 1.0)
 
+    def test_gcl_scores_none_on_failure(self):
+        tmp = Path(tempfile.mkdtemp(prefix="gcl_failure_test_"))
+        sink = ObservableSink(runtime_root=tmp)
+        span = TraceSpan(
+            span_id="s1", trace_id="t1", parent_span_id=None,
+            run_id="r1", skill="qcloud-cvm-ops",
+            operation="RunInstances", step_id="step-1",
+            status="failure", error_code="InvalidVpc.NotFound",
+        )
+        sink.emit_trace_span(span)
+        spans_path = tmp / "traces" / "r1" / "spans.jsonl"
+        record = json.loads(spans_path.read_text(encoding="utf-8").strip())
+        self.assertIsNone(record.get("gcl_scores"))
+
+    def test_gcl_scores_none_on_halted(self):
+        tmp = Path(tempfile.mkdtemp(prefix="gcl_halted_test_"))
+        sink = ObservableSink(runtime_root=tmp)
+        span = TraceSpan(
+            span_id="s1", trace_id="t1", parent_span_id=None,
+            run_id="r1", skill="qcloud-cvm-ops",
+            operation="RunInstances", step_id="step-1",
+            status="halted",
+        )
+        sink.emit_trace_span(span)
+        spans_path = tmp / "traces" / "r1" / "spans.jsonl"
+        record = json.loads(spans_path.read_text(encoding="utf-8").strip())
+        self.assertIsNone(record.get("gcl_scores"))
+
+
+class EvidenceKernelSpanIdTests(unittest.TestCase):
+    """post_record() includes span_id when supplied."""
+
+    def test_post_record_includes_span_id(self):
+        sys.path.insert(0, str(SCRIPTS))
+        import tempfile as _tempfile
+
+        import evidence_kernel as ek
+        from evidence_kernel import post_record
+        # Override AUDIT to a temp dir so we don't pollute real audit-results.
+        old_audit = ek.AUDIT
+        try:
+            tmp_audit = Path(_tempfile.mkdtemp(prefix="evid_test_"))
+            ek.AUDIT = tmp_audit
+            ek.AUDIT.mkdir(exist_ok=True)
+            record = {"run_id": "test-spanid-run", "skill": "cvm",
+                      "status": "success"}
+            returned = post_record(record, span_id="run1:cvm")
+            self.assertTrue(returned.exists())
+            content = json.loads(returned.read_text(encoding="utf-8"))
+            self.assertEqual(content.get("span_id"), "run1:cvm")
+        finally:
+            ek.AUDIT = old_audit
+
 
 if __name__ == "__main__":
     unittest.main()

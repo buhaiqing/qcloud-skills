@@ -67,11 +67,18 @@ def post_record(record: dict, span_id: str | None = None) -> Path:
     recorded in the Evidence JSON so downstream queries can walk from a
     destructive-op audit back to the TraceSpan that caused it. Optional for
     backward compatibility with existing callers that don't pass it.
+
+    Multiple calls with the same ``run_id`` are appended to the same JSONL file
+    (one JSON object per line). This makes the record idempotent for retry
+    scenarios where the same run emits evidence multiple times.
     """
     if span_id is not None:
         record = {**record, "span_id": span_id}
-    out = AUDIT / f"evidence-{record['run_id']}.json"
-    out.write_text(json.dumps(mask_trace(record), indent=2, ensure_ascii=False))
+    # JSONL append: one line per emission, same run_id appends rather than overwrites.
+    out = AUDIT / f"evidence-{record['run_id']}.jsonl"
+    masked = mask_trace(record)
+    with out.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(masked, ensure_ascii=False) + "\n")
     return out
 
 

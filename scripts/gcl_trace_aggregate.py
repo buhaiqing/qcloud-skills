@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 """Aggregate GCL trace files into a quality summary (AGENTS.md GCL Phase 3).
 
-Reads ``audit-results/gcl-trace-*.json`` (or ``--input`` paths), emits
-``audit-results/gcl-quality-summary-YYYYMMDD-HHMMSS.json``.
-
-Output contract: ``qcloud-monitor-ops/assets/gcl-quality-summary.schema.json``.
-
 Usage:
   python3 scripts/gcl_trace_aggregate.py
   python3 scripts/gcl_trace_aggregate.py --input audit-results/gcl-trace-*.json
   python3 scripts/gcl_trace_aggregate.py --since-hours 24
+  python3 scripts/gcl_trace_aggregate.py --cross-skill --run-id <id> [--since ISO8601]
 """
 
 from __future__ import annotations
@@ -122,8 +118,23 @@ def persist_summary(root: Path, summary: dict[str, Any]) -> Path:
     return path
 
 
-def cross_skill_chain(root: Path, run_id: str) -> dict[str, Any]:
+def _span_start_time(span: dict[str, Any]) -> str | None:
+    """Return span start_time as ISO8601 string, or None if absent."""
+    v = span.get("start_time")
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return datetime.fromtimestamp(v, tz=UTC).isoformat()
+    return str(v)
+
+
+def cross_skill_chain(root: Path, run_id: str, since: str | None = None) -> dict[str, Any]:
     """Phase 1.4 — read spans.jsonl for a run, build parent-child chain.
+
+    Args:
+        root: Project root.
+        run_id: Run id to inspect.
+        since: ISO8601 timestamp; if set, filter out spans with start_time < since.
 
     Output:
 
@@ -132,8 +143,8 @@ def cross_skill_chain(root: Path, run_id: str) -> dict[str, Any]:
     * ``total_duration_ms``: wall-clock duration of the run
     * ``delegations``: list of {from_skill, to_skill, error_code}
 
-    Used by ``gcl_trace_aggregate --cross-skill --run-id X`` to surface the
-    cross-skill call DAG for an end-to-end run.
+    Used by ``gcl_trace_aggregate --cross-skill --run-id X [--since ISO8601]``
+    to surface the cross-skill call DAG for an end-to-end run.
     """
     spans_path = root / ".runtime" / "traces" / run_id / "spans.jsonl"
     if not spans_path.exists():
@@ -147,6 +158,14 @@ def cross_skill_chain(root: Path, run_id: str) -> dict[str, Any]:
             spans.append(json.loads(line))
         except json.JSONDecodeError:
             continue
+
+    # Filter by start_time when --since is set.
+    if since is not None:
+        spans = [
+            s for s in spans
+            if (_span_start_time(s) or "") >= since
+        ]
+
     # Order by start_time when available; fall back to insertion order.
     spans.sort(key=lambda s: s.get("start_time", ""))
     skills_invoked: list[str] = []
@@ -196,13 +215,15 @@ def main() -> int:
                         help="Print the cross-skill delegation chain for --run-id")
     parser.add_argument("--run-id", type=str, default=None,
                         help="Run id to inspect with --cross-skill")
+    parser.add_argument("--since", type=str, default=None,
+                        help="ISO8601 timestamp; filter spans with start_time < since (cross-skill only)")
     args = parser.parse_args()
 
     if args.cross_skill:
         if not args.run_id:
             print("ERROR: --cross-skill requires --run-id", file=sys.stderr)
             return 2
-        chain = cross_skill_chain(args.root, args.run_id)
+        chain = cross_skill_chain(args.root, args.run_id, since=args.since)
         print(json.dumps(chain, indent=2, ensure_ascii=False))
         return 0
 

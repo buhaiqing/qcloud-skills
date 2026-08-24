@@ -107,15 +107,33 @@ SKILL_MAX_ITER: dict[str, int] = {
 }
 
 
+
 @contextlib.contextmanager
 def _rubric_calibration(root: Path, skill: str):
     """Apply calibrated rubric thresholds for skill; restore on exit.
 
-    Looks for ``audit-results/rubric-calibration-*.json`` and, if a matching
-    skill entry exists, overrides ``RUBRIC_THRESHOLDS`` for the duration of the
-    block.  The module-global is always restored, even on exception.
+    Priority order:
+    1. EvolutionRegistry (EVO-1 runtime injection)
+    2. audit-results/rubric-calibration-*.json (file-based)
+    3. assets/shared/thresholds.json (build-time defaults)
+
+    The module-global RUBRIC_THRESHOLDS is always restored, even on exception.
     """
     _saved = dict(RUBRIC_THRESHOLDS)
+
+    # Priority 1 — EvolutionRegistry (runtime injection from CopilotEngine)
+    try:
+        from copilot.evolution import get_calibration_for_skill
+        registry_cal = get_calibration_for_skill(skill)
+        if registry_cal:
+            for dim, val in registry_cal.items():
+                if dim in RUBRIC_THRESHOLDS:
+                    RUBRIC_THRESHOLDS[dim] = val
+            print(f"[rubric_calibrate] Using EVO-1 registry thresholds for {skill}", file=sys.stderr)
+    except Exception:  # noqa: BLE001, S110
+        pass  # non-blocking
+
+    # Priority 2 — file-based calibration (existing logic)
     try:
         CAL_DIR = root / "audit-results"
         files = sorted(CAL_DIR.glob("rubric-calibration-*.json"))
@@ -128,18 +146,15 @@ def _rubric_calibration(root: Path, skill: str):
                 for dim, val in skill_calib.items():
                     if dim in RUBRIC_THRESHOLDS:
                         RUBRIC_THRESHOLDS[dim] = val
-                print(
-                    f"[rubric_calibrate] Using calibrated thresholds for {skill}",
-                    file=sys.stderr,
-                )
+                print(f"[rubric_calibrate] Using calibrated thresholds for {skill}", file=sys.stderr)
     except Exception:  # noqa: BLE001, S110
         pass  # non-blocking
+
     try:
         yield
     finally:
         RUBRIC_THRESHOLDS.clear()
         RUBRIC_THRESHOLDS.update(_saved)
-
 
 # Shared thresholds — assets/shared/thresholds.json is the single source
 # (AGENTS.md TE-4). Loaded at import time; a missing/corrupt asset degrades to
@@ -798,7 +813,7 @@ def emit_evidence_record(root: Path, trace: dict[str, Any], args: argparse.Names
             "cost": {"tokens": 0, "usd": None},
             "scores": _final_scores(trace),
         }
-        post_record(record)
+        post_record(record, span_id=f"{run_id}:{args.skill}")
     except Exception as exc:  # noqa: BLE001 - Evidence side-emit must never break GCL
         # Still non-fatal, but no longer silent: a permanently broken KPI
         # pipeline used to look identical to a healthy one.

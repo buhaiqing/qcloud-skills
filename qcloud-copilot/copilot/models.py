@@ -138,4 +138,23 @@ class SessionState:
     created_at: str
     history: list[dict] = field(default_factory=list)
     current_plan: ExecutionPlan | None = None
-    context: dict[str, Any] = field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# EVO-1 self-evolution signals (L3→L4闭环)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class EvolutionSignals:
+    """Aggregated EVO-1 decision signals produced by subagent fan-out.
+
+    Produced by CopilotEngine._query_evolution() and consumed by
+    SkillDispatcher (route_hint / calibrated_thresholds) and
+    gcl_runner._rubric_calibration() (calibrated_thresholds).
+    """
+
+    skill: str
+    route_hint: str | None = None          # from EvolutionPolicy.route_hint()
+    calibrated_thresholds: dict[str, float] | None = None  # from recommend_threshold()
+    allowlist: set[str] | None = None     # from op_allowlist()
+    source: str = "evolution_policy"       # "evolution_policy" | "store_only" | "none"

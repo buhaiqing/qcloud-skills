@@ -20,7 +20,8 @@ def audit_trace(
     skill: str | None = None,
     skill_info: object | None = None,
     runtime_info: object | None = None,
-) -> None:
+    runtime_root: Path | None = None,
+) -> Path:
     """Persist a step-level execution trace.
 
     `trace_id` is the cross-system join key: when provided it is written into
@@ -36,21 +37,26 @@ def audit_trace(
     RuntimeInfo blobs so a trace can answer which Skill version + which code
     commit + which Python/tccli/SDK versions produced this step. Both objects
     are persisted as JSON via their `to_dict()` if available, else as-is.
+
+    `runtime_root` overrides where ``.runtime`` lives (for testing / isolation).
+    Defaults to ``Path.cwd()``.
+
+    Idempotent per run_id: records are appended to _index.jsonl (one JSON line
+    per call), never overwrite. Backward compat: existing step-*.json files are
+    left untouched.
     """
     run_id = trace_id or session_id
-    audit_dir = Path.cwd() / ".runtime" / "gcl" / "copilot" / "audit" / run_id
+    root = runtime_root or Path.cwd()
+    audit_dir = root / ".runtime" / "gcl" / "copilot" / "audit" / run_id
     audit_dir.mkdir(parents=True, exist_ok=True)
-    record = {"trace_id": run_id, "session_id": session_id, **trace_data}
+    record = {"trace_id": run_id, "session_id": session_id, "step_id": step_id, **trace_data}
     if provenance is not None:
         record["provenance"] = provenance
     if skill_info is not None:
         record["skill"] = skill_info.to_dict() if hasattr(skill_info, "to_dict") else skill_info
     if runtime_info is not None:
         record["runtime"] = runtime_info.to_dict() if hasattr(runtime_info, "to_dict") else runtime_info
-    filename = (
-        audit_dir / f"step-{step_id}-{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}.json"
-    )
-    filename.write_text(json.dumps(record, ensure_ascii=False, indent=2))
+    index_path = audit_dir / "_index.jsonl"
 
     # Emit a span only for non-step (system) traces: per-step dispatcher
     # traces already get a skill-keyed span from dispatcher._emit_span, so
@@ -68,8 +74,7 @@ def audit_trace(
                 error_code=trace_data.get("error"),
             )
         )
-
-
+    return index_path
 
 
 def audit_trace_v3(
@@ -86,6 +91,7 @@ def audit_trace_v3(
     observation_name: str | None = None,
     kind: str | None = None,
     usage_events: list | None = None,
+    runtime_root: Path | None = None,
 ) -> None:
     """P2.6.b — bridge: fire legacy audit_trace() AND emit TRACE-1 v3 record.
 
@@ -112,6 +118,7 @@ def audit_trace_v3(
         skill=skill,
         skill_info=skill_info,
         runtime_info=runtime_info,
+        runtime_root=runtime_root,
     )
 
     # 2. v3 observation

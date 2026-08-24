@@ -5,7 +5,6 @@ from contextlib import suppress
 
 from copilot.classifier import classify
 from copilot.dispatcher import PlanDispatcher
-from copilot.env_loader import ensure_runtime_env
 from copilot.integration.cruise import CruiseRunner
 from copilot.integration.skills import SkillDispatcher
 from copilot.mode_resolver import resolve_inspection_mode, strip_ci_trigger_words
@@ -39,6 +38,95 @@ class CopilotEngine:
             skill_dispatcher=self._skill_dispatcher,
             cruise_runner=self._cruise_runner,
         )
+        # EVO-1: lazy-init EvolutionPolicy so it does not force a
+        # docs/ dependency when the copilot is imported as a library.
+        self._evolution_policy = None  # type: ignore[assignment]
+
+    def _init_evolution_policy(self) -> None:
+        """Lazily bootstrap EvolutionPolicy (EVO-1 Generator component)."""
+        if self._evolution_policy is not None:
+            return
+        try:
+            from copilot import observ_query  # type: ignore[attr-defined]
+            from copilot.evolution import EvolutionPolicy, EvolutionStore
+            store = EvolutionStore()
+            query_mod = getattr(observ_query, "query_metrics", None)
+            self._evolution_policy = EvolutionPolicy(store=store, query=query_mod)
+        except Exception:  # noqa: BLE001
+            self._evolution_policy = None
+
+    # -------------------------------------------------------------------------
+    # EVO-1 subagent fan-out — 3 parallel subagents query one signal each
+    # -------------------------------------------------------------------------
+
+    def _query_evolution(self, skill: str, intent) -> EvolutionSignals:  # noqa: F821
+        """Fan out 3 subagents in parallel; aggregate into EvolutionSignals.
+
+        Subagent 1 → route_hint    (EvolutionPolicy.route_hint)
+        Subagent 2 → calibrated thresholds (recommend_threshold per dim)
+        Subagent 3 → op_allowlist  (op_allowlist)
+
+        Runs via thread pool so all 3 queries execute concurrently.
+        Each subagent degrades gracefully when policy is None or raises.
+        """
+        from concurrent.futures import ThreadPoolExecutor
+
+        from copilot.evolution import (
+            query_calibrated_thresholds,
+            query_op_allowlist,
+            query_route_hint,
+        )
+        from copilot.models import EvolutionSignals
+
+        policy = self._evolution_policy
+        default_dims = ["correctness", "safety", "idempotency", "traceability", "spec_compliance"]
+
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            f_route = pool.submit(query_route_hint, policy, intent)
+            f_thresh = pool.submit(query_calibrated_thresholds, policy, skill, default_dims)
+            f_allow = pool.submit(query_op_allowlist, policy, skill)
+
+        route_hint = f_route.result()
+        thresholds = f_thresh.result()
+        allowlist = f_allow.result()
+
+        source: str
+        if policy is None:
+            source = "none"
+        elif thresholds or route_hint or allowlist:
+            source = "evolution_policy"
+        else:
+            source = "store_only"
+
+        return EvolutionSignals(
+            skill=skill,
+            route_hint=route_hint,
+            calibrated_thresholds=thresholds,
+            allowlist=allowlist,
+            source=source,
+        )
+
+    def _apply_evo_signals(self, signals: EvolutionSignals) -> None:  # noqa: F821
+        """Write EVO-1 signals into runtime state.
+
+        - calibrated_thresholds  → EvolutionRegistry (read by gcl_runner)
+        - route_hint           → stored on self._last_evo_signals (for injection)
+        """
+        from copilot.evolution import set_calibration_for_skill
+
+        if signals.calibrated_thresholds:
+            set_calibration_for_skill(signals.skill, signals.calibrated_thresholds)
+        self._last_evo_signals = signals  # type: ignore[assignment]
+
+    def _build_evo_context(self, signals: EvolutionSignals | None) -> dict:  # noqa: F821
+        """Build evolution_context dict passed to PlanDispatcher."""
+        if signals is None:
+            return {}
+        return {
+            "evolution_warning": signals.route_hint,
+            "evolution_source": signals.source,
+            "evolution_allowlist": sorted(signals.allowlist) if signals.allowlist else [],
+        }
 
     def ask(
         self,
@@ -49,7 +137,6 @@ class CopilotEngine:
         l3_reviewed: bool = False,
         inspection_mode: str | None = None,
     ) -> Report:
-        ensure_runtime_env()
         start = time.time()
         self._session_id = session_id or f"inline-{int(start * 1000)}"
 
@@ -187,9 +274,15 @@ class CopilotEngine:
                     audience=audience,
                 )
             )
+        # EVO-1: bootstrap + fan-out before execution
+        self._init_evolution_policy()
+        skill = (intent.targets or ["qcloud-copilot"])[0]
+        evo_signals = self._query_evolution(skill, intent)
+        self._apply_evo_signals(evo_signals)
 
         exec_result = self._run_execution(
-            plan, audience=audience, l3_reviewed=l3_reviewed, l2_confirmed=l2_confirmed
+            plan, audience=audience, l3_reviewed=l3_reviewed, l2_confirmed=l2_confirmed,
+            evo_signals=evo_signals,
         )
         exec_result.final_report.duration_ms = int((time.time() - start) * 1000)
 
@@ -241,14 +334,16 @@ class CopilotEngine:
         if dry_run:
             return self._dry_run_plan(plan, session_id)
 
-        self._session_id = session_id
-        sm = SessionManager()
-        sm.init_blackboard(session_id, plan.context.get("user_request", "plan execution"))
-        self._plan_context = plan.context
-        exec_result = self._run_execution(
-            plan, audience=audience, l3_reviewed=l3_reviewed, l2_confirmed=l2_confirmed
+        self._init_evolution_policy()
+        skill = (plan.intent.targets or ["qcloud-copilot"])[0]
+        evo_signals = self._query_evolution(skill, plan.intent)
+        self._apply_evo_signals(evo_signals)
+        return self._deliver_report(
+            self._run_execution(
+                plan, audience=audience, l3_reviewed=l3_reviewed, l2_confirmed=l2_confirmed,
+                evo_signals=evo_signals,
+            ).final_report
         )
-        return self._deliver_report(exec_result.final_report)
 
     def _dry_run_plan(self, plan: ExecutionPlan, session_id: str) -> dict:
         order = [step.id for step in plan.steps]
@@ -307,6 +402,7 @@ class CopilotEngine:
         audience: str,
         l3_reviewed: bool,
         l2_confirmed: bool = False,
+        evo_signals: EvolutionSignals | None = None,  # noqa: F821
     ) -> ExecutionResult:
         session_id = getattr(self, "_session_id", "inline")
         self._plan_context = plan.context
@@ -317,6 +413,7 @@ class CopilotEngine:
             bb_client,
             session_id,
             l2_confirmed=l2_confirmed,
+            evolution_context=self._build_evo_context(evo_signals),
         )
 
         status, report = self._build_final_report(
