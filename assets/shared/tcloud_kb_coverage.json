@@ -1,0 +1,128 @@
+{
+  "qcloud-apigw-ops": {
+    "actions_covered": 98,
+    "actions_total": 99,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/apigateway/v20180808/api.json",
+    "version": "v20180808"
+  },
+  "qcloud-cam-ops": {
+    "actions_covered": 84,
+    "actions_total": 94,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/cam/v20190116/api.json",
+    "version": "v20190116"
+  },
+  "qcloud-cbs-ops": {
+    "actions_covered": 45,
+    "actions_total": 47,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/cbs/v20170312/api.json",
+    "version": "v20170312"
+  },
+  "qcloud-cdb-ops": {
+    "actions_covered": 174,
+    "actions_total": 176,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/cdb/v20170320/api.json",
+    "version": "v20170320"
+  },
+  "qcloud-cdn-ops": {
+    "actions_covered": 49,
+    "actions_total": 52,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/cdn/v20180606/api.json",
+    "version": "v20180606"
+  },
+  "qcloud-ckafka-ops": {
+    "actions_covered": 94,
+    "actions_total": 94,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/ckafka/v20190819/api.json",
+    "version": "v20190819"
+  },
+  "qcloud-clb-ops": {
+    "actions_covered": 88,
+    "actions_total": 91,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/clb/v20180317/api.json",
+    "version": "v20180317"
+  },
+  "qcloud-cls-ops": {
+    "actions_covered": 184,
+    "actions_total": 190,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/cls/v20201016/api.json",
+    "version": "v20201016"
+  },
+  "qcloud-cvm-ops": {
+    "actions_covered": 99,
+    "actions_total": 106,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/cvm/v20170312/api.json",
+    "version": "v20170312"
+  },
+  "qcloud-dc-ops": {
+    "actions_covered": 20,
+    "actions_total": 22,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/dc/v20180410/api.json",
+    "version": "v20180410"
+  },
+  "qcloud-es-ops": {
+    "actions_covered": 10,
+    "actions_total": 10,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/es/v20250101/api.json",
+    "version": "v20250101"
+  },
+  "qcloud-finops-ops": {
+    "actions_covered": 68,
+    "actions_total": 68,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/billing/v20180709/api.json",
+    "version": "v20180709"
+  },
+  "qcloud-mongodb-ops": {
+    "actions_covered": 79,
+    "actions_total": 81,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/mongodb/v20190725/api.json",
+    "version": "v20190725"
+  },
+  "qcloud-monitor-ops": {
+    "actions_covered": 9,
+    "actions_total": 9,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/monitor/v20230616/api.json",
+    "version": "v20230616"
+  },
+  "qcloud-postgres-ops": {
+    "actions_covered": 108,
+    "actions_total": 112,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/postgres/v20170312/api.json",
+    "version": "v20170312"
+  },
+  "qcloud-redis-ops": {
+    "actions_covered": 116,
+    "actions_total": 119,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/redis/v20180412/api.json",
+    "version": "v20180412"
+  },
+  "qcloud-scf-ops": {
+    "actions_covered": 51,
+    "actions_total": 52,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/scf/v20180416/api.json",
+    "version": "v20180416"
+  },
+  "qcloud-ssl-ops": {
+    "actions_covered": 68,
+    "actions_total": 68,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/ssl/v20191205/api.json",
+    "version": "v20191205"
+  },
+  "qcloud-tdmq-ops": {
+    "actions_covered": 149,
+    "actions_total": 152,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/tdmq/v20200217/api.json",
+    "version": "v20200217"
+  },
+  "qcloud-tke-ops": {
+    "actions_covered": 21,
+    "actions_total": 22,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/tke/v20220501/api.json",
+    "version": "v20220501"
+  },
+  "qcloud-vpc-ops": {
+    "actions_covered": 426,
+    "actions_total": 448,
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/vpc/v20170312/api.json",
+    "version": "v20170312"
+  }
+}

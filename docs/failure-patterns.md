@@ -2,7 +2,7 @@
 
 > **Purpose**: Structured failure memory extracted from GCL traces and Self-Review records.
 > Agents can optionally load this file during Pre-flight to 预防 (prevent) known errors.
-> **Updated**: 2026-08-25 (0 total hits across all patterns).
+> **Updated**: 2026-08-26 (0 total hits across all patterns).
 > **Token budget**: ≤ 200 lines. When exceeded, prune patterns with count < 3.
 
 

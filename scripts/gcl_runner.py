@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import json
 import os
 import re
@@ -998,6 +999,17 @@ def cmd_run(args: argparse.Namespace) -> int:
         # Combine: success hints guide Generator toward fast convergence;
         # failure hints prevent known mistakes
         reflexion_block = "\n".join(filter(None, [succ_block, fail_block]))
+        # Efficacy attribution (memory-efficacy spec): stable id + exact pattern
+        # keys so reflexion_efficacy.py can correlate injection → outcome.
+        injection_id = (
+            f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-"
+            + hashlib.sha1(f"{args.skill}|{args.command}".encode()).hexdigest()[:8]
+        )
+
+        failure_keys = [
+            "|".join(str(p.get(k, "")) for k in ("skill", "command", "error"))
+            for p in prior_fail
+        ]
         trace: dict[str, Any] = {
             "skill": args.skill,
             "request": args.request,
@@ -1006,6 +1018,8 @@ def cmd_run(args: argparse.Namespace) -> int:
             "preflight_reflexion": {
                 "skill": args.skill,
                 "command": args.command,
+                "injection_id": injection_id if reflexion_block else None,
+                "matched_failure_keys": failure_keys if reflexion_block else [],
                 "matched_failures": len(prior_fail),
                 "matched_successes": len(prior_success),
                 "injection": reflexion_block,

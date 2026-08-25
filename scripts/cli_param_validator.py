@@ -26,6 +26,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[1]
+
 # ---------------------------------------------------------------------------
 # Knowledge base: skill -> action -> valid flags (lowercase, no leading --)
 # ---------------------------------------------------------------------------
@@ -258,9 +260,35 @@ _KNOWN_FLAGS: dict[str, dict[str, frozenset[str]]] = {
 }
 
 
+_EXTERNAL_FLAGS_FILE = ROOT / "assets" / "shared" / "tcloud_cli_flags.json"
+
+
+def _load_generated_flags() -> dict[str, dict[str, frozenset[str]]]:
+    """Load generated KB from kb_sync_openapi.py (authoritative per skill/action).
+
+    Location: ``$TCLOUD_KB_DIR`` or repo ``assets/shared/``. Missing file →
+    empty dict (built-in hand KB remains the only source; L10 skip gracefully).
+    """
+    base = os.environ.get("TCLOUD_KB_DIR", "")
+    path = Path(base) / "tcloud_cli_flags.json" if base else _EXTERNAL_FLAGS_FILE
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    out: dict[str, dict[str, frozenset[str]]] = {}
+    for skill, actions in data.items():
+        out[skill] = {
+            action: frozenset(flags) for action, flags in (actions or {}).items()
+        }
+    return out
+
+
 def _load_extended() -> dict[str, dict[str, frozenset[str]]]:
     """Load from TCLOUD_OPERATIONS env var (JSON) to extend KB at runtime."""
-    raw = _KNOWN_FLAGS
+    raw = {skill: dict(actions) for skill, actions in _KNOWN_FLAGS.items()}
+    # Generated KB wins over hand-maintained entries (auto-synced from tccli metadata).
+    for skill, actions in _load_generated_flags().items():
+        raw.setdefault(skill, {}).update(actions)
     try:
         env = os.environ.get("TCLOUD_OPERATIONS", "")
         if env:

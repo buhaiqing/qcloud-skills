@@ -245,6 +245,53 @@ class AutonomyPolicyTests(unittest.TestCase):
         self.assertEqual(decision.action_taken, "human_token")
         self.assertEqual(decision.matched_rule.condition, "is_destructive")
 
+
+    # ------------------------------------------------------------------
+    # No-match fallback — fail-safe (deny-by-default)
+    # ------------------------------------------------------------------
+
+    def test_level_1_unknown_risk_level_fails_safe(self) -> None:
+        """Unrecognized risk_level matches no rule → MUST require human approval."""
+        decision = LEVEL_1.evaluate(
+            operation="SomeUnclassifiedOp",
+            risk_level="UNKNOWN",
+            is_destructive=False,
+            is_cross_system=False,
+        )
+        self.assertEqual(decision.action_taken, "human_approval")
+        self.assertIsNone(decision.matched_rule)
+        self.assertIn("human_approval", decision.rationale)
+
+    def test_no_rule_matched_never_auto_confirms(self) -> None:
+        """Policy with zero rules must never auto-confirm anything."""
+        empty = AutonomyPolicy(level=99, description="empty", rules=[])
+        for risk in ("LOW", "MEDIUM", "HIGH", "CRITICAL", "UNKNOWN"):
+            d = empty.evaluate(
+                operation="TerminateInstances",
+                risk_level=risk,
+                is_destructive=True,
+                is_cross_system=True,
+            )
+            self.assertNotEqual(d.action_taken, "auto_confirm")
+
+    def test_explicit_else_rule_still_honored(self) -> None:
+        """An explicit catch-all 'else' rule is a documented escape hatch."""
+        p = AutonomyPolicy(
+            level=0,
+            description="explicit else",
+            rules=[
+                AutonomyRule(condition="else", action="auto_confirm", scope=["*"]),
+            ],
+        )
+        d = p.evaluate(
+            operation="DescribeInstances",
+            risk_level="UNKNOWN",
+            is_destructive=False,
+            is_cross_system=False,
+        )
+        self.assertEqual(d.action_taken, "auto_confirm")
+        self.assertIsNotNone(d.matched_rule)
+
     # ------------------------------------------------------------------
     # Rate limiting
     # ------------------------------------------------------------------

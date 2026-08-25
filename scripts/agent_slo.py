@@ -36,13 +36,19 @@ class SLOMonitor:
     def record(self, agent: str, metric: str, value: float) -> None:
         self._samples.setdefault(agent, {}).setdefault(metric, []).append(value)
 
-    def compliance(self, agent: str) -> dict[str, float]:
-        result: dict[str, float] = {}
+    def compliance(self, agent: str) -> dict[str, float | None]:
+        """Compliance ratio per SLO. ``None`` = no samples (N/A).
+
+        Missing telemetry MUST NOT read as a perfect SLO (lesson L8:
+        "green but vacuous") — callers get ``None`` and ``breaches()``
+        treats it as a breach.
+        """
+        result: dict[str, float | None] = {}
         agent_data = self._samples.get(agent, {})
         for slo in self.slos:
             samples = agent_data.get(slo.name, [])
             if not samples:
-                result[slo.name] = 1.0
+                result[slo.name] = None
                 continue
             passing = sum(1 for v in samples if _meets_target(slo, v))
             result[slo.name] = passing / len(samples)
@@ -52,10 +58,13 @@ class SLOMonitor:
         comp = self.compliance(agent)
         breached: list[str] = []
         for slo in self.slos:
-            # breach if not 100% compliant (any sample missed target)
-            if comp.get(slo.name, 1.0) < 1.0:
+            c = comp.get(slo.name)
+            # Breach if any sample missed target OR no data at all —
+            # an unobserved SLO is an alerting gap, not compliance.
+            if c is None or c < 1.0:
                 breached.append(slo.name)
         return breached
+
 
 
 def render_dashboard(monitor: SLOMonitor) -> str:
@@ -69,8 +78,9 @@ def render_dashboard(monitor: SLOMonitor) -> str:
         comp = monitor.compliance(agent)
         breached_set = set(monitor.breaches(agent))
         for slo in monitor.slos:
-            c = comp.get(slo.name, 1.0)
+            c = comp.get(slo.name)
+            c_str = "N/A" if c is None else f"{c:.1%}"
             breached = "yes" if slo.name in breached_set else "no"
-            lines.append(f"| {agent} | {slo.name} | {slo.target} | {c:.1%} | {breached} |")
+            lines.append(f"| {agent} | {slo.name} | {slo.target} | {c_str} | {breached} |")
     lines.append("")
     return "\n".join(lines)

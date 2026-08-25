@@ -9,8 +9,14 @@ import pytest
 from copilot.blackboard import BlackboardClient
 from copilot.dispatcher import PlanDispatcher
 from copilot.integration.skills import SkillDispatcher
-from copilot.models import ClassifiedIntent, Condition, ExecutionPlan, IntentType, PlanStep, StepResult
-from copilot.plan_schema import load_plan_file
+from copilot.models import (
+    ClassifiedIntent,
+    Condition,
+    ExecutionPlan,
+    IntentType,
+    PlanStep,
+    StepResult,
+)
 
 
 @pytest.fixture
@@ -306,7 +312,7 @@ class TestPlanRevision:
         new_findings = {"vpc_id": "vpc-xxx"}
 
         dispatcher = PlanDispatcher()
-        result = dispatcher.plan_revision(plan, completed, pending_ids, new_findings, max_revisions=3)
+        dispatcher.plan_revision(plan, completed, pending_ids, new_findings, max_revisions=3)
 
         # pending-2 params should be updated with vpc_id value
         pending_step_updated = next((s for s in plan.steps if s.id == "pending-2"), None)
@@ -338,7 +344,7 @@ class TestPlanRevision:
         """Pending steps get updated params from context."""
         from copilot.plan_gen import replan
 
-        intent = ClassifiedIntent(primary=IntentType.DIAGNOSE, secondary=[], targets=["vm"], confidence=1.0)
+        _ = ClassifiedIntent(primary=IntentType.DIAGNOSE, secondary=[], targets=["vm"], confidence=1.0)
 
         pending_steps = [
             PlanStep(

@@ -112,7 +112,6 @@ def test_audit_trace_v3_without_usage_writes_only_observation(tmp_path: Path):
 
 def test_audit_trace_v3_legacy_callers_unaffected(tmp_path: Path):
     """Plain `audit_trace()` (legacy) must still work and write only the legacy file."""
-    from unittest.mock import patch
 
     from copilot.quality.audit import audit_trace
 

@@ -30,6 +30,30 @@ from typing import Any
 # data_field: the key under Response that holds the actual data (or empty for no data wrap)
 # request_id: field name for request tracking
 # error_in_response: whether Error may appear in Response (some APIs put it there)
+ROOT = Path(__file__).resolve().parents[1]
+
+_EXTERNAL_SCHEMA_FILE = ROOT / "assets" / "shared" / "tcloud_response_schemas.json"
+
+
+def _load_generated_schemas() -> dict[str, dict[str, dict[str, Any]]]:
+    """Load generated response-schema KB from kb_sync_openapi.py.
+
+    Authoritative per skill/action over the built-in hand-written entries.
+    Location: ``$TCLOUD_KB_DIR`` or repo ``assets/shared/``; missing file →
+    empty dict (L10 — skip gracefully).
+    """
+    import json
+    import os
+
+    base = os.environ.get("TCLOUD_KB_DIR", "")
+    path = Path(base) / "tcloud_response_schemas.json" if base else _EXTERNAL_SCHEMA_FILE
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 _SCHEMA_KB: dict[str, dict[str, dict[str, Any]]] = {
     "qcloud-cvm-ops": {
         "DescribeInstances": {
@@ -394,7 +418,9 @@ def validate_response_schema(cmd: str, response: dict, skill: str = "") -> list[
         _, action = _detect_action(cmd)
 
     violations = []
-    schema = _SCHEMA_KB.get(skill, {}).get(action)
+    merged: dict[str, dict[str, Any]] = dict(_SCHEMA_KB.get(skill, {}))
+    merged.update(_load_generated_schemas().get(skill, {}))
+    schema = merged.get(action)
     if schema is None:
         return []  # unknown API — pass silently
 

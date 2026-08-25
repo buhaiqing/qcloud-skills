@@ -27,10 +27,21 @@ class SLOMonitorTest(unittest.TestCase):
         self.assertAlmostEqual(m.compliance("agent-a")["p95_latency_ms"], 0.5)
         self.assertIn("p95_latency_ms", m.breaches("agent-a"))
 
-    def test_no_samples_means_compliant(self) -> None:
+    def test_no_samples_is_not_vacuously_compliant(self) -> None:
         m = SLOMonitor(slos=[SLO(name="success_rate", target=0.99, window="30d")])
-        self.assertEqual(m.compliance("agent-a")["success_rate"], 1.0)
-        self.assertEqual(m.breaches("agent-a"), [])
+        # L8 lesson: missing telemetry must read as N/A, not a perfect SLO.
+        self.assertIsNone(m.compliance("agent-a")["success_rate"])
+        self.assertEqual(m.breaches("agent-a"), ["success_rate"])
+
+    def test_dashboard_renders_na_for_missing_data(self) -> None:
+        m = SLOMonitor(slos=[
+            SLO(name="success_rate", target=0.99, window="30d"),
+            SLO(name="p95_latency_ms", target=2000, window="30d"),
+        ])
+        m.record("agent-a", "success_rate", 1.0)
+        out = render_dashboard(m)
+        self.assertIn("N/A", out)
+        self.assertIn("| agent-a | p95_latency_ms | 2000 | N/A | yes |", out)
 
     def test_default_slos(self) -> None:
         self.assertGreaterEqual(len(DEFAULT_SLOS), 2)

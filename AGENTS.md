@@ -158,6 +158,7 @@ Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` addition
 | L18 | `ruamel.yaml` round-trip preserves indent; `yaml.dump` does not | Use `YAML(typ="rt")` + `indent(mapping=2, sequence=4, offset=2)` |
 | L19 | Cross-instance races need file locks + forced reload | `fcntl.flock` + forced reload; exact assertions for zero loss |
 | L20 | unittest buffer=False: print-capable funcs leak stdout | Wrap with `contextlib.redirect_stdout(io.StringIO())` |
+| L21 | Governance/evaluator fallbacks MUST be deny-by-default | No-match policy rule → `human_approval`, never `auto_confirm`; empty SLO samples → N/A + breach, never 1.0 |
 
 ## Adding or modifying a skill
 

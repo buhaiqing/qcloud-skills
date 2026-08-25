@@ -145,13 +145,15 @@ class AutonomyPolicy:
                     rationale=rationale,
                 )
 
-        # No rule matched — safe default
+        # No rule matched — fail-safe default (deny-by-default).
+        # An unclassified operation MUST NOT auto-execute; it requires a human.
         rationale = (
             f"no rule matched for operation={operation!r}, "
-            f"risk_level={risk_level!r}; defaulting to auto_confirm"
+            f"risk_level={risk_level!r}; failing safe to human_approval "
+            "(unmatched operations never auto-confirm)"
         )
         return AutonomyDecision(
-            action_taken="auto_confirm",
+            action_taken="human_approval",
             matched_rule=None,
             rationale=rationale,
         )
