@@ -260,11 +260,23 @@ def run_command(
             "stdout_len": 0,
             "stderr_len": 0,
             "op_type": classify_op(command),
+            "shadow": False,
         }
     try:
         proc_env = dict(os.environ)
         if env:
             proc_env.update(env)
+        # Shadow rehearsal: route through tccli_shadow exec (replay-only,
+        # zero cloud side-effects). See docs/superpowers/specs/shadow-rehearsal-design.md
+        shadow = str(proc_env.get("TCCLI_SHADOW", "")) == "1"
+        if shadow:
+            argv = [
+                sys.executable,
+                str(Path(__file__).resolve().parent / "tccli_shadow.py"),
+                "exec",
+                "--",
+                command,
+            ]
         proc = subprocess.run(
             argv,
             capture_output=True,
@@ -283,10 +295,12 @@ def run_command(
             "stdout_len": len(proc.stdout or ""),
             "stderr_len": len(proc.stderr or ""),
             "op_type": classify_op(command),
+            "shadow": shadow,
         }
     except subprocess.TimeoutExpired:
         return {
             "command": mask_secrets(command),
+            "shadow": shadow,
             "exit_code": -1,
             "result_excerpt": f"TIMEOUT after {timeout}s",
             "stdout_len": 0,
