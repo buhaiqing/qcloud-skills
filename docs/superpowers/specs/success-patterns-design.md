@@ -107,51 +107,8 @@ composite_score = base_score × severity_weight × recency_decay
 
 ### 4.2 淘汰算法（merge_batch）
 
-```python
-def merge_batch(pending, hot, warm, cold):
-    """
-    每日合并算法。
-    核心：substitution 优先于 silence；同键合并，不重复存储。
-    """
-    # 步骤1：合并 pending → hot（substitution 逻辑）
-    # 对每条 pending:
-    #   if key in hot:         # substitution 发生
-    #       hot[key].count += 1
-    #       hot[key].last_hit = today
-    #       hot[key].avg_iter = 加权更新
-    #   elif key in warm:       # 从 warm 复活
-    #       if pending.last_hit - warm[key].last_hit <= 30 days:
-    #           warm[key] → hot (keep count)
-    #       else:
-    #           hot[new] = pending (count=1, no warm merge)
-    #   else:
-    #       hot[new] = pending (count=1)
+> 权威实现见 scripts/success_pattern_mine.py
 
-    # 步骤2：hot 层容量保护（静默淘汰）
-    # if len(hot) > HOT_LIMIT:
-    #     # 2a. 淘汰无 recent hit 的
-    #     candidates = [k for k in hot if last_hit > 30 days ago]
-    #     for k in sorted(candidates, key=lambda k: hot[k].last_hit):
-    #         if k in warm: warm[k].count += hot[k].count  # 合并到 warm
-    #         else: warm[k] = hot[k]
-    #         del hot[k]
-    #         if len(hot) <= HOT_LIMIT: break
-    #     # 2b. 如果 2a 不够（30天内的新模式占满 hot），强制淘汰最老的
-    #     if len(hot) > HOT_LIMIT:
-    #         sorted(hot.items(), key=lambda x: x.last_hit)[:needed] → warm
-
-    # 步骤3：warm 层容量保护
-    # if len(warm) > WARM_LIMIT:
-    #     candidates = [k for k in warm if last_hit > 90 days ago]
-    #     for k in sorted(candidates, key=lambda k: warm[k].last_hit):
-    #         cold[k] = warm[k]
-    #         del warm[k]
-    #         if len(warm) <= WARM_LIMIT: break
-
-    # 步骤4：cold 层硬上限（安全阀）
-    # if len(cold) > COLD_LIMIT:
-    #     修剪最低 count 的条目至 COLD_LIMIT
-```
 
 ### 4.3 为什么这样设计
 
@@ -165,46 +122,8 @@ def merge_batch(pending, hot, warm, cold):
 
 ### 4.4 自验证（每日 merge 后执行）
 
-```python
-def self_verify(hot, warm, cold):
-    """运行每日 merge 后自验证，确保逻辑自洽。"""
-    errors = []
+> 权威实现见 scripts/gcl_trajectory_quality.py
 
-    # V1: 无重复 key（跨层检查）
-    all_keys = set(hot.keys()) | set(warm.keys()) | set(cold.keys())
-    for layer1, d1 in [("hot", hot), ("warm", warm), ("cold", cold)]:
-        for layer2, d2 in [("hot", hot), ("warm", warm), ("cold", cold)]:
-            if layer1 >= layer2: continue
-            dup = set(d1.keys()) & set(d2.keys())
-            if dup:
-                errors.append(f"V1: duplicate keys across {layer1} and {layer2}: {dup}")
-
-    # V2: 各层容量合规
-    for name, d, limit in [("hot", hot, HOT_LIMIT), ("warm", warm, WARM_LIMIT)]:
-        if len(d) > limit:
-            errors.append(f"V2: {name} exceeds limit {limit}: {len(d)} entries")
-
-    # V3: count 一致性（warm/cold 接受 hot 合并时 count 应该相加）
-    for k in set(warm.keys()) & set(hot.keys()):
-        errors.append(f"V3: key {k} in both hot and warm — merge error")
-
-    # V4: 所有 entry 有必填字段
-    for layer, d in [("hot", hot), ("warm", warm), ("cold", cold)]:
-        for k, e in d.items():
-            for field in ["skill", "operation", "count", "last_hit"]:
-                if field not in e:
-                    errors.append(f"V4: key {k} in {layer} missing field {field}")
-
-    # V5: last_hit 格式合法
-    import re
-    DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-    for layer, d in [("hot", hot), ("warm", warm), ("cold", cold)]:
-        for k, e in d.items():
-            if "last_hit" in e and not DATE_RE.match(str(e["last_hit"])):
-                errors.append(f"V5: key {k} in {layer} has invalid last_hit: {e['last_hit']}")
-
-    assert not errors, f"Self-verification failed: {errors}"
-```
 
 ## 5. Retrieval 查询逻辑
 

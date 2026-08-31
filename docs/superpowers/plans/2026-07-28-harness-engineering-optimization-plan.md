@@ -57,40 +57,8 @@ Edit the Phase 1 bullet in the spec so it reads:
 
 - [ ] **Step 2: Write the failing test for schema validation**
 
-```python
-# scripts/evidence_kernel_test.py
-import json, tempfile, subprocess, sys
-from pathlib import Path
+> 权威实现见 scripts/evidence_kernel_test.py
 
-ROOT = Path(__file__).resolve().parents[1]
-VALID = {
-    "skill": "qcloud-cvm-ops", "run_id": "r1", "phase": "self-test",
-    "intent": "list instances",
-    "router_decision": {"top1_skill": "qcloud-cvm-ops", "candidates": ["qcloud-cvm-ops"],
-                         "misdelegated": False, "fell_back": False},
-    "trace": {}, "golden_ref": "assets/golden/list.json", "fixture_ref": None,
-    "safety": {"destructive": False, "token": None, "plan_hash": None, "leak_checked": True},
-    "provenance": {"source": "sandbox_e2e", "tool": "tccli", "captured_at": "2026-07-28T00:00:00Z"},
-    "budgets": {"context_tokens": 100, "tool_calls": 2, "wall_clock_ms": 500},
-    "cost": {"tokens": 100, "usd": None},
-    "scores": {"correctness": 1, "safety": 1, "idempotency": 1, "traceability": 1, "spec_compliance": 1}
-}
-
-def test_valid_record_passes():
-    p = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
-    json.dump(VALID, p); p.close()
-    r = subprocess.run([sys.executable, "scripts/validate_evidence_schema.py", p.name],
-                       capture_output=True, text=True)
-    assert r.returncode == 0, r.stderr
-
-def test_missing_provenance_fails():
-    bad = dict(VALID); bad.pop("provenance")
-    p = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
-    json.dump(bad, p); p.close()
-    r = subprocess.run([sys.executable, "scripts/validate_evidence_schema.py", p.name],
-                       capture_output=True, text=True)
-    assert r.returncode != 0
-```
 
 - [ ] **Step 3: Run test to verify it fails**
 
@@ -243,52 +211,8 @@ if __name__ == "__main__":
 
 - [ ] **Step 6: Write `evidence_kernel.py` (PreFlight + PostRecord + mask + plan_hash)**
 
-```python
-#!/usr/bin/env python3
-"""Evidence Kernel: PreFlight gate + PostRecord persistence.
-PreFlight runs before execution (budget/destructive/token gating).
-PostRecord persists a validated EvidenceRecord under audit-results/.
-NOTE: human-in-the-loop — harness never auto-issues the confirmation token."""
-import json, hashlib, re
-from pathlib import Path
+> 权威实现见 scripts/evidence_kernel.py
 
-ROOT = Path(__file__).resolve().parents[1]
-AUDIT = ROOT / "audit-results"
-AUDIT.mkdir(exist_ok=True)
-
-DESTRUCTIVE_VERBS = {"delete", "terminate", "destroy", "drop", "reset", "remove", "stop"}
-
-def plan_hash(plan_text: str) -> str:
-    return hashlib.sha256(plan_text.encode()).hexdigest()[:16]
-
-def is_destructive(plan_text: str) -> bool:
-    return any(v in plan_text.lower().split() for v in DESTRUCTIVE_VERBS)
-
-def preflight(plan_text: str, human_token: str | None) -> dict:
-    """Return a PreFlight decision. Does NOT auto-issue tokens."""
-    destructive = is_destructive(plan_text)
-    decision = {"destructive": destructive, "allowed": True, "reason": ""}
-    if destructive and not human_token:
-        decision["allowed"] = False
-        decision["reason"] = "destructive op requires human-issued confirmation token"
-    return decision
-
-def mask_trace(trace: dict) -> dict:
-    """Redact obvious secret patterns (KPI#1). Returns a sanitized copy."""
-    text = json.dumps(trace, ensure_ascii=False)
-    text = re.sub(r"(AKID|secretId|secretKey)[\w]*[\"'= :]+[\w-]+", "<masked>", text)
-    text = re.sub(r"TENCENTCLOUD_SECRET_KEY=[\w-]+", "TENCENTCLOUD_SECRET_KEY=<masked>", text)
-    return json.loads(text)
-
-def post_record(record: dict) -> Path:
-    out = AUDIT / f"evidence-{record['run_id']}.json"
-    out.write_text(json.dumps(record, indent=2, ensure_ascii=False))
-    return out
-
-if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        print(plan_hash(Path(sys.argv[1]).read_text()))
-```
 
 - [ ] **Step 7: Run tests to verify they pass**
 
@@ -337,68 +261,8 @@ Expected: FAIL — script missing.
 
 - [ ] **Step 3: Write `build_skill_registry.py`**
 
-```python
-#!/usr/bin/env python3
-"""Build Skill Registry from all qcloud-*-ops/SKILL.md frontmatter.
-Emits audit-results/skill-registry.json. Also --check for CI (KPI #3)."""
-import json, re, sys
-from pathlib import Path
+> 权威实现见 scripts/skill_registry.py
 
-ROOT = Path(__file__).resolve().parents[1]
-AUDIT = ROOT / "audit-results"
-FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---", re.DOTALL)
-
-def parse_frontmatter(text: str) -> dict:
-    m = FRONTMATTER_RE.match(text)
-    if not m:
-        return {}
-    fm = {}
-    for line in m.group(1).splitlines():
-        if ":" in line:
-            k, v = line.split(":", 1)
-            fm[k.strip()] = v.strip().strip('"')
-    return fm
-
-def build():
-    skills = []
-    for sk in sorted(ROOT.glob("qcloud-*-ops/SKILL.md")):
-        fm = parse_frontmatter(sk.read_text())
-        if not fm:
-            continue
-        skills.append({
-            "name": fm.get("name", sk.parent.name),
-            "path": str(sk.parent),
-            "cli_applicability": fm.get("cli_applicability", ""),
-            "description": fm.get("description", ""),
-            "intent_keywords": re.findall(r"`([^`]+)`", fm.get("description", "")),
-            "delegate_to": fm.get("related_skills", ""),
-        })
-    return {"skills": skills, "count": len(skills)}
-
-def main():
-    if "--emit" in sys.argv:
-        data = build()
-        AUDIT.mkdir(exist_ok=True)
-        (AUDIT / "skill-registry.json").write_text(json.dumps(data, indent=2, ensure_ascii=False))
-        print(f"emitted {data['count']} skills")
-        sys.exit(0)
-    if "--check" in sys.argv:
-        data = build()
-        missing = []
-        for s in data["skills"]:
-            if s["cli_applicability"] in ("dual-path", "sdk-only"):
-                gdir = Path(s["path"]) / "assets" / "golden"
-                n = len(list(gdir.glob("*.json"))) if gdir.exists() else 0
-                if n < 5:
-                    missing.append(f"{s['name']}: {n}/5 golden")
-        if missing:
-            print("KPI#3 FAIL:\n" + "\n".join(missing)); sys.exit(1)
-        print("KPI#3 OK: all executable skills have >=5 golden"); sys.exit(0)
-    print("usage: --emit | --check"); sys.exit(2)
-
-if __name__ == "__main__":
-    main()
-```
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -452,39 +316,8 @@ git commit -m "feat(harness): Skill Registry builder from SKILL.md frontmatter"
 
 - [ ] **Step 2: Write failing test for sandbox_e2e**
 
-```python
-# scripts/sandbox_e2e_test.py
-import json, subprocess, sys, tempfile
-from pathlib import Path
-ROOT = Path(__file__).resolve().parents[1]
+> 权威实现见 scripts/sandbox_e2e_test.py
 
-def test_golden_match_passes():
-    d = tempfile.mkdtemp()
-    fix = Path(d) / "fixtures"; fix.mkdir()
-    (fix / "describe_instances.json").write_text(json.dumps({
-        "Response": {"TotalCount": 1, "InstanceSet": [{"InstanceId": "ins-abc123"}]}}))
-    gold = Path(d) / "golden"; gold.mkdir()
-    (gold / "list.json").write_text(json.dumps({
-        "intent": "x", "input": {},
-        "expected": {"fixture": "fixtures/describe_instances.json",
-                     "assertions": [{"path": "$.Response.InstanceSet[0].InstanceId", "op": "exists"}]}}))
-    r = subprocess.run([sys.executable, "scripts/sandbox_e2e.py", "--skill-dir", d],
-                       capture_output=True, text=True)
-    assert r.returncode == 0, r.stderr
-
-def test_golden_mismatch_fails():
-    d = tempfile.mkdtemp()
-    fix = Path(d) / "fixtures"; fix.mkdir()
-    (fix / "describe_instances.json").write_text(json.dumps({"Response": {"InstanceSet": []}}))
-    gold = Path(d) / "golden"; gold.mkdir()
-    (gold / "list.json").write_text(json.dumps({
-        "intent": "x", "input": {},
-        "expected": {"fixture": "fixtures/describe_instances.json",
-                     "assertions": [{"path": "$.Response.InstanceSet[0].InstanceId", "op": "exists"}]}}))
-    r = subprocess.run([sys.executable, "scripts/sandbox_e2e.py", "--skill-dir", d],
-                       capture_output=True, text=True)
-    assert r.returncode != 0
-```
 
 - [ ] **Step 3: Run test to verify it fails**
 
@@ -493,55 +326,8 @@ Expected: FAIL — script missing.
 
 - [ ] **Step 4: Write `sandbox_e2e.py`**
 
-```python
-#!/usr/bin/env python3
-"""Sandbox E2E: run a skill's golden scenarios against recorded fixtures (no live creds).
-Asserts golden assertions; emits an EvidenceRecord (phase=self-test). Exits non-zero on mismatch."""
-import json, sys, re
-from pathlib import Path
+> 权威实现见 scripts/sandbox_e2e.py
 
-def get_path(obj, pointer: str):
-    cur = obj
-    for part in re.findall(r"\[(\d+)\]|([^.\[\]]+)", pointer):
-        idx, key = part
-        cur = cur[int(idx)] if idx != "" else cur[key]
-    return cur
-
-def check_assertion(data, assertion):
-    val = get_path(data, assertion["path"])
-    op = assertion["op"]
-    if op == "exists": return val is not None
-    if op == "exists_not": return val is None
-    if op == ">=": return val >= assertion["value"]
-    if op == "==": return val == assertion["value"]
-    raise ValueError(f"unknown op {op}")
-
-def run_skill_dir(skill_dir: Path):
-    errors = []
-    for g in (skill_dir / "golden").glob("*.json"):
-        scen = json.loads(g.read_text())
-        fix_path = skill_dir / scen["expected"]["fixture"]
-        data = json.loads(fix_path.read_text()) if fix_path.exists() else {}
-        for a in scen["expected"]["assertions"]:
-            try:
-                if not check_assertion(data, a):
-                    errors.append(f"{g.name}: assertion failed {a}")
-            except (KeyError, IndexError, ValueError) as e:
-                errors.append(f"{g.name}: {e}")
-    return errors
-
-def main():
-    if "--skill-dir" not in sys.argv:
-        print("usage: sandbox_e2e.py --skill-dir <path>"); sys.exit(2)
-    sd = Path(sys.argv[sys.argv.index("--skill-dir") + 1])
-    errors = run_skill_dir(sd)
-    if errors:
-        print("GOLDEN MISMATCH:\n" + "\n".join(errors)); sys.exit(1)
-    print("OK: golden scenarios matched"); sys.exit(0)
-
-if __name__ == "__main__":
-    main()
-```
 
 - [ ] **Step 5: Run tests to verify they pass**
 
@@ -595,40 +381,8 @@ def test_kpi_targets_enforced():
 
 - [ ] **Step 3: Write `aggregate_kpi.py`**
 
-```python
-#!/usr/bin/env python3
-"""Aggregate KPI set from one or more EvidenceRecords. Emits JSON report; exits 1 if any target unmet."""
-import json, sys
-from pathlib import Path
+> 权威实现见 scripts/gcl_trace_aggregate.py
 
-TARGETS = {"leak": 0, "destructive_coverage": 1.0, "provenance": 1.0, "mixing": 0.0}
-
-def aggregate(records):
-    n = len(records)
-    leak = sum(0 if r["safety"]["leak_checked"] else 1 for r in records)
-    dest = [r for r in records if r["safety"]["destructive"]]
-    dest_cov = (sum(1 for r in dest if r["safety"]["token"]) / len(dest)) if dest else 1.0
-    prov = (sum(1 for r in records if r.get("provenance")) / n) if n else 0.0
-    mixing = (sum(1 for r in records if r["phase"]=="self-test" and r["provenance"]["source"]=="production") / n) if n else 0.0
-    p95 = sorted(r["budgets"]["wall_clock_ms"] for r in records)[max(0, int(0.95*n)-1)] if n else 0
-    return {"kpi": {"leak": leak, "destructive_coverage": dest_cov,
-                    "provenance": prov, "mixing": mixing, "p95_ms": p95},
-            "records": n}
-
-def main():
-    recs = [json.loads(Path(p).read_text()) for p in sys.argv[1:]]
-    rep = aggregate(recs)
-    print(json.dumps(rep, indent=2))
-    k = rep["kpi"]
-    if k["leak"] > TARGETS["leak"] or k["destructive_coverage"] < TARGETS["destructive_coverage"] \
-       or k["provenance"] < TARGETS["provenance"] or k["mixing"] > TARGETS["mixing"]:
-        sys.exit(1)
-    sys.exit(0)
-
-if __name__ == "__main__":
-    if len(sys.argv) < 2: print("usage: aggregate_kpi.py <evidence.json> [...]"); sys.exit(2)
-    main()
-```
 
 - [ ] **Step 4: Run test → PASS.**
 
@@ -853,50 +607,8 @@ def test_confusion_matrix_from_eval_queries():
 
 - [ ] **Step 3: Write `harness_router.py`**
 
-```python
-#!/usr/bin/env python3
-"""Phase 4 — Runtime Router: frontmatter-only candidate selection, progressive
-references load (by the caller after selection), per-run budget enforcement, and
-intent confusion matrix over existing eval_queries.json (ground truth)."""
-import json, sys, re
-from pathlib import Path
+> 权威实现见 scripts/harness_router.py
 
-def select_top1(registry: dict, intent: str) -> dict:
-    best, best_score = None, -1
-    for s in registry["skills"]:
-        score = sum(1 for kw in s.get("intent_keywords", []) if kw.lower() in intent.lower())
-        if score > best_score:
-            best, best_score = s["name"], score
-    return {"top1_skill": best, "score": best_score, "candidates": [s["name"] for s in registry["skills"]]}
-
-def confusion_matrix(registry: dict, eval_queries: dict, skill: str) -> dict:
-    """Reuse eval_queries.json (has should_trigger + intent) as ground truth."""
-    pos = [q for q in eval_queries if q.get("should_trigger") and skill in q.get("intent", "")]
-    neg = [q for q in eval_queries if not q.get("should_trigger")]
-    tp = sum(1 for q in pos if select_top1(registry, q["intent"])["top1_skill"] == skill)
-    fp = sum(1 for q in neg if select_top1(registry, q["intent"])["top1_skill"] == skill)
-    top1 = (tp / len(pos)) if pos else 0.0
-    misdelegation = (fp / len(neg)) if neg else 0.0
-    return {"top1_accuracy": top1, "misdelegation": misdelegation, "fallback": 0.0}
-
-def main():
-    args = sys.argv
-    if "--registry" in args and "--intent" in args:
-        reg = json.loads(Path(args[args.index("--registry")+1]).read_text())
-        intent = args[args.index("--intent")+1]
-        print(json.dumps(select_top1(reg, intent)))
-        sys.exit(0)
-    if "--confusion" in args:
-        reg = json.loads(Path(args[args.index("--registry")+1]).read_text())
-        eq = json.loads(Path(args[args.index("--eval")+1]).read_text())
-        skill = args[args.index("--skill")+1]
-        print(json.dumps(confusion_matrix(reg, eq, skill)))
-        sys.exit(0)
-    print("usage: --registry R --intent I | --confusion --registry R --eval E --skill S"); sys.exit(2)
-
-if __name__ == "__main__":
-    main()
-```
 
 - [ ] **Step 4: Run tests → PASS.**
 

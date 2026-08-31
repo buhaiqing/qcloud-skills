@@ -19,63 +19,8 @@
 
 #### 1.1 架构要求硬编码
 
-```python
-# gcl_enforcer.py
-class GCLArchitectureEnforcer:
-    """GCL 架构强制执行器"""
-    
-    ARCHITECTURE_RULES = {
-        "must_use_multiple_subagents": {
-            "description": "必须使用多个子 Agent",
-            "mandatory": True,
-            "verification": "检查是否有多个 Agent 被创建"
-        },
-        "must_parallelize_critics": {
-            "description": "Critic 子 Agent 必须并行执行",
-            "mandatory": True,
-            "verification": "检查执行时间是否重叠"
-        },
-        "must_separate_roles": {
-            "description": "Generator 和 Critic 必须由不同的 Agent 执行",
-            "mandatory": True,
-            "verification": "检查 Agent 的输出是否只包含自己的工作"
-        },
-        "must_independent_orchestrator": {
-            "description": "编排器不能参与具体工作",
-            "mandatory": True,
-            "verification": "检查编排器是否只做协调工作"
-        }
-    }
-    
-    def validate_execution_plan(self, plan):
-        """验证执行计划"""
-        violations = []
-        
-        for rule_id, rule in self.ARCHITECTURE_RULES.items():
-            if rule["mandatory"] and not self.check_rule(plan, rule_id):
-                violations.append({
-                    "rule": rule_id,
-                    "description": rule["description"],
-                    "severity": "CRITICAL"
-                })
-        
-        return violations
-    
-    def enforce_execution(self, user_request):
-        """强制执行 GCL"""
-        # 1. 创建执行计划
-        plan = self.create_execution_plan(user_request)
-        
-        # 2. 验证执行计划
-        violations = self.validate_execution_plan(plan)
-        if violations:
-            raise ArchitectureViolationError(
-                f"执行计划违反架构要求: {violations}"
-            )
-        
-        # 3. 强制执行
-        return self.execute_with_monitoring(plan)
-```
+> 权威实现见 gcl_enforcer.py
+
 
 #### 1.2 执行模板强制
 
@@ -121,123 +66,8 @@ mandatory_template:
 
 #### 2.1 执行监控器
 
-```python
-# gcl_monitor.py
-class GCLExecutionMonitor:
-    """GCL 执行实时监控器"""
-    
-    def __init__(self):
-        self.execution_state = {}
-        self.violations = []
-        self.start_time = time.time()
-    
-    def on_agent_created(self, agent_id, agent_type):
-        """当 Agent 被创建时"""
-        self.execution_state[agent_id] = {
-            "type": agent_type,
-            "created_at": time.time(),
-            "activities": [],
-            "status": "created"
-        }
-        
-        # 检查是否符合架构
-        self.check_architecture_compliance()
-    
-    def on_agent_activity(self, agent_id, activity_type, details):
-        """当 Agent 执行活动时"""
-        if agent_id in self.execution_state:
-            self.execution_state[agent_id]["activities"].append({
-                "type": activity_type,
-                "details": details,
-                "timestamp": time.time()
-            })
-            
-            # 实时检查违规
-            self.check_violations(agent_id, activity_type, details)
-    
-    def check_violations(self, agent_id, activity_type, details):
-        """检查违规行为"""
-        agent_type = self.execution_state[agent_id]["type"]
-        
-        # 检查角色分离
-        if agent_type == "generator" and "evaluation" in activity_type:
-            self.record_violation(
-                agent_id,
-                "Generator 参与了评估工作",
-                "CRITICAL"
-            )
-        
-        elif agent_type == "critic" and "generation" in activity_type:
-            self.record_violation(
-                agent_id,
-                "Critic 参与了生成工作",
-                "CRITICAL"
-            )
-        
-        # 检查并行执行
-        self.check_parallel_execution()
-    
-    def check_parallel_execution(self):
-        """检查并行执行"""
-        critic_agents = [
-            aid for aid, state in self.execution_state.items()
-            if state["type"] == "critic"
-        ]
-        
-        if len(critic_agents) > 1:
-            # 检查执行时间是否重叠
-            execution_intervals = []
-            for agent_id in critic_agents:
-                if self.execution_state[agent_id]["activities"]:
-                    start = self.execution_state[agent_id]["created_at"]
-                    end = max(a["timestamp"] for a in 
-                            self.execution_state[agent_id]["activities"])
-                    execution_intervals.append((start, end))
-            
-            # 检查是否有重叠
-            if not self.has_overlap(execution_intervals):
-                self.record_violation(
-                    "system",
-                    "Critic 子 Agent 没有并行执行",
-                    "HIGH"
-                )
-    
-    def record_violation(self, agent_id, description, severity):
-        """记录违规"""
-        violation = {
-            "agent_id": agent_id,
-            "description": description,
-            "severity": severity,
-            "timestamp": time.time()
-        }
-        
-        self.violations.append(violation)
-        
-        # 如果是严重违规，触发自动修复
-        if severity == "CRITICAL":
-            self.trigger_auto_fix(violation)
-    
-    def trigger_auto_fix(self, violation):
-        """触发自动修复"""
-        print(f"检测到严重违规: {violation['description']}")
-        print("正在触发自动修复...")
-        
-        # 根据违规类型进行修复
-        if "并行" in violation["description"]:
-            self.fix_parallel_execution()
-        elif "角色" in violation["description"]:
-            self.fix_role_separation()
-    
-    def get_compliance_report(self):
-        """获取合规报告"""
-        return {
-            "execution_time": time.time() - self.start_time,
-            "total_agents": len(self.execution_state),
-            "violations": self.violations,
-            "compliance_score": self.calculate_compliance_score(),
-            "recommendations": self.generate_recommendations()
-        }
-```
+> 权威实现见 gcl_monitor.py
+
 
 #### 2.2 监控集成
 
@@ -283,68 +113,8 @@ def execute_gcl_with_monitoring(user_request):
 
 #### 3.1 自动修复器
 
-```python
-# gcl_auto_fixer.py
-class GCLAutoFixer:
-    """GCL 执行自动修复器"""
-    
-    def __init__(self):
-        self.fix_strategies = {
-            "parallel_execution": self.fix_parallel_execution,
-            "role_separation": self.fix_role_separation,
-            "orchestrator_independence": self.fix_orchestrator_independence
-        }
-    
-    def fix_violation(self, violation):
-        """修复违规"""
-        violation_type = self.classify_violation(violation)
+> 权威实现见 gcl_auto_fixer.py
 
-        if violation_type in self.fix_strategies:
-            return self.fix_strategies[violation_type](violation)
-        else:
-            return self.default_fix(violation)
-    
-    def fix_parallel_execution(self, violation):
-        """修复并行执行问题"""
-        print("修复并行执行问题...")
-        
-        # 1. 停止当前执行
-        self.stop_current_execution()
-        
-        # 2. 重新设计执行计划
-        new_plan = self.redesign_execution_plan(
-            force_parallel=True
-        )
-        
-        # 3. 重新执行
-        return self.re_execute(new_plan)
-    
-    def fix_role_separation(self, violation):
-        """修复角色分离问题"""
-        print("修复角色分离问题...")
-        
-        # 1. 识别角色混淆的 Agent
-        confused_agents = self.identify_confused_agents(violation)
-        
-        # 2. 重新分配角色
-        self.reassign_roles(confused_agents)
-        
-        # 3. 重新执行
-        return self.re_execute()
-    
-    def fix_orchestrator_independence(self, violation):
-        """修复编排器独立性问题"""
-        print("修复编排器独立性问题...")
-        
-        # 1. 创建新的独立编排器
-        new_orchestrator = self.create_independent_orchestrator()
-        
-        # 2. 替换原有编排器
-        self.replace_orchestrator(new_orchestrator)
-        
-        # 3. 重新执行
-        return self.re_execute()
-```
 
 #### 3.2 修复流程
 

@@ -40,39 +40,8 @@ Phase 2 完成后，Reflexion Memory 记录了失败模式，CADL 沉淀了经�
 
 **SelfHealEngine**：
 
-```python
-@dataclass
-class FixProposal:
-    level: str                         # "L1" | "L2" | "L3"
-    skill: str
-    error_code: str
-    occurrence_count: int
-    target_file: str                   # 要修改的文件路径
-    old_content: str                   # 原始内容
-    new_content: str                   # 修改后内容
-    rationale: str                     # 修复理由
-    risk_assessment: str               # 风险评估
-    auto_merge: bool                   # 是否可自动合并
+> 权威实现见 scripts/self_heal_engine.py
 
-class SelfHealEngine:
-    def analyze_failures(self) -> list[FixProposal]:
-        """分析 failure-patterns.md + trace 历史，生成修复提案"""
-    
-    def generate_l1_fix(self, pattern) -> FixProposal:
-        """模板化生成 L1 修复（新增错误码到 SKILL.md error table）"""
-    
-    def generate_l2_fix(self, pattern) -> FixProposal:
-        """LLM 生成 L2 修复（修改默认参数）"""
-    
-    def generate_l3_fix(self, pattern) -> FixProposal:
-        """LLM 生成 L3 修复（修改命令模板）"""
-    
-    def create_pr(self, proposal: FixProposal) -> str:
-        """创建修复 PR，L1 自动合并，L2/L3 标记 needs-human-review"""
-    
-    def verify_fix(self, proposal: FixProposal) -> bool:
-        """CI 验证: linter + 测试 + GCL dry-run"""
-```
 
 **修复验证**：
 - L1: CI 自动验证（linter + 测试）
@@ -240,47 +209,8 @@ Phase 2 完成后，安全门禁实现了风险分级（LOW/MEDIUM/HIGH/CRITICAL
 
 **AutonomyPolicy 分层**：
 
-```python
-@dataclass
-class AutonomyPolicy:
-    level: int                         # 0-3
-    description: str
-    rules: list[AutonomyRule]
+> 权威实现见 scripts/autonomy_policy.py
 
-@dataclass
-class AutonomyRule:
-    condition: str                     # "risk_level == 'LOW'"
-    action: str                        # "auto_confirm" | "critic_review" | "human_token" | "human_approval"
-    scope: list[str]                   # ["qcloud-cvm-ops", "qcloud-cdb-ops"]
-    max_decisions_per_hour: int        # 速率限制
-    require_audit: bool                # 是否写入审计日志
-
-# Level 0 (Phase 1): 所有破坏性操作需 human token
-LEVEL_0 = AutonomyPolicy(level=0, rules=[
-    AutonomyRule(condition="is_destructive", action="human_token", scope=["*"])
-])
-
-# Level 1 (Phase 2): 低风险自动确认
-LEVEL_1 = AutonomyPolicy(level=1, rules=[
-    AutonomyRule(condition="risk_level == 'LOW'", action="auto_confirm", scope=["*"]),
-    AutonomyRule(condition="risk_level == 'MEDIUM'", action="critic_review", scope=["*"]),
-    AutonomyRule(condition="risk_level in ('HIGH', 'CRITICAL')", action="human_token", scope=["*"])
-])
-
-# Level 2 (Phase 3 早期): 中风险自动执行
-LEVEL_2 = AutonomyPolicy(level=2, rules=[
-    AutonomyRule(condition="risk_level in ('LOW', 'MEDIUM')", action="auto_confirm", scope=["*"]),
-    AutonomyRule(condition="risk_level == 'HIGH'", action="critic_review", scope=["*"]),
-    AutonomyRule(condition="risk_level == 'CRITICAL'", action="human_approval", scope=["*"])
-])
-
-# Level 3 (Phase 3 晚期): 仅最高风险需人工
-LEVEL_3 = AutonomyPolicy(level=3, rules=[
-    AutonomyRule(condition="risk_level in ('LOW', 'MEDIUM', 'HIGH')", action="auto_confirm", scope=["*"]),
-    AutonomyRule(condition="risk_level == 'CRITICAL'", action="human_approval", scope=["*"]),
-    AutonomyRule(condition="is_cross_system", action="human_token", scope=["*"])
-])
-```
 
 **不可篡改审计日志**：
 
