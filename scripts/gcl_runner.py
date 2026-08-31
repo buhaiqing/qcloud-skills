@@ -776,17 +776,37 @@ def _emit_trace_span(
         pass
 
 
+def _audit_dir(root: Path) -> Path:
+    """Return the audit-results directory (module-local, not exposed in API)."""
+    d = root / "audit-results"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 def persist_trace(root: Path, trace: dict[str, Any], trace_id: str | None = None) -> Path:
-    """Persist a GCL trace.
+    """Persist a GCL trace with auto-completion of 4 schema fields.
 
     `trace_id` is the cross-system join key: when provided it names the file
     (gcl-trace-<trace_id>.json) so copilot session traces and GCL traces share
     one identifier namespace (fixes data-lineage break L3). Falls back to a
     UTC timestamp to stay backward-compatible with existing timestamp-based
     queries and the structural smoke tests.
+
+    Auto-fills ``started_at``, ``finished_at``, ``commits``, ``files_changed``
+    if not already present so downstream dashboards (aggregate/cost) always have
+    populated fields.
     """
-    out_dir = root / "audit-results"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    now_iso = datetime.now(UTC).isoformat()
+    if "started_at" not in trace:
+        trace["started_at"] = now_iso
+    if "finished_at" not in trace:
+        trace["finished_at"] = now_iso
+    if "commits" not in trace:
+        trace["commits"] = []
+    if "files_changed" not in trace:
+        trace["files_changed"] = []
+
+    out_dir = _audit_dir(root)
     if trace_id:
         trace = {**trace, "trace_id": trace_id}
         path = out_dir / f"gcl-trace-{trace_id}.json"
@@ -795,6 +815,42 @@ def persist_trace(root: Path, trace: dict[str, Any], trace_id: str | None = None
         path = out_dir / f"gcl-trace-{ts}.json"
     path.write_text(json.dumps(trace, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return path
+
+
+def record_commit(trace_id: str, commit_hash: str, root: Path | None = None) -> None:
+    """Append a commit hash to an existing trace's ``commits`` list.
+
+    Idempotent: no-op if the trace file does not exist yet.
+    """
+    if root is None:
+        root = Path(__file__).resolve().parents[1]
+    path = _audit_dir(root) / f"gcl-trace-{trace_id}.json"
+    if not path.exists():
+        return
+    try:
+        trace = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return
+    trace.setdefault("commits", []).append(commit_hash)
+    path.write_text(json.dumps(trace, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def record_file_change(trace_id: str, file_path: str, root: Path | None = None) -> None:
+    """Append a file path to an existing trace's ``files_changed`` list.
+
+    Idempotent: no-op if the trace file does not exist yet.
+    """
+    if root is None:
+        root = Path(__file__).resolve().parents[1]
+    path = _audit_dir(root) / f"gcl-trace-{trace_id}.json"
+    if not path.exists():
+        return
+    try:
+        trace = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return
+    trace.setdefault("files_changed", []).append(file_path)
+    path.write_text(json.dumps(trace, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 def emit_evidence_record(root: Path, trace: dict[str, Any], args: argparse.Namespace, run_id: str,
@@ -1028,6 +1084,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             "skill": args.skill,
             "request": args.request,
             "rubric_version": "v1",
+            "started_at": datetime.now(UTC).isoformat(),
             "iterations": [],
             "preflight_reflexion": {
                 "skill": args.skill,
@@ -1056,6 +1113,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         pf = preflight(args.command, token)
         pf["token_bound"] = False
         if not pf["allowed"]:
+            trace["finished_at"] = datetime.now(UTC).isoformat()
             print(f"PREFLIGHT BLOCKED: {pf['reason']}", file=sys.stderr)
             return 2
         if is_destructive(args.command):
@@ -1063,6 +1121,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                 bind_token(args.command, token or "")
                 pf["token_bound"] = True
             except PermissionError as e:
+                trace["finished_at"] = datetime.now(UTC).isoformat()
                 print(f"PLAN-TOKEN MISMATCH: {e} (human must set HARNESS_CONFIRM_TOKEN=plan_hash)", file=sys.stderr)
                 return 2
 
@@ -1085,6 +1144,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     cfg = cfg or {}
                     cfg["base_url"] = args.llm_base_url.rstrip("/")
                 if cfg is None:
+                    trace["finished_at"] = datetime.now(UTC).isoformat()
                     print(
                         "ERROR: --llm-critic requires GCL_LLM_API_KEY and GCL_LLM_BASE_URL "
                         "(or --llm-base-url + --llm-model).",
@@ -1101,6 +1161,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             else:
                 critic = load_critic(args.critic_json, args.critic_stdin)
                 if critic is None:
+                    trace["finished_at"] = datetime.now(UTC).isoformat()
                     print(
                         "ERROR: No Critic payload. Pass --critic-json, pipe JSON to stdin, "
                         "or use --structural-critic-only for rule-based audit.",
@@ -1109,6 +1170,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     return 2
                 errs = validate_critic_payload(critic)
                 if errs:
+                    trace["finished_at"] = datetime.now(UTC).isoformat()
                     print("ERROR: Invalid critic JSON:", "; ".join(errs), file=sys.stderr)
                     return 2
     
@@ -1138,6 +1200,12 @@ def cmd_run(args: argparse.Namespace) -> int:
                         args.skill, command, generator, critic
                     ),
                 }
+                trace["finished_at"] = datetime.now(UTC).isoformat()
+                try:
+                    fc = subprocess.run(["git", "diff", "--name-only"], capture_output=True, text=True, timeout=10, check=False)
+                    trace["files_changed"] = fc.stdout.strip().split("\n") if fc.returncode == 0 else []
+                except Exception:  # noqa: BLE001
+                    trace["files_changed"] = []
                 path = persist_trace(root, trace, trace_id=args.trace_id)
                 emit_evidence_record(root, trace, args, run_id, pf)
                 _emit_trace_span(
@@ -1157,6 +1225,12 @@ def cmd_run(args: argparse.Namespace) -> int:
                     "iter": iteration,
                     "output": generator.get("result_excerpt", ""),
                 }
+                trace["finished_at"] = datetime.now(UTC).isoformat()
+                try:
+                    fc = subprocess.run(["git", "diff", "--name-only"], capture_output=True, text=True, timeout=10, check=False)
+                    trace["files_changed"] = fc.stdout.strip().split("\n") if fc.returncode == 0 else []
+                except Exception:  # noqa: BLE001
+                    trace["files_changed"] = []
                 path = persist_trace(root, trace, trace_id=args.trace_id)
                 emit_evidence_record(root, trace, args, run_id, pf)
                 _emit_trace_span(
@@ -1200,6 +1274,12 @@ def cmd_run(args: argparse.Namespace) -> int:
                 args.skill, command, trace["iterations"][-1]["generator"], trace["iterations"][-1]["critic"]
             ),
         }
+        trace["finished_at"] = datetime.now(UTC).isoformat()
+        try:
+            fc = subprocess.run(["git", "diff", "--name-only"], capture_output=True, text=True, timeout=10, check=False)
+            trace["files_changed"] = fc.stdout.strip().split("\n") if fc.returncode == 0 else []
+        except Exception:  # noqa: BLE001
+            trace["files_changed"] = []
         path = persist_trace(root, trace, trace_id=args.trace_id)
         emit_evidence_record(root, trace, args, run_id, pf)
         _emit_trace_span(
