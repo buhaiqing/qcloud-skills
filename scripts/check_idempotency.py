@@ -11,6 +11,12 @@ Detection rules:
      → requires ClientToken field in request object
   C. requests: requests.post(...) / requests.get(...) / requests.request(...)
      → requires headers={"Idempotency-Key": ...} or "Idempotency-Key" in headers dict
+  D. boto3 (aws-sdk): client.method(...) calls
+     → requires ClientToken kwarg
+  E. azure-sdk: arm resource calls via azure-mgmt-*
+     → requires x-ms-client-request-id header or Operation-Location polling
+  F. google-cloud-python: storage/bigquery/pubsub mutation calls
+     → requires request_id or destination_id parameter
 
 Usage (pre-commit hook, no args):
     python3 scripts/check_idempotency.py
@@ -21,6 +27,7 @@ Usage (self-test):
 from __future__ import annotations
 
 import argparse
+import ast
 import re
 import subprocess
 import sys
@@ -127,6 +134,246 @@ def check_requests_headers(text: str) -> list[str]:
     return issues
 
 
+# ─── Rule D: boto3 (AWS SDK) ─────────────────────────────────────────────────
+
+# boto3 methods that are NOT idempotent without ClientToken
+# https://docs.aws.amazon.com/AWSEC2/latest/APIReference/query-api-qr.html
+IDEMPOTENT_BOTO3_METHODS = {
+    "run_instances", "create_volume", "copy_image", "copy_snapshot",
+    "create_security_group", "authorize_security_group_ingress",
+    "revoke_security_group_ingress", "delete_security_group",
+    "create_bucket", "put_object", "delete_object", "delete_bucket",
+    "create_stack", "delete_stack", "update_stack", "create_change_set",
+    "delete_change_set", "start_job", "create_pipeline", "send_message",
+    "receive_message", "delete_queue", "create_queue",
+    "publish", "subscribe", "create_topic", "delete_topic",
+    "create_table", "update_table", "delete_table",
+    "create_function", "update_function_code", "delete_function",
+    "create_role", "delete_role", "attach_role_policy", "detach_role_policy",
+    "put_item", "delete_item", "update_item",
+    "send_templated_email", "send_raw_email", "send_email",
+}
+
+_BOTO3_CALL_RE = re.compile(r"\.\s*(client|resource)\s*\(", re.IGNORECASE)
+
+
+def check_boto3(text: str) -> list[str]:
+    """
+    Return issues for boto3 client calls that lack ClientToken kwarg.
+    Uses AST to safely parse and detect missing kwargs.
+    """
+    issues = []
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return []  # Let other rules handle malformed files
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        # Match: something.client(...) or something.resource(...) returning a variable,
+        # then variable.method(...) — or chained: something.client(...).method(...)
+        if not isinstance(node.func, ast.Attribute):
+            continue
+        obj = node.func.value
+        # Case: boto3.client('ec2').run_instances(...) — chained
+        if isinstance(obj, ast.Attribute) and obj.attr in ("client", "resource"):
+            pass  # chained, ok
+        # Case: ec2 = boto3.client('ec2'); ec2.run_instances(...) — variable assignment
+        elif isinstance(obj, ast.Name):
+            pass  # variable holding client, ok
+        else:
+            continue
+        # Check if method is one that needs ClientToken
+        if node.func.attr not in IDEMPOTENT_BOTO3_METHODS:
+            continue
+        # Check kwargs for ClientToken
+        kwarg_names = [k.arg for k in node.keywords if k.arg]
+        if "ClientToken" in kwarg_names:
+            continue
+        lineno = getattr(node, "lineno", 0)
+        issues.append(
+            f"  Line {lineno}: boto3.{node.func.attr} without ClientToken kwarg\n"
+            f"    {node.func.attr}(...) — add ClientToken kwarg for idempotency"
+        )
+    return issues
+
+
+# ─── Rule E: azure-sdk ───────────────────────────────────────────────────────
+
+# azure-mgmt methods that are NOT idempotent without proper request-id header
+# begin_* methods are async long-running operations; non-begin mutation methods also need it
+IDEMPOTENT_AZURE_METHODS = {
+    # Compute
+    "begin_create_or_update", "begin_delete", "begin_update",
+    "begin_create", "begin_delete_method",
+    # Storage
+    "create", "update", "delete", "set",
+    # Network
+    "put", "patch",
+}
+
+_AZURE_MGMT_CALL_RE = re.compile(r"azure\.mgmt\.[a-z]+\.[a-z]+\.[a-zA-Z0-9_]+", re.IGNORECASE)
+_AZURE_REQ_ID_HEADER_RE = re.compile(r"x-ms-client-request-id", re.IGNORECASE)
+
+
+def check_azure_sdk(text: str) -> list[str]:
+    """
+    Return issues for azure-sdk calls that lack idempotency-related patterns.
+
+    Detects:
+      - azure-mgmt client.begin_*() calls without x-ms-client-request-id header
+      - raw requests.post/get calls mentioning azure endpoints without idempotency header
+    """
+    issues = []
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return []
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        # Detect azure.mgmt.X.Y.Z.client.begin_*() or similar
+        method_name = None
+        if isinstance(node.func, ast.Attribute):
+            method_name = node.func.attr
+        elif isinstance(node.func, ast.Name):
+            method_name = node.func.id
+
+        if not method_name:
+            continue
+
+        # Check begin_* mutation methods
+        is_begin_mutation = method_name.startswith("begin_")
+        is_mutation = method_name in IDEMPOTENT_AZURE_METHODS or any(
+            method_name.startswith(p) for p in ("create", "update", "delete", "put", "patch")
+        )
+        if not (is_begin_mutation or is_mutation):
+            continue
+
+        # Check if kwarg contains request_id or client_request_id
+        kwarg_names = [k.arg for k in node.keywords if k.arg]
+        has_request_id = any(
+            "request_id" in name.lower() or "client_request_id" in name.lower()
+            for name in kwarg_names
+        )
+        if has_request_id:
+            continue
+
+        # Check headers kwarg for x-ms-client-request-id
+        has_header_id = False
+        for k in node.keywords:
+            if (k.arg in ("headers", "header_dict", "kwargs")
+                    and isinstance(k.value, ast.Dict)):
+                for key_node in k.value.keys:
+                    if isinstance(key_node, ast.Constant) and "request-id" in str(key_node.value).lower():
+                        has_header_id = True
+                        break
+        if has_header_id:
+            continue
+
+        lineno = getattr(node, "lineno", 0)
+        issues.append(
+            f"  Line {lineno}: azure-sdk {method_name} without request-id\n"
+            f"    Add x-ms-client-request-id header or polling Operation-Location"
+        )
+
+    # Also flag raw requests calls to *.azure.com without Idempotency-Key
+    # (complement to Rule C, but azure-specific)
+    for lineno, line in enumerate(text.splitlines(), 1):
+        if not _REQUESTS_CALL_RE.search(line):
+            continue
+        if ".azure.com" not in line.lower() and ".azurewebsites.net" not in line.lower():
+            continue
+        if _IDEMPOTENCY_KEY_RE.search(line) or _AZURE_REQ_ID_HEADER_RE.search(line):
+            continue
+        issues.append(
+            f"  Line {lineno}: requests call to Azure endpoint without x-ms-client-request-id\n"
+            f"    {line.strip()[:80]}"
+        )
+
+    return issues
+
+
+# ─── Rule F: google-cloud-python ──────────────────────────────────────────────
+
+# google-cloud methods that are NOT idempotent without request_id
+IDEMPOTENT_GCP_METHODS = {
+    # Storage
+    "upload_from_string", "upload_from_filename", "upload_as_string",
+    "delete", "copy_blob", "rename", "compose",
+    # BigQuery
+    "insert", "insert_rows", "insert_rows_json", "delete_table",
+    "update_table", "patch_table", "copy_table",
+    # Pub/Sub
+    "publish", "publish_message", "delete_topic", "delete_subscription",
+    "create_snapshot", "seek",
+    # Datastore
+    "put", "allocate_ids",
+    # KMS
+    "encrypt", "decrypt", "destroy_crypto_key", "disable_crypto_key",
+    # Secret Manager
+    "add_version", "destroy_secret_version",
+    # AI Platform / Vertex AI
+    "create_endpoint", "deploy_model", "undeploy_model",
+}
+
+_GCP_SDK_RE = re.compile(
+    r"from google\.cloud|import google\.cloud"
+    r"|google\.cloud\.",
+    re.IGNORECASE,
+)
+
+
+def check_google_cloud(text: str) -> list[str]:
+    """
+    Return issues for google-cloud-python calls that lack request_id parameter.
+    """
+    issues = []
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return []
+
+    has_gcp_import = bool(_GCP_SDK_RE.search(text))
+    if not has_gcp_import:
+        return []
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Attribute):
+            continue
+
+        method_name = node.func.attr
+        # Check mutation methods
+        is_mutation = (
+            method_name in IDEMPOTENT_GCP_METHODS or
+            any(method_name.startswith(p) for p in
+                ("insert", "update", "delete", "create", "upload", "publish", "put"))
+        )
+        if not is_mutation:
+            continue
+
+        kwarg_names = [k.arg for k in node.keywords if k.arg]
+        # GCP uses request_id, destination_id, source, etc.
+        has_request_id = any(
+            name in kwarg_names or name.lower() in ("request_id", "destination_id", ("source"
+                             "client_request_id"), "requestid", "idempotency_token")
+            for name in kwarg_names
+        )
+        if has_request_id:
+            continue
+
+        lineno = getattr(node, "lineno", 0)
+        issues.append(
+            f"  Line {lineno}: google-cloud.{method_name} without request_id\n"
+            f"    {method_name}(...) — add request_id kwarg for idempotency"
+        )
+    return issues
+
+
 # ─── Per-file check ───────────────────────────────────────────────────────────
 
 def check_file(path: Path) -> list[str]:
@@ -140,6 +387,9 @@ def check_file(path: Path) -> list[str]:
     issues.extend(check_tccli_subprocess(text))
     issues.extend(check_tencentcloud_sdk(text))
     issues.extend(check_requests_headers(text))
+    issues.extend(check_boto3(text))
+    issues.extend(check_azure_sdk(text))
+    issues.extend(check_google_cloud(text))
     return issues
 
 
@@ -195,6 +445,67 @@ SELF_TEST_CASES = [
         "clean file (no API calls)",
         "x = 1\ny = 2\n",
         False,
+    ),
+    # ── Rule D: boto3 ───────────────────────────────────────────────────────────
+    (
+        "boto3 run_instances WITHOUT ClientToken (should flag)",
+        (
+            "import boto3\n"
+            "ec2 = boto3.client('ec2')\n"
+            "ec2.run_instances(ImageId='ami-xxx', MinCount=1, MaxCount=1)\n"
+        ),
+        True,
+    ),
+    (
+        "boto3 run_instances WITH ClientToken (should NOT flag)",
+        (
+            "import boto3\n"
+            "ec2 = boto3.client('ec2')\n"
+            "ec2.run_instances(ImageId='ami-xxx', MinCount=1, MaxCount=1, ClientToken='tok-123')\n"
+        ),
+        False,
+    ),
+    (
+        "boto3 create_bucket WITHOUT ClientToken (should flag)",
+        (
+            "import boto3\n"
+            "s3 = boto3.client('s3')\n"
+            "s3.create_bucket(Bucket='my-bucket', CreateBucketConfiguration={'LocationConstraint': 'ap-guangzhou'})\n"
+        ),
+        True,
+    ),
+    # ── Rule E: azure-sdk ──────────────────────────────────────────────────────
+    (
+        "azure-mgmt begin_create_or_update without request-id (should flag)",
+        (
+            "from azure.mgmt.compute.v2022_03_01 import ComputeManagementClient\n"
+            "client = ComputeManagementClient(credential, subscription_id)\n"
+            "async_poller = client.virtual_machines.begin_create_or_update(\n"
+            "    resource_group_name, vm_name, vm_params)\n"
+        ),
+        True,
+    ),
+    (
+        "azure-mgmt begin_create_or_update with request_id kwarg (should NOT flag)",
+        (
+            "from azure.mgmt.compute.v2022_03_01 import ComputeManagementClient\n"
+            "client = ComputeManagementClient(credential, subscription_id)\n"
+            "async_poller = client.virtual_machines.begin_create_or_update(\n"
+            "    resource_group_name, vm_name, vm_params, request_id='req-123')\n"
+        ),
+        False,
+    ),
+    # ── Rule F: google-cloud-python ───────────────────────────────────────────
+    (
+        "google-cloud storage upload without request_id (should flag)",
+        (
+            "from google.cloud import storage\n"
+            "client = storage.Client()\n"
+            "bucket = client.bucket('my-bucket')\n"
+            "blob = bucket.blob('my-file.txt')\n"
+            "blob.upload_from_filename('/tmp/my-file.txt')\n"
+        ),
+        True,
     ),
 ]
 

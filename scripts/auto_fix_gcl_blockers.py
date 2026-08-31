@@ -50,6 +50,155 @@ IDEMPOTENCY_CLIENT_TOKEN_MSG = "Response missing ClientToken — idempotency can
 IDEMPOTENCY_SET_TOKEN_MSG = "set ClientToken"
 AUTH_CRED_MSG = "Generator exit_code=-2; fix command or credentials"
 
+# ─── Traceability code fixer ──────────────────────────────────────────────────
+
+_REQUESTID_GET_RE = re.compile(r'RequestId\s*\)', re.IGNORECASE)
+_REQUESTID_LOG_RE = re.compile(r'RequestId["\']', re.IGNORECASE)
+_REQUESTID_VAR_RE = re.compile(r'request[_-]?id\s*=', re.IGNORECASE)
+_SDK_RESPONSE_RE = re.compile(r'\.Response\.[A-Z]', re.IGNORECASE)
+_SDK_IMPORT_RE = re.compile(r'from tencentcloud', re.IGNORECASE)
+_TCCLI_RE = re.compile(r'subprocess\.run\s*\(\s*(\[|")', re.IGNORECASE)
+_JSON_PARSE_RE = re.compile(r'json\.(load|loads)\s*\(', re.IGNORECASE)
+_READONLY_OPS_RE = re.compile(r'Describe|Query|List|Get|Check', re.IGNORECASE)
+
+
+def _has_requestid_nearby(line_idx: int, lines: list[str], radius: int = 8) -> bool:
+    """Check if RequestId is captured within `radius` lines of line_idx."""
+    start = max(0, line_idx - radius)
+    end = min(len(lines), line_idx + radius)
+    window = "\n".join(lines[start:end])
+    return (
+        _REQUESTID_GET_RE.search(window)
+        or _REQUESTID_LOG_RE.search(window)
+        or _REQUESTID_VAR_RE.search(window)
+    )
+
+
+def fix_requestid_in_text(text: str) -> tuple[str, list[str]]:
+    """
+    Scan text for tccli/SDK response handling without RequestId capture
+    and insert:  request_id = <source>.RequestId; logger.info(..., request_id=request_id)
+
+    Returns (fixed_text, list_of_changes).
+    Skips: comment lines, read-only operations, lines already capturing RequestId.
+    """
+    changes: list[str] = []
+    fixed_lines: list[str] = []
+    lines = text.splitlines()
+    in_triple = False
+
+    for lineno, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if '"""' in stripped or "'''" in stripped:
+            in_triple = not in_triple
+            fixed_lines.append(line)
+            continue
+        if in_triple or not stripped or stripped.startswith('#'):
+            fixed_lines.append(line)
+            continue
+
+        is_sdk = bool(_SDK_RESPONSE_RE.search(line) and _SDK_IMPORT_RE.search(
+            "\n".join(lines[max(0, lineno - 6):lineno - 1])
+        ))
+        is_tccli = bool(_TCCLI_RE.search(line))
+        is_json = bool(_JSON_PARSE_RE.search(line))
+
+        if not (is_sdk or is_tccli or is_json):
+            fixed_lines.append(line)
+            continue
+
+        # Skip read-only
+        if is_tccli and _READONLY_OPS_RE.search(line):
+            fixed_lines.append(line)
+            continue
+
+        # Skip if already has RequestId nearby
+        if _has_requestid_nearby(lineno - 1, lines):
+            fixed_lines.append(line)
+            continue
+
+        # Determine the source expression for RequestId
+        if is_sdk:
+            # response.Response.X → response.Response.RequestId
+            m = _SDK_RESPONSE_RE.search(line)
+            if m:
+                prefix = line[:m.start()]
+                # extract the response variable, e.g. "resp" from "resp.Response.InstanceSet"
+                src_var = prefix.strip().split()[-1].rstrip('.')
+                src = f"{src_var}.Response.RequestId"
+        elif is_tccli:
+            # tccli subprocess → data["Response"].get("RequestId")
+            src = 'data["Response"].get("RequestId")'
+        else:
+            src = 'data.get("RequestId")'
+
+        indent = len(line) - len(line.lstrip())
+        pad = ' ' * indent
+        injected_lines = [
+            f"{pad}request_id = {src}",
+            f"{pad}logger.info(__name__, request_id=request_id)",
+        ]
+
+        fixed_lines.append(line)
+        fixed_lines.extend(injected_lines)
+        changes.append(f"  Line {lineno}: injected RequestId capture after {('SDK' if is_sdk else 'tccli' if is_tccli else 'json')}-response access")
+        changes.append(f"    {stripped[:80]}")
+
+    return '\n'.join(fixed_lines), changes
+
+
+def fix_file_traceability(file_path: Path, dry_run: bool = True) -> list[str]:
+    """Detect and optionally fix RequestId capture issues in a Python source file."""
+    text = file_path.read_text(encoding='utf-8')
+    new_text, changes = fix_requestid_in_text(text)
+    if not changes:
+        return []
+    if dry_run:
+        return changes
+    backup = file_path.with_suffix(file_path.suffix + '.bak')
+    backup.write_text(text, encoding='utf-8')
+    file_path.write_text(new_text, encoding='utf-8')
+    changes.append(f"  [APPLIED] {file_path} — .bak saved")
+    return changes
+
+
+def scan_code_traceability(dry_run: bool = True) -> tuple[int, int]:
+    """Scan Python files for missing RequestId capture. Returns (total_issues, files_with_issues)."""
+    py_files = sorted(
+        list((ROOT / 'qcloud-copilot').rglob('*.py'))
+        + list((ROOT / 'scripts').rglob('*.py'))
+    )
+    py_files = [f for f in py_files if f.name not in (
+        'auto_fix_gcl_blockers.py', 'check_requestid_capture.py'
+    )]
+
+    total_issues = 0
+    files_with_issues = 0
+    all_changes: list[str] = []
+
+    for path in py_files:
+        try:
+            text = path.read_text(encoding='utf-8')
+        except OSError:
+            continue
+        if 'tccli' not in text and 'tencentcloud' not in text and 'json.loads' not in text:
+            continue
+        _, changes = fix_requestid_in_text(text)
+        if changes:
+            files_with_issues += 1
+            total_issues += len([c for c in changes if c.startswith('  Line')])
+            all_changes.extend(changes)
+
+    if all_changes:
+        action = '[DRY-RUN] Would fix' if dry_run else '[APPLIED]'
+        print(f'\n{action} RequestId capture in {files_with_issues} file(s), {total_issues} issue(s):')
+        for c in all_changes[:20]:
+            print(c)
+        if len(all_changes) > 20:
+            print(f"  ... and {len(all_changes) - 20} more")
+
+    return total_issues, files_with_issues
+
 # Fields that gcl_runner.py SHOULD write but currently may be missing
 TRACER_FIELDS = ("started_at", "finished_at", "commits", "files_changed")
 
@@ -379,7 +528,26 @@ def self_test() -> bool:
 
 # ─── Idempotency code fixer (Rule A: tccli subprocess) ───────────────────────
 
+# boto3 methods requiring ClientToken (same list as check_idempotency.py)
+IDEMPOTENT_BOTO3_METHODS = {
+    "run_instances", "create_volume", "copy_image", "copy_snapshot",
+    "create_security_group", "authorize_security_group_ingress",
+    "revoke_security_group_ingress", "delete_security_group",
+    "create_bucket", "put_object", "delete_object", "delete_bucket",
+    "create_stack", "delete_stack", "update_stack", "create_change_set",
+    "delete_change_set", "start_job", "create_pipeline", "send_message",
+    "receive_message", "delete_queue", "create_queue",
+    "publish", "subscribe", "create_topic", "delete_topic",
+    "create_table", "update_table", "delete_table",
+    "create_function", "update_function_code", "delete_function",
+    "create_role", "delete_role", "attach_role_policy", "detach_role_policy",
+    "put_item", "delete_item", "update_item",
+    "send_templated_email", "send_raw_email", "send_email",
+}
+
 _TCCLI_LIST_RE = re.compile(r'subprocess\.run\s*\(\s*\[\s*\"tccli\"', re.IGNORECASE)
+
+_BOTO3_CLIENT_TOKEN_RE = re.compile(r'ClientToken\s*=', re.IGNORECASE)
 
 
 def _inject_client_token_list(tokens: list[str]) -> list[str]:
@@ -490,10 +658,66 @@ def fix_tccli_subprocess_in_text(text: str) -> tuple[str, list[str]]:
     return '\n'.join(fixed_lines), changes
 
 
+def fix_boto3_in_text(text: str) -> tuple[str, list[str]]:
+    """
+    Scan text for boto3 method calls that lack ClientToken kwarg and inject it.
+    Handles: client.method(..., ClientToken=uuid.uuid4().hex)
+    Returns (fixed_text, list_of_changes).
+    """
+    import ast
+    changes = []
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return text, []
+
+    # Find boto3 method calls missing ClientToken
+    problematic_lines: dict[int, str] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Attribute):
+            continue
+        method = node.func.attr
+        if method not in IDEMPOTENT_BOTO3_METHODS:
+            continue
+        kwarg_names = [k.arg for k in node.keywords if k.arg]
+        if "ClientToken" in kwarg_names:
+            continue
+        lineno = getattr(node, "lineno", 0)
+        problematic_lines[lineno] = method
+
+    if not problematic_lines:
+        return text, []
+
+    fixed_lines = []
+    for lineno, line in enumerate(text.splitlines(), 1):
+        if lineno in problematic_lines:
+            method = problematic_lines[lineno]
+            if _BOTO3_CLIENT_TOKEN_RE.search(line):
+                fixed_lines.append(line)
+                continue
+            stripped = line.rstrip()
+            if stripped.endswith(')'):
+                insert_pos = len(stripped) - 1
+                new_line = stripped[:insert_pos] + ", ClientToken=uuid.uuid4().hex" + stripped[insert_pos:]
+                fixed_lines.append(new_line)
+                changes.append(f'  Line {lineno}: injected ClientToken into boto3.{method}')
+                changes.append(f'    {line.strip()[:80]}')
+            else:
+                fixed_lines.append(line)
+        else:
+            fixed_lines.append(line)
+
+    return '\n'.join(fixed_lines), changes
+
+
 def fix_file_idempotency(file_path: Path, dry_run: bool = True) -> list[str]:
     """Detect and optionally fix idempotency issues in a Python source file."""
     text = file_path.read_text(encoding='utf-8')
     new_text, changes = fix_tccli_subprocess_in_text(text)
+    new_text, boto3_changes = fix_boto3_in_text(new_text)
+    changes.extend(boto3_changes)
     if not changes:
         return []
     if dry_run:
@@ -558,6 +782,8 @@ def main() -> None:
                         help="Also scan for race conditions (non-monotonic timestamps)")
     parser.add_argument("--scan-code-idempotency", action="store_true",
                         help="Scan Python source files for missing ClientToken in tccli calls")
+    parser.add_argument("--scan-code-traceability", action="store_true",
+                        help="Scan Python source files for missing RequestId capture in tccli/SDK responses")
     args = parser.parse_args()
 
     if args.self_test:
@@ -569,6 +795,13 @@ def main() -> None:
         issues, _files = scan_code_idempotency(dry_run=dry_run)
         if issues == 0:
             print("No idempotency issues found in Python source files.")
+        sys.exit(0 if issues == 0 else 1)
+
+    if args.scan_code_traceability:
+        dry_run = not args.apply
+        issues, _files = scan_code_traceability(dry_run=dry_run)
+        if issues == 0:
+            print("No RequestId capture issues found in Python source files.")
         sys.exit(0 if issues == 0 else 1)
 
     dry_run = not args.apply
