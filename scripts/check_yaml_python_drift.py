@@ -34,36 +34,42 @@ def parse_yaml_deps(yaml_path: Path) -> dict[str, list[str]]:
     return result
 
 
+def _match_balanced(text: str, start: int) -> tuple[int, str]:
+    """Find the matching ')' for '(' at position start. Returns (end_pos, block)."""
+    depth = 0
+    i = start
+    while i < len(text):
+        if text[i] == '(':
+            depth += 1
+        elif text[i] == ')':
+            depth -= 1
+            if depth == 0:
+                return i + 1, text[start:i + 1]
+        i += 1
+    return i, text[start:]
+
+
 def parse_python_deps(py_path: Path) -> dict[str, list[str]]:
     """
     Parse state_dependency.py → {tool_name: [sorted requires atoms]}.
     Extracts from StateAtom("tool", "output") in SPECS dict.
-    Uses regex for simplicity (avoids AST complexity).
+    Handles nested parentheses by counting balanced parens.
     """
     text = py_path.read_text(encoding="utf-8")
-
-    # Find all StateAtom(...) calls within SPECS dict definition
-    # Build atom list per tool by scanning SPECS block
     result = {}
-
-    # Match "tool_name="key"" or '"key"': inside SPECS = {...}
-    # We scan for ToolStateSpec(tool_name="X", ...) blocks
-    tool_block_re = re.compile(
-        r'ToolStateSpec\s*\(\s*tool_name\s*=\s*"([^"]+)"[^)]*\)',
-        re.DOTALL,
-    )
-    # Find all ToolStateSpec blocks
-    for block_match in tool_block_re.finditer(text):
-        tool_name = block_match.group(1)
-        block = block_match.group(0)
-        # Extract StateAtom calls within this block
-        atom_list = []
-        for atom_match in re.finditer(
-            r'StateAtom\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"', block
-        ):
-            atom_list.append(f"{atom_match.group(1)}.{atom_match.group(2)}")
-        result[tool_name] = sorted(atom_list)
-
+    pos = 0
+    while True:
+        m = re.search(r'ToolStateSpec\s*\(', text[pos:])
+        if not m:
+            break
+        start = pos + m.start()
+        end, block = _match_balanced(text, start)
+        tn_m = re.search(r'tool_name\s*=\s*"([^"]+)"', block)
+        if tn_m:
+            tool_name = tn_m.group(1)
+            atoms = re.findall(r'StateAtom\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"', block)
+            result[tool_name] = sorted(f"{a}.{b}" for a, b in atoms)
+        pos = end
     return result
 
 
