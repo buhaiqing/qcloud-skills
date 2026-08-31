@@ -589,8 +589,8 @@ def derive_rule_hits(
 ) -> dict[str, list[str]]:
     """Explain each rubric dimension score via structured rule names (fixes L6/S-B).
 
-    Returns ``{dim: [rule_hit, ...]}`` so a trace answers "safety=0 because
-    which rule". Hits are structured rule identifiers, not free-text suggestions.
+    Returns ``{dim: [rule_hit, ...]}`` so a trace answers 'safety=0 because
+    which rule'. Hits are structured rule identifiers, not free-text suggestions.
 
     - Structural mode: derived purely from score signals (credential leak,
       non-zero exit code, sub-threshold markers).
