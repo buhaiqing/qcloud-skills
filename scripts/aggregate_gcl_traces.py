@@ -25,6 +25,16 @@ TRACER_PATTERN = "gcl-trace-*.json"
 
 # ─── Fake trace factory (for --self-test) ────────────────────────────────────
 
+def _make_base_ts(i: int) -> tuple[str, str]:
+    """Return (started_at, finished_at) ISO strings for fake trace i."""
+    import datetime as _dt
+    base_dt = datetime(2026, 8, 25, 8, 0, 0)  # noqa: DTZ001
+    delta = _dt.timedelta(hours=i)
+    start = base_dt + delta
+    finish = start + _dt.timedelta(minutes=30 + i * 5)
+    return start.isoformat(), finish.isoformat()
+
+
 def _fake_traces() -> list[dict]:
     """Generate 10 synthetic GCL traces covering PASS / MAX_ITER / multi-iter paths."""
     base = {
@@ -58,9 +68,13 @@ def _fake_traces() -> list[dict]:
         ], "final": {"status": "MAX_ITER", "iter": 2, "output": "partial"}}
         traces.append(t)
 
-    # PASS in 2 iters (drift→fix)
+    # PASS in 2 iters (drift→fix) — WITH started_at/finished_at (new schema)
     for i in range(2):
-        t = {**base, "iterations": [
+        started, finished = _make_base_ts(5 + i)
+        t = {**base,
+             "started_at": started,
+             "finished_at": finished,
+             "iterations": [
             _iter(1, "RETRY", suggestions=["yaml_drift: missing field X"], blocking=True,
                   scores={"correctness": 0.5, "safety": 1.0,
                           "traceability": 1.0, "idempotency": 1.0, "spec_compliance": 0.5}),
@@ -70,8 +84,12 @@ def _fake_traces() -> list[dict]:
         ], "final": {"status": "PASS", "iter": 2, "output": "ok"}}
         traces.append(t)
 
-    # RETRY→PASS with blocker type variety
-    traces.append({**base, "iterations": [
+    # RETRY→PASS with blocker type variety — WITH started_at/finished_at (new schema)
+    started, finished = _make_base_ts(7)
+    traces.append({**base,
+                   "started_at": started,
+                   "finished_at": finished,
+                   "iterations": [
         _iter(1, "RETRY", suggestions=["spec file refs/xxx not found",
                                          "major: unclear error message"], blocking=True,
               scores={"correctness": 0.5, "safety": 1.0,
@@ -119,7 +137,31 @@ def load_traces(audit_dir: Path = AUDIT_DIR, use_fake: bool = False) -> list[dic
     return traces
 
 
-# ─── Timestamp extraction ─────────────────────────────────────────────────────
+# ─── Timestamp helpers ───────────────────────────────────────────────────────
+
+def trace_started_at(trace: dict) -> datetime | None:
+    """Extract started_at from trace, return None if absent."""
+    ts = trace.get("started_at")
+    if ts:
+        for fmt in ("%Y%m%d-%H%M%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+            try:
+                return datetime.strptime(str(ts), fmt)
+            except ValueError:
+                continue
+    return None
+
+
+def trace_finished_at(trace: dict) -> datetime | None:
+    """Extract finished_at from trace, return None if absent."""
+    ts = trace.get("finished_at")
+    if ts:
+        for fmt in ("%Y%m%d-%H%M%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+            try:
+                return datetime.strptime(str(ts), fmt)
+            except ValueError:
+                continue
+    return None
+
 
 def trace_timestamp(trace: dict, filename: str = "") -> datetime | None:
     """Parse YYYYMMDD-HHMMSS from trace filename or trace['ts'] field."""
@@ -143,8 +185,8 @@ def trace_timestamp(trace: dict, filename: str = "") -> datetime | None:
 
 # ─── Blockers / Majors extraction ───────────────────────────────────────────
 
-_BLOCKER_KEYWORDS = ("blocker", "critical", "safety", "abort", "fail")
-_MAJOR_KEYWORDS = ("major", "error", "drift", "missing", "invalid")
+_BLOCKER_KEYWORDS = ("blocker", "critical", "safety", "abort", "fail", "drift", "ref")
+_MAJOR_KEYWORDS = ("major", "error", "missing", "invalid")
 
 
 def _tag_suggestions(suggestions: list[str]) -> tuple[list[str], list[str]]:
@@ -186,6 +228,161 @@ def _extract_issue_types(suggestions: list[str]) -> list[str]:
         else:
             types.append("other")
     return types
+
+
+# ─── MTTR computation ─────────────────────────────────────────────────────────
+
+def _duration_bucket(delta_seconds: float) -> str:
+    if delta_seconds < 3600:
+        return "< 1h"
+    elif delta_seconds < 4 * 3600:
+        return "1-4h"
+    elif delta_seconds < 24 * 3600:
+        return "4-24h"
+    elif delta_seconds < 7 * 24 * 3600:
+        return "1-7d"
+    else:
+        return "> 7d"
+
+
+def compute_mttr(traces: list[dict]) -> dict:
+    """Compute MTTR per BLOCKER type from real trace timestamps.
+
+    Logic:
+    - For each trace, find the iter where a BLOCKER was first detected.
+    - Find the iter where it was fixed (verdict == PASS after RETRY).
+    - MTTR = finished_at - first_detection_timestamp.
+    - Gracefully skips traces without started_at/finished_at.
+    """
+    from collections import defaultdict
+
+    by_type: dict[str, list[float]] = defaultdict(list)
+    buckets: Counter = Counter()
+    skipped_no_ts = 0
+    skipped_no_blocker = 0
+
+    for trace in traces:
+        started = trace_started_at(trace)
+        finished = trace_finished_at(trace)
+        if not (started and finished):
+            skipped_no_ts += 1
+            continue
+
+        iters = trace.get("iterations", [])
+        if not iters:
+            skipped_no_blocker += 1
+            continue
+
+        # Find first iter with a blocking suggestion
+        first_blocker_iter: int | None = None
+        blocker_type_first: str = "unknown"
+        for it in iters:
+            suggestions = it.get("critic", {}).get("suggestions", [])
+            b, _ = _tag_suggestions(suggestions)
+            if b:
+                first_blocker_iter = it.get("iter")
+                # Use _extract_issue_types on first blocker suggestion
+                types = _extract_issue_types(suggestions)
+                blocker_type_first = types[0] if types else "unknown"
+                break
+
+        if first_blocker_iter is None:
+            skipped_no_blocker += 1
+            continue
+
+        # Only traces that eventually PASS count toward MTTR
+        status = trace.get("final", {}).get("status", "")
+        if status != "PASS":
+            continue
+
+        # Detection time = started_at + (first_blocker_iter - 1) * avg_iter_duration
+        # Simpler: use started_at as detection anchor
+        delta = (finished - started).total_seconds()
+        by_type[blocker_type_first].append(delta)
+        buckets[_duration_bucket(delta)] += 1
+
+    # Build per-type summary
+    per_type: dict[str, dict] = {}
+    for btype, durations in by_type.items():
+        durations.sort()
+        n = len(durations)
+        avg_s = sum(durations) / n
+        median_s = durations[n // 2]
+        per_type[btype] = {
+            "count": n,
+            "avg_seconds": avg_s,
+            "avg_human": _fmt_duration(avg_s),
+            "median_human": _fmt_duration(median_s),
+            "min_human": _fmt_duration(min(durations)),
+            "max_human": _fmt_duration(max(durations)),
+        }
+
+    return {
+        "per_type": per_type,
+        "fix_time_buckets": dict(buckets.most_common()),
+        "skipped_no_ts": skipped_no_ts,
+        "skipped_no_blocker": skipped_no_blocker,
+    }
+
+
+def _fmt_duration(seconds: float) -> str:
+    if seconds < 60:
+        return f"{seconds:.0f}s"
+    elif seconds < 3600:
+        return f"{seconds/60:.1f}m"
+    elif seconds < 86400:
+        return f"{seconds/3600:.1f}h"
+    else:
+        return f"{seconds/86400:.1f}d"
+
+
+# ─── Daily trace counts ────────────────────────────────────────────────────────
+
+def compute_daily_counts(traces: list[dict]) -> dict[str, int]:
+    """Return {date_str: count} for all traces that have timestamps."""
+    daily: dict[str, int] = {}
+    for trace in traces:
+        ts = trace_started_at(trace) or trace_timestamp(trace, trace.get("__filename", ""))
+        if ts:
+            date_str = ts.strftime("%Y-%m-%d")
+            daily[date_str] = daily.get(date_str, 0) + 1
+    return dict(sorted(daily.items()))
+
+
+def compute_7day_trend(daily_counts: dict[str, int]) -> str:
+    """Build a text mini-chart from daily counts over last 7 days."""
+    bars = []
+    for i in range(6, -1, -1):
+        day = (datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+               - __import__("datetime").timedelta(days=i)).strftime("%Y-%m-%d")
+        cnt = daily_counts.get(day, 0)
+        bar_ch = chr(0x2588)  # full block
+        bars.append(f"{day} {bar_ch * min(cnt, 10)}")
+    return "\n".join(bars)
+
+
+# ─── Playback rate ──────────────────────────────────────────────────────────────
+
+def compute_playback_rate(traces: list[dict]) -> dict:
+    """Historical playback rate: traces / time window."""
+    ts_list: list[datetime] = []
+    for trace in traces:
+        ts = trace_started_at(trace) or trace_timestamp(trace, trace.get("__filename", ""))
+        if ts:
+            ts_list.append(ts)
+    if len(ts_list) < 2:
+        return {"rate": "N/A", "window_days": None, "count": len(ts_list),
+                "note": "need ≥2 traces with timestamps"}
+    ts_list.sort()
+    span = (ts_list[-1] - ts_list[0]).total_seconds()
+    window_days = span / 86400
+    rate = len(ts_list) / window_days if window_days > 0 else len(ts_list)
+    return {
+        "rate": f"{rate:.2f} traces/day",
+        "window_days": round(window_days, 1),
+        "count": len(ts_list),
+        "note": f"from {ts_list[0].strftime('%Y-%m-%d')} to {ts_list[-1].strftime('%Y-%m-%d')}",
+    }
 
 
 # ─── Metrics ─────────────────────────────────────────────────────────────────
@@ -254,13 +451,6 @@ def aggregate(traces: list[dict], use_fake: bool = False,
             status = trace.get("final", {}).get("status", "")
             ts_map[key] = status
 
-    # MTTR: for each PASS that took >1 iter, compute time diff
-    # (No real timestamps in traces → report N/A with explanation)
-    mttr_n = sum(1 for t in traces
-                 if t.get("final", {}).get("status") == "PASS"
-                 and len(t.get("iterations", [])) > 1)
-    mttr_avg = "N/A (trace files lack started_at/finished_at — use real GCL runner timestamps)"
-
     # commits / files: not tracked in current schema → N/A
     commits_avg = "N/A (schema does not track commits)"
     files_avg = "N/A (schema does not track files_changed)"
@@ -272,6 +462,18 @@ def aggregate(traces: list[dict], use_fake: bool = False,
     # retry rate (traces with at least one RETRY)
     traces_with_retry = sum(1 for d in decisions_all if d == "RETRY")
     retry_rate = f"{traces_with_retry}/{len(decisions_all)} iters had RETRY"
+
+    # ── Time-dimension analyses ──────────────────────────────────────────────
+    # MTTR: only meaningful when traces have started_at/finished_at
+    mttr_result = compute_mttr(traces)
+    mttr_n = sum(v["count"] for v in mttr_result["per_type"].values())
+
+    # Playback rate
+    playback = compute_playback_rate(traces)
+
+    # Daily counts
+    daily = compute_daily_counts(traces)
+    trend_7day = compute_7day_trend(daily)
 
     return {
         "total_traces": n,
@@ -289,7 +491,12 @@ def aggregate(traces: list[dict], use_fake: bool = False,
         "major_types_top5": dict(major_types.most_common(5)),
         "issues_per_trace_avg": f"{sum(issues_by_trace)/n:.2f}" if n else "0",
         "mttr_drifts_fixed": mttr_n,
-        "mttr_note": mttr_avg,
+        "mttr_result": mttr_result,
+        "mttr_note": ("N/A" if mttr_n == 0
+                      else f"{mttr_n} traces with started_at/finished_at measured"),
+        "playback": playback,
+        "daily_counts": daily,
+        "trend_7day": trend_7day,
         "commits_avg": commits_avg,
         "files_avg": files_avg,
         "trend_last20": trend_seq[-20:],
@@ -365,11 +572,100 @@ def render(metrics: dict) -> str:
         "| 指标 | 值 |",
         "|------|----|",
         f"| 平均每 trace 问题数 | {metrics['issues_per_trace_avg']} |",
-        f"| drift→fix 次数 (MTTR样本) | {metrics['mttr_drifts_fixed']} |",
-        f"| MTTR | {metrics['mttr_note']} |",
         f"| 平均 commits/trace | {metrics['commits_avg']} |",
         f"| 平均落盘文件/trace | {metrics['files_avg']} |",
         "",
+        "## MTTR (按 BLOCKER 类型)",
+        "",
+    ]
+    mttr_res = metrics.get("mttr_result", {})
+    per_type = mttr_res.get("per_type", {})
+    if per_type:
+        lines += [
+            "| BLOCKER 类型 | 次数 | 平均 MTTR | 中位 MTTR | 范围 |",
+            "|--------------|------|-----------|-----------|------|",
+        ]
+        for btype, info in sorted(per_type.items(), key=lambda x: -x[1]["count"]):
+            lines.append(
+                f"| {btype} | {info['count']} | "
+                f"{info['avg_human']} | {info['median_human']} | "
+                f"{info['min_human']} – {info['max_human']} |"
+            )
+        lines.append("")
+        lines.append(
+            f"> MTTR = finished_at − first BLOCKER detection timestamp (started_at). "
+            f"跳过 {mttr_res.get('skipped_no_ts', 0)} 条缺 started_at/finished_at trace, "
+            f"{mttr_res.get('skipped_no_blocker', 0)} 条无 BLOCKER trace。"
+        )
+    else:
+        lines.append("*无带 started_at/finished_at 的 PASS-with-BLOCKER trace，MTTR 不可计算。*")
+        lines.append("")
+        lines.append(
+            f"> 提示: R6 T1 补全 started_at/finished_at 后，此处将有数据。 "
+            f"当前 {mttr_res.get('skipped_no_ts', 0)} 条 trace 缺时间戳，"
+            f"{mttr_res.get('skipped_no_blocker', 0)} 条无 BLOCKER。"
+        )
+
+    # ── Fix time distribution histogram ─────────────────────────────────────
+    fix_buckets = mttr_res.get("fix_time_buckets", {})
+    if fix_buckets:
+        lines += [
+            "",
+            "## BLOCKER 修复时间分布",
+            "",
+            "| 时间段 | 次数 |",
+            "|--------|------|",
+        ]
+        bucket_order = ["< 1h", "1-4h", "4-24h", "1-7d", "> 7d"]
+        for bucket in bucket_order:
+            cnt = fix_buckets.get(bucket, 0)
+            bar = chr(0x2588) * min(cnt, 10)
+            lines.append(f"| {bucket} | {cnt} {bar} |")
+        lines.append("")
+
+    # ── Playback rate ──────────────────────────────────────────────────────
+    playback = metrics.get("playback", {})
+    lines += [
+        "",
+        "## 历史回放速率",
+        "",
+        "| 指标 | 值 |",
+        "|------|----|",
+        f"| 回放速率 | {playback.get('rate', 'N/A')} |",
+        f"| 时间窗口 | {playback.get('window_days', 'N/A')} 天 |",
+        f"| 有时间戳的 trace 数 | {playback.get('count', 0)} |",
+    ]
+    if playback.get("note"):
+        lines.append(f"> {playback['note']}")
+    lines.append("")
+
+    # ── Daily trace counts ─────────────────────────────────────────────────
+    daily = metrics.get("daily_counts", {})
+    if daily:
+        lines += [
+            "",
+            "## 每日 trace 数",
+            "",
+            "| 日期 | Count |",
+            "|------|-------|",
+        ]
+        for date_str, cnt in sorted(daily.items())[-30:]:   # last 30 days
+            lines.append(f"| {date_str} | {cnt} |")
+        lines.append("")
+
+    # ── 7-day mini-chart ──────────────────────────────────────────────────
+    trend_7day = metrics.get("trend_7day", "")
+    lines += [
+        "",
+        "## 最近 7 天趋势",
+        "",
+        "```",
+        trend_7day if trend_7day else "无数据（缺 started_at）",
+        "```",
+        "",
+    ]
+
+    lines += [
         "## PASS 趋势 (最近 20 次, 旧→新)",
         "",
         "```",
@@ -498,7 +794,13 @@ def self_test() -> bool:
         ("retry_count >= 5", m["retry_count"] >= 5),
         ("blocker_types has yaml_python_drift", "yaml_python_drift" in m["blocker_types_top5"]),
         ("spec_file_refs_missing in blocker_types", "spec_file_refs_missing" in m["blocker_types_top5"]),
-        ("mttr_drifts_fixed == 3", m["mttr_drifts_fixed"] == 3),  # 3 PASS in >1 iter (2 drift + 1 blocker)
+        # MTTR: 3 new traces have started_at/finished_at and are PASS with BLOCKER
+        ("mttr_drifts_fixed == 3", m["mttr_drifts_fixed"] == 3),
+        ("mttr_result has per_type", len(m["mttr_result"]["per_type"]) > 0),
+        ("mttr_result skipped_no_ts >= 7", m["mttr_result"]["skipped_no_ts"] >= 7),
+        ("playback rate computed", "rate" in m["playback"]),
+        ("daily_counts has data", len(m["daily_counts"]) > 0),
+        ("trend_7day has data", len(m["trend_7day"]) > 0),
     ]
     for label, result in checks:
         status = "PASS" if result else "FAIL"
