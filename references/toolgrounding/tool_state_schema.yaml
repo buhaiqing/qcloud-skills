@@ -1,0 +1,122 @@
+# Tool State Dependency YAML Schema
+# 用于描述工具间的隐式状态依赖，显式化建模
+
+state_dependency_version: "1.0"
+
+# 全局状态定义（可选，供跨工具引用）
+global_state:
+  ccn_id:
+    type: string
+    description: "CCN 实例 ID，由 ccn_create 返回"
+  vpc_id:
+    type: string
+    description: "VPC 实例 ID，由 vpc_create 或 vpc_describe 返回"
+  cdb_instance_id:
+    type: string
+    description: "CDB 实例 ID，由 cdb_create 返回"
+  cdb_account_name:
+    type: string
+    description: "CDB 账户名，由 cdb_create_account 返回"
+
+tools:
+  # --- CDN ---
+  cdn_create:
+    provides:
+      - ServiceId
+    dependency:
+      requires: []
+
+  cdn_configure_domain:
+    provides: []
+    dependency:
+      requires:
+        - tool: cdn_create
+          output: ServiceId
+
+  # --- VPC ---
+  vpc_create:
+    provides:
+      - VpcId
+      - SubnetId
+    dependency:
+      requires: []
+
+  vpc_create_flow_log:
+    provides:
+      - FlowLogId
+    dependency:
+      requires:
+        - tool: vpc_create
+          output: VpcId
+
+  # --- CCN ---
+  ccn_create:
+    provides:
+      - CcnId
+    dependency:
+      requires: []
+
+  ccn_attach_vpc:
+    provides: []
+    dependency:
+      requires:
+        - tool: ccn_create
+          output: CcnId
+        - tool: vpc_create
+          output: VpcId
+
+  # --- CDB ---
+  cdb_create:
+    provides:
+      - InstanceId
+      - VpcId
+    dependency:
+      requires:
+        - tool: vpc_create
+          output: VpcId
+
+  cdb_create_account:
+    provides:
+      - AccountName
+    dependency:
+      requires:
+        - tool: cdb_create
+          output: InstanceId
+        - tool: vpc_create
+          output: VpcId
+
+  cdb_set_cnf:
+    provides: []
+    dependency:
+      requires:
+        - tool: cdb_create
+          output: InstanceId
+        - tool: cdb_create_account
+          output: AccountName
+          value: "root"  # 必须为 root 账户
+
+  cdb_import_data:
+    provides: []
+    dependency:
+      requires:
+        - tool: cdb_set_cnf
+          # 隐式依赖 cdb_create.InstanceId 和 cdb_create_account.AccountName=root
+        - tool: cdb_create_account
+          output: AccountName
+
+  # --- Redis ---
+  redis_create:
+    provides:
+      - InstanceId
+    dependency:
+      requires:
+        - tool: vpc_create
+          output: VpcId
+
+  redis_create_backup:
+    provides:
+      - BackupId
+    dependency:
+      requires:
+        - tool: redis_create
+          output: InstanceId
