@@ -1,0 +1,43 @@
+# GCL Loop Token Budget
+# 用户可编辑此文件调整预算
+
+defaults:
+  total_budget: 80000        # 默认每次 GCL Loop 总 token 上限
+  warn_threshold: 0.8        # 80% 触发 warn
+  abort_threshold: 1.2       # 120% 强制 abort
+
+# 模型价格表（每 1K tokens，单位 USD；按需调整）
+model_pricing:
+  minimax-cn/MiniMax-M2.7:
+    input: 0.0001
+    output: 0.0003
+  minimax-cn/MiniMax-M3:
+    input: 0.0003
+    output: 0.0009
+  MiniMax-M2.7:
+    input: 0.0001
+    output: 0.0003
+  MiniMax-M3:
+    input: 0.0003
+    output: 0.0009
+
+# 任务类型 → 推荐模型 + 预估 token
+task_routing:
+  worker_fix:
+    model: minimax-cn/MiniMax-M2.7
+    est_tokens: 5000
+  blind_review:
+    model: minimax-cn/MiniMax-M3
+    est_tokens: 8000
+  skill_integration:
+    model: minimax-cn/MiniMax-M2.7
+    est_tokens: 15000
+  auto_fix:
+    model: minimax-cn/MiniMax-M2.7
+    est_tokens: 3000
+
+# 按 loop 复杂度分级（per-agent 预估 token）
+complexity_budget:
+  low:    5000    # 1-3 文件、<50 行，per-agent
+  medium: 15000   # 4-10 文件、50-200 行，per-agent
+  high:   30000   # >10 文件、>200 行，per-agent
