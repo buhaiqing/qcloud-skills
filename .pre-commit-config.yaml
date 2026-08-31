@@ -1,0 +1,21 @@
+repos:
+  - repo: local
+    hooks:
+      - id: check-spec-file-refs
+        name: Verify spec file references exist on disk
+        entry: python3 scripts/check_spec_file_refs.py
+        language: system
+        pass_filenames: false
+        types: [markdown]
+      - id: check-doc-code-drift
+        name: Detect oversized code blocks in spec docs
+        entry: python3 scripts/check_doc_code_drift.py
+        language: system
+        pass_filenames: false
+        types: [markdown]
+      - id: check-yaml-python-drift
+        name: Detect YAML ↔ Python dependency drift
+        entry: python3 scripts/check_yaml_python_drift.py
+        language: system
+        pass_filenames: false
+        types: [python]

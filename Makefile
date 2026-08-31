@@ -1,7 +1,12 @@
-.PHONY: validate registry golden kpi manifest all reflexion-update replay-smoke l4-gate
+.PHONY: validate registry golden kpi manifest all reflexion-update replay-smoke l4-gate compounding-checks
 
 validate:
 	python3 scripts/validate_local.py
+
+compounding-checks:
+	python3 scripts/check_spec_file_refs.py
+	python3 scripts/check_doc_code_drift.py
+	python3 scripts/check_yaml_python_drift.py
 
 registry:
 	python3 scripts/build_skill_registry.py --emit

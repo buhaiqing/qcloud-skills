@@ -90,3 +90,10 @@ jobs:
           python3 scripts/pattern_anomaly_detect.py | tee audit-results/pattern-anomaly-$(date +%Y%m%d).json || true
         continue-on-error: true
         # NOTE: script outputs to stdout/stderr only; does not block merges
+
+      - name: Compounding-engineering checks
+        run: |
+          set -euo pipefail
+          python3 scripts/check_spec_file_refs.py
+          python3 scripts/check_doc_code_drift.py
+          python3 scripts/check_yaml_python_drift.py
