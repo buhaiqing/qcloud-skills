@@ -73,6 +73,99 @@ def parse_python_deps(py_path: Path) -> dict[str, list[str]]:
     return result
 
 
+def _find_yaml_dep_lines(yaml_path: Path) -> tuple[dict[str, dict[str, int]], dict[str, int]]:
+    """
+    Scan raw YAML lines for fix-suggestion anchors (detection logic unchanged).
+    Returns ({tool: {atom: line_no}}, {tool: header_line}).
+    """
+    lines = yaml_path.read_text(encoding="utf-8").splitlines()
+    deps: dict[str, dict[str, int]] = {}
+    headers: dict[str, int] = {}
+    seen_tools = False
+    current_tool: str | None = None
+    pending_item: str | None = None  # atom prefix from a `- tool: X` entry
+    for lineno, raw in enumerate(lines, 1):
+        stripped = raw.strip()
+        if raw.lstrip().startswith("tools:"):
+            seen_tools = True
+            continue
+        if not seen_tools or not stripped or stripped.startswith("#"):
+            continue
+        m = re.match(r"^  ([A-Za-z_][\w]*):", raw)  # tool header at indent 2
+        if m:
+            current_tool = m.group(1)
+            headers.setdefault(current_tool, lineno)
+            deps.setdefault(current_tool, {})
+            pending_item = None
+            continue
+        if current_tool is None:
+            continue
+        m = re.match(r"^\s+- tool:\s*([A-Za-z_][\w]*)", stripped)
+        if m:
+            pending_item = m.group(1)
+            continue
+        m = re.match(r"^\s+output:\s*([A-Za-z_][\w]*)", stripped)
+        if m and pending_item:
+            deps[current_tool].setdefault(f"{pending_item}.{m.group(1)}", lineno)
+            pending_item = None
+            continue
+        if stripped in ("provides:", "dependency:", "requires:"):
+            pending_item = None
+    return deps, headers
+
+
+def _find_py_atom_lines(py_path: Path) -> tuple[dict[str, dict[str, int]], dict[str, int]]:
+    """
+    Scan Python SPECS lines for fix-suggestion anchors (detection logic unchanged).
+    Returns ({tool: {atom: line_no}}, {tool: header_line}).
+    """
+    lines = py_path.read_text(encoding="utf-8").splitlines()
+    atoms: dict[str, dict[str, int]] = {}
+    headers: dict[str, int] = {}
+    current_tool: str | None = None
+    for lineno, line in enumerate(lines, 1):
+        m = re.search(r'tool_name\s*=\s*"([^"]+)"', line)
+        if m:
+            current_tool = m.group(1)
+            headers.setdefault(current_tool, lineno)
+            atoms.setdefault(current_tool, {})
+            continue
+        m = re.search(r'StateAtom\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"', line)
+        if m and current_tool:
+            atoms[current_tool].setdefault(f"{m.group(1)}.{m.group(2)}", lineno)
+    return atoms, headers
+
+
+FIX_TEMPLATE = "docs/superpowers/specs/yaml-drift-fix-template.md"
+
+
+def fix_suggestions(
+    tool: str,
+    y_deps: list[str],
+    p_deps: list[str],
+    yaml_path: Path,
+    py_path: Path,
+    yaml_lines: dict[str, dict[str, int]],
+    py_lines: dict[str, dict[str, int]],
+    yaml_headers: dict[str, int],
+    py_headers: dict[str, int],
+) -> list[str]:
+    """Actionable fix lines for a drifted tool (YAML = authoritative by design)."""
+    missing_in_py = [d for d in y_deps if d not in p_deps]   # YAML has, PY lacks
+    missing_in_yaml = [d for d in p_deps if d not in y_deps]  # PY has, YAML lacks
+    out: list[str] = []
+    if missing_in_py:
+        anchor = py_headers.get(tool) or min((py_lines.get(tool, {}).get(a) for a in missing_in_py if a in py_lines.get(tool, {})), default=0)
+        out.append(f"  → FIX (YAML 权威): {py_path}:{anchor} 补 StateAtom 依赖 {missing_in_py}")
+    if missing_in_yaml:
+        anchor = yaml_headers.get(tool) or min((yaml_lines.get(tool, {}).get(a) for a in missing_in_yaml if a in yaml_lines.get(tool, {})), default=0)
+        out.append(f"  → FIX (PY 权威):   {yaml_path}:{anchor} 删 requires 依赖 {missing_in_yaml}")
+    if out:
+        out.append("  → 决策依据: 业务上该依赖是否真实前置? 是→补 PY; 否→改 YAML (见决策矩阵)")
+        out.append(f"  → 完整模板: {FIX_TEMPLATE}")
+    return out
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Check YAML vs Python state dependency declarations for drift."
@@ -107,6 +200,10 @@ def main():
 
     py_deps = parse_python_deps(py_path)
 
+    # Line anchors for fix suggestions (output only — detection logic unchanged)
+    yaml_lines, yaml_headers = _find_yaml_dep_lines(yaml_path)
+    py_lines, py_headers = _find_py_atom_lines(py_path)
+
     errors = []
     warnings = []
 
@@ -127,13 +224,21 @@ def main():
                 errors.append(
                     f"{tool}: YAML=[{', '.join(y_deps)}], PY=[{', '.join(p_deps)}]"
                 )
+                for fix_line in fix_suggestions(
+                    tool, y_deps, p_deps, yaml_path, py_path,
+                    yaml_lines, py_lines, yaml_headers, py_headers,
+                ):
+                    errors.append(fix_line)
 
     for w in warnings:
         print(f"WARN {w}")
     for e in errors:
-        print(f"✗ {e}")
+        if e.startswith("  →"):
+            print(e)
+        else:
+            print(f"✗ {e}")
 
-    n_errors = len(errors)
+    n_errors = len([e for e in errors if not e.startswith("  →")])
     n_warns = len(warnings)
     print(f"\nSUMMARY: {n_errors} tool(s) drifted, {n_warns} warning(s)")
     sys.exit(1 if n_errors else 0)

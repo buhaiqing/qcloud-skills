@@ -43,7 +43,7 @@ request_id = response.Response.RequestId
 logger.info("cvm.DescribeInstances", request_id=request_id)
 ```
 
-### 场景 3: requests（HTTP 直调）
+### 场景 3: requests (HTTP)
 
 ```python
 resp = requests.get(url, headers=...)

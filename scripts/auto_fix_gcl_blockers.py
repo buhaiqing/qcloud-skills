@@ -101,7 +101,7 @@ def traceability_fix_suggestion(line: str) -> str:
         anchor = "场景-1-tccli-subprocess"
     elif _JSON_PARSE_RE.search(stripped):
         src = 'request_id = data.get("RequestId", "unknown")'
-        anchor = "场景-3-requests-json"
+        anchor = "场景-3-requests-http"
     else:
         return ""
     return (
@@ -394,6 +394,37 @@ def check_auth_credential(trace: dict) -> list[str]:
     return issues
 
 
+# ─── YAML ↔ Python drift fix suggestion ──────────────────────────────────────
+
+YAML_DRIFT_TEMPLATE = "docs/superpowers/specs/yaml-drift-fix-template.md"
+
+
+def yaml_drift_fix_suggestion(drift: dict) -> str:
+    """
+    Generate fix suggestion with template reference for a yaml_python_drift blocker.
+
+    drift = {"tool": str, "yaml": [atoms...], "py": [atoms...]}  (atoms = "tool.output")
+    Returns a one-line actionable hint; the template holds the full decision matrix.
+    """
+    yaml_deps = drift.get("yaml", []) or []
+    py_deps = drift.get("py", []) or []
+    missing_in_py = [d for d in yaml_deps if d not in py_deps]
+    missing_in_yaml = [d for d in py_deps if d not in yaml_deps]
+    tool = drift.get("tool", "")
+    tag = f"[{tool}] " if tool else ""
+    if missing_in_py:
+        return (
+            f"{tag}YAML 更完整，补 Python: {missing_in_py} "
+            f"— 见 {YAML_DRIFT_TEMPLATE}"
+        )
+    if missing_in_yaml:
+        return (
+            f"{tag}PY 更完整，改 YAML: {missing_in_yaml} "
+            f"— 见 {YAML_DRIFT_TEMPLATE}"
+        )
+    return f"{tag}两处一致或无法判断"
+
+
 # ─── Main fix function ────────────────────────────────────────────────────────
 
 def process_trace(trace_path: str, dry_run: bool = True) -> dict[str, Any]:
@@ -541,6 +572,29 @@ def self_test() -> bool:
     if not ac:
         ok = False
         print("  [FAIL] check_auth_credential")
+
+    # Test yaml_drift_fix_suggestion
+    sug_yaml = yaml_drift_fix_suggestion({
+        "tool": "cdb_create_account",
+        "yaml": ["cdb_create.InstanceId", "vpc_create.VpcId"],
+        "py": ["cdb_create.InstanceId"],
+    })
+    if "补 Python" not in sug_yaml or "yaml-drift-fix-template" not in sug_yaml:
+        ok = False
+        print("  [FAIL] yaml_drift_fix_suggestion (YAML authoritative)")
+    sug_py = yaml_drift_fix_suggestion({
+        "tool": "cdb_create_account",
+        "yaml": ["cdb_create.InstanceId"],
+        "py": ["cdb_create.InstanceId", "vpc_create.VpcId"],
+    })
+    if "改 YAML" not in sug_py or "yaml-drift-fix-template" not in sug_py:
+        ok = False
+        print("  [FAIL] yaml_drift_fix_suggestion (PY authoritative)")
+    sug_ok = yaml_drift_fix_suggestion({"yaml": ["a.B"], "py": ["a.B"]})
+    if "无法判断" not in sug_ok:
+        ok = False
+        print("  [FAIL] yaml_drift_fix_suggestion (no drift)")
+
 
     # Test fix_traceability
     fixed = fix_traceability({"iterations": []})
