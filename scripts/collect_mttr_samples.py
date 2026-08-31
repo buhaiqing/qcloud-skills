@@ -208,6 +208,46 @@ SCENARIOS = [
         "iter2_suggestions": [],
         "iter2_blocking": False,
     },
+    # yaml_drift 模板修复路径（R10 真实 run 验证）：脚本化机制实测 0.09s，
+    # mock 用 1m/iter 保守覆盖真实 agent 的人为读矩阵/编辑/重跑开销，
+    # 基准 = spec_compliance_drift 12m（6m x 2 iter）→ 模板路径 2m (-83%)
+    # 详见 docs/superpowers/specs/yaml-drift-mttr-validation.md
+    {
+        "name": "yaml_template_basic",
+        "skill": "qcloud-cdb-ops",
+        "started_delta_minutes": 100,
+        "iter_duration_minutes": 1,
+        "iter1_scores": {
+            "correctness": 1.0, "safety": 1.0,
+            "idempotency": 1.0, "traceability": 1.0, "spec_compliance": 0.0,
+        },
+        "iter1_suggestions": ["BLOCKER: yaml_python_drift — YAML=[cdb_create.InstanceId, vpc_create.VpcId], PY=[cdb_create.InstanceId]; fix via docs/superpowers/specs/yaml-drift-fix-template.md"],
+        "iter1_blocking": True,
+        "iter2_scores": {
+            "correctness": 1.0, "safety": 1.0,
+            "idempotency": 1.0, "traceability": 1.0, "spec_compliance": 1.0,
+        },
+        "iter2_suggestions": [],
+        "iter2_blocking": False,
+    },
+    {
+        "name": "yaml_template_retry",
+        "skill": "qcloud-vpc-ops",
+        "started_delta_minutes": 110,
+        "iter_duration_minutes": 1,
+        "iter1_scores": {
+            "correctness": 1.0, "safety": 1.0,
+            "idempotency": 1.0, "traceability": 1.0, "spec_compliance": 0.0,
+        },
+        "iter1_suggestions": ["BLOCKER: yaml_python_drift — YAML=[cdb_create.InstanceId, vpc_create.VpcId], PY=[cdb_create.InstanceId]; fix via docs/superpowers/specs/yaml-drift-fix-template.md"],
+        "iter1_blocking": True,
+        "iter2_scores": {
+            "correctness": 1.0, "safety": 1.0,
+            "idempotency": 1.0, "traceability": 1.0, "spec_compliance": 1.0,
+        },
+        "iter2_suggestions": [],
+        "iter2_blocking": False,
+    },
 ]
 
 
@@ -324,6 +364,8 @@ EXPECTED_ISSUE_TYPES = {
     "spec_compliance_missing_field": "spec_compliance",
     "traceability_template_basic": "traceability",
     "traceability_template_retry": "traceability",
+    "yaml_template_basic": "yaml_python_drift",
+    "yaml_template_retry": "yaml_python_drift",
 }
 
 
