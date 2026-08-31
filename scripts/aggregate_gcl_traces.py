@@ -72,7 +72,7 @@ def _fake_traces() -> list[dict]:
 
     # RETRY→PASS with blocker type variety
     traces.append({**base, "iterations": [
-        _iter(1, "RETRY", suggestions=["spec_file_refs_missing: file Y not found",
+        _iter(1, "RETRY", suggestions=["spec file refs/xxx not found",
                                          "major: unclear error message"], blocking=True,
               scores={"correctness": 0.5, "safety": 1.0,
                       "traceability": 1.0, "idempotency": 1.0, "spec_compliance": 0.5}),
@@ -165,18 +165,22 @@ def _extract_issue_types(suggestions: list[str]) -> list[str]:
         low = s.lower()
         if "yaml" in low or "drift" in low or "schema" in low:
             types.append("yaml_python_drift")
-        elif "spec" in low or "file" in low or "ref" in low or "missing" in low:
-            types.append("spec_file_refs_missing")
         elif "auth" in low or "credential" in low or "secret" in low:
             types.append("auth_credential")
         elif "param" in low or "argument" in low or "flag" in low:
             types.append("invalid_params")
         elif "rubric" in low or "compliance" in low or "spec_compliance" in low:
             types.append("spec_compliance")
+        # NOTE: trace/idempot must come BEFORE the broad spec/file/ref/missing
+        # bucket — "missing RequestId" and "missing ClientToken" contain "missing"
+        # but are traceability/idempotency issues, not spec file reference issues.
         elif "trace" in low or "audit" in low or "log" in low:
             types.append("traceability")
         elif "idempot" in low:
             types.append("idempotency")
+        # Only use the broad bucket for genuinely spec/file/ref/path-not-found patterns
+        elif any(_ in low for _ in ["spec", "file", "ref"]) and "missing" not in low:
+            types.append("spec_file_refs_missing")
         elif "error" in low or "code" in low:
             types.append("error_handling")
         else:
