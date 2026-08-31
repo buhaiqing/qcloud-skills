@@ -20,6 +20,7 @@ ignore = [
   "DTZ005",  # datetime.now() without tzinfo — codebase intentionally naive
   "DTZ007",  # datetime.strptime() without zone
   "DTZ011",  # date.today() without tzinfo
+  "EXE001",  # shebang not executable — scripts are invoked via python3 explicitly
   "PERF402", # manual-list-copy (list(x)) — perf, not correctness
   "SIM113",  # enumerate-for-loop — micro-style
   "SIM115",  # open-file-with-context-handler — covered by readers
