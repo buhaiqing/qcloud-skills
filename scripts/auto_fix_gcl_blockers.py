@@ -379,9 +379,32 @@ def check_idempotency_race(trace: dict) -> str | None:
 
 # ─── Auth credential checker ──────────────────────────────────────────────────
 
+AUTH_CRED_TEMPLATE = "docs/superpowers/specs/auth-credential-fix-template.md"
+SPEC_COMPLIANCE_TEMPLATE = "docs/superpowers/specs/spec-compliance-fix-template.md"
+
+
+def auth_credential_fix_suggestion(suggestion: str) -> str:
+    """Map an auth/credential suggestion to its template section.
+
+    Returns a one-line actionable hint (with template anchor); these issues have
+    no auto-fix, so the hint is the deliverable.
+    """
+    low = suggestion.lower()
+    if "127" in suggestion:
+        anchor = "场景-2-exit-code-127-命令不存在"
+        hint = "tccli 未安装或不在 PATH: pip install tccli / 确认 venv"
+    elif "-2" in suggestion or "authfailure" in low or "invalidcredential" in low:
+        anchor = "场景-1-exit-code-2-凭证无效"
+        hint = "凭证无效: env + .env 检查 SecretId/Key/Region，CAM 权限见场景3"
+    else:
+        anchor = "凭证检查清单"
+        hint = "按凭证检查清单逐项排查"
+    return f"{hint} — 见 {AUTH_CRED_TEMPLATE}#{anchor}"
+
+
 def check_auth_credential(trace: dict) -> list[str]:
     """
-    Return list of auth/credential issues found.
+    Return list of auth/credential issues found (each enriched with a template hint).
     These cannot be auto-fixed — human must fix command or credentials.
     """
     iters = trace.get("iterations", []) or trace.get("trace", {}).get("iterations", [])
@@ -390,8 +413,37 @@ def check_auth_credential(trace: dict) -> list[str]:
         c = it.get("critic", {})
         for s in c.get("suggestions", []):
             if "exit_code" in s.lower() or "credentials" in s.lower():
-                issues.append(s)
+                issues.append(f"{s} — {auth_credential_fix_suggestion(s)}")
     return issues
+
+
+# ─── Spec compliance suggestion ───────────────────────────────────────────────
+
+def spec_compliance_fix_suggestion(suggestion: str) -> str:
+    """Classify a spec_compliance suggestion into a template scenario.
+
+    Returns a one-line actionable hint with template anchor (scenario or check
+    script). Delegates yaml drift to the dedicated template.
+    """
+    low = suggestion.lower()
+    if "yaml" in low or "drift" in low:
+        return (
+            "YAML↔Python 漂移，转 yaml-drift-fix-template.md: "
+            "python3 scripts/check_yaml_python_drift.py"
+        )
+    if "ref" in low and ("not found" in low or "unresolved" in low):
+        return (
+            f"spec 文件引用缺失，见 {SPEC_COMPLIANCE_TEMPLATE}#场景-1-spec-文件引用缺失: "
+            f"python3 scripts/check_spec_file_refs.py"
+        )
+    if "missing" in low or "field" in low:
+        return (
+            f"mock/响应缺字段，见 {SPEC_COMPLIANCE_TEMPLATE}#场景-3-mock-输出不满足-spec: "
+            f"能跑真实命令就换真实命令，mock 必须对齐 spec 字段"
+        )
+    return (
+        f"spec_compliance 降级，见 {SPEC_COMPLIANCE_TEMPLATE}（失败模式分类决策树先查表）"
+    )
 
 
 # ─── YAML ↔ Python drift fix suggestion ──────────────────────────────────────
@@ -594,6 +646,30 @@ def self_test() -> bool:
     if "无法判断" not in sug_ok:
         ok = False
         print("  [FAIL] yaml_drift_fix_suggestion (no drift)")
+
+    # Test spec_compliance_fix_suggestion (template reference)
+    sug_ref = spec_compliance_fix_suggestion("BLOCKER: spec_compliance failure — spec refs unresolved; audit gap")
+    if SPEC_COMPLIANCE_TEMPLATE not in sug_ref or "check_spec_file_refs" not in sug_ref:
+        ok = False
+        print("  [FAIL] spec_compliance_fix_suggestion (spec refs): " + repr(sug_ref))
+    sug_yaml2 = spec_compliance_fix_suggestion("yaml_python_drift: YAML=[a.B], PY=[a.B]")
+    if "yaml-drift-fix-template" not in sug_yaml2:
+        ok = False
+        print("  [FAIL] spec_compliance_fix_suggestion (yaml drift): " + repr(sug_yaml2))
+    sug_mock = spec_compliance_fix_suggestion("Response missing spec field InstanceSet")
+    if SPEC_COMPLIANCE_TEMPLATE not in sug_mock or "场景-3" not in sug_mock:
+        ok = False
+        print("  [FAIL] spec_compliance_fix_suggestion (missing field): " + repr(sug_mock))
+
+    # Test auth_credential_fix_suggestion (template reference)
+    sug_auth2 = auth_credential_fix_suggestion("Generator exit_code=-2; fix command or credentials")
+    if AUTH_CRED_TEMPLATE not in sug_auth2 or "凭证" not in sug_auth2:
+        ok = False
+        print("  [FAIL] auth_credential_fix_suggestion (exit -2): " + repr(sug_auth2))
+    sug_auth127 = auth_credential_fix_suggestion("Generator exit_code=127; fix command or credentials")
+    if AUTH_CRED_TEMPLATE not in sug_auth127 or "127" not in sug_auth127:
+        ok = False
+        print("  [FAIL] auth_credential_fix_suggestion (exit 127): " + repr(sug_auth127))
 
 
     # Test fix_traceability
