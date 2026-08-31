@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import glob
 import json
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -358,8 +359,189 @@ def self_test() -> bool:
         ok = False
         print("  [FAIL] fix_traceability missing fields")
 
+    # Test idempotency tccli fixer
+    test_input = (
+        'subprocess.run([\"tccli\", \"cvm\", \"RunInstances\", \"--Region\", \"ap-guangzhou\"])\n'
+        'subprocess.run([\"tccli\", \"cvm\", \"DescribeInstances\", \"--ClientToken\", \"x\"])\n'
+    )
+    fixed, changes = fix_tccli_subprocess_in_text(test_input)
+    n_injections = len([c for c in changes if c.startswith('  Line')])
+    if n_injections != 1:
+        ok = False
+        print("  [FAIL] fix_tccli_subprocess_in_text: expected 1 injection, got " + str(n_injections))
+    if '--ClientToken' not in fixed.splitlines()[0]:
+        ok = False
+        print("  [FAIL] fix_tccli_subprocess_in_text: ClientToken not in first line")
+
     print("Self-test " + ("PASSED" if ok else "FAILED"))
     return ok
+
+
+# ─── Idempotency code fixer (Rule A: tccli subprocess) ───────────────────────
+
+_TCCLI_LIST_RE = re.compile(r'subprocess\.run\s*\(\s*\[\s*\"tccli\"', re.IGNORECASE)
+
+
+def _inject_client_token_list(tokens: list[str]) -> list[str]:
+    """
+    Given a token list for subprocess.run(["tccli", "cvm", ...]),
+    inject ClientToken pair after "tccli".
+    Returns new token list.
+    """
+    result = []
+    for i, tok in enumerate(tokens):
+        result.append(tok)
+        if tok == '"tccli"' or tok == "'tccli'":
+            # Insert ClientToken pair after tccli element
+            result.extend(['"--ClientToken"', '"$CLIENT_TOKEN"'])
+    return result
+
+
+def _tokenize_subprocess_call(line: str) -> list[str] | None:
+    """
+    Attempt to extract tokens from a subprocess.run([...]) call.
+    Returns list of tokens or None if parsing fails.
+    Handles basic comma-separated quoted strings.
+    """
+    # Find the [ ... ] boundaries
+    start = line.find('[')
+    end = line.rfind(']')
+    if start == -1 or end == -1 or end <= start:
+        return None
+    inner = line[start + 1:end]
+    # Split on commas, strip whitespace, split on unquoted commas
+    tokens = []
+    current = ''
+    in_quote = False
+    quote_char = None
+    for ch in inner:
+        if ch in ('"', "'") and not in_quote:
+            in_quote = True
+            quote_char = ch
+            current += ch
+        elif ch == quote_char and in_quote:
+            in_quote = False
+            quote_char = None
+            current += ch
+        elif ch == ',' and not in_quote:
+            tok = current.strip()
+            if tok:
+                tokens.append(tok)
+            current = ''
+        else:
+            current += ch
+    tok = current.strip()
+    if tok:
+        tokens.append(tok)
+    return tokens
+
+
+def fix_tccli_subprocess_in_text(text: str) -> tuple[str, list[str]]:
+    """
+    Scan text for tccli subprocess calls without --ClientToken and inject it.
+    Uses tokenization to safely insert ClientToken without regex-quote issues.
+    Returns (fixed_text, list_of_changes).
+    Skips: comment lines, docstrings, read-only ops (--version, Describe, Get, List, Query).
+    """
+    changes: list[str] = []
+    fixed_lines: list[str] = []
+    in_triple = False
+
+    for lineno, line in enumerate(text.splitlines(), 1):
+        stripped = line.strip()
+        if '"""' in stripped or "'''" in stripped:
+            in_triple = not in_triple
+            continue
+        if in_triple:
+            fixed_lines.append(line)
+            continue
+        if not stripped or stripped.startswith('#'):
+            fixed_lines.append(line)
+            continue
+        if not _TCCLI_LIST_RE.search(line):
+            fixed_lines.append(line)
+            continue
+        # Skip read-only operations
+        if any(x in line for x in ('--version', 'Describe', 'Query', 'List', 'Get', 'Check')):
+            fixed_lines.append(line)
+            continue
+        if '--ClientToken' in line or '--client-token' in line:
+            fixed_lines.append(line)
+            continue
+
+        tokens = _tokenize_subprocess_call(line)
+        if tokens is None:
+            fixed_lines.append(line)
+            continue
+
+        new_tokens = _inject_client_token_list(tokens)
+        indent = len(line) - len(line.lstrip())
+        prefix = line[:indent]
+        inner = ', '.join(new_tokens)
+        new_line = prefix + 'subprocess.run([' + inner + '])'
+
+        if new_line != line:
+            fixed_lines.append(new_line)
+            changes.append(f'  Line {lineno}: injected --ClientToken into tccli subprocess')
+            changes.append(f'    {line.strip()[:80]}')
+        else:
+            fixed_lines.append(line)
+
+    return '\n'.join(fixed_lines), changes
+
+
+def fix_file_idempotency(file_path: Path, dry_run: bool = True) -> list[str]:
+    """Detect and optionally fix idempotency issues in a Python source file."""
+    text = file_path.read_text(encoding='utf-8')
+    new_text, changes = fix_tccli_subprocess_in_text(text)
+    if not changes:
+        return []
+    if dry_run:
+        return changes
+    backup = file_path.with_suffix(file_path.suffix + '.bak')
+    backup.write_text(text, encoding='utf-8')
+    file_path.write_text(new_text, encoding='utf-8')
+    changes.append(f'  [APPLIED] {file_path} — .bak saved')
+    return changes
+
+
+def scan_code_idempotency(dry_run: bool = True) -> tuple[int, int]:
+    """
+    Scan Python files for idempotency issues.
+    Returns (total_issues, files_with_issues).
+    """
+    py_files = sorted(
+        list((ROOT / 'qcloud-copilot').rglob('*.py'))
+        + list((ROOT / 'scripts').rglob('*.py'))
+    )
+    py_files = [f for f in py_files if f.name != 'auto_fix_gcl_blockers.py']
+
+    total_issues = 0
+    files_with_issues = 0
+    all_changes: list[str] = []
+
+    for path in py_files:
+        try:
+            text = path.read_text(encoding='utf-8')
+        except OSError:
+            continue
+        if 'tccli' not in text and 'tencentcloud' not in text:
+            continue
+        _, changes = fix_tccli_subprocess_in_text(text)
+        if changes:
+            files_with_issues += 1
+            total_issues += len([c for c in changes if c.startswith('  Line')])
+            all_changes.extend(changes)
+
+    if all_changes:
+        action = '[DRY-RUN] Would fix' if dry_run else '[APPLIED]'
+        print(f'\n{action} idempotency in {files_with_issues} file(s), {total_issues} issue(s):')
+        for c in all_changes[:20]:
+            print(c)
+        if len(all_changes) > 20:
+            print(f'  ... and {len(all_changes) - 20} more')
+
+    return total_issues, files_with_issues
 
 
 # ─── CLI ─────────────────────────────────────────────────────────────────────
@@ -374,11 +556,20 @@ def main() -> None:
                         help="Run internal checks")
     parser.add_argument("--check-idempotency", action="store_true",
                         help="Also scan for race conditions (non-monotonic timestamps)")
+    parser.add_argument("--scan-code-idempotency", action="store_true",
+                        help="Scan Python source files for missing ClientToken in tccli calls")
     args = parser.parse_args()
 
     if args.self_test:
         ok = self_test()
         sys.exit(0 if ok else 1)
+
+    if args.scan_code_idempotency:
+        dry_run = not args.apply
+        issues, _files = scan_code_idempotency(dry_run=dry_run)
+        if issues == 0:
+            print("No idempotency issues found in Python source files.")
+        sys.exit(0 if issues == 0 else 1)
 
     dry_run = not args.apply
     results = scan_all(dry_run=dry_run, check_race=args.check_idempotency)
