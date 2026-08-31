@@ -57,8 +57,7 @@ PRODUCT_SKILL: dict[str, str] = {
     "scf": "qcloud-scf-ops",
     "mongodb": "qcloud-mongodb-ops",
     "postgres": "qcloud-postgres-ops",
-    "ssl": "qcloud-ssl-ops",
-    "as": "qcloud-agsx-ops",
+    "ags": "qcloud-agsx-ops",
     "billing": "qcloud-finops-ops",
     "ccn": "qcloud-ccn-ops",
     "vpcn": "qcloud-vpn-ops",
@@ -138,8 +137,12 @@ def parse_api_json(api_json: dict[str, Any]) -> tuple[dict[str, list[str]], dict
     return flags_kb, schema_kb, {"actions_total": len(actions), "actions_covered": covered}
 
 
-def sync(metadata_dir: Path | None) -> dict[str, Any]:
-    """Walk metadata dir and build all three KB payloads."""
+def sync(metadata_dir: Path | None, all_products: bool = False) -> dict[str, Any]:
+    """Walk metadata dir and build all three KB payloads.
+
+    When all_products=True, also write coverage entries for unmapped products
+    with source="no_tccli" so the full set of known tccli products is tracked.
+    """
     if metadata_dir is None:
         raise SystemExit(
             "No tccli metadata found. Pass --metadata <services-dir> or pip install tccli."
@@ -149,22 +152,36 @@ def sync(metadata_dir: Path | None) -> dict[str, Any]:
     schema_out: dict[str, dict[str, dict[str, Any]]] = {}
     coverage: dict[str, dict[str, Any]] = {}
     skipped: list[str] = []
+    no_tccli: list[str] = []
 
     for product_dir in sorted(p for p in metadata_dir.iterdir() if p.is_dir()):
         product = product_dir.name.lower()
         skill = PRODUCT_SKILL.get(product)
-        if not skill:
-            skipped.append(product)
-            continue
         version_dir = _latest_version_dir(product_dir)
         api_file = version_dir / "api.json" if version_dir else None
+
         if api_file is None or not api_file.exists():
-            print(f"WARN: no api.json for product {product}, skipping", file=sys.stderr)
+            if skill:
+                print(f"WARN: no api.json for product {product} ({skill}), skipping", file=sys.stderr)
+            if all_products and not skill:
+                no_tccli.append(product)
+            if not skill:
+                skipped.append(product)
             continue
+
+        if not skill:
+            skipped.append(product)
+            if all_products:
+                no_tccli.append(product)
+            continue
+
         try:
             api_json = json.loads(api_file.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as exc:
             print(f"WARN: cannot parse {api_file}: {exc}", file=sys.stderr)
+            if all_products:
+                no_tccli.append(product)
+            skipped.append(product)
             continue
 
         flags_kb, schema_kb, counts = parse_api_json(api_json)
@@ -178,8 +195,17 @@ def sync(metadata_dir: Path | None) -> dict[str, Any]:
             "version": version_dir.name if version_dir else "",
         }
 
+    # When --all, write no_tccli entries for products without a tccli api.json
+    for product in no_tccli:
+        coverage[product] = {
+            "actions_covered": 0,
+            "actions_total": 0,
+            "source": "no_tccli",
+        }
+
     if skipped:
-        print(f"INFO: {len(skipped)} unmapped products skipped: {', '.join(sorted(skipped))}", file=sys.stderr)
+        mode = "unmapped" if all_products else "unmapped/unavailable"
+        print(f"INFO: {len(skipped)} {mode} products: {', '.join(sorted(skipped))}", file=sys.stderr)
 
     return {"flags": flags_out, "schemas": schema_out, "coverage": coverage}
 
@@ -218,7 +244,9 @@ def main() -> int:
                         help="Path to tccli services/ dir (default: auto-detect installed tccli)")
     parser.add_argument("--out-dir", type=str, default=str(DEFAULT_OUT_DIR))
     parser.add_argument("--check", action="store_true",
-                        help="CI mode: exit 1 if generated files are missing or stale")
+                        help="CI mode: exit 1 if generated KBs are missing or stale")
+    parser.add_argument("--all", action="store_true",
+                        help="Sync ALL tccli products, not just mapped ones; write no_tccli entries for unmapped")
     args = parser.parse_args()
 
     metadata_dir: Path | None
@@ -230,7 +258,7 @@ def main() -> int:
     else:
         metadata_dir = detect_tccli_services_dir()
 
-    payload = sync(metadata_dir)
+    payload = sync(metadata_dir, all_products=args.all)
     out_dir = Path(args.out_dir)
 
     if args.check:

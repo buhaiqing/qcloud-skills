@@ -167,6 +167,26 @@ def store_failure_pattern(
         return False
 
 
+def get_cross_skill_patterns(error_category: str | None = None) -> dict[str, dict[str, Any]]:
+    """Retrieve failure patterns optionally filtered by error_category.
+
+    Args:
+        error_category: If provided, only return patterns matching this
+            error_category. If None, return all patterns.
+
+    Returns:
+        Dict of pattern dicts keyed by (category, skill, command_norm, error) tuple.
+    """
+    patterns = parse_existing_safe(DEFAULT_STORE_PATH)
+    if error_category is None:
+        return patterns
+
+    filtered: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    for key, p in patterns.items():
+        if p.get("error_category") == error_category:
+            filtered[key] = p
+    return filtered
+
 def main() -> int:
     """CLI entry point for testing."""
     import argparse
