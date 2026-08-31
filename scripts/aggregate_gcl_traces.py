@@ -190,7 +190,8 @@ def _extract_issue_types(suggestions: list[str]) -> list[str]:
 
 # ─── Metrics ─────────────────────────────────────────────────────────────────
 
-def aggregate(traces: list[dict], use_fake: bool = False) -> dict:
+def aggregate(traces: list[dict], use_fake: bool = False,
+               evidence_jsonl: str = "") -> dict:
     if not traces:
         return {}
 
@@ -293,6 +294,8 @@ def aggregate(traces: list[dict], use_fake: bool = False) -> dict:
         "files_avg": files_avg,
         "trend_last20": trend_seq[-20:],
         "trend_note": "Each entry = final status per trace, oldest→newest",
+        "suggestion_top3": _collect_suggestion_top3(evidence_jsonl) if evidence_jsonl else {},
+        "fix_coverage": _compute_fix_coverage(evidence_jsonl) if evidence_jsonl else {},
     }
 
 
@@ -375,7 +378,109 @@ def render(metrics: dict) -> str:
         "",
         f"> **Note**: {metrics['trend_note']}",
     ]
+
+    # ── suggestion Top-3 per type ──────────────────────────────────────────
+    s3 = metrics.get("suggestion_top3")
+    if s3:
+        lines += [
+            "",
+            "## BLOCKER / MAJOR 精确 Suggestion Top-3",
+            "",
+        ]
+        for category, items in sorted(s3.items(), key=lambda x: -sum(c for _, c in x[1])):
+            if not items:
+                continue
+            lines.append(f"### {category}")
+            lines.append("")
+            lines.append("| Suggestion | 次数 |")
+            lines.append("|------------|------|")
+            for msg, cnt in items[:3]:
+                escaped = msg.replace("|", "&#124;")
+                lines.append(f"| {escaped} | {cnt} |")
+            lines.append("")
+
+    # ── fix coverage ───────────────────────────────────────────────────────
+    fc = metrics.get("fix_coverage")
+    if fc:
+        lines += [
+            "",
+            "## Auto-fix 覆盖率",
+            "",
+            "| 类别 | 已有值 | 缺失(可补) | 覆盖率 |",
+            "|------|--------|------------|--------|",
+        ]
+        for cat, vals in sorted(fc.items()):
+            present = vals["present"]
+            missing = vals["missing"]
+            total = present + missing
+            rate = f"{present/total*100:.1f}%" if total else "N/A"
+            lines.append(f"| {cat} | {present} | {missing} | {rate} |")
+        lines.append("")
+
+    # ── next-run optimization suggestions ─────────────────────────────────
+    lines += [
+        "## 下次 GCL 优化建议",
+        "",
+        ("- **traceability**: Generator 输出应包含 `RequestId`（从 tccli JSON 响应中提取） "
+         f"共 {sum(c for _, c in s3.get('traceability', [])) if s3 else 'N/A'} 次缺失 → 更新 skill generator 模板. "
+         "临时修复: `scripts/auto_fix_gcl_blockers.py --dry-run` 补默认值"),
+        ("- **idempotency**: Generator 应为每个请求生成并跟踪 `ClientToken`（UUID） "
+         f"共 {sum(c for _, c in s3.get('idempotency', [])) if s3 else 'N/A'} 次缺失 → skill generator 模板需在每次 tccli 调用前生成 ClientToken"),
+        ("- **auth_credential**: `exit_code=-2` 表示命令被 skill harness 拒绝 "
+         f"共 {sum(c for _, c in s3.get('auth_credential', [])) if s3 else 'N/A'} 次 → 检查 skill 权限或命令语法. 此类型无法自动修复，需人工排查"),
+    ]
+
     return "\n".join(lines)
+
+
+# ─── Suggestion Top-3 collector ───────────────────────────────────────────
+
+def _collect_suggestion_top3(evidence_jsonl: str) -> dict[str, list[tuple[str, int]]]:
+    """Read evidence JSONL, return {type: [(msg, count), ...]} for BLOCKER/MAJOR types."""
+    type_suggestions: dict[str, list[str]] = defaultdict(list)
+    try:
+        with open(evidence_jsonl, encoding="utf-8") as fh:
+            for line in fh:
+                d = json.loads(line)
+                iters = d.get("trace", {}).get("iterations", [])
+                for it in iters:
+                    c = it.get("critic", {})
+                    for s in c.get("suggestions", []):
+                        low = s.lower()
+                        if "requestid" in low or ("trace" in low and "missing" in low):
+                            type_suggestions["traceability"].append(s)
+                        elif "clienttoken" in low or ("idempot" in low and "missing" in low) or s == "set ClientToken":
+                            type_suggestions["idempotency"].append(s)
+                        elif "exit_code" in low or "credentials" in low:
+                            type_suggestions["auth_credential"].append(s)
+    except (OSError, json.JSONDecodeError):
+        pass
+    result = {}
+    for t, msgs in type_suggestions.items():
+        result[t] = Counter(msgs).most_common(3)
+    return result
+
+
+# ─── Fix coverage ─────────────────────────────────────────────────────────────
+
+_TRACER_FIELDS = ("started_at", "finished_at", "commits", "files_changed")
+
+
+def _compute_fix_coverage(evidence_jsonl: str) -> dict[str, dict[str, int]]:
+    """Count present/missing TRACER_FIELDS across all traces."""
+    counts: dict[str, dict[str, int]] = {f: {"present": 0, "missing": 0} for f in _TRACER_FIELDS}
+    try:
+        with open(evidence_jsonl, encoding="utf-8") as fh:
+            for line in fh:
+                d = json.loads(line)
+                for field in _TRACER_FIELDS:
+                    if field in d:
+                        counts[field]["present"] += 1
+                    else:
+                        counts[field]["missing"] += 1
+    except (OSError, json.JSONDecodeError):
+        pass
+    return counts
 
 
 # ─── Self-test ────────────────────────────────────────────────────────────────
@@ -418,8 +523,9 @@ def main() -> None:
         print("Self-test " + ("PASSED" if ok else "FAILED"))
         sys.exit(0)
 
+    evidence_jsonl = str(args.dir / "evidence-local.jsonl")
     traces = load_traces(args.dir)
-    metrics = aggregate(traces)
+    metrics = aggregate(traces, evidence_jsonl=evidence_jsonl)
     print(render(metrics))
     sys.exit(0)
 
