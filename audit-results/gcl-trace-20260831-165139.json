@@ -1,0 +1,320 @@
+{
+  "skill": "qcloud-cvm-ops",
+  "request": "List CVM instances for read-only verification",
+  "rubric_version": "v1",
+  "started_at": "2026-08-31T16:51:39.486344+00:00",
+  "iterations": [
+    {
+      "iter": 1,
+      "generator": {
+        "command": "echo mock-cvm-output",
+        "exit_code": -2,
+        "result_excerpt": "COMMAND REJECTED: only tccli invocations permitted (got 'echo')",
+        "stdout_len": 0,
+        "stderr_len": 0,
+        "op_type": "read",
+        "shadow": false,
+        "args": {
+          "iter": 1,
+          "critic_feedback": null
+        },
+        "error_code_hints": "## Tencent Cloud Error Code Reference\n- `AuthFailure`: auth — Check SecretId/Key and CAM policy\n- `InvalidParameter`: param — Verify all required parameters are present and valid\n- `InvalidCredential`: auth — SecretKey may be expired or invalid\n- `ResourceNotFound`: state — Resource may have been deleted; verify existence first\n- `UnsupportedOperation`: api — Operation not supported in this region or for this resource type\n- `RequestLimitExceeded`: rate_limit — Reduce request frequency; implement exponential backoff\n- `InternalError`: unknown — Retry with exponential backoff; if persists, contact support\n- `ResourceInsufficient`: quota — Check account quota; request increase if needed\n- `DryRunOperation`: dry_run — Dry run passed; operation is safe to execute",
+        "_error_code_map": {
+          "AuthFailure": {
+            "severity": "major",
+            "category": "auth",
+            "fix": "Check SecretId/Key and CAM policy"
+          },
+          "InvalidParameter": {
+            "severity": "minor",
+            "category": "param",
+            "fix": "Verify all required parameters are present and valid"
+          },
+          "InvalidCredential": {
+            "severity": "major",
+            "category": "auth",
+            "fix": "SecretKey may be expired or invalid"
+          },
+          "ResourceNotFound": {
+            "severity": "minor",
+            "category": "state",
+            "fix": "Resource may have been deleted; verify existence first"
+          },
+          "UnsupportedOperation": {
+            "severity": "major",
+            "category": "api",
+            "fix": "Operation not supported in this region or for this resource type"
+          },
+          "RequestLimitExceeded": {
+            "severity": "major",
+            "category": "rate_limit",
+            "fix": "Reduce request frequency; implement exponential backoff"
+          },
+          "InternalError": {
+            "severity": "major",
+            "category": "unknown",
+            "fix": "Retry with exponential backoff; if persists, contact support"
+          },
+          "ResourceInsufficient": {
+            "severity": "major",
+            "category": "quota",
+            "fix": "Check account quota; request increase if needed"
+          },
+          "DryRunOperation": {
+            "severity": "minor",
+            "category": "dry_run",
+            "fix": "Dry run passed; operation is safe to execute"
+          }
+        }
+      },
+      "critic": {
+        "scores": {
+          "correctness": 0.0,
+          "safety": 1.0,
+          "traceability": 0.5,
+          "idempotency": 0.5,
+          "spec_compliance": 0.0
+        },
+        "suggestions": [
+          "Generator exit_code=-2; fix command or credentials",
+          "Response missing RequestId — traceability degraded"
+        ],
+        "blocking": true,
+        "rubric_rule_hits": {
+          "correctness": [
+            "generator_exit_code_nonzero"
+          ],
+          "safety": [],
+          "idempotency": [],
+          "traceability": [],
+          "spec_compliance": [
+            "below_rubric_threshold"
+          ]
+        }
+      },
+      "decision": "RETRY"
+    },
+    {
+      "iter": 2,
+      "generator": {
+        "command": "echo mock-cvm-output",
+        "exit_code": -2,
+        "result_excerpt": "COMMAND REJECTED: only tccli invocations permitted (got 'echo')",
+        "stdout_len": 0,
+        "stderr_len": 0,
+        "op_type": "read",
+        "shadow": false,
+        "args": {
+          "iter": 2,
+          "critic_feedback": "Generator exit_code=-2; fix command or credentials; Response missing RequestId — traceability degraded"
+        },
+        "error_code_hints": "## Tencent Cloud Error Code Reference\n- `AuthFailure`: auth — Check SecretId/Key and CAM policy\n- `InvalidParameter`: param — Verify all required parameters are present and valid\n- `InvalidCredential`: auth — SecretKey may be expired or invalid\n- `ResourceNotFound`: state — Resource may have been deleted; verify existence first\n- `UnsupportedOperation`: api — Operation not supported in this region or for this resource type\n- `RequestLimitExceeded`: rate_limit — Reduce request frequency; implement exponential backoff\n- `InternalError`: unknown — Retry with exponential backoff; if persists, contact support\n- `ResourceInsufficient`: quota — Check account quota; request increase if needed\n- `DryRunOperation`: dry_run — Dry run passed; operation is safe to execute",
+        "_error_code_map": {
+          "AuthFailure": {
+            "severity": "major",
+            "category": "auth",
+            "fix": "Check SecretId/Key and CAM policy"
+          },
+          "InvalidParameter": {
+            "severity": "minor",
+            "category": "param",
+            "fix": "Verify all required parameters are present and valid"
+          },
+          "InvalidCredential": {
+            "severity": "major",
+            "category": "auth",
+            "fix": "SecretKey may be expired or invalid"
+          },
+          "ResourceNotFound": {
+            "severity": "minor",
+            "category": "state",
+            "fix": "Resource may have been deleted; verify existence first"
+          },
+          "UnsupportedOperation": {
+            "severity": "major",
+            "category": "api",
+            "fix": "Operation not supported in this region or for this resource type"
+          },
+          "RequestLimitExceeded": {
+            "severity": "major",
+            "category": "rate_limit",
+            "fix": "Reduce request frequency; implement exponential backoff"
+          },
+          "InternalError": {
+            "severity": "major",
+            "category": "unknown",
+            "fix": "Retry with exponential backoff; if persists, contact support"
+          },
+          "ResourceInsufficient": {
+            "severity": "major",
+            "category": "quota",
+            "fix": "Check account quota; request increase if needed"
+          },
+          "DryRunOperation": {
+            "severity": "minor",
+            "category": "dry_run",
+            "fix": "Dry run passed; operation is safe to execute"
+          }
+        }
+      },
+      "critic": {
+        "scores": {
+          "correctness": 0.0,
+          "safety": 1.0,
+          "traceability": 0.5,
+          "idempotency": 0.5,
+          "spec_compliance": 0.0
+        },
+        "suggestions": [
+          "Generator exit_code=-2; fix command or credentials",
+          "Response missing RequestId — traceability degraded"
+        ],
+        "blocking": true,
+        "rubric_rule_hits": {
+          "correctness": [
+            "generator_exit_code_nonzero"
+          ],
+          "safety": [],
+          "idempotency": [],
+          "traceability": [],
+          "spec_compliance": [
+            "below_rubric_threshold"
+          ]
+        }
+      },
+      "decision": "RETRY"
+    },
+    {
+      "iter": 3,
+      "generator": {
+        "command": "echo mock-cvm-output",
+        "exit_code": -2,
+        "result_excerpt": "COMMAND REJECTED: only tccli invocations permitted (got 'echo')",
+        "stdout_len": 0,
+        "stderr_len": 0,
+        "op_type": "read",
+        "shadow": false,
+        "args": {
+          "iter": 3,
+          "critic_feedback": "Generator exit_code=-2; fix command or credentials; Response missing RequestId — traceability degraded"
+        },
+        "error_code_hints": "## Tencent Cloud Error Code Reference\n- `AuthFailure`: auth — Check SecretId/Key and CAM policy\n- `InvalidParameter`: param — Verify all required parameters are present and valid\n- `InvalidCredential`: auth — SecretKey may be expired or invalid\n- `ResourceNotFound`: state — Resource may have been deleted; verify existence first\n- `UnsupportedOperation`: api — Operation not supported in this region or for this resource type\n- `RequestLimitExceeded`: rate_limit — Reduce request frequency; implement exponential backoff\n- `InternalError`: unknown — Retry with exponential backoff; if persists, contact support\n- `ResourceInsufficient`: quota — Check account quota; request increase if needed\n- `DryRunOperation`: dry_run — Dry run passed; operation is safe to execute",
+        "_error_code_map": {
+          "AuthFailure": {
+            "severity": "major",
+            "category": "auth",
+            "fix": "Check SecretId/Key and CAM policy"
+          },
+          "InvalidParameter": {
+            "severity": "minor",
+            "category": "param",
+            "fix": "Verify all required parameters are present and valid"
+          },
+          "InvalidCredential": {
+            "severity": "major",
+            "category": "auth",
+            "fix": "SecretKey may be expired or invalid"
+          },
+          "ResourceNotFound": {
+            "severity": "minor",
+            "category": "state",
+            "fix": "Resource may have been deleted; verify existence first"
+          },
+          "UnsupportedOperation": {
+            "severity": "major",
+            "category": "api",
+            "fix": "Operation not supported in this region or for this resource type"
+          },
+          "RequestLimitExceeded": {
+            "severity": "major",
+            "category": "rate_limit",
+            "fix": "Reduce request frequency; implement exponential backoff"
+          },
+          "InternalError": {
+            "severity": "major",
+            "category": "unknown",
+            "fix": "Retry with exponential backoff; if persists, contact support"
+          },
+          "ResourceInsufficient": {
+            "severity": "major",
+            "category": "quota",
+            "fix": "Check account quota; request increase if needed"
+          },
+          "DryRunOperation": {
+            "severity": "minor",
+            "category": "dry_run",
+            "fix": "Dry run passed; operation is safe to execute"
+          }
+        }
+      },
+      "critic": {
+        "scores": {
+          "correctness": 0.0,
+          "safety": 1.0,
+          "traceability": 0.5,
+          "idempotency": 0.5,
+          "spec_compliance": 0.0
+        },
+        "suggestions": [
+          "Generator exit_code=-2; fix command or credentials",
+          "Response missing RequestId — traceability degraded"
+        ],
+        "blocking": true,
+        "rubric_rule_hits": {
+          "correctness": [
+            "generator_exit_code_nonzero"
+          ],
+          "safety": [],
+          "idempotency": [],
+          "traceability": [],
+          "spec_compliance": [
+            "below_rubric_threshold"
+          ]
+        }
+      },
+      "decision": "RETRY"
+    }
+  ],
+  "preflight_reflexion": {
+    "skill": "qcloud-cvm-ops",
+    "command": "echo mock-cvm-output",
+    "injection_id": null,
+    "matched_failure_keys": [],
+    "matched_failures": 0,
+    "matched_successes": 0,
+    "injection": ""
+  },
+  "final": {
+    "status": "MAX_ITER",
+    "iter": 3,
+    "output": "COMMAND REJECTED: only tccli invocations permitted (got 'echo')",
+    "unresolved": [
+      "correctness",
+      "spec_compliance"
+    ],
+    "failure_pattern": {
+      "category": "runtime",
+      "skill": "qcloud-cvm-ops",
+      "command": "echo mock-cvm-output",
+      "error": "correctness=0.00<0.5",
+      "fix": "Generator exit_code=-2; fix command or credentials",
+      "count": 1,
+      "reusable": true,
+      "severity": "major"
+    }
+  },
+  "finished_at": "2026-08-31T16:51:39.487139+00:00",
+  "files_changed": [
+    "AGENTS.md",
+    "assets/shared/tcloud_kb_coverage.json",
+    "references/toolgrounding/_demo.py",
+    "references/toolgrounding/grounding_trace.py",
+    "references/toolgrounding/hallucination_detector.py",
+    "references/toolgrounding/state_dependency.py",
+    "references/toolgrounding/tool_schema.py",
+    "scripts/failure_pattern_extract.py",
+    "scripts/kb_sync_openapi.py",
+    "scripts/reflexion_store.py"
+  ],
+  "commits": []
+}

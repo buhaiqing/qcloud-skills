@@ -1,0 +1,125 @@
+{
+  "skill": "qcloud-cvm-ops",
+  "request": "Show CVM help for read-only verification",
+  "rubric_version": "v1",
+  "started_at": "2026-08-31T16:53:09.688990+00:00",
+  "iterations": [
+    {
+      "iter": 1,
+      "generator": {
+        "command": "tccli cvm help",
+        "exit_code": 0,
+        "result_excerpt": "AVAILABLE VERSIONS\n    2017-03-12  (recommended)\nDESCRIPTION\n    介绍如何使用API对云服务器进行操作，包括使用并管理实例、镜像、密钥等资源。\n\nUSAGE\n    tccli cvm <action> [--param...]\n\nOPTIONS\n    help\n    show the tccli cvm help info\n\nAVAILABLE ACTIONS\n    <AllocateHosts> <AssociateInstancesKeyPairs> <AssociateSecurityGroups> <ConfigureChcAssistVpc> <ConfigureChcDeployVpc> <ConvertOperatingSystems> <CreateDisasterRecoverGroup> <CreateHpcCluster> <CreateImage> <CreateKeyPair> <CreateLaunchTemplate> <CreateLaunchTemplateVersion> <DeleteDisasterRecoverGroups> <DeleteHpcClusters> <DeleteImages> <DeleteInstancesActionTimer> <DeleteInstancesDisasterRecoverGroups> <DeleteKeyPairs> <DeleteLaunchTemplate> <DeleteLaunchTemplateVersions> <DescribeAccountQuota> <DescribeChcDeniedActions> <DescribeChcHosts> <DescribeDisasterRecoverGroupQuota> <DescribeDisasterRecoverGroups> <DescribeHosts> <DescribeHpcClusters> <DescribeImageFromFamily> <DescribeImageQuota> <DescribeImageSharePermission> <DescribeImages> <DescribeImportImageOs> <DescribeInstanceFamilyConfigs> <DescribeInstanceInternetBandwidthConfigs> <DescribeInstanceTypeConfigs> <DescribeInstanceVncUrl> <DescribeInstances> <DescribeInstancesActionTimer> <DescribeInstancesAttributes> <DescribeInstancesModification> <DescribeInstancesOperationLimit> <DescribeInstancesStatus> <DescribeInternetChargeTypeConfigs> <DescribeKeyPairs> <DescribeLaunchTemplateVersions> <DescribeLaunchTemplates> <DescribeRegions> <DescribeResourcePoolPackInstances> <DescribeResourcePoolPackTypeConfigs> <DescribeResourcePoolPacks> <DescribeTaskInfo> <DescribeZoneInstanceConfigInfos> <DescribeZones> <DisassociateInstancesKeyPairs> <DisassociateSecurityGroups> <EnterRescueMode> <ExitRescueMode> <ExportImages> <ImportImage> <ImportInstancesActionTimer> <ImportKeyPair> <InquirePricePurchaseResourcePoolPacks> <InquiryPriceModifyInstancesChargeType> <InquiryPriceRenewHosts> <InquiryPriceRenewInstances> <InquiryPriceResetInstance> <InquiryPriceResetInstancesInternetMaxBandwidth> <InquiryPriceReset...",
+        "stdout_len": 3002,
+        "stderr_len": 0,
+        "op_type": "read",
+        "shadow": false,
+        "args": {
+          "iter": 1,
+          "critic_feedback": null
+        },
+        "error_code_hints": "## Tencent Cloud Error Code Reference\n- `AuthFailure`: auth — Check SecretId/Key and CAM policy\n- `InvalidParameter`: param — Verify all required parameters are present and valid\n- `InvalidCredential`: auth — SecretKey may be expired or invalid\n- `ResourceNotFound`: state — Resource may have been deleted; verify existence first\n- `UnsupportedOperation`: api — Operation not supported in this region or for this resource type\n- `RequestLimitExceeded`: rate_limit — Reduce request frequency; implement exponential backoff\n- `InternalError`: unknown — Retry with exponential backoff; if persists, contact support\n- `ResourceInsufficient`: quota — Check account quota; request increase if needed\n- `DryRunOperation`: dry_run — Dry run passed; operation is safe to execute",
+        "_error_code_map": {
+          "AuthFailure": {
+            "severity": "major",
+            "category": "auth",
+            "fix": "Check SecretId/Key and CAM policy"
+          },
+          "InvalidParameter": {
+            "severity": "minor",
+            "category": "param",
+            "fix": "Verify all required parameters are present and valid"
+          },
+          "InvalidCredential": {
+            "severity": "major",
+            "category": "auth",
+            "fix": "SecretKey may be expired or invalid"
+          },
+          "ResourceNotFound": {
+            "severity": "minor",
+            "category": "state",
+            "fix": "Resource may have been deleted; verify existence first"
+          },
+          "UnsupportedOperation": {
+            "severity": "major",
+            "category": "api",
+            "fix": "Operation not supported in this region or for this resource type"
+          },
+          "RequestLimitExceeded": {
+            "severity": "major",
+            "category": "rate_limit",
+            "fix": "Reduce request frequency; implement exponential backoff"
+          },
+          "InternalError": {
+            "severity": "major",
+            "category": "unknown",
+            "fix": "Retry with exponential backoff; if persists, contact support"
+          },
+          "ResourceInsufficient": {
+            "severity": "major",
+            "category": "quota",
+            "fix": "Check account quota; request increase if needed"
+          },
+          "DryRunOperation": {
+            "severity": "minor",
+            "category": "dry_run",
+            "fix": "Dry run passed; operation is safe to execute"
+          }
+        }
+      },
+      "critic": {
+        "scores": {
+          "correctness": 1.0,
+          "safety": 1.0,
+          "traceability": 0.5,
+          "idempotency": 0.5,
+          "spec_compliance": 1.0
+        },
+        "suggestions": [
+          "Response missing RequestId — traceability degraded",
+          "Response missing ClientToken — idempotency cannot be verified"
+        ],
+        "blocking": false,
+        "rubric_rule_hits": {
+          "correctness": [],
+          "safety": [],
+          "idempotency": [],
+          "traceability": [],
+          "spec_compliance": []
+        }
+      },
+      "decision": "PASS"
+    }
+  ],
+  "preflight_reflexion": {
+    "skill": "qcloud-cvm-ops",
+    "command": "tccli cvm help",
+    "injection_id": null,
+    "matched_failure_keys": [],
+    "matched_failures": 0,
+    "matched_successes": 0,
+    "injection": ""
+  },
+  "final": {
+    "status": "PASS",
+    "iter": 1,
+    "output": "AVAILABLE VERSIONS\n    2017-03-12  (recommended)\nDESCRIPTION\n    介绍如何使用API对云服务器进行操作，包括使用并管理实例、镜像、密钥等资源。\n\nUSAGE\n    tccli cvm <action> [--param...]\n\nOPTIONS\n    help\n    show the tccli cvm help info\n\nAVAILABLE ACTIONS\n    <AllocateHosts> <AssociateInstancesKeyPairs> <AssociateSecurityGroups> <ConfigureChcAssistVpc> <ConfigureChcDeployVpc> <ConvertOperatingSystems> <CreateDisasterRecoverGroup> <CreateHpcCluster> <CreateImage> <CreateKeyPair> <CreateLaunchTemplate> <CreateLaunchTemplateVersion> <DeleteDisasterRecoverGroups> <DeleteHpcClusters> <DeleteImages> <DeleteInstancesActionTimer> <DeleteInstancesDisasterRecoverGroups> <DeleteKeyPairs> <DeleteLaunchTemplate> <DeleteLaunchTemplateVersions> <DescribeAccountQuota> <DescribeChcDeniedActions> <DescribeChcHosts> <DescribeDisasterRecoverGroupQuota> <DescribeDisasterRecoverGroups> <DescribeHosts> <DescribeHpcClusters> <DescribeImageFromFamily> <DescribeImageQuota> <DescribeImageSharePermission> <DescribeImages> <DescribeImportImageOs> <DescribeInstanceFamilyConfigs> <DescribeInstanceInternetBandwidthConfigs> <DescribeInstanceTypeConfigs> <DescribeInstanceVncUrl> <DescribeInstances> <DescribeInstancesActionTimer> <DescribeInstancesAttributes> <DescribeInstancesModification> <DescribeInstancesOperationLimit> <DescribeInstancesStatus> <DescribeInternetChargeTypeConfigs> <DescribeKeyPairs> <DescribeLaunchTemplateVersions> <DescribeLaunchTemplates> <DescribeRegions> <DescribeResourcePoolPackInstances> <DescribeResourcePoolPackTypeConfigs> <DescribeResourcePoolPacks> <DescribeTaskInfo> <DescribeZoneInstanceConfigInfos> <DescribeZones> <DisassociateInstancesKeyPairs> <DisassociateSecurityGroups> <EnterRescueMode> <ExitRescueMode> <ExportImages> <ImportImage> <ImportInstancesActionTimer> <ImportKeyPair> <InquirePricePurchaseResourcePoolPacks> <InquiryPriceModifyInstancesChargeType> <InquiryPriceRenewHosts> <InquiryPriceRenewInstances> <InquiryPriceResetInstance> <InquiryPriceResetInstancesInternetMaxBandwidth> <InquiryPriceReset..."
+  },
+  "finished_at": "2026-08-31T16:53:09.953777+00:00",
+  "files_changed": [
+    ".pre-commit-config.yaml",
+    "AGENTS.md",
+    "assets/shared/tcloud_kb_coverage.json",
+    "docs/failure-patterns.md",
+    "references/toolgrounding/_demo.py",
+    "references/toolgrounding/grounding_trace.py",
+    "references/toolgrounding/hallucination_detector.py",
+    "references/toolgrounding/state_dependency.py",
+    "references/toolgrounding/tool_schema.py",
+    "scripts/check_idempotency.py",
+    "scripts/failure_pattern_extract.py",
+    "scripts/kb_sync_openapi.py",
+    "scripts/reflexion_store.py"
+  ],
+  "commits": []
+}
