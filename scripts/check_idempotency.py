@@ -17,6 +17,8 @@ Detection rules:
      → requires x-ms-client-request-id header or Operation-Location polling
   F. google-cloud-python: storage/bigquery/pubsub mutation calls
      → requires request_id or destination_id parameter
+  G. Go SDK (tencentcloud-sdk-go / aws-sdk-go-v2 / alibaba-cloud-sdk-go)
+     → regex heuristic: client.<Method>(...) without ClientToken in call window
 
 Usage (pre-commit hook, no args):
     python3 scripts/check_idempotency.py
@@ -374,14 +376,62 @@ def check_google_cloud(text: str) -> list[str]:
     return issues
 
 
+# ─── Rule G: Go SDK (tencentcloud-sdk-go / aws-sdk-go-v2 / alibaba-cloud-sdk-go) ──
+
+# Go SDK write-method prefixes (PascalCase). Read-only ops are skipped below.
+GO_IDEMPOTENT_PREFIXES = (
+    "Create", "Run", "Modify", "Update", "Set", "Put", "Delete",
+    "Terminate", "Stop", "Release", "Reset", "Reboot", "Restart",
+    "Bind", "Attach", "Associate", "Allocate", "Start", "Clone", "Copy",
+)
+_GO_READONLY_PREFIXES = ("Describe", "Query", "List", "Get", "Check", "Head", "Inspect")
+
+# client.<Method>( / svc.<Method>( / xxxClient.<Method>( / xxxSvc.<Method>( / conn.<Method>(
+_GO_CALL_RE = re.compile(r"\b(?:\w*[Cc]lient|\w*[Ss]vc|conn)\.([A-Z]\w*)\s*\(")
+_GO_TOKEN_RE = re.compile(r"ClientToken|Idempotency", re.IGNORECASE)
+
+
+def check_go_idempotency(text: str) -> list[str]:
+    """
+    Detect Go SDK client calls without ClientToken (regex heuristic, no Go toolchain).
+
+    Heuristic: for each `client.<Method>(` write call, inspect the window bounded by the
+    previous/next SDK call (±800 chars at file edges) for a ClientToken field or
+    IdempotencyToken assignment. Read-only methods (Describe*/List*/Get*/...) are skipped.
+    """
+    issues: list[str] = []
+    matches = list(_GO_CALL_RE.finditer(text))
+    for i, m in enumerate(matches):
+        method = m.group(1)
+        if method.startswith(_GO_READONLY_PREFIXES):
+            continue
+        if not method.startswith(GO_IDEMPOTENT_PREFIXES):
+            continue
+        # Per-call window: previous call end → next call start, so a GOOD call's
+        # ClientToken does not mask a neighboring BAD call.
+        start = matches[i - 1].end() if i > 0 else max(0, m.start() - 800)
+        end = matches[i + 1].start() if i < len(matches) - 1 else min(len(text), m.end() + 800)
+        if _GO_TOKEN_RE.search(text[start:end]):
+            continue
+        lineno = text.count("\n", 0, m.start()) + 1
+        issues.append(
+            f"  Line {lineno}: Go SDK {method} without ClientToken\n"
+            f"    {m.group(0)}...) — add ClientToken field (aws.String(...)) for idempotency"
+        )
+    return issues
+
+
 # ─── Per-file check ───────────────────────────────────────────────────────────
 
 def check_file(path: Path) -> list[str]:
-    """Return all idempotency issues in a Python file."""
+    """Return all idempotency issues in a Python or Go file."""
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as e:
         return [f"  Cannot read {path}: {e}"]
+
+    if path.suffix == ".go":
+        return check_go_idempotency(text)
 
     issues: list[str] = []
     issues.extend(check_tccli_subprocess(text))
@@ -396,7 +446,7 @@ def check_file(path: Path) -> list[str]:
 # ─── Self-test ───────────────────────────────────────────────────────────────
 
 SELF_TEST_CASES = [
-    # (description, file_content, expect_issues)
+    # (description, file_content, expect_issues[, suffix])
     (
         "tccli subprocess WITH ClientToken",
         'subprocess.run(["tccli", "cvm", "RunInstances", "--ClientToken", token, "--Region", "ap-guangzhou"])',
@@ -507,14 +557,105 @@ SELF_TEST_CASES = [
         ),
         True,
     ),
+    # ── Rule G: Go SDK ───────────────────────────────────────────────────────
+    (
+        "go tencentcloud v3 RunInstances WITHOUT ClientToken (should flag)",
+        (
+            "package main\n\n"
+            "import (\n"
+            "\t\"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common\"\n"
+            "\t\"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/cvm/v20170312\"\n"
+            ")\n\n"
+            "func deploy() {\n"
+            "\tclient := cvm.NewClient(credential, region, clientProfile)\n"
+            "\trequest := cvm.NewRunInstancesRequest()\n"
+            "\tresponse, err := client.RunInstances(request)\n"
+            "\t_, _ = response, err\n"
+            "}\n"
+        ),
+        True,
+        ".go",
+    ),
+    (
+        "go tencentcloud v3 RunInstances WITH ClientToken (should NOT flag)",
+        (
+            "package main\n\n"
+            "func deploy() {\n"
+            "\tclient := cvm.NewClient(credential, region, clientProfile)\n"
+            "\trequest := cvm.NewRunInstancesRequest()\n"
+            "\trequest.ClientToken = aws.String(uuid.New().String())\n"
+            "\tresponse, err := client.RunInstances(request)\n"
+            "\t_, _ = response, err\n"
+            "}\n"
+        ),
+        False,
+        ".go",
+    ),
+    (
+        "go aws-sdk-go-v2 RunInstances WITHOUT ClientToken (should flag)",
+        (
+            "client := ec2.NewFromConfig(cfg)\n"
+            "_, err := client.RunInstances(ctx, &ec2.RunInstancesInput{\n"
+            "\tImageId:  aws.String(\"ami-0abc123\"),\n"
+            "\tMinCount: aws.Int32(1),\n"
+            "})\n"
+        ),
+        True,
+        ".go",
+    ),
+    (
+        "go aws-sdk-go-v2 RunInstances WITH inline ClientToken (should NOT flag)",
+        (
+            "client := ec2.NewFromConfig(cfg)\n"
+            "_, err := client.RunInstances(ctx, &ec2.RunInstancesInput{\n"
+            "\tClientToken: aws.String(uuid.New().String()),\n"
+            "\tImageId:     aws.String(\"ami-0abc123\"),\n"
+            "})\n"
+        ),
+        False,
+        ".go",
+    ),
+    (
+        "go method variant ModifyInstance WITHOUT ClientToken (should flag)",
+        (
+            "client := cvm.NewClient(credential, region, clientProfile)\n"
+            "request := cvm.NewModifyInstanceRequest()\n"
+            "response, err := client.ModifyInstance(request)\n"
+            "_, _ = response, err\n"
+        ),
+        True,
+        ".go",
+    ),
+    (
+        "go read-only DescribeInstances (should NOT flag)",
+        (
+            "client := cvm.NewClient(credential, region, clientProfile)\n"
+            "response, err := client.DescribeInstances(request)\n"
+            "_, _ = response, err\n"
+        ),
+        False,
+        ".go",
+    ),
+    (
+        "go aliyun CreateInstance WITHOUT ClientToken (should flag)",
+        (
+            "client := ecs.NewClient()\n"
+            "request := ecs.CreateInstanceRequest{}\n"
+            "response, err := client.CreateInstance(request)\n"
+            "_, _ = response, err\n"
+        ),
+        True,
+        ".go",
+    ),
 ]
 
 
 def self_test() -> bool:
     """Run self-test, return True if all pass."""
     all_pass = True
-    for desc, content, expect_issues in SELF_TEST_CASES:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as fh:
+    for desc, content, expect_issues, *rest in SELF_TEST_CASES:
+        suffix = rest[0] if rest else ".py"
+        with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as fh:
             fh.write(content)
             fh.flush()
             path = Path(fh.name)
@@ -540,8 +681,8 @@ def self_test() -> bool:
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
-def get_staged_python_files() -> list[Path]:
-    """Return list of staged Python files from git."""
+def get_staged_code_files() -> list[Path]:
+    """Return list of staged .py/.go files from git."""
     try:
         result = subprocess.run(
             ["git", "diff", "--cached", "--name-only", "--diff-filter=AM"],
@@ -554,7 +695,7 @@ def get_staged_python_files() -> list[Path]:
     files = []
     for path in result.stdout.splitlines():
         p = Path(path)
-        if p.suffix == ".py":
+        if p.suffix in (".py", ".go"):
             files.append(p)
     return files
 
@@ -570,7 +711,7 @@ def main() -> None:
         ok = self_test()
         sys.exit(0 if ok else 1)
 
-    files = args.files if args.files else get_staged_python_files()
+    files = args.files if args.files else get_staged_code_files()
 
     if not files:
         # No staged Python files — nothing to check, allow commit

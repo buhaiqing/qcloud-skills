@@ -22,6 +22,7 @@ A pre-commit hook (`scripts/check_idempotency.py`) + auto-fix mode in `scripts/a
 | **D: boto3** | `client.method(...)` for write operations without `ClientToken=` kwarg | Add `ClientToken=uuid.uuid4().hex` |
 | **E: azure-sdk** | `client.begin_*()` or mutation method without `request_id=` kwarg or `x-ms-client-request-id` header | Add `request_id=` kwarg or header |
 | **F: google-cloud** | `bucket.blob().upload_from_filename(...)` / mutation without `request_id=` kwarg | Add `request_id=uuid.uuid4().hex` |
+| **G: Go SDK** | `client.<Method>(...)` (tencentcloud-sdk-go / aws-sdk-go-v2 / alibaba-cloud-sdk-go) without `ClientToken` field | Add `ClientToken: aws.String(uuid.New().String())` (inline struct) or `request.ClientToken = ...` before call |
 
 ### Skip rules (false-positive suppression)
 - `tccli --version` — read-only probe, no write semantics
@@ -109,12 +110,32 @@ For tccli injection: `--ClientToken "$CLIENT_TOKEN"` where `$CLIENT_TOKEN` is se
 **google-cloud idempotent methods requiring request_id:**
 `upload_from_string`, `upload_from_filename`, `delete`, `copy_blob`, `rename`, `compose`, `insert`, `insert_rows`, `insert_rows_json`, `delete_table`, `update_table`, `patch_table`, `copy_table`, `publish`, `publish_message`, `delete_topic`, `delete_subscription`, `create_snapshot`, `seek`, `put`, `allocate_ids`, `encrypt`, `decrypt`, `destroy_crypto_key`, `disable_crypto_key`, `add_version`, `destroy_secret_version`, `create_endpoint`, `deploy_model`, `undeploy_model`
 
+### Rule G: Go SDK (tencentcloud-sdk-go / aws-sdk-go-v2 / alibaba-cloud-sdk-go)
+
+Go is not Python AST — detection is **regex heuristic** (no Go toolchain dependency):
+
+| Pattern | Fix |
+|---------|-----|
+| `client.RunInstances(request)` — request built via `cvm.NewRunInstancesRequest()` without `request.ClientToken = ...` | Add `request.ClientToken = aws.String(uuid.New().String())` before the call |
+| `client.RunInstances(ctx, &ec2.RunInstancesInput{...})` without `ClientToken:` field | Add `ClientToken: aws.String(uuid.New().String())` to the Input struct literal |
+| `client.CreateInstance(request)` (aliyun) without `request.ClientToken = ...` | Add `request.ClientToken = uuid.New().String()` |
+
+**How it works:** regex matches `client.<Method>(` / `svc.<Method>(` / `xxxClient.<Method>(` call sites,
+skips read-only ops (`Describe*`, `Query*`, `List*`, `Get*`, `Check*`, `Head*`, `Inspect*`),
+then checks the window bounded by the previous/next SDK call for `ClientToken` / `Idempotency*`
+(a GOOD call's token never masks a neighboring BAD call).
+
+**Go idempotent method prefixes:** `Create`, `Run`, `Modify`, `Update`, `Set`, `Put`, `Delete`,
+`Terminate`, `Stop`, `Release`, `Reset`, `Reboot`, `Restart`, `Bind`, `Attach`, `Associate`,
+`Allocate`, `Start`, `Clone`, `Copy`.
+
 ### SDK Field Mapping
 
 | SDK | Idempotency Field | Example |
 |-----|-------------------|---------|
 | tccli / tencentcloud-sdk | `ClientToken` | `--ClientToken "$TOKEN"` / `req.ClientToken = uuid` |
 | boto3 (AWS) | `ClientToken` | `ClientToken=uuid.uuid4().hex` |
+| Go SDK (tencent/aws/aliyun) | `ClientToken` | `ClientToken: aws.String(uuid.New().String())` / `request.ClientToken = ...` |
 | azure-sdk | `request_id` or `x-ms-client-request-id` header | `request_id=uuid.hex` / `headers={"x-ms-client-request-id": uuid}` |
 | google-cloud-python | `request_id` | `request_id=uuid.uuid4().hex` |
 | requests (raw HTTP) | `Idempotency-Key` header | `headers={"Idempotency-Key": uuid}` |
@@ -127,3 +148,10 @@ For tccli injection: `--ClientToken "$CLIENT_TOKEN"` where `$CLIENT_TOKEN` is se
 | azure-mgmt begin_create_or_update with request_id kwarg | PASS (no issue) |
 | google-cloud storage upload without request_id | FAIL (issue detected) |
 | clean file (no API calls) | PASS (no issue) |
+| go tencentcloud v3 RunInstances WITHOUT ClientToken | FAIL (issue detected) |
+| go tencentcloud v3 RunInstances WITH ClientToken | PASS (no issue) |
+| go aws-sdk-go-v2 RunInstances WITHOUT ClientToken | FAIL (issue detected) |
+| go aws-sdk-go-v2 RunInstances WITH inline ClientToken | PASS (no issue) |
+| go ModifyInstance WITHOUT ClientToken (method variant) | FAIL (issue detected) |
+| go DescribeInstances (read-only) | PASS (no issue) |
+| go aliyun CreateInstance WITHOUT ClientToken | FAIL (issue detected) |

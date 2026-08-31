@@ -24,7 +24,7 @@ repos:
         entry: python3 scripts/check_idempotency.py
         language: system
         pass_filenames: false
-        types: [python]
+        types_or: [python, go]
       - id: check-requestid-capture
         name: Check tccli response handling captures RequestId (traceability)
         entry: python3 scripts/check_requestid_capture.py
