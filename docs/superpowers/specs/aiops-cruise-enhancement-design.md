@@ -374,6 +374,7 @@ ELIF multi-source RCA → Workflow 6
 ## Self-Check / Self-Verification
 
 ```python
+# AUTHORITATIVE: docs/superpowers/specs/aiops-cruise-enhancement-design.md:376 — self-check pseudocode, no disk implementation
 # ML 模块自验
 from ml.detectors import IsolationForestDetector, ThresholdDetector
 from ml.predictors import LinearTrendPredictor

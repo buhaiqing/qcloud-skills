@@ -142,6 +142,7 @@ Expected: FAIL — `scripts/validate_evidence_schema.py` and `docs/evidence-kern
 - [ ] **Step 5: Write `validate_evidence_schema.py` (stdlib-only)**
 
 ```python
+# AUTHORITATIVE: scripts/validate_evidence_schema.py — plan-specified implementation, planned file
 #!/usr/bin/env python3
 """Validate EvidenceRecord JSON files against docs/evidence-kernel-schema.json.
 Exits non-zero on any validation failure (CI gate for KPI #1/#2/#5)."""

@@ -72,6 +72,7 @@ mandatory_template:
 #### 2.2 监控集成
 
 ```python
+# AUTHORITATIVE: docs/gcl-enforcement-plan.md:74 — usage example, no disk implementation
 # 在 GCL 执行中集成监控
 def execute_gcl_with_monitoring(user_request):
     """带监控的 GCL 执行"""

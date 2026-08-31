@@ -116,6 +116,7 @@ gcl_enforcement:
 ### 创建验证脚本
 
 ```python
+# AUTHORITATIVE: docs/gcl-multi-subagent-rule.md:118 — planned validation script stub, no disk implementation
 #!/usr/bin/env python3
 """validate_gcl_architecture.py - 验证 GCL 架构合规性
 

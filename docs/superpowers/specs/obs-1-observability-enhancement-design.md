@@ -60,6 +60,7 @@ User ID 是 TRACE-1 的开放/延后决策，不是 OBS-1 或当前 AIOps/FinOps
 ### 1. `copilot/observ.py` — 统一埋点门面（解决 O1/O2/O3）
 
 ```python
+# AUTHORITATIVE: docs/superpowers/specs/obs-1-observability-enhancement-design.md:62 — design spec for planned copilot/observ.py
 from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
