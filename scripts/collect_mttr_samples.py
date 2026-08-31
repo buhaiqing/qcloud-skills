@@ -171,6 +171,43 @@ SCENARIOS = [
         "iter2_suggestions": [],
         "iter2_blocking": False,
     },
+    # traceability 模板修复路径（R9）：修复耗时从 4-5m → 1m，验证模板可缩短 MTTR
+    {
+        "name": "traceability_template_basic",
+        "skill": "qcloud-cdb-ops",
+        "started_delta_minutes": 80,
+        "iter_duration_minutes": 1,
+        "iter1_scores": {
+            "correctness": 1.0, "safety": 1.0,
+            "idempotency": 1.0, "traceability": 0.0, "spec_compliance": 1.0,
+        },
+        "iter1_suggestions": ["BLOCKER: traceability failure — response lacks RequestId; fix via docs/superpowers/specs/traceability-fix-template.md"],
+        "iter1_blocking": True,
+        "iter2_scores": {
+            "correctness": 1.0, "safety": 1.0,
+            "idempotency": 1.0, "traceability": 1.0, "spec_compliance": 1.0,
+        },
+        "iter2_suggestions": [],
+        "iter2_blocking": False,
+    },
+    {
+        "name": "traceability_template_retry",
+        "skill": "qcloud-es-ops",
+        "started_delta_minutes": 90,
+        "iter_duration_minutes": 1,
+        "iter1_scores": {
+            "correctness": 1.0, "safety": 1.0,
+            "idempotency": 1.0, "traceability": 0.0, "spec_compliance": 1.0,
+        },
+        "iter1_suggestions": ["BLOCKER: traceability failure — response lacks RequestId; fix via docs/superpowers/specs/traceability-fix-template.md"],
+        "iter1_blocking": True,
+        "iter2_scores": {
+            "correctness": 1.0, "safety": 1.0,
+            "idempotency": 1.0, "traceability": 1.0, "spec_compliance": 1.0,
+        },
+        "iter2_suggestions": [],
+        "iter2_blocking": False,
+    },
 ]
 
 
@@ -285,6 +322,8 @@ EXPECTED_ISSUE_TYPES = {
     "auth_credential_retry": "auth_credential",
     "spec_compliance_drift": "yaml_python_drift",
     "spec_compliance_missing_field": "spec_compliance",
+    "traceability_template_basic": "traceability",
+    "traceability_template_retry": "traceability",
 }
 
 

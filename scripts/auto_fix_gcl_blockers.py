@@ -74,6 +74,42 @@ def _has_requestid_nearby(line_idx: int, lines: list[str], radius: int = 8) -> b
     )
 
 
+TRACEABILITY_TEMPLATE_DOC = "docs/superpowers/specs/traceability-fix-template.md"
+
+
+def traceability_fix_suggestion(line: str) -> str:
+    """Generate a fix suggestion with template reference for a line missing RequestId capture.
+
+    Returns "" when the line already captures RequestId or is not response-handling code.
+    Otherwise returns a paste-ready capture snippet + anchor into TRACEABILITY_TEMPLATE_DOC.
+    """
+    stripped = line.strip()
+    if (
+        not stripped
+        or stripped.startswith("#")
+        or _REQUESTID_GET_RE.search(stripped)
+        or _REQUESTID_LOG_RE.search(stripped)
+        or _REQUESTID_VAR_RE.search(stripped)
+        or "RequestId" in stripped
+    ):
+        return ""
+    if _SDK_RESPONSE_RE.search(stripped):
+        src = "request_id = <resp>.Response.RequestId"
+        anchor = "场景-2-tencentcloud-sdk"
+    elif _TCCLI_RE.search(stripped):
+        src = 'request_id = data["Response"].get("RequestId", "unknown")'
+        anchor = "场景-1-tccli-subprocess"
+    elif _JSON_PARSE_RE.search(stripped):
+        src = 'request_id = data.get("RequestId", "unknown")'
+        anchor = "场景-3-requests-json"
+    else:
+        return ""
+    return (
+        f"Add: {src}; logger.info(..., request_id=request_id) — "
+        f"see {TRACEABILITY_TEMPLATE_DOC}#{anchor}"
+    )
+
+
 def fix_requestid_in_text(text: str) -> tuple[str, list[str]]:
     """
     Scan text for tccli/SDK response handling without RequestId capture
@@ -143,6 +179,9 @@ def fix_requestid_in_text(text: str) -> tuple[str, list[str]]:
         fixed_lines.extend(injected_lines)
         changes.append(f"  Line {lineno}: injected RequestId capture after {('SDK' if is_sdk else 'tccli' if is_tccli else 'json')}-response access")
         changes.append(f"    {stripped[:80]}")
+        sug = traceability_fix_suggestion(line)
+        if sug:
+            changes.append(f"    SUGGEST: {sug}")
 
     return '\n'.join(fixed_lines), changes
 
@@ -196,6 +235,7 @@ def scan_code_traceability(dry_run: bool = True) -> tuple[int, int]:
             print(c)
         if len(all_changes) > 20:
             print(f"  ... and {len(all_changes) - 20} more")
+        print(f'  Fix template: {TRACEABILITY_TEMPLATE_DOC} — paste pattern, re-run scan to confirm')
 
     return total_issues, files_with_issues
 
@@ -507,6 +547,23 @@ def self_test() -> bool:
     if "started_at" not in fixed or "finished_at" not in fixed:
         ok = False
         print("  [FAIL] fix_traceability missing fields")
+
+    # Test traceability_fix_suggestion (template reference)
+    sug_tccli = traceability_fix_suggestion(
+        'subprocess.run(["tccli", "cvm", "RunInstances", "--Region", "ap-guangzhou"])'
+    )
+    if TRACEABILITY_TEMPLATE_DOC not in sug_tccli or "场景-1" not in sug_tccli:
+        ok = False
+        print("  [FAIL] traceability_fix_suggestion (tccli line missing template ref): " + repr(sug_tccli))
+    sug_sdk = traceability_fix_suggestion(
+        "resp = client.DescribeInstances(req)\nitems = resp.Response.InstanceSet"
+    )
+    if TRACEABILITY_TEMPLATE_DOC not in sug_sdk or "场景-2" not in sug_sdk:
+        ok = False
+        print("  [FAIL] traceability_fix_suggestion (SDK line missing template ref): " + repr(sug_sdk))
+    if traceability_fix_suggestion('request_id = data["Response"].get("RequestId", "unknown")') != "":
+        ok = False
+        print("  [FAIL] traceability_fix_suggestion (should skip already-captured line)")
 
     # Test idempotency tccli fixer
     test_input = (
