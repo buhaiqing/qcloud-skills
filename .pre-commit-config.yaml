@@ -25,3 +25,9 @@ repos:
         language: system
         pass_filenames: false
         types: [python]
+      - id: check-requestid-capture
+        name: Check tccli response handling captures RequestId (traceability)
+        entry: python3 scripts/check_requestid_capture.py
+        language: system
+        pass_filenames: false
+        types: [python]
