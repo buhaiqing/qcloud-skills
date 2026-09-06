@@ -47,6 +47,60 @@ AUDIT_DIR = ROOT / "audit-results"
 CATEGORIES = ("cli_parameter", "skill_generation", "cross_skill", "runtime", "token_efficiency")
 MAX_LINES = 200
 
+# Error category taxonomy for cross-skill aggregation
+ERROR_CATEGORIES = (
+    "rate_limit",
+    "auth_failure",
+    "network_timeout",
+    "quota_exceeded",
+    "internal_error",
+    "not_found",
+    "invalid_param",
+    "unknown",
+)
+
+
+def derive_error_category(error: str, category: str) -> str:
+    """Derive error_category from error message and failure category.
+
+    Maps raw error strings to ERROR_CATEGORIES taxonomy for cross-skill
+    aggregation while preserving 'unknown' as the backward-compatible default.
+    """
+    if not error:
+        return "unknown"
+
+    error_lower = error.lower()
+
+    # Rate limit patterns
+    if any(kw in error_lower for kw in ("requestlimit", "ratelimit", "throttle", "too many requests")):
+        return "rate_limit"
+
+    # Auth failure patterns
+    if any(kw in error_lower for kw in ("authfailure", "auth failure", "unauthorized", "access denied", "invalid credentials")):
+        return "auth_failure"
+
+    # Network timeout patterns
+    if any(kw in error_lower for kw in ("timeout", "connection", "network", "econnrefused", "etimedout")):
+        return "network_timeout"
+
+    # Quota exceeded patterns
+    if any(kw in error_lower for kw in ("quota", "limit exceeded", "exceed", "insufficient quota")):
+        return "quota_exceeded"
+
+    # Internal error patterns
+    if any(kw in error_lower for kw in ("internalerror", "internal error", "server error", "service unavailable")):
+        return "internal_error"
+
+    # Not found patterns
+    if any(kw in error_lower for kw in ("notfound", "not found", "does not exist", "resource not found")):
+        return "not_found"
+
+    # Invalid param patterns (CLI-level)
+    if any(kw in error_lower for kw in ("invalidparameter", "missingparameter", "invalid param", "missing param", "illegal parameter")):
+        return "invalid_param"
+
+    return "unknown"
+
 # ---------------------------------------------------------------------------
 # Markdown table emit
 # ---------------------------------------------------------------------------

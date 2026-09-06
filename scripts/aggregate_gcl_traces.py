@@ -143,9 +143,13 @@ def trace_started_at(trace: dict) -> datetime | None:
     """Extract started_at from trace, return None if absent."""
     ts = trace.get("started_at")
     if ts:
-        for fmt in ("%Y%m%d-%H%M%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        for fmt in ("%Y%m%d-%H%M%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S%z"):
             try:
-                return datetime.strptime(str(ts), fmt)
+                dt = datetime.strptime(str(ts), fmt)
+                # Normalize to naive UTC for consistent comparisons
+                if dt.tzinfo is not None:
+                    dt = dt.replace(tzinfo=None) - dt.utcoffset()
+                return dt
             except ValueError:
                 continue
     return None
@@ -155,9 +159,13 @@ def trace_finished_at(trace: dict) -> datetime | None:
     """Extract finished_at from trace, return None if absent."""
     ts = trace.get("finished_at")
     if ts:
-        for fmt in ("%Y%m%d-%H%M%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        for fmt in ("%Y%m%d-%H%M%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S%z"):
             try:
-                return datetime.strptime(str(ts), fmt)
+                dt = datetime.strptime(str(ts), fmt)
+                # Normalize to naive UTC for consistent comparisons
+                if dt.tzinfo is not None:
+                    dt = dt.replace(tzinfo=None) - dt.utcoffset()
+                return dt
             except ValueError:
                 continue
     return None
@@ -167,9 +175,13 @@ def trace_timestamp(trace: dict, filename: str = "") -> datetime | None:
     """Parse YYYYMMDD-HHMMSS from trace filename or trace['ts'] field."""
     ts = trace.get("ts") or trace.get("started_at")
     if ts:
-        for fmt in ("%Y%m%d-%H%M%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        for fmt in ("%Y%m%d-%H%M%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S%z"):
             try:
-                return datetime.strptime(str(ts), fmt)
+                dt = datetime.strptime(str(ts), fmt)
+                # Normalize to naive UTC for consistent comparisons
+                if dt.tzinfo is not None:
+                    dt = dt.replace(tzinfo=None) - dt.utcoffset()
+                return dt
             except ValueError:
                 continue
     # derive from filename
