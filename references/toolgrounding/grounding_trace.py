@@ -1,10 +1,9 @@
 """工具调用 Grounding Trace: 结构化 trace + dataclass"""
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
-from enum import Enum
-import uuid
 import json
-from typing import Any, Optional
+import uuid
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
+from enum import Enum
 
 
 class ParamSource(Enum):
@@ -20,7 +19,7 @@ class GroundingMetadata:
     confidence: float
     source: ParamSource
     constraints: list[str] = field(default_factory=list)
-    inferior_model_hint: Optional[str] = None
+    inferior_model_hint: str | None = None
 
 
 @dataclass
@@ -30,7 +29,7 @@ class ToolCallTrace:
     call: dict
     grounding: GroundingMetadata
     result: dict
-    state_snapshot: Optional[dict] = None
+    state_snapshot: dict | None = None
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -49,11 +48,11 @@ class ToolCallTrace:
         source: ParamSource,
         constraints: list[str],
         result: dict,
-        state_snapshot: Optional[dict] = None,
+        state_snapshot: dict | None = None,
     ) -> "ToolCallTrace":
         return ToolCallTrace(
             trace_id=str(uuid.uuid4()),
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             call={"tool_name": tool_name, "params": params, "reasoning": reasoning},
             grounding=GroundingMetadata(confidence=confidence, source=source, constraints=constraints),
             result=result,

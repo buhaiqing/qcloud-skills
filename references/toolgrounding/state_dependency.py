@@ -1,13 +1,12 @@
 """工具状态依赖显式化: 状态机 + StateTracker"""
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
 class StateAtom:
     tool_name: str
     output_key: str
-    expected_value: Optional[str] = None  # None = any non-null
+    expected_value: str | None = None  # None = any non-null
 
     def __str__(self):
         val_hint = f"={self.expected_value}" if self.expected_value else ""

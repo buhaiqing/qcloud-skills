@@ -1,11 +1,9 @@
 """幻觉检测器: 三类失效模式检测"""
-from dataclasses import dataclass
-from typing import Optional
 import difflib
+from dataclasses import dataclass
 
-from tool_schema import REGISTRY, ToolSchema, ErrorCode
 from state_dependency import StateTracker, ToolStateSpec
-from grounding_trace import ParamSource
+from tool_schema import REGISTRY, ToolSchema
 
 
 @dataclass
@@ -84,8 +82,8 @@ class GroundingDetector:
 
 
 if __name__ == "__main__":
+    from state_dependency import SPECS, StateTracker
     from tool_schema import REGISTRY
-    from state_dependency import StateTracker, SPECS
 
     tracker = StateTracker()
     tracker.record("cdb_create", {"InstanceId": "cdb-789"})

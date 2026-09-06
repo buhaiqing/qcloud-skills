@@ -1,8 +1,8 @@
 """Tool Schema 严格化: 函数签名校验 + 结构化错误码"""
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Optional
 import re
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any
 
 
 class ErrorCode(Enum):
@@ -18,11 +18,11 @@ class ErrorCode(Enum):
 @dataclass
 class ParamConstraint:
     type: str  # "string" | "number" | "boolean" | "object" | "array" | "enum"
-    enum_values: Optional[list] = None
-    min_val: Optional[float] = None
-    max_val: Optional[float] = None
-    max_length: Optional[int] = None
-    pattern: Optional[str] = None
+    enum_values: list | None = None
+    min_val: float | None = None
+    max_val: float | None = None
+    max_length: int | None = None
+    pattern: str | None = None
     required: bool = False
     default: Any = None
 
@@ -35,7 +35,7 @@ class ToolSchema:
     returns: dict[str, Any]  # expected return keys + types
     error_codes: list[ErrorCode]
 
-    def validate_params(self, params: dict) -> tuple[bool, Optional[str], Optional[ErrorCode]]:
+    def validate_params(self, params: dict) -> tuple[bool, str | None, ErrorCode | None]:
         for pname, constraint in self.params.items():
             val = params.get(pname)
             if val is None:
@@ -65,7 +65,7 @@ class ToolSchema:
 @dataclass
 class ToolCallResult:
     error_code: ErrorCode
-    data: Optional[Any] = None
+    data: Any | None = None
     message: str = ""
 
     def to_dict(self) -> dict:
@@ -85,7 +85,7 @@ def register(schema: ToolSchema):
     REGISTRY[schema.name] = schema
 
 
-def validate_call(tool_name: str, params: dict) -> tuple[bool, Optional[str], Optional[ErrorCode]]:
+def validate_call(tool_name: str, params: dict) -> tuple[bool, str | None, ErrorCode | None]:
     schema = REGISTRY.get(tool_name)
     if schema is None:
         return False, f"Tool {tool_name!r} not found", ErrorCode.TOOL_NOT_FOUND
