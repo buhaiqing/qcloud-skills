@@ -72,6 +72,8 @@ Run `ls qcloud-*-ops/` for canonical list.
 
 通用行为准则详见 `~/.pi/agent/AGENTS.md §行为准则`（中英等价权威源）。本仓库仅需遵循，不重复定义。
 
+GCL Loop 中的 subagent 模型可见性详见 `~/.pi/agent/AGENTS.md §subagent-model-visibility`（进度表必须含 `provider/modelId` 列，默认分层 Generator=M2.7 / Critic=M3）。
+
 ## Mandatory rule: 2-round self-review after every skill update
 
 After modifying `SKILL.md`, `references/`, or `assets/`, MUST run 2 rounds before declaring done.
@@ -159,6 +161,7 @@ Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` addition
 | L19 | Cross-instance races need file locks + forced reload | `fcntl.flock` + forced reload; exact assertions for zero loss |
 | L20 | unittest buffer=False: print-capable funcs leak stdout | Wrap with `contextlib.redirect_stdout(io.StringIO())` |
 | L21 | Governance/evaluator fallbacks MUST be deny-by-default | No-match policy rule → `human_approval`, never `auto_confirm`; empty SLO samples → N/A + breach, never 1.0 |
+| L22 | GCL 终轮若仅剩「描述精确化 / L* 引用补齐」类 MAJOR（无新逻辑），可省 Critic，由主 Agent fact-check 替代 | 判据：改动不含控制流/接口/算法 → 省 Critic；主 Agent 用 3-5 条命令复核数字与引用真实性（如 `grep -c '^\| L1 '` 验证引用非幻觉）。实证：2026-09-06 R3 4 MAJOR 全为此类，省一轮 Critic，主 Agent 5 条命令复核 4/4 通过、零幻觉引用 |
 
 ## Adding or modifying a skill
 

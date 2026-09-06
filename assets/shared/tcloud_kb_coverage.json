@@ -124,5 +124,15 @@
     "actions_total": 448,
     "source": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/tccli/services/vpc/v20170312/api.json",
     "version": "v20170312"
+  },
+  "qcloud-agsx-ops": {
+    "actions_covered": 0,
+    "actions_total": 0,
+    "source": "no_tccli"
+  },
+  "qcloud-cos-ops": {
+    "actions_covered": 0,
+    "actions_total": 0,
+    "source": "no_tccli"
   }
 }
