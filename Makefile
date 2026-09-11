@@ -1,4 +1,4 @@
-.PHONY: validate registry golden kpi manifest all reflexion-update replay-smoke l4-gate compounding-checks
+.PHONY: validate registry golden kpi kpi-gates manifest all reflexion-update replay-smoke l4-gate compounding-checks
 
 validate:
 	python3 scripts/validate_local.py
@@ -21,6 +21,13 @@ kpi:
 		echo "no evidence files — KPI gate skipped"; \
 	fi
 
+# Aggregated CI gate for spec-mandated KPIs (KPI#1/#2/#3/#7).
+# - KPI#1/#2 require evidence-*.json and are skipped otherwise (informational).
+# - KPI#3 and KPI#7 are always enforced.
+# Spec anchor: docs/superpowers/specs/2026-07-28-harness-engineering-optimization-design.md
+kpi-gates:
+	python3 scripts/check_kpi_gates.py
+
 reflexion-update:
 	python3 scripts/reflexion_auto_writer.py
 
@@ -35,5 +42,5 @@ replay-smoke:
 l4-gate:
 	python3 scripts/l4_metrics_tracker.py --gate --min-traces 5
 
-all: validate registry golden kpi manifest reflexion-update
+all: validate registry golden kpi kpi-gates manifest reflexion-update
 	@echo "Harness Evidence gates passed"
