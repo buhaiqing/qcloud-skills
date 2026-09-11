@@ -46,7 +46,7 @@ Efficiency (so iteration becomes affordable).
 |------|---------|--------|
 | [kpi-pattern.md](./kpi-pattern.md) | 8-attribute KPI design template | ✅ Ready |
 | [spec-drift-gate.md](./spec-drift-gate.md) | Detect when code drifts from spec | ✅ Ready |
-| [preflight-checklist.md](./preflight-checklist.md) | Pre-merge self-review checklist | ⏳ Pending — extracted from PR review pain points once enough data |
+| [preflight-checklist.md](./preflight-checklist.md) | Pre-merge self-review checklist | ✅ Ready |
 | [agent-routing-blueprint.md](./agent-routing-blueprint.md) | Multi-agent decision contract | ⏳ Pending — needs ≥2 cross-project usage to validate |
 
 ## How to consume this directory
@@ -70,5 +70,6 @@ Efficiency (so iteration becomes affordable).
 
 This methodology is distilled from real PRs against `qcloud-skills`. Every
 pattern carries an evidence trail back to a specific commit, file, or KPI
-gate. If a pattern cannot be traced, it is a candidate for deletion — see
-`preflight-checklist.md` § "Evidence discipline".
+gate. If a pattern cannot be traced, it is a candidate for deletion; the
+[self-review checklist](./preflight-checklist.md) names the discipline
+that prevents phantom references from creeping in.
