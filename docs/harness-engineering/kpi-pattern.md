@@ -84,3 +84,42 @@ drift_check:   none — definition is self-evident
   Fix: drift_check or remove.
 - **KPI with no failure-mode runbook.** Alert fires at 3am; nobody knows
   what to do. Fix: write the failure_mode row.
+
+## Case study: scoring qcloud-skills KPIs against the 8 attributes
+
+The 8 attributes are not a checklist for show. Applied to the four KPIs
+that `make kpi-gates` actually enforces today (Sep 2026), the matrix is:
+
+| Attribute | KPI#1 leak | KPI#2 token | KPI#3 golden | KPI#7 router |
+|-----------|------------|-------------|--------------|--------------|
+| Observable | ✅ | ✅ | ✅ | ✅ |
+| Thresholded | ✅ | ✅ | ✅ | ⚠️ no target |
+| Authoritative source | ✅ | ✅ | ✅ | ✅ |
+| Skip-aware | ✅ | ✅ | ✅ | ⚠️ never skips in practice |
+| Aggregatable | ✅ | ✅ | ✅ | ✅ |
+| Failure-mode-defined | ⚠️ generic | ⚠️ generic | ⚠️ generic | ⚠️ generic |
+| CI-hooked | ✅ | ✅ | ✅ | ✅ |
+| Drift-detectable | ⚠️ | ⚠️ | ✅ | ⚠️ |
+
+**Observations:**
+
+1. **KPI#3 is the strongest.** All 8 attributes are addressed (with
+   "generic" failure-mode as the only weakness). That is the level other
+   KPIs should aim for.
+2. **"Failure-mode-defined" is the universal weak spot.** All four KPIs
+   have a generic failure_mode line; none has a one-click runbook that
+   tells the on-call engineer exactly which file to open and which
+   command to run. Fixing this for KPI#3 alone would halve the time to
+   recover from a Golden regression.
+3. **KPI#7's "no target" is honest.** Better to admit a missing target
+   than to invent one. The threshold-less-KPI note above flags this as
+   an open question.
+4. **Drift detection is uneven.** Only KPI#3 has a working
+   drift-detector (the threshold-drift case in
+   [spec-drift-gate.md](./spec-drift-gate.md)). The other three could
+   silently rot.
+
+**Use this template to score your own KPIs.** A KPI with two ⚠️ rows
+is acceptable; four is a smell. If a KPI has ⚠️ on Failure-mode-defined
+AND Drift-detectable, treat it as a known-loose KPI and schedule a
+tightening pass.
