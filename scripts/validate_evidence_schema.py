@@ -68,6 +68,16 @@ def validate_record(record: dict, idx: int, errors: list) -> None:
         errors.append(
             f"record[{idx}].safety.token: KPI#2 destructive op requires a non-null confirmation token"
         )
+    # KPI#2 (extended): destructive requires plan_hash bound to the executed plan.
+    # Spec Phase 3 — token<->plan_hash binding. The schema allows plan_hash to
+    # be null for non-destructive records, but destructive=true without a
+    # plan_hash means the audit trail cannot verify which plan the token
+    # authorised. Without this rule, gcl_runner.py regressing to write
+    # plan_hash=None for destructive ops would silently pass schema validation.
+    if isinstance(safety, dict) and safety.get("destructive") is True and not safety.get("plan_hash"):
+        errors.append(
+            f"record[{idx}].safety.plan_hash: KPI#2 destructive op requires a non-null plan_hash (Phase 3 token<->plan binding)"
+        )
 
 
 def main(argv: list) -> int:
