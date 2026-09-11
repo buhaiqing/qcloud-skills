@@ -10,10 +10,11 @@ Outputs: audit-results/skill-registry.json
 Modes:
   --emit   write the registry JSON
   --check  CI gate (KPI#3): every executable skill (dual-path / sdk-only)
-           must provide golden-sample evidence — either a parseable JSON
-           under assets/golden/, or (when the golden dir is absent) a
-           non-empty assets/eval_queries.json list. Missing both is a hard
-           failure; coverage via eval_queries.json only is informational.
+           must provide >=5 parseable JSON files under assets/golden/.
+           Missing the directory, having <5 golden files, or any unparseable
+           JSON is a hard failure (exit 1). Spec anchor:
+           docs/superpowers/specs/2026-07-28-harness-engineering-optimization-design.md
+           Phase 1.
 """
 import json
 import sys
@@ -84,15 +85,13 @@ def main() -> None:
             if s["cli_applicability"] not in ("dual-path", "sdk-only"):
                 continue
             gdir = Path(s["path"]) / "assets" / "golden"
-            if gdir.exists():
-                golden = list(gdir.glob("*.json"))
-                if not any(_is_valid_json(p) for p in golden):
-                    missing.append(f"{s['name']}: {len(golden)} golden file(s) present, none parse as JSON")
+            if not gdir.exists():
+                missing.append(f"{s['name']}: missing assets/golden/ directory")
                 continue
-            if not _has_eval_queries(Path(s["path"])):
-                missing.append(f"{s['name']}: no golden samples and no eval_queries.json")
-            else:
-                notes.append(f"{s['name']}: covered by eval_queries.json (no assets/golden/ dir)")
+            golden = [p for p in gdir.glob("*.json") if _is_valid_json(p)]
+            if len(golden) < 5:
+                missing.append(f"{s['name']}: {len(golden)} golden scenario(s) (spec KPI#3 requires >=5)")
+                continue
         if notes:
             print("golden-sample coverage notes:")
             for n in notes:
