@@ -876,7 +876,9 @@ def emit_evidence_record(root: Path, trace: dict[str, Any], args: argparse.Names
             "golden_ref": None, "fixture_ref": None,
             "safety": {"destructive": destructive,
                        "token": os.environ.get("HARNESS_CONFIRM_TOKEN") if destructive else None,
-                       "token_bound": token_bound, "plan_hash": None, "leak_checked": True},
+                       "token_bound": token_bound,
+                       "plan_hash": pf.get("plan_hash") if pf else None,
+                       "leak_checked": True},
             "provenance": {"source": "gcl_runner", "tool": "tccli",
                            "captured_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")},
             "budgets": {"context_tokens": 0, "tool_calls": len(trace.get("iterations", [])),
@@ -1103,7 +1105,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         run_id = os.environ.get("HARNESS_RUN_ID", args.trace_id or "local")
 
         # Evidence Kernel PreFlight + Phase 3 human-token binding (additive gates)
-        from harness_safety import bind_token, is_destructive  # local import to keep top clean
+        from harness_safety import bind_token, is_destructive, plan_hash  # local import to keep top clean
         token = os.environ.get("HARNESS_CONFIRM_TOKEN")
 
         # Perf: error-code hints/map are constant across iterations (the loop only
@@ -1112,6 +1114,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         error_code_map = load_error_code_map()
         pf = preflight(args.command, token)
         pf["token_bound"] = False
+        pf["plan_hash"] = None
         if not pf["allowed"]:
             trace["finished_at"] = datetime.now(UTC).isoformat()
             print(f"PREFLIGHT BLOCKED: {pf['reason']}", file=sys.stderr)
@@ -1120,6 +1123,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             try:
                 bind_token(args.command, token or "")
                 pf["token_bound"] = True
+                pf["plan_hash"] = plan_hash(args.command)
             except PermissionError as e:
                 trace["finished_at"] = datetime.now(UTC).isoformat()
                 print(f"PLAN-TOKEN MISMATCH: {e} (human must set HARNESS_CONFIRM_TOKEN=plan_hash)", file=sys.stderr)
