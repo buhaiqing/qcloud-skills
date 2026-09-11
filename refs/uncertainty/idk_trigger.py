@@ -6,9 +6,7 @@ and Structured Refusal response generation.
 """
 from __future__ import annotations
 
-import re
-from dataclasses import dataclass, field
-from typing import List, Optional, Callable
+from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
 # UncertaintyTrigger
@@ -37,13 +35,11 @@ class UncertaintyTrigger:
 
     def should_refuse(self) -> bool:
         """Refuse if any condition is met."""
-        if self.knowledge_boundary_flag:
-            return True
-        if self.time_sensitivity_flag and self.self_eval_confidence < 0.60:
-            return True
-        if self.self_eval_confidence < self.refusal_threshold:
-            return True
-        return False
+        return (
+            self.knowledge_boundary_flag
+            or (self.time_sensitivity_flag and self.self_eval_confidence < 0.60)
+            or self.self_eval_confidence < self.refusal_threshold
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -52,7 +48,7 @@ class UncertaintyTrigger:
 
 # ponytail: no embedding model in stdlib; stub with keyword heuristic.
 # Upgrade path: swap `_detect_kb_stub` for a real encoder in production.
-_TIME_INDICATORS: List[str] = [
+_TIME_INDICATORS: list[str] = [
     "最新", "最近", "现在", "今天", "当前",
     "latest", "recent", "current", "now", "today",
     "2024", "2025", "2026",
@@ -62,7 +58,7 @@ _KB_SIMILARITY_STUB_THRESHOLD = 0.5
 
 def detect_knowledge_boundary(
     query: str,
-    retrieval_scores: List[float],
+    retrieval_scores: list[float],
     threshold: float = _KB_SIMILARITY_STUB_THRESHOLD,
 ) -> bool:
     """
@@ -91,7 +87,7 @@ def detect_knowledge_boundary(
 def detect_time_sensitivity(
     query: str,
     knowledge_cutoff: str,  # ISO date string "YYYY-MM-DD"
-    current_time: Optional[str] = None,
+    current_time: str | None = None,
 ) -> bool:
     """
     Detect whether query requires up-to-date information.
@@ -132,7 +128,7 @@ class RefusalResponse:
     confidence: float
     # optional fields with defaults
     status: str = "refused"
-    suggestion: Optional[str] = None
+    suggestion: str | None = None
 
     def to_markdown(self) -> str:
         return (
@@ -154,10 +150,10 @@ _REFUSAL_TEMPLATES = {
 def build_refusal(
     reason: str,
     confidence: float,
-    query: Optional[str] = None,
-    domain: Optional[str] = None,
-    cutoff: Optional[str] = None,
-    suggestion: Optional[str] = None,
+    query: str | None = None,
+    domain: str | None = None,
+    cutoff: str | None = None,
+    suggestion: str | None = None,
 ) -> RefusalResponse:
     """Build a structured refusal response."""
     return RefusalResponse(

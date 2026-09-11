@@ -1105,7 +1105,11 @@ def cmd_run(args: argparse.Namespace) -> int:
         run_id = os.environ.get("HARNESS_RUN_ID", args.trace_id or "local")
 
         # Evidence Kernel PreFlight + Phase 3 human-token binding (additive gates)
-        from harness_safety import bind_token, is_destructive, plan_hash  # local import to keep top clean
+        from harness_safety import (  # local import to keep top clean
+            bind_token,
+            is_destructive,
+            plan_hash,
+        )
         token = os.environ.get("HARNESS_CONFIRM_TOKEN")
 
         # Perf: error-code hints/map are constant across iterations (the loop only

@@ -207,8 +207,8 @@ def main() -> int:
     if not items:
         print("| Drift class | Status | Detail |")
         print("|---|---|---|")
-        print(f"| Threshold drift | \u2705 pass | all spec thresholds have matching code literals |")
-        print(f"| Source drift    | \u2705 pass | all schema required fields written by emit_evidence_record |")
+        print("| Threshold drift | \u2705 pass | all spec thresholds have matching code literals |")
+        print("| Source drift    | \u2705 pass | all schema required fields written by emit_evidence_record |")
         print("\nSPEC DRIFT: clean")
         return 0
 

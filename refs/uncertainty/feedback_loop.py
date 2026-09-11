@@ -12,8 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Optional, Any, List
-import math
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # State machine
@@ -36,7 +35,7 @@ class UncertaintyContext:
     state: UncertaintyState
     confidence: float
     prior_confidence: float
-    external_signals: Dict[str, Any] = field(default_factory=dict)
+    external_signals: dict[str, Any] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -57,11 +56,11 @@ class UncertaintyFeedbackLoop:
 
     state: UncertaintyState = UncertaintyState.INITIAL
     confidence: float = 1.0
-    prior_confidence_history: List[tuple[float, float]] = field(default_factory=list)
-    retrain_buffer: List[Dict[str, str]] = field(default_factory=list)
+    prior_confidence_history: list[tuple[float, float]] = field(default_factory=list)
+    retrain_buffer: list[dict[str, str]] = field(default_factory=list)
 
     # Default tool reliability weights (经验值; 生产环境通过历史调用统计)
-    TOOL_RELIABILITY: Dict[str, float] = field(default_factory=lambda: {
+    TOOL_RELIABILITY: dict[str, float] = field(default_factory=lambda: {
         "search": 0.80,
         "calculator": 0.95,
         "code_executor": 0.90,
@@ -71,7 +70,7 @@ class UncertaintyFeedbackLoop:
     def update_from_tool_result(
         self,
         tool_name: str,
-        tool_result: Dict[str, Any],
+        tool_result: dict[str, Any],
         prior_confidence: float,
     ) -> float:
         """
@@ -141,7 +140,7 @@ class UncertaintyFeedbackLoop:
         return "minor"
 
     def _flag_for_retraining(
-        self, original: str, corrected: str, timestamp: Optional[str] = None
+        self, original: str, corrected: str, timestamp: str | None = None
     ):
         """Mark (original, corrected) pair for retraining buffer."""
         if timestamp is None:

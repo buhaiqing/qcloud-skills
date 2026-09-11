@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ruff: noqa: EXE001 - shebang preserved for direct invocation, file is invoked via `python3` in tests
+
 """Level 3 scenario runner — real cloud by default; use --mock for offline CI."""
 
 from __future__ import annotations

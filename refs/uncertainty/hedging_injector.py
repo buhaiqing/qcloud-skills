@@ -9,16 +9,14 @@ from __future__ import annotations
 import random
 import re
 from dataclasses import dataclass
-from typing import Dict, List
 
 from token_confidence import ConfidenceLevel
-
 
 # ---------------------------------------------------------------------------
 # Four-level hedging phrases (anchored to ConfidenceLevel)
 # ---------------------------------------------------------------------------
 
-HEDGING_PHRASES: Dict[ConfidenceLevel, List[str]] = {
+HEDGING_PHRASES: dict[ConfidenceLevel, list[str]] = {
     ConfidenceLevel.HIGH: [
         "这是正确的。",
         "根据我的知识，这是确定的。",
@@ -71,8 +69,8 @@ class HedgingInjector:
     UNKNOWN: no injection (response already a refusal)
     """
 
-    STRENGTHEN_MAP: Dict[str, str] | None = None   # lazy init
-    WEAKEN_MAP: Dict[str, str] | None = None       # lazy init
+    STRENGTHEN_MAP: dict[str, str] | None = None   # lazy init
+    WEAKEN_MAP: dict[str, str] | None = None       # lazy init
 
     def __post_init__(self):
         if self.STRENGTHEN_MAP is None:
@@ -89,10 +87,12 @@ class HedgingInjector:
                 "will": "may",
             }
 
-    # Compiled regex patterns (class-level, not per-instance — ponytail)
-    _PATTERNS = [
-        re.compile(r"\b(may|might|could|possibly)\b", re.I),
-        re.compile(r"\b(will|definitely|certainly)\b", re.I),
+    # Compiled regex patterns (class-level, not per-instance — ponytail).
+    # Deliberately mutable so subclasses or tests can extend it; the
+    # ponytail comment above records the trade-off.
+    _PATTERNS = [  # noqa: RUF012
+        re.compile(r"\b(may|might|could|possibly)\b", re.IGNORECASE),
+        re.compile(r"\b(will|definitely|certainly)\b", re.IGNORECASE),
     ]
 
     def inject(self, text: str, target_level: ConfidenceLevel) -> str:
@@ -108,14 +108,14 @@ class HedgingInjector:
         for pattern in self._PATTERNS[1:]:  # only over-confident patterns
             if pattern.search(text):
                 for p, replacement in (self.WEAKEN_MAP or {}).items():
-                    text = re.sub(r"\b" + p + r"\b", replacement, text, flags=re.I)
+                    text = re.sub(r"\b" + p + r"\b", replacement, text, flags=re.IGNORECASE)
         return text
 
     def _strengthen_hedging(self, text: str) -> str:
         for pattern in self._PATTERNS[:1]:   # only hedging patterns
             if pattern.search(text):
                 for weak, strong in (self.STRENGTHEN_MAP or {}).items():
-                    text = re.sub(r"\b" + weak + r"\b", strong, text, flags=re.I)
+                    text = re.sub(r"\b" + weak + r"\b", strong, text, flags=re.IGNORECASE)
         return text
 
 

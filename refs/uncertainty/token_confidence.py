@@ -9,10 +9,8 @@ and exposed as an optional parameter.
 from __future__ import annotations
 
 import math
-import random
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, Dict
 
 # ---------------------------------------------------------------------------
 # Enums & dataclasses
@@ -36,7 +34,7 @@ class TokenConfidence:
 @dataclass
 class SentenceConfidence:
     sentence: str
-    token_confidences: List[TokenConfidence]
+    token_confidences: list[TokenConfidence]
     semantic_uncertainty: float  # ambiguity degree 0~1
     factual_uncertainty: float   # knowledge-gap degree 0~1
     level: ConfidenceLevel = field(init=False)
@@ -59,7 +57,7 @@ class SentenceConfidence:
 
 @dataclass
 class DocumentConfidence:
-    sentences: List[SentenceConfidence]
+    sentences: list[SentenceConfidence]
     overall_confidence: float = field(init=False)
     level: ConfidenceLevel = field(init=False)
 
@@ -86,7 +84,7 @@ class DocumentConfidence:
 # Core algorithms
 # ---------------------------------------------------------------------------
 
-def compute_semantic_uncertainty(token_probs: List[float]) -> float:
+def compute_semantic_uncertainty(token_probs: list[float]) -> float:
     """
     Shannon entropy — normalised to [0, 1].
     A uniform distribution (max entropy) → uncertainty = 1.0.
@@ -103,7 +101,7 @@ def compute_factual_uncertainty(
     retrieval_recall: float,       # 0~1, retrieval recall
     knowledge_age_days: int,        # days since last knowledge update
     knowledge_cutoff_days: int = 90,  # threshold for full time decay
-    weights: Optional[Dict[str, float]] = None,  # ponytail: make tunable
+    weights: dict[str, float] | None = None,  # ponytail: make tunable
 ) -> float:
     """
     Knowledge-gap degree = retrieval gap * weight + time decay * weight.
