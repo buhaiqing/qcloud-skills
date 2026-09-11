@@ -1,0 +1,20 @@
+{
+  "_seed": true,
+  "_seed_generator": "generate_golden_seeds.py",
+  "_seed_skill": "qcloud-service-mesh-ops",
+  "_seed_action_verb": "list",
+  "intent": "List all resources in {{user.region}}",
+  "input": {
+    "action": "<REPLACE_WITH_REAL_TCCLI_ACTION_FOR_LIST>",
+    "region": "{{env.TENCENTCLOUD_REGION}}"
+  },
+  "expected": {
+    "fixture": null,
+    "assertions": [
+      {
+        "path": "$.Response",
+        "op": "exists"
+      }
+    ]
+  }
+}
