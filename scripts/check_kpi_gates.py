@@ -48,7 +48,11 @@ EVAL_QUERIES_GLOB = "assets/eval_queries.json"  # relative to each skill dir
 
 
 def _run(cmd: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
+    # check=False: this helper is fire-and-forget; callers read returncode
+    # and decide. Raising on non-zero would prevent the aggregator from
+    # reporting the actual KPI failure (e.g. build_skill_registry --check
+    # returns 1 when KPI#3 fails — exactly what we want to surface).
+    return subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, check=False)
 
 
 def kpi1_2_safety() -> tuple[str, str, str]:

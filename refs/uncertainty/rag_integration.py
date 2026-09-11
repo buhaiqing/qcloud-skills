@@ -6,11 +6,10 @@ retrieval quality → confidence correction.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import List, Optional, Any, Dict
+from dataclasses import dataclass
+from typing import Any
 
 from token_confidence import ConfidenceLevel
-
 
 # ---------------------------------------------------------------------------
 # Metrics
@@ -80,7 +79,7 @@ class RAGUncertaintyIntegrator:
 
     def _stub_compute_metrics(
         self,
-        docs: List[Any],
+        docs: list[Any],
         query: str,
     ) -> RAGQualityMetrics:
         """Stub: return synthetic metrics when no real retriever is available."""
@@ -96,7 +95,7 @@ class RAGUncertaintyIntegrator:
         """Stub: return fixed base confidence."""
         return 0.70
 
-    def _stub_generate(self, query: str, docs: List[Any]) -> str:
+    def _stub_generate(self, query: str, docs: list[Any]) -> str:
         """Stub: return a placeholder answer."""
         if not docs:
             return "[No relevant documents found.]"
@@ -109,7 +108,7 @@ class RAGUncertaintyIntegrator:
     def generate_with_uncertainty(
         self,
         query: str,
-        docs: Optional[List[Any]] = None,
+        docs: list[Any] | None = None,
         return_full_context: bool = False,
     ) -> RAGUncertaintyOutput:
         """
