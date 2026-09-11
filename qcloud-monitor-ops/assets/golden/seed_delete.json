@@ -1,0 +1,20 @@
+{
+  "_seed": true,
+  "_seed_generator": "generate_golden_seeds.py",
+  "_seed_skill": "qcloud-monitor-ops",
+  "_seed_action_verb": "delete",
+  "intent": "Delete a resource by id in {{user.region}} (destructive; requires confirmation token)",
+  "input": {
+    "action": "<REPLACE_WITH_REAL_TCCLI_ACTION_FOR_DELETE>",
+    "region": "{{env.TENCENTCLOUD_REGION}}"
+  },
+  "expected": {
+    "fixture": null,
+    "assertions": [
+      {
+        "path": "$.Response",
+        "op": "exists"
+      }
+    ]
+  }
+}
