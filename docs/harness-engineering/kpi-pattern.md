@@ -97,7 +97,7 @@ that `make kpi-gates` actually enforces today (Sep 2026), the matrix is:
 | Authoritative source | ✅ | ✅ | ✅ | ✅ |
 | Skip-aware | ✅ | ✅ | ✅ | ⚠️ never skips in practice |
 | Aggregatable | ✅ | ✅ | ✅ | ✅ |
-| Failure-mode-defined | ⚠️ generic | ⚠️ generic | ⚠️ generic | ⚠️ generic |
+| Failure-mode-defined | ✅ [rb1](./runbooks/kpi1-leak-checked-failure.md) | ✅ [rb2](./runbooks/kpi2-destructive-token-plan-hash-failure.md) | ✅ [rb3](./runbooks/kpi3-golden-coverage-failure.md) | ✅ [rb7](./runbooks/kpi7-router-confusion-failure.md) |
 | CI-hooked | ✅ | ✅ | ✅ | ✅ |
 | Drift-detectable | ⚠️ | ⚠️ | ✅ | ⚠️ |
 
@@ -111,6 +111,8 @@ that `make kpi-gates` actually enforces today (Sep 2026), the matrix is:
    tells the on-call engineer exactly which file to open and which
    command to run. Fixing this for KPI#3 alone would halve the time to
    recover from a Golden regression.
+   *(Resolved 2026-09: see [./runbooks/](./runbooks/) — each KPI now has
+   a concrete runbook with file paths, commands, and verification steps.)*
 3. **KPI#7's "no target" is honest.** Better to admit a missing target
    than to invent one. The threshold-less-KPI note above flags this as
    an open question.
