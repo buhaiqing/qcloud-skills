@@ -331,6 +331,7 @@ ADR 记录**跨子系统**架构决策（参见 `docs/architecture/ADR-0001-esta
 **AGENTS.md 行数门禁**：本规范若使 AGENTS.md ≥500 行，应将详细示例/检查清单移至 linked docs，保持本文件为简洁策略索引。
 
 **Checkpoint 规范**：多步骤任务开始时设 Checkpoint（`.runtime/checkpoints/<id>.json`），每里程碑完成更新 `next_step`；会话恢复读最新 Checkpoint 继续执行。详见 `AGENTS.md §长任务支持协议`。
+**GCL self-review 优先**：GCL 评审型任务启动前，先直接读磁盘验证待修复项是否已在最近 commit 中；clean 则 kill subagent，避免重复验证。经验见 MEMORY.md `GCL Loop Self-Review Shortcut`。
 
 **L23 · subagent report 双向验证**：subagent 既可能假报"没做"（0 输出），也可能假报"做了"（含伪造的 mutation test 数字、错误的 commit hash）。
 - **Always verify disk state**：commit log + `git status --short` + 必要时 `git diff HEAD`
