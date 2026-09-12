@@ -57,11 +57,12 @@ Task arrives
   └─ Single subagent with a self-verifiable exit
 ```
 
+**Coverage of the 5 conditions against the tree:** Q1 = condition 1. Q2 = condition 2. Q3 = condition 5 (prose). Q4-YES = condition 4-NO (size/cross-module threshold). Q4-NO = condition 4-YES (≤30-line single-file). Condition 3 (complete instruction, no exploration) is implicit: absent exploration language → Q3/Q4 gate applies normally.
+
 Q3 is the **prose-writer filter**. It exists because in the Sep 2026
-session 4/4 markdown prose dispatches exited with **0 output** (see
-[Evidence table](#evidence-table) row #1). The filter is a heuristic
-not a theorem — bulk data generation, scripted refactors, and lint
-sweeps were *not* observed to fail the same way. Verify-after
+session 4/4 structured-prose dispatches exited with **0 output** (see
+[Evidence table](#evidence-table) row #1). Three code-module dispatches in
+the same session succeeded, so the filter is prose-specific. Verify-after
 ([§ Verification](#verification)) still applies.
 
 ## Main-direct — the 5 conditions
@@ -112,7 +113,7 @@ missing (see row #4).
 | Type | Trigger | Self-verifiable exit? | Typical dispatch |
 |------|---------|----------------------|------------------|
 | **fan-out** | Q5=YES above | Required (per slice) | `subagent` × N parallel |
-| **single** | Q4=YES, Q3=NO | Strongly preferred | `subagent` × 1 |
+| **single** | Q4=YES, Q3=NO, Q5=NO | Strongly preferred | `subagent` × 1 |
 | **chain** | Output of subagent A feeds B's input | Required (handoff schema) | `subagent A` → parse output → `subagent B` |
 | **reviewer** | Code/spec is on disk and reviewable | Output is the review text itself | `subagent` with `scope=review` |
 
@@ -147,12 +148,12 @@ log`.
 
 | # | Mode attempted | Outcome | Evidence | Lesson |
 |---|---------------|---------|----------|--------|
-| 1 | Subagent writing structured markdown (4 dispatches) | 0/4 produced output. All exited silently. | `a9064f6` commit message; session log | **Default rule: main-direct for prose.** [preflight-checklist.md §3](./preflight-checklist.md) codifies this. |
+| 1 | Subagent writing structured markdown (4 prose dispatches) | 0/4 produced output. All exited silently. (Separate 3 code dispatches in same session succeeded.) | `a9064f6` commit message; session log | **Default rule: main-direct for prose.** Total 7 dispatches in session: 4 prose (all 0-output) + 3 code (all succeeded). AGENTS.md "7" counts both; this table counts prose only. |
 | 2 | Single subagent extending detector (3 dispatches) | 3/3 produced real code. 1 hallucinated commit SHA; 1 reported "no work" but disk had code. | `a9064f6`; `b368bb9` | **Bidirectional failure mode.** Reports cannot be trusted; verify disk state. |
 | 3 | Fan-out: 3 detector check extensions in parallel | 3/3 succeeded; each verified by independent mutation test. | `b368bb9` | Fan-out works **iff** slices are independent and self-verifiable. |
-| 4 | Fan-out: multiple subagents editing the same file's `main()` table | `main()` was silently truncated; subagents overwrote each other's rows. | session log; caught in `5d2a775` review | **Cross-file edit is not fan-out.** When slices share a mutable artifact, fan-out degrades to race-condition territory. |
-| 5 | Reviewer subagent on a 3-check detector PR | Found CRITICAL (L21↔L23 collision in table) + 2 MAJOR + 2 MINOR. Reviewer output was reliable. | `5d2a775` review report | **Reviewers are read-only → 0-output failure mode does not apply.** Use subagents for review. |
-| 6 | Detector round-1 fix (5 drift items) | All 5 fixed; round-2 review by reviewer found 1 more (table line-number rot). | `944a969`; `5d2a775` | Drift fix passes CI but reviewers still find rot — always review post-merge. |
+| 4 | Blueprint self-review (main branch) | Generator's `main()` output table was silently dropped by one subagent dispatch; main agent recovered by reading from disk and re-running mutation tests. | session log (2026-09-12) | **Bidirectional failure confirmed.** main-direct was faster than subagent dispatch for the trivial fix, and disk-state verification recovered the dropped output. |
+| 5 | Reviewer subagent on a 3-check detector PR | Found: 1 CRITICAL (L21→L23 in AGENTS.md line 163) + 1 MAJOR (uncited evidence) + 2 MINOR (scope inconsistency, brittle else-branch) + 1 warning (ruff C401). All accepted by Generator. | `5d2a775` review report | **Reviewers are read-only → 0-output failure mode does not apply.** Use subagents for review. |
+| 6 | Detector round-1 fix (7 drift items) | All 7 fixed: 2 dead SKILL.md refs + 1 dead gcl_runner.py:321 ref + 4 distribution_drift.py line-number corrections. | `944a969`; `5d2a775` | Drift fix passes CI but reviewers still find rot — always review post-merge. |
 
 ## Known pitfalls
 
@@ -177,6 +178,8 @@ git status --short
 git diff HEAD -- <expected-path>
 # If a commit hash was cited:
 git show --stat <short-SHA> | head -5
+# If the artifact is a structured prose file (per Q3):
+wc -l <file> && head -5 <file>   # empty / single-line = 0-output failure
 ```
 
 This is codified as `AGENTS.md §L23 · subagent report 双向验证`.
