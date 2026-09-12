@@ -179,7 +179,7 @@ Insert before `## 4. Redis-specific safety rules`. Use the cdb-ops versions as t
 - [AGENTS.md §3 Rubric](../../AGENTS.md#3-rubric-mandatory-per-skill)
 - [AGENTS.md §8 Per-Skill Defaults](../../AGENTS.md#8-per-skill-defaults-qcloud) — `qcloud-redis-ops` is `required`, `max_iter=2`
 - [`prompt-templates.md`](prompt-templates.md) — G/C/O prompt skeletons
-- [SKILL.md §Safety Gates](../SKILL.md#safety-gates-destructive-operations) — build-time sibling
+
 ```
 
 - [ ] **Step 2.1.5: Run conformance and tests**
@@ -952,7 +952,7 @@ audit trail the meta-skill emits to track which Charter checks fire most often.
 - [AGENTS.md §8 Per-Skill Defaults](../../AGENTS.md#8-per-skill-defaults-qcloud) — `qcloud-skill-generator` is `optional`, `max_iter=3`
 - [AGENTS.md §10 GCL spec](../../AGENTS.md#10-generator-critic-loop-gcl--adversarial-quality-gate)
 - [`prompt-templates.md`](prompt-templates.md) — G/C/O prompt skeletons
-- [SKILL.md §Post-Generation Self-Check](../SKILL.md#post-generation-self-check------) — build-time sibling
+
 
 ---
 

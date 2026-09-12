@@ -32,7 +32,7 @@ gcl_trajectory_quality.py 事后统计（无 ground truth）：
 ```
 
 - 5 维 rubric：`correctness / safety / idempotency / traceability / spec_compliance`（取值 `0/0.5/1`）。
-- 证据：`scripts/gcl_trajectory_quality.py:59` `RUBRIC_DIMS`；`scripts/gcl_runner.py:67-69` 默认分；`scripts/gcl_runner.py:321` `decide(critic["scores"])`。
+- 证据：`scripts/gcl_trajectory_quality.py:59` `RUBRIC_DIMS`；`scripts/gcl_runner.py:67-69`（默认分）。
 
 ### 链路 B — qcloud-copilot quality/ 四个薄模块
 

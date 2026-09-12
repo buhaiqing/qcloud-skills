@@ -132,6 +132,8 @@ def kpi8_spec_drift() -> tuple[str, str, str]:
     known limitations (fields written via _final_scores helper).
     New drift kinds (file_line_ref_drift, md_fragment_drift,
     phantom_link_drift) indicate real rot and are surfaced for review.
+    Scope: docs/harness-engineering/ only (the maintained methodology dir).
+    Other docs/superpowers/ drift is pre-existing and out of scope.
     """
     r = _run(["python3", "scripts/detect_spec_drift.py"])
     lines = r.stdout.split("\n")

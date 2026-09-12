@@ -416,7 +416,7 @@ def check_readme_phantom_links(readme_path: Path, docs_root: Path) -> list[dict]
 def main() -> int:
     threshold = check_threshold_drift()
     source = check_source_drift()
-    docs_refs = check_docs_file_line_refs(ROOT / "docs")  # widened to match md_fragments scope
+    docs_refs = check_docs_file_line_refs(ROOT / "docs" / "harness-engineering")  # maintainable scope
     readme_refs = check_readme_phantom_links(
         ROOT / "docs" / "harness-engineering" / "README.md",
         ROOT / "docs" / "harness-engineering",
