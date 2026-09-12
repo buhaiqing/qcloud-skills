@@ -22,7 +22,9 @@ Spec references a field; code does not read it.
 binding). `scripts/gcl_runner.py:879` hardcoded `"plan_hash": None` instead
 of reading the value computed by `harness_safety.plan_hash(args.command)`.
 The audit trail was permanently missing the field, even when the runtime
-check actually fired. Fixed in `e511508` (this PR series).
+check actually fired (caught at `gcl_runner.py:1131`, except
+`PermissionError` from `bind_token` raised at `harness_safety.py:70`).
+Fixed in `e511508` (this PR series).
 
 ### 3. Behavior drift
 Spec describes an active mechanism; code's "stub" simulates the mechanism
@@ -30,7 +32,8 @@ without executing it.
 
 **Instance:** Spec Phase 3 says "refuses execution unless token matches
 plan_hash of the specific execution plan". `gcl_runner.py` raised
-`PermissionError` correctly (line 1125), but the evidence record written
+`PermissionError` correctly (caught at `gcl_runner.py:1131`, raised at
+`harness_safety.py:70` from `bind_token`), but the evidence record written
 immediately after had `plan_hash: None`. Downstream `validate_evidence_schema.py`
 saw the missing field and reported KPI#2 as **pass** because the schema
 validator only required `leak_checked: true` for non-destructive ops —
