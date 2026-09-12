@@ -93,6 +93,13 @@ _THRESHOLD_RE_CODE = re.compile(
 # Source drift: schema required fields. JSON Schema arrays of strings.
 _REQUIRED_RE = re.compile(r'"required"\s*:\s*\[([^\]]*)\]')
 
+# Docs ref drift: file:line refs and #fragment refs in markdown.
+# These rot when source files change — see preflight-checklist.md §4
+# and spec-drift-gate.md for why this is a real (not theoretical) drift.
+_FILE_LINE_RE = re.compile(r'\bscripts/([a-zA-Z_-]+\.py):(\d+)(?:-\d+)?')
+_MD_FRAGMENT_RE = re.compile(r'\]\((\.\.?/)([a-zA-Z_-]+\.md)#([a-zA-Z0-9-]+)\)')
+_MD_LINK_RE = re.compile(r'\]\((\.\.?/)([a-zA-Z_-]+\.md)\)')
+
 
 def _extract_spec_thresholds(spec_dir: Path) -> list[dict]:
     """Pull every numeric threshold from spec files under spec_dir.
