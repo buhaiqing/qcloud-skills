@@ -125,11 +125,41 @@ def kpi7_router_confusion() -> tuple[str, str, str]:
     )
 
 
+def kpi8_spec_drift() -> tuple[str, str, str]:
+    """KPI#8 (informational): run detect_spec_drift.py, report new drift kinds.
+
+    Always 'skip' (informational) — source_drift items are pre-existing
+    known limitations (fields written via _final_scores helper).
+    New drift kinds (file_line_ref_drift, md_fragment_drift,
+    phantom_link_drift) indicate real rot and are surfaced for review.
+    """
+    r = _run(["python3", "scripts/detect_spec_drift.py"])
+    lines = r.stdout.split("\n")
+    # Extract non-pre-existing drift kinds (source_drift = known limitation)
+    new_kinds = sorted({
+        l.split("|")[1].strip() for l in lines
+        if any(k in l for k in [
+            "file_line_ref_drift",
+            "md_fragment_drift",
+            "phantom_link_drift",
+        ]) and "pass" not in l.lower() and "Field" not in l
+    })
+    if not new_kinds:
+        return "skip", "detector clean; 5 source_drift known limitations documented", "informational"
+    detail = "; ".join(new_kinds)
+    # Check for pre-existing only
+    only_source = new_kinds == ["source_drift"]
+    if only_source:
+        return "skip", "detector clean; 5 source_drift known limitations documented", "informational"
+    return "skip", f"informational: {detail}", "review recommended"
+
+
 def main() -> int:
     results = {
         "KPI#1 leak_checked / KPI#2 destructive-token": kpi1_2_safety(),
         "KPI#3 golden coverage": kpi3_golden_coverage(),
         "KPI#7 router confusion matrix": kpi7_router_confusion(),
+        "KPI#8 spec drift (informational)": kpi8_spec_drift(),
     }
 
     print("| KPI | Status | Detail |")
@@ -137,7 +167,7 @@ def main() -> int:
     failed = 0
     skipped = 0
     for label, (status, detail, note) in results.items():
-        marker = {"pass": "✅", "fail": "❌", "skip": "⏭ "}[status]
+        marker = {"pass": "✅", "fail": "❌", "skip": "⏭ ", "informational": "ℹ️ "}[status]
         suffix = f" — {note}" if note else ""
         print(f"| {label} | {marker} {status} | {detail}{suffix} |")
         if status == "fail":

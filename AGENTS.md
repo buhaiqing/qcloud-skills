@@ -330,9 +330,12 @@ ADR 记录**跨子系统**架构决策（参见 `docs/architecture/ADR-0001-esta
 
 **AGENTS.md 行数门禁**：本规范若使 AGENTS.md ≥500 行，应将详细示例/检查清单移至 linked docs，保持本文件为简洁策略索引。
 
-**L21 · subagent report 双向验证**：subagent 既可能假报"没做"（0 输出），也可能假报"做了"（含伪造的 mutation test 数字、错误的 commit hash）。
+**Checkpoint 规范**：多步骤任务开始时设 Checkpoint（`.runtime/checkpoints/<id>.json`），每里程碑完成更新 `next_step`；会话恢复读最新 Checkpoint 继续执行。详见 `AGENTS.md §长任务支持协议`。
+
+**L23 · subagent report 双向验证**：subagent 既可能假报"没做"（0 输出），也可能假报"做了"（含伪造的 mutation test 数字、错误的 commit hash）。
 - **Always verify disk state**：commit log + `git status --short` + 必要时 `git diff HEAD`
 - **Self-verifiable code tasks**（detector / validator 扩展）：subagent 能做，因为有 mutation test / subprocess 验证出口
 - **Complex prose tasks**（skill 文档 / runbook 写作）：subagent 失败率高（实测 7 次 markdown 任务 0 输出），自己写
 - **Fan-out 适合场景**：≥2 个**独立**、**有明确退出标准**的代码模块扩展；不适合跨文件协作式写作
 - **Pre-existing drift 是 detector 的功**：detector 抓到真实 drift（如 `../SKILL.md#...` 相对路径错误）→ 不是误报，是 detector 在工作；接受并记录
+- **Evidence sourcing**：本规则的经验基础来自 qcloud-skills 项目 2026-09-12 session；如需引用具体数字（如"N 次"）应指向对应 commit 或 session log

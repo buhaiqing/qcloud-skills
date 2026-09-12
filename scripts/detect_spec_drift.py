@@ -416,7 +416,7 @@ def check_readme_phantom_links(readme_path: Path, docs_root: Path) -> list[dict]
 def main() -> int:
     threshold = check_threshold_drift()
     source = check_source_drift()
-    docs_refs = check_docs_file_line_refs(ROOT / "docs" / "harness-engineering")
+    docs_refs = check_docs_file_line_refs(ROOT / "docs")  # widened to match md_fragments scope
     readme_refs = check_readme_phantom_links(
         ROOT / "docs" / "harness-engineering" / "README.md",
         ROOT / "docs" / "harness-engineering",
@@ -448,8 +448,10 @@ def main() -> int:
             # `target` carries the relative path + fragment, e.g.
             # "../spec-drift-gate.md#2-source-drift".
             print(f"| md_fragment_drift | `{it['target']}` | `{it['doc_file']}` | {it['note']} |")
-        else:
+        elif it["kind"] == "file_line_ref_drift":
             print(f"| file_line_ref_drift | {it['script']}:{it['line']} | `{it['doc_file']}` | {it['note']} |")
+        else:
+            print(f"| UNKNOWN drift kind | {it} |")
 
     AUDIT.mkdir(exist_ok=True)
     (AUDIT / "spec-drift-report.json").write_text(
