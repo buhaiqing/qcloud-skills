@@ -57,12 +57,8 @@ def _size_gate(task: str) -> bool:
         "typo", "bump version", "update comment", "ruff fix",
     ]
     has_small = any(p in t for p in small_patterns)
-    has_file = (
-        "file" in t or
-        ".py" in t or ".md" in t or ".json" in t or
-        ".yaml" in t or ".yml" in t or ".sh" in t
-    )
-    return has_small and has_file
+    has_ext = any(ext in t for ext in [".py", ".md", ".json", ".yaml", ".yml", ".sh"])
+    return has_small and has_ext
 
 
 def decide(task: str) -> dict:

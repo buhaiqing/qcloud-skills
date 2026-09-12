@@ -2,8 +2,8 @@
   {
     "id": "routing-01",
     "task": "fix the ruff check error in detect_spec_drift.py",
-    "expected_routing": "main-direct",
-    "should_trigger": "fix typo / single-file / deterministic"
+    "expected_routing": "single-subagent",
+    "should_trigger": "no size_gate (no 'file' keyword), no prose → default single-subagent"
   },
   {
     "id": "routing-02",
