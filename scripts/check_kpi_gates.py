@@ -153,7 +153,7 @@ def kpi8_spec_drift() -> tuple[str, str, str]:
     only_source = new_kinds == ["source_drift"]
     if only_source:
         return "skip", "detector clean; 5 source_drift known limitations documented", "informational"
-    return "skip", f"informational: {detail}", "review recommended"
+    return "fail", f"NEW spec drift: {detail}", "review required before merge"
 
 
 def main() -> int:
@@ -174,7 +174,7 @@ def main() -> int:
         print(f"| {label} | {marker} {status} | {detail}{suffix} |")
         if status == "fail":
             failed += 1
-        elif status == "skip":
+        elif status == "skip" or status == "informational":
             skipped += 1
 
     AUDIT.mkdir(exist_ok=True)
