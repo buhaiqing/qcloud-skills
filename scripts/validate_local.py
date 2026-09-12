@@ -188,6 +188,10 @@ def build_steps(python: str = sys.executable, github_output: bool = False) -> li
             (python, "-m", "unittest", "discover", "-s", "scripts", "-p", "*_test.py", "-v"),
         ),
         Step(
+            "Blueprint routing KPI gate",
+            (python, "scripts/routing_eval.py"),
+        ),
+        Step(
             "GCL alarm wire plan",
             (
                 python,

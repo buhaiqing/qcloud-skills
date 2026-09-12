@@ -32,6 +32,7 @@ class BuildStepsTests(unittest.TestCase):
                 "GCL runner smoke test",
                 "GCL trace aggregate",
                 "Script unit tests",
+                "Blueprint routing KPI gate",
                 "GCL alarm wire plan",
                 "GCL Tier-A conformance",
                 "SecOps filename completeness",
@@ -45,8 +46,9 @@ class BuildStepsTests(unittest.TestCase):
             steps[7].argv,
             ("python3", "-m", "unittest", "discover", "-s", "scripts", "-p", "*_test.py", "-v"),
         )
+        self.assertEqual(steps[8].argv, ("python3", "scripts/routing_eval.py"))
         self.assertEqual(
-            steps[8].argv,
+            steps[9].argv,
             (
                 "python3",
                 "scripts/gcl_alarm_wire.py",
