@@ -206,16 +206,232 @@ def check_source_drift() -> list[dict]:
     return items
 
 
+def _github_slug(heading: str) -> str:
+    """GitHub-style markdown anchor slug (ASCII-simplified variant).
+
+    The fragment refs in this repo's docs are pre-simplified — Unicode
+    letters (e.g. Chinese characters), em-dashes, and other non-ASCII
+    punctuation are dropped at link-author time rather than passed
+    through GitHub's full unicode-aware slugger. This helper matches
+    that convention so the two sides agree.
+
+    Steps:
+      1. lowercase
+      2. strip every char that is not ASCII letter / digit / underscore /
+         hyphen / space — drops parentheses, colons, em-dashes, Chinese
+         chars, etc.
+      3. collapse whitespace runs to '-'
+      4. strip leading/trailing hyphens
+
+    Leading numbers ARE preserved: `### 2. Source drift` becomes
+    `2-source-drift` (matching the reference in
+    runbooks/kpi2-destructive-token-plan-hash-failure.md). Earlier
+    revisions stripped the leading `2.` and produced a false-positive
+    drift on that known-good fragment.
+    """
+    s = heading.strip().lower()
+    s = re.sub(r"[^a-z0-9_\- ]", "", s)  # drop non-ASCII-alphanumeric/hyphen/space
+    s = re.sub(r"\s+", "-", s)            # whitespace runs -> '-'
+    s = s.strip("-")                      # trim leading/trailing '-'
+    return s
+
+
+def check_md_fragment_refs(docs_root: Path) -> list[dict]:
+    """Detect broken `.md#fragment` cross-doc links.
+
+    Scans every `*.md` under `docs_root` for links of the form
+    `[label](./path.md#fragment)` or `[label](../path.md#fragment)`.
+    For each, resolves the relative path and computes GitHub-style
+    heading slugs from the target md's h2/h3 headings. Reports two
+    drift classes:
+
+    1. **target md missing** — referenced md file does not exist.
+    2. **fragment unresolved** — md exists but no heading slug matches.
+
+    Known-good fragments already in use (Sep 2026):
+    #the-8-attributes, #2-source-drift, #case-study-scoring-...
+    """
+    items = []
+    if not docs_root.exists():
+        return items
+    for md in docs_root.rglob("*.md"):
+        try:
+            text = md.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        md_dir = md.parent
+        try:
+            md_rel = str(md.relative_to(ROOT))
+        except ValueError:
+            md_rel = str(md)
+        for m in _MD_FRAGMENT_RE.finditer(text):
+            rel_prefix = m.group(1)
+            target_md_name = m.group(2)
+            fragment = m.group(3)
+            target = (md_dir / rel_prefix / target_md_name).resolve()
+            if not target.exists():
+                items.append({
+                    "kind": "md_fragment_drift",
+                    "doc_file": md_rel,
+                    "target": f"{rel_prefix}{target_md_name}#{fragment}",
+                    "note": "target md missing",
+                })
+                continue
+            try:
+                target_text = target.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            slugs = set()
+            for h in re.finditer(r"^(#{2,3})\s+(.+?)\s*$", target_text, re.MULTILINE):
+                slugs.add(_github_slug(h.group(2)))
+            if fragment not in slugs:
+                items.append({
+                    "kind": "md_fragment_drift",
+                    "doc_file": md_rel,
+                    "target": f"{rel_prefix}{target_md_name}#{fragment}",
+                    "note": f"fragment '#{fragment}' does not resolve to any heading",
+                })
+    return items
+
+
+def check_docs_file_line_refs(docs_root: Path) -> list[dict]:
+    """Detect docs/code drift from `scripts/<name>.py:<N>` refs in markdown.
+
+    Scans every `*.md` under `docs_root` recursively, extracts refs that
+    look like `scripts/validate_x.py:64` (or `scripts/validate_x.py:64-70`),
+    and reports two drift classes:
+
+    1. **script file missing** — referenced script not present under
+       `scripts/`. Usually means a renamed/deleted file the docs forgot
+       to update.
+    2. **line empty or past EOF** — script exists but line N is blank
+       (whitespace only) or the file is shorter than N. Usually means
+       the code at that line moved or was removed.
+
+    The regex `_FILE_LINE_RE` requires the file path to start with
+    `scripts/`, so plain prose like "see runbook #42" is not flagged.
+    Only `.md` files inside `docs_root` are inspected — pass a
+    different Path to widen the scope (e.g. ROOT/'docs').
+
+    Returns an empty list when every ref resolves to a non-empty line
+    in an existing file. No side effects; safe to call repeatedly.
+    """
+    items = []
+    if not docs_root.exists():
+        return items
+    for md in docs_root.rglob("*.md"):
+        try:
+            text = md.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        md_rel = md.relative_to(ROOT)
+        for m in _FILE_LINE_RE.finditer(text):
+            script = m.group(1)
+            line = int(m.group(2))
+            target = SCRIPTS_DIR / script
+            if not target.exists():
+                items.append({
+                    "kind": "file_line_ref_drift",
+                    "script": script,
+                    "line": line,
+                    "doc_file": str(md_rel),
+                    "note": "script file missing",
+                })
+                continue
+            try:
+                lines = target.read_text(encoding="utf-8").splitlines()
+            except OSError:
+                items.append({
+                    "kind": "file_line_ref_drift",
+                    "script": script,
+                    "line": line,
+                    "doc_file": str(md_rel),
+                    "note": f"line {line} is empty or past EOF in {script}",
+                })
+                continue
+            if line > len(lines) or not lines[line - 1].strip():
+                items.append({
+                    "kind": "file_line_ref_drift",
+                    "script": script,
+                    "line": line,
+                    "doc_file": str(md_rel),
+                    "note": f"line {line} is empty or past EOF in {script}",
+                })
+    return items
+
+
+def check_readme_phantom_links(readme_path: Path, docs_root: Path) -> list[dict]:
+    """Detect phantom README table links: Ready rows pointing to missing .md.
+
+    Scans `readme_path` for markdown table rows whose Status column contains
+    "✅ Ready", extracts the first `./<name>.md` link on the row using
+    `_MD_LINK_RE`, and reports any link whose target does not exist on
+    disk relative to `readme_path.parent`.
+
+    Rows marked "⏳ Pending" are skipped: per `preflight-checklist.md` §5,
+    Pending rows are legitimate placeholders for patterns still in flight
+    and must not be flagged. The same row pattern with a missing target
+    is therefore expected behaviour, not drift.
+
+    `docs_root` is part of the signature for parity with the other
+    `check_docs_*` helpers; the current implementation resolves each link
+    against `readme_path.parent` (which is always inside `docs_root`),
+    so `docs_root` itself is unused. Keeping it in the signature keeps
+    the call sites uniform and lets a future caller pass a different
+    anchor (e.g. for multi-readme scans) without changing the function
+    shape.
+
+    Returns an empty list when every ✅ Ready link resolves. No side
+    effects; safe to call repeatedly.
+    """
+    items = []
+    if not readme_path.exists():
+        return items
+    try:
+        text = readme_path.read_text(encoding="utf-8")
+    except OSError:
+        return items
+    base = readme_path.parent
+    readme_rel = readme_path.resolve().relative_to(ROOT.resolve())
+    for line in text.splitlines():
+        # Filter to ✅ Ready table rows only. ⏳ Pending rows are
+        # explicitly out of scope (see preflight-checklist.md §5).
+        if "✅ Ready" not in line:
+            continue
+        m = _MD_LINK_RE.search(line)
+        if not m:
+            continue
+        target_name = m.group(2)
+        target = base / target_name
+        if not target.exists():
+            items.append({
+                "kind": "phantom_link_drift",
+                "readme": str(readme_rel),
+                "link_target": target_name,
+                "note": "Ready row points to missing .md file",
+            })
+    return items
+
+
 def main() -> int:
     threshold = check_threshold_drift()
     source = check_source_drift()
-    items = threshold + source
+    docs_refs = check_docs_file_line_refs(ROOT / "docs" / "harness-engineering")
+    readme_refs = check_readme_phantom_links(
+        ROOT / "docs" / "harness-engineering" / "README.md",
+        ROOT / "docs" / "harness-engineering",
+    )
+    md_fragments = check_md_fragment_refs(ROOT / "docs")
+    items = threshold + source + docs_refs + readme_refs + md_fragments
 
     if not items:
         print("| Drift class | Status | Detail |")
         print("|---|---|---|")
-        print("| Threshold drift | \u2705 pass | all spec thresholds have matching code literals |")
-        print("| Source drift    | \u2705 pass | all schema required fields written by emit_evidence_record |")
+        print("| Threshold drift        | \u2705 pass | all spec thresholds have matching code literals |")
+        print("| Source drift           | \u2705 pass | all schema required fields written by emit_evidence_record |")
+        print("| File-line ref drift    | \u2705 pass | all `scripts/*.py:N` refs in docs resolve to non-empty lines |")
+        print("| MD fragment drift      | \u2705 pass | all `.md#fragment` cross-refs resolve to a heading |")
+        print("| Phantom README link    | \u2705 pass | all ✅ Ready rows in README resolve to existing .md files |")
         print("\nSPEC DRIFT: clean")
         return 0
 
@@ -224,8 +440,16 @@ def main() -> int:
     for it in items:
         if it["kind"] == "threshold_drift":
             print(f"| threshold_drift | {it['spec_value']} | `{it['spec_file']}` | {it['note']} |")
-        else:
+        elif it["kind"] == "source_drift":
             print(f"| source_drift | `{it['schema_field']}` | docs/evidence-kernel-schema.json | {it['note']} |")
+        elif it["kind"] == "phantom_link_drift":
+            print(f"| phantom_link_drift | `{it['link_target']}` | `{it['readme']}` | {it['note']} |")
+        elif it["kind"] == "md_fragment_drift":
+            # `target` carries the relative path + fragment, e.g.
+            # "../spec-drift-gate.md#2-source-drift".
+            print(f"| md_fragment_drift | `{it['target']}` | `{it['doc_file']}` | {it['note']} |")
+        else:
+            print(f"| file_line_ref_drift | {it['script']}:{it['line']} | `{it['doc_file']}` | {it['note']} |")
 
     AUDIT.mkdir(exist_ok=True)
     (AUDIT / "spec-drift-report.json").write_text(
