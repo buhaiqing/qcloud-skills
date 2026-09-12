@@ -67,5 +67,5 @@ diff <(jq -S . audit-results/router-confusion.json) /tmp/last-known.json
 # expect: small delta, not a cliff
 ```
 
-See also: [kpi-pattern.md § Case study](../kpi-pattern.md) for what
+See also: [kpi-pattern.md § Case study](../kpi-pattern.md#case-study-scoring-qcloud-skills-kpis-against-the-8-attributes) for what
 counts as a healthy baseline (today: avg top1=14.72%, misdelegation=2.15%).

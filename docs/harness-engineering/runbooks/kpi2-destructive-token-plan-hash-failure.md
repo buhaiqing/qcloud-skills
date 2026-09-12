@@ -55,6 +55,6 @@ make kpi-gates | grep KPI#1
 # expect: ✅ pass for both KPI#1 and the destructive sub-row
 ```
 
-See also: [spec-drift-gate.md § Source drift](../spec-drift-gate.md) for
+See also: [spec-drift-gate.md § 2. Source drift](../spec-drift-gate.md#2-source-drift) for
 how this gap was introduced (plan_hash hardcoded to None in the original
 emit_evidence_record) and fixed (commit `9499c35`).
