@@ -47,7 +47,7 @@ Efficiency (so iteration becomes affordable).
 | [kpi-pattern.md](./kpi-pattern.md) | 8-attribute KPI design template | ✅ Ready |
 | [spec-drift-gate.md](./spec-drift-gate.md) | Detect when code drifts from spec | ✅ Ready |
 | [preflight-checklist.md](./preflight-checklist.md) | Pre-merge self-review checklist | ✅ Ready |
-| [agent-routing-blueprint.md](./agent-routing-blueprint.md) | Multi-agent decision contract | ⏳ Pending — needs ≥2 cross-project usage to validate |
+| [agent-routing-blueprint.md](./agent-routing-blueprint.md) | Multi-agent decision contract | ✅ Ready — 2 cross-project usages (qcloud-skills + myskills) validated |
 
 ## How to consume this directory
 

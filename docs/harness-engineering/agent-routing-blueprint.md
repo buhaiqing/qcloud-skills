@@ -1,13 +1,10 @@
 # Agent Routing Blueprint
 
-> ⏳ **Pending validation.** This blueprint is the first formal distillation
-> of the routing rules the `qcloud-skills` repo has been operating under
-> since Sep 2026. It needs ≥2 cross-project usages before being marked
-> Ready in `README.md`. Submit findings as PR comments against this file.
+> ✅ **Ready** (2026-09-12). Cross-project validated: (1) qcloud-skills
+> `routing_decision.py` + `make routing-check`; (2) myskills `routing_decision.py`
+> via worktree merge (`myskills` commit `43d7877`). Submit findings as PR comments.
 
-**Status:** First draft (2026-09-12). Source evidence: `qcloud-skills`
-session of the same date. See [Evidence table](#evidence-table) for
-traceable cases.
+**Status:** Ready — 2 cross-project usages validated.
 
 ---
 
