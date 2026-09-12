@@ -1,0 +1,32 @@
+[
+  {
+    "id": "routing-01",
+    "task": "fix the ruff check error in detect_spec_drift.py",
+    "expected_routing": "main-direct",
+    "should_trigger": "fix typo / single-file / deterministic"
+  },
+  {
+    "id": "routing-02",
+    "task": "write a runbook for k8s cluster inspection",
+    "expected_routing": "main-direct",
+    "should_trigger": "prose-writer filter (Q3)"
+  },
+  {
+    "id": "routing-03",
+    "task": "parallel: fix ruff + update Makefile + bump version",
+    "expected_routing": "fan-out",
+    "should_trigger": "independent slices (Q5)"
+  },
+  {
+    "id": "routing-04",
+    "task": "add KPI#9 to check_kpi_gates.py",
+    "expected_routing": "single-subagent",
+    "should_trigger": "code change, not small, not prose"
+  },
+  {
+    "id": "routing-05",
+    "task": "investigate why the detector reports phantom drift",
+    "expected_routing": "single-subagent",
+    "should_trigger": "exploration detected → single preferred"
+  }
+]

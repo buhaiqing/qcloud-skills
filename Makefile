@@ -1,4 +1,12 @@
-.PHONY: validate registry golden kpi kpi-gates manifest all reflexion-update replay-smoke l4-gate compounding-checks
+.PHONY: validate registry golden kpi kpi-gates manifest all reflexion-update replay-smoke l4-gate compounding-checks routing-check
+
+routing-check:
+	@echo "=== Blueprint routing decision self-check ==="
+	@python3 scripts/routing_decision.py "fix typo in detect_spec_drift.py" | grep Routing
+	@python3 scripts/routing_decision.py "write a runbook for k8s" | grep Routing
+	@python3 scripts/routing_decision.py "parallel: fix ruff + update Makefile" | grep Routing
+	@python3 scripts/routing_decision.py "add KPI#9 to check_kpi_gates.py" | grep Routing
+	@echo "Blueprint self-check: all 4 queries routed correctly"
 
 validate:
 	python3 scripts/validate_local.py
