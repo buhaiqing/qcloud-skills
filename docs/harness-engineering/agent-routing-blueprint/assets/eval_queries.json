@@ -28,5 +28,35 @@
     "task": "investigate why the detector reports phantom drift",
     "expected_routing": "single-subagent",
     "should_trigger": "exploration detected → single preferred"
+  },
+  {
+    "id": "routing-06",
+    "task": "skip orchestrator",
+    "expected_routing": "main-direct",
+    "should_trigger": "Q2 user opt-out ('skip orchestrator')"
+  },
+  {
+    "id": "routing-07",
+    "task": "fix typo in test.py",
+    "expected_routing": "main-direct",
+    "should_trigger": "Q1 size_gate (.py extension + small fix patterns)"
+  },
+  {
+    "id": "routing-08",
+    "task": "implement new feature across multiple modules",
+    "expected_routing": "single-subagent",
+    "should_trigger": "Q4 large but 'new module' not exact match → default single-subagent"
+  },
+  {
+    "id": "routing-09",
+    "task": "你自己处理",
+    "expected_routing": "main-direct",
+    "should_trigger": "Q2 Chinese opt-out ('你自己处理')"
+  },
+  {
+    "id": "routing-10",
+    "task": "create SPEC.md for a new skill",
+    "expected_routing": "main-direct",
+    "should_trigger": "Q3 prose filter ('create' verb + 'spec' noun)"
   }
 ]

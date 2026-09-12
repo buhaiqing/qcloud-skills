@@ -28,7 +28,7 @@ class TestRoutingEval(unittest.TestCase):
             ["python3", str(SCRIPT)],
             capture_output=True, text=True, cwd=str(ROOT), check=False,
         )
-        for line in ["routing-01", "routing-02", "routing-03"]:
+        for line in ["routing-01", "routing-02", "routing-03", "routing-06", "routing-09", "routing-10"]:
             self.assertIn(line, r.stdout, f"{line} missing from output")
 
     def test_all_pass(self):
@@ -36,7 +36,7 @@ class TestRoutingEval(unittest.TestCase):
             ["python3", str(SCRIPT)],
             capture_output=True, text=True, cwd=str(ROOT), check=False,
         )
-        self.assertIn("5/5 passed", r.stdout, r.stdout)
+        self.assertIn("10/10 passed", r.stdout, r.stdout)
         self.assertIn("KPI PASS", r.stdout, r.stdout)
 
     def test_routing_eval_is_importable(self):
