@@ -421,7 +421,13 @@ class FailurePatternTests(unittest.TestCase):
 
 
 class CmdRunEndToEndTests(unittest.TestCase):
-    def _run(self, critic_payload: dict | None, structural: bool = False, max_iter: int = 2) -> tuple[int, Path]:
+    def _run(
+        self,
+        critic_payload: dict | None,
+        structural: bool = False,
+        max_iter: int = 2,
+        command: str = "tccli cvm DescribeInstances",
+    ) -> tuple[int, Path]:
         """Helper to invoke cmd_run with a temp root."""
         tmp = Path(tempfile.mkdtemp())
         # run_command only executes `tccli`, so put a stub of that name on PATH.
@@ -439,7 +445,7 @@ class CmdRunEndToEndTests(unittest.TestCase):
             "--root", str(tmp),
             "--skill", "qcloud-test-ops",
             "--request", "test",
-            "--command", "tccli cvm DescribeInstances",
+            "--command", command,
             "--max-iter", str(max_iter),
         ]
         if structural:
@@ -500,6 +506,48 @@ class CmdRunEndToEndTests(unittest.TestCase):
         }
         rc, _root = self._run(critic_payload=critic)
         self.assertEqual(rc, 2)
+
+    def test_waf_destructive_without_confirmation_triggers_safety_fail(self) -> None:
+        """P0-3: WAF detects destructive op without --confirmed → scores[safety]=0 → SAFETY_FAIL.
+
+        A destructive tccli command (TerminateInstances) with no --confirmed flag
+        should be caught by WAF even when the Critic scores safety=1.
+        """
+        # Critic scores safety=1 (doesn't see the WAF gap), but WAF will override to 0
+        critic = {
+            "scores": {"correctness": 1, "safety": 1, "idempotency": 1, "traceability": 1, "spec_compliance": 1},
+            "suggestions": [],
+            "blocking": False,
+        }
+        # TerminateInstances is a destructive action; no --confirmed flag
+        rc, root = self._run(critic_payload=critic, command="tccli cvm TerminateInstances --Region ap-guangzhou --InstanceIds '[\"ins-abc123\"]'")
+        self.assertEqual(rc, 3)  # SAFETY_FAIL
+        trace_files = list((root / "audit-results").glob("gcl-trace-*.json"))
+        self.assertEqual(len(trace_files), 1)
+        data = json.loads(trace_files[0].read_text())
+        self.assertEqual(data["final"]["status"], "SAFETY_FAIL")
+        # WAF overrode safety=0 despite Critic scoring it 1
+        iteration = data["iterations"][0]
+        self.assertEqual(iteration["critic"]["scores"]["safety"], 0)
+        self.assertEqual(iteration["decision"], "SAFETY_FAIL")
+
+    def test_waf_destructive_with_confirmed_flag_passes(self) -> None:
+        """P0-3: same destructive op with --confirmed flag should pass."""
+        critic = {
+            "scores": {"correctness": 1, "safety": 1, "idempotency": 1, "traceability": 1, "spec_compliance": 1},
+            "suggestions": [],
+            "blocking": False,
+        }
+        rc, root = self._run(
+            critic_payload=critic,
+            command="tccli cvm TerminateInstances --Region ap-guangzhou --InstanceIds '[\"ins-abc123\"]' --confirmed",
+        )
+        self.assertEqual(rc, 0)  # PASS — --confirmed satisfies WAF
+        trace_files = list((root / "audit-results").glob("gcl-trace-*.json"))
+        data = json.loads(trace_files[0].read_text())
+        self.assertEqual(data["final"]["status"], "PASS")
+        # safety stays at 1 (WAF check passes)
+        self.assertEqual(data["iterations"][0]["critic"]["scores"]["safety"], 1)
 
 
 

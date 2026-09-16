@@ -1182,6 +1182,28 @@ def cmd_run(args: argparse.Namespace) -> int:
                     print("ERROR: Invalid critic JSON:", "; ".join(errs), file=sys.stderr)
                     return 2
     
+            # P0-3: Layer-3 WAF safety check — promote critical destructive-without-confirmation
+            # to SAFETY_FAIL before decide().  Runs inside the iteration loop so SAFETY_FAIL
+            # aborts immediately (same as a Critic score of 0).
+            # Separable: WAF violations are also emitted to stderr by post_process() so the
+            # alert pipeline still sees them.
+            m = re.search(r"tccli\s+\w+\s+(\w+)", command or "")
+            waf_action = m.group(1) if m else ""
+            try:
+                waf_violations = waf_check(trace, args.skill, waf_action, command or "")
+                for v in waf_violations:
+                    if v.get("severity") == "critical" and v.get("type") == "destructive_without_confirmation":
+                        critic["scores"]["safety"] = 0
+                        # Also annotate the iteration so the trace is self-documenting
+                        critic["waf_violation"] = {
+                            "type": v["type"],
+                            "action": v.get("action", ""),
+                            "suggestion": v.get("suggestion", ""),
+                        }
+                        break
+            except (re.error, KeyError, ValueError, TypeError):
+                pass  # best-effort: never break GCL loop
+
             decision = decide(critic["scores"])
             trace["iterations"].append(
                 {
@@ -1266,6 +1288,17 @@ def cmd_run(args: argparse.Namespace) -> int:
                 print(f"PASS (iter {iteration}) — trace: {path}")
                 if args.enable_post_process:
                     post_process(path, root, three_layer=args.three_layer_check)
+                # P0-1: self-heal trigger — mine failure patterns after MAX_ITER or PASS
+                # SAFETY_FAIL deliberately excluded: the loop halted before pattern extraction.
+                if getattr(args, "self_heal", False):
+                    try:
+                        from self_evolution_loop import SelfEvolutionLoop
+                        loop = SelfEvolutionLoop(root=root, dry_run=True, max_skills=1)
+                        summary = loop.run()
+                        for o in summary.get("outcomes", []):
+                            print(f"[self-heal] {o['skill']}: {o['status']} — {o['detail'][:80]}", file=sys.stderr)
+                    except Exception:  # noqa: BLE001, S110 — self-heal must never break the return path
+                        pass
                 return 0
     
             critic_feedback = "; ".join(critic.get("suggestions", [])[:3])
@@ -1301,6 +1334,16 @@ def cmd_run(args: argparse.Namespace) -> int:
         print(f"MAX_ITER — trace: {path}", file=sys.stderr)
         if args.enable_post_process:
             post_process(path, root, three_layer=args.three_layer_check)
+        # P0-1: self-heal trigger — same as PASS path above
+        if getattr(args, "self_heal", False):
+            try:
+                from self_evolution_loop import SelfEvolutionLoop
+                loop = SelfEvolutionLoop(root=root, dry_run=True, max_skills=1)
+                summary = loop.run()
+                for o in summary.get("outcomes", []):
+                    print(f"[self-heal] {o['skill']}: {o['status']} — {o['detail'][:80]}", file=sys.stderr)
+            except Exception:  # noqa: BLE001, S110
+                pass
         return 1
 
 
@@ -1367,6 +1410,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="Skip preflight reflexion retrieval. For A/B testing with eval_e2e.py mode=ab.",
+    )
+    run.add_argument(
+        "--self-heal",
+        action="store_true",
+        default=False,
+        help="After PASS/MAX_ITER, invoke SelfEvolutionLoop to mine failure patterns "
+        "and (if GITHUB_TOKEN is set) create a FixProposal PR. "
+        "WARNING: may create real GitHub PRs in non-dry-run mode.",
     )
     run.set_defaults(func=cmd_run)
     return p

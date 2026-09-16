@@ -75,6 +75,15 @@ jobs:
           python3 scripts/gcl_alarm_wire.py plan \
             --summary scripts/fixtures/gcl-quality-summary-healthy.json
 
+      - name: Skill quality score (informational)
+        run: |
+          python3 scripts/skill_quality_score.py score --json \
+            --since-hours 720 \
+            2>&1 | head -50 || true
+        continue-on-error: true
+        # NOTE: signal only; aggregates per-skill upgrade_signal from audit-results/.
+        # Skips gracefully when no traces exist (L10 convergence gate).
+
       - name: GCL Tier-A conformance (Charter C7)
         run: |
           python3 scripts/check_gcl_conformance.py

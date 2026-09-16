@@ -58,8 +58,13 @@ UPGRADE_THRESHOLD = 0.6
 RUBRIC_DIMS = ("correctness", "safety", "idempotency", "traceability", "spec_compliance")
 
 
-def read_traces(root: Path, since_hours: int | None = 168) -> list[dict[str, Any]]:
+def read_traces(root: Path, since_hours: int | None = None) -> list[dict[str, Any]]:
     """Load gcl-trace-*.json files under audit-results/, windowed by mtime.
+
+    Also walks gcl-session directories (gcl-YYYYMMDDTHHMMSS/) for nested
+    gcl-trace-*.json files produced by multi-subagent sessions.  Session dirs
+    that contain only markdown/yaml artifacts (e.g. final.md) are skipped —
+    those are subagent session metadata, not GCL traces.
 
     Returns an empty list (not raises) when the audit-results/ directory is
     missing or no files match — per L10 (convergence gate on runtime
@@ -68,7 +73,17 @@ def read_traces(root: Path, since_hours: int | None = 168) -> list[dict[str, Any
     audit = root / "audit-results"
     if not audit.is_dir():
         return []
+    # Top-level JSON traces
     paths = sorted(audit.glob("gcl-trace-*.json"))
+    # Traces nested inside gcl-session directories (multi-subagent sessions)
+    for session_dir in audit.iterdir():
+        if session_dir.is_dir() and session_dir.name.startswith("gcl-"):
+            paths.extend(sorted(session_dir.glob("gcl-trace-*.json")))
+    return _load_traces(paths, since_hours)
+
+
+def _load_traces(paths: list[Path], since_hours: int | None) -> list[dict[str, Any]]:
+    """Parse a sorted list of JSON trace paths, optionally filtered by mtime."""
     if since_hours is None:
         out: list[dict[str, Any]] = []
         for p in paths:
