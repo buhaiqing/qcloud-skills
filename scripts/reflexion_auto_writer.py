@@ -73,7 +73,10 @@ def write_trace(trace: dict[str, Any], trace_path: Path | None = None) -> bool:
             try:
                 existing = parse_existing(PATTERNS_FILE)
                 merged = merge(existing.copy(), [fp])
-                prune_low_frequency(merged, min_count=3)
+                # Do NOT prune low-count patterns here — store_failure_pattern()
+                # handles capacity via _prune_by_count + _demote_patterns when the
+                # hot layer exceeds ~150 patterns. A count=1 pattern must survive
+                # its first write so it can be observed and incremented on recurrence.
                 lines = enforce_line_cap(merged)
                 f.seek(0)
                 f.write("\n".join(lines) + "\n")

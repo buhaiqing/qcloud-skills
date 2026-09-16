@@ -262,6 +262,66 @@ class TestReflexionStore(unittest.TestCase):
         self.assertNotEqual(k1, k2)
 
 
+class TestCount1Survival(unittest.TestCase):
+    """Regression: count=1 patterns must survive their first write.
+
+    Previously reflexion_auto_writer.write_trace() called prune_low_frequency(min_count=3)
+    BEFORE enforce_line_cap, silently removing brand-new patterns before they were ever
+    written. store_failure_pattern() correctly handles capacity via _prune_by_count
+    (which only fires when patterns > ~150). The write_trace path now mirrors this.
+    """
+
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.temp_path = Path(self.temp_dir.name)
+        self.patterns_file = self.temp_path / "failure-patterns.md"
+
+    def tearDown(self) -> None:
+        self.temp_dir.cleanup()
+
+    def test_count1_pattern_survives_first_write(self) -> None:
+        """A new pattern with count=1 must persist after its first store_failure_pattern call."""
+        result = store_failure_pattern(
+            skill="qcloud-cvm-ops",
+            command="DescribeInstances",
+            error="AuthFailure: SecretId not found",
+            resolution="Verify TENCENTCLOUD_SECRET_ID is correct",
+            path=self.patterns_file,
+        )
+        self.assertTrue(result)
+        patterns = parse_existing_safe(self.patterns_file)
+        self.assertEqual(len(patterns), 1, "count=1 pattern must survive first write")
+        first_pattern = next(iter(patterns.values()))
+        self.assertEqual(first_pattern["count"], 1)
+        self.assertEqual(first_pattern["skill"], "qcloud-cvm-ops")
+
+    def test_write_trace_preserves_count1(self) -> None:
+        """write_trace must NOT strip count=1 patterns before writing."""
+        import reflexion_auto_writer as raw
+        # Patch PATTERNS_FILE to our temp path
+        orig = raw.PATTERNS_FILE
+        raw.PATTERNS_FILE = self.patterns_file
+        try:
+            trace = {
+                "final": {
+                    "failure_pattern": {
+                        "category": "runtime",
+                        "skill": "qcloud-redis-ops",
+                        "command": "DescribeInstances",
+                        "error": "Resource not found",
+                        "fix": "Check resource ID",
+                        "count": 1,
+                    }
+                }
+            }
+            ok = raw.write_trace(trace)
+            self.assertTrue(ok)
+            patterns = parse_existing_safe(self.patterns_file)
+            self.assertEqual(len(patterns), 1, "count=1 pattern must survive write_trace")
+        finally:
+            raw.PATTERNS_FILE = orig
+
+
 class TestDemotionIntegration(unittest.TestCase):
     """P1-2: evicted patterns demote to warm/cold layers instead of being lost."""
 
