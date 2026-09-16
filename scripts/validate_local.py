@@ -116,7 +116,7 @@ def run_quality_score(root: Path, python: str = sys.executable) -> dict[str, Any
         print(f"$ scripts/skill_quality_score.py — SKIPPED (not found at {script})")
         return {
             "quality_score": 0.0,
-            "upgrade_signal": "ok",
+            "upgrade_signal": "none",
             "recommendations": ["skill_quality_score.py not present — step skipped"],
         }
 
@@ -309,6 +309,21 @@ def main(argv: list[str] | None = None) -> int:
     if quality_result["upgrade_signal"] == "critical":
         print("\nWARNING: Critical upgrade signal detected", file=sys.stderr)
         return 1
+
+    # FinOps cost gate (warn-only v1): surface GCL budget breaches without
+    # blocking local validation. Only runs when traces exist; missing
+    # dashboard or zero traces skips silently.
+    dashboard = root / "scripts" / "cost_dashboard.py"
+    if dashboard.exists() and list(root.glob("audit-results/gcl-trace-*.json")):
+        try:
+            cost_rc = subprocess.run(
+                [sys.executable, str(dashboard), "--strict"],
+                cwd=root, capture_output=True, text=True, check=False, timeout=120,
+            ).returncode
+            if cost_rc != 0:
+                print("\nWARNING: GCL cost budget exceeded (warn-only; see cost_dashboard --strict)", file=sys.stderr)
+        except Exception as e:  # noqa: BLE001 — cost gate must never block validation
+            print(f"\nWARNING: cost gate skipped ({e})", file=sys.stderr)
 
     # Harness Evidence gates (additive — does not alter existing gates)
     ev_files = glob.glob(str(root / "audit-results" / "evidence-*.json"))

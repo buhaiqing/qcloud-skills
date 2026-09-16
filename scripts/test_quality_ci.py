@@ -119,14 +119,16 @@ class TestGenerateRecommendations(unittest.TestCase):
 class TestRunQualityScore(unittest.TestCase):
     def test_failed_subprocess_returns_critical(self) -> None:
         mock_result = Mock(returncode=1, stderr="error")
-        with patch("validate_local.subprocess.run", return_value=mock_result):
+        with patch("validate_local.subprocess.run", return_value=mock_result), \
+             patch("validate_local.Path.exists", return_value=True):
             result = run_quality_score(Path("/tmp"))
         self.assertEqual(result["upgrade_signal"], "critical")
         self.assertEqual(result["quality_score"], 0.0)
 
     def test_invalid_json_returns_critical(self) -> None:
         mock_result = Mock(returncode=0, stdout="not json")
-        with patch("validate_local.subprocess.run", return_value=mock_result):
+        with patch("validate_local.subprocess.run", return_value=mock_result), \
+             patch("validate_local.Path.exists", return_value=True):
             result = run_quality_score(Path("/tmp"))
         self.assertEqual(result["upgrade_signal"], "critical")
 
@@ -137,7 +139,8 @@ class TestRunQualityScore(unittest.TestCase):
             "upgrade_signal": [],
         }
         mock_result = Mock(returncode=0, stdout=json.dumps(report))
-        with patch("validate_local.subprocess.run", return_value=mock_result):
+        with patch("validate_local.subprocess.run", return_value=mock_result), \
+             patch("validate_local.Path.exists", return_value=True):
             result = run_quality_score(Path("/tmp"))
         self.assertEqual(result["upgrade_signal"], "none")
         self.assertEqual(result["quality_score"], 100.0)

@@ -154,6 +154,34 @@ class RoutingTest(unittest.TestCase):
         model = route("qcloud-cvm-ops", budgets, tracker, breaker)
         self.assertIsNone(model)
 
+    def test_zero_cost_budget_routes_by_tokens(self) -> None:
+        budgets = {
+            "qcloud-cvm-ops": {
+                "daily_token_budget": 1000000,
+                "daily_cost_budget_usd": 0.0,
+                "model_options": ["gpt-4o", "gpt-4o-mini"],
+                "default_model": "gpt-4o",
+            }
+        }
+        tracker = CostTracker(budgets)
+        breaker = CostCircuitBreaker()
+        model = route("qcloud-cvm-ops", budgets, tracker, breaker)
+        self.assertEqual(model, "gpt-4o-mini")
+
+    def test_degenerate_budget_blocks(self) -> None:
+        budgets = {
+            "qcloud-cvm-ops": {
+                "daily_token_budget": 0,
+                "daily_cost_budget_usd": 0.0,
+                "model_options": ["gpt-4o-mini"],
+                "default_model": "gpt-4o-mini",
+            }
+        }
+        tracker = CostTracker(budgets)
+        breaker = CostCircuitBreaker()
+        self.assertTrue(tracker.is_breached("qcloud-cvm-ops"))
+        self.assertIsNone(route("qcloud-cvm-ops", budgets, tracker, breaker))
+
 
 if __name__ == "__main__":
     unittest.main()

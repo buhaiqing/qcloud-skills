@@ -45,11 +45,21 @@ class CostTracker:
         return (daily_tokens - used_tokens, daily_cost - used_cost)
 
     def is_breached(self, skill: str) -> bool:
-        tokens_left, cost_left = self.remaining(skill)
+        budget = self._budgets.get(skill)
         # No budget entry -> not breached (caller handles missing budget separately)
-        if skill not in self._budgets:
+        if budget is None:
             return False
-        return tokens_left <= 0 or cost_left <= 0
+        daily_tokens = int(budget.get("daily_token_budget", 0))
+        daily_cost = float(budget.get("daily_cost_budget_usd", 0.0))
+        # Degenerate budget (no allowance in either dimension) -> breached.
+        if daily_tokens <= 0 and daily_cost <= 0:
+            return True
+        tokens_left, cost_left = self.remaining(skill)
+        # Only dimensions with a positive daily allowance are enforced, so
+        # tokens-only (cost=0) or cost-only (tokens=0) budgets work.
+        tokens_breached = daily_tokens > 0 and tokens_left <= 0
+        cost_breached = daily_cost > 0 and cost_left <= 0
+        return tokens_breached or cost_breached
 
 
 class CostCircuitBreaker:
@@ -113,6 +123,9 @@ def route(
     tokens_left, cost_left = tracker.remaining(skill)
     daily_tokens = int(budget.get("daily_token_budget", 0))
     daily_cost = float(budget.get("daily_cost_budget_usd", 0.0))
+    # A zero daily allowance disables that dimension (tokens-only /
+    # cost-only budgets). Cost-side affordability only applies when enforced.
+    cost_enforced = daily_cost > 0
 
     # Nearly exhausted -> force cheapest.
     nearly_exhausted = False
@@ -121,24 +134,29 @@ def route(
     if daily_tokens > 0 and tokens_left < daily_tokens * 0.2:
         nearly_exhausted = True
     if nearly_exhausted:
-        # Cheapest must still be affordable; otherwise trip.
-        if _cost(cheapest) > cost_left and cost_left <= 0:
-            breaker.trip(skill)
-            return None
-        affordable = [m for m in sorted_models if _cost(m) <= cost_left]
-        if not affordable:
-            # If remaining cost is tiny but >0, still return cheapest
-            # (allow slight over-budget rather than hard block mid-day).
-            # Only block when fully exhausted which is already handled above.
-            return cheapest
-        return affordable[0]
+        if cost_enforced:
+            # Cheapest must still be affordable; otherwise trip.
+            if _cost(cheapest) > cost_left and cost_left <= 0:
+                breaker.trip(skill)
+                return None
+            affordable = [m for m in sorted_models if _cost(m) <= cost_left]
+            if not affordable:
+                # If remaining cost is tiny but >0, still return cheapest
+                # (allow slight over-budget rather than hard block mid-day).
+                # Only block when fully exhausted which is already handled above.
+                return cheapest
+            return affordable[0]
+        return cheapest
 
     if (
         preferred is not None
         and preferred in model_options
-        and _cost(preferred) <= cost_left
+        and (not cost_enforced or _cost(preferred) <= cost_left)
     ):
         return preferred
+
+    if not cost_enforced:
+        return cheapest
 
     affordable = [m for m in sorted_models if _cost(m) <= cost_left]
     if not affordable:

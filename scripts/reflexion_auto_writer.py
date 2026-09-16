@@ -50,8 +50,17 @@ ROOT = Path(__file__).resolve().parents[1]
 # Single-trace atomic write (called by gcl_runner.py after persist_trace)
 # ---------------------------------------------------------------------------
 
-def write_trace(trace: dict[str, Any], trace_path: Path | None = None) -> bool:
-    """Update docs/failure-patterns.md from a single GCL trace dict.
+def write_trace(
+    trace: dict[str, Any],
+    trace_path: Path | None = None,
+    patterns_path: Path | None = None,
+) -> bool:
+    """Update failure patterns from a single GCL trace dict.
+
+    Default destination is docs/failure-patterns.md (module PATTERNS_FILE).
+    Pass patterns_path to redirect output (tests/dry-runs); the path is an
+    explicit caller opt-in and used as-is.
+    trace_path only backfills the _source field; it never changes destination.
 
     Extracts the failure_pattern field at trace['final']['failure_pattern'].
     Atomic via fcntl.flock + write_text. Never raises — reflexion failures
@@ -65,13 +74,17 @@ def write_trace(trace: dict[str, Any], trace_path: Path | None = None) -> bool:
         if trace_path:
             fp = {**fp, "_source": trace_path.name}
 
-        PATTERNS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        # patterns_path is an explicit caller opt-in (tests/dry-runs); the
+        # caller already holds filesystem access, so no path guard here —
+        # a guard would only break the documented tmp-dir use case.
+        target = patterns_path or PATTERNS_FILE
+        target.parent.mkdir(parents=True, exist_ok=True)
         # fcntl.flock requires an open fd; create if missing
-        PATTERNS_FILE.touch(exist_ok=True)
-        with PATTERNS_FILE.open("r+", encoding="utf-8") as f:
+        target.touch(exist_ok=True)
+        with target.open("r+", encoding="utf-8") as f:
             fcntl.flock(f.fileno(), fcntl.LOCK_EX)
             try:
-                existing = parse_existing(PATTERNS_FILE)
+                existing = parse_existing(target)
                 merged = merge(existing.copy(), [fp])
                 # Do NOT prune low-count patterns here — store_failure_pattern()
                 # handles capacity via _prune_by_count + _demote_patterns when the

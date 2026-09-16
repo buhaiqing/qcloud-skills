@@ -298,28 +298,40 @@ class TestCount1Survival(unittest.TestCase):
     def test_write_trace_preserves_count1(self) -> None:
         """write_trace must NOT strip count=1 patterns before writing."""
         import reflexion_auto_writer as raw
-        # Patch PATTERNS_FILE to our temp path
-        orig = raw.PATTERNS_FILE
-        raw.PATTERNS_FILE = self.patterns_file
-        try:
-            trace = {
-                "final": {
-                    "failure_pattern": {
-                        "category": "runtime",
-                        "skill": "qcloud-redis-ops",
-                        "command": "DescribeInstances",
-                        "error": "Resource not found",
-                        "fix": "Check resource ID",
-                        "count": 1,
-                    }
+        trace = {
+            "final": {
+                "failure_pattern": {
+                    "category": "runtime",
+                    "skill": "qcloud-redis-ops",
+                    "command": "DescribeInstances",
+                    "error": "Resource not found",
+                    "fix": "Check resource ID",
+                    "count": 1,
                 }
             }
-            ok = raw.write_trace(trace)
-            self.assertTrue(ok)
-            patterns = parse_existing_safe(self.patterns_file)
-            self.assertEqual(len(patterns), 1, "count=1 pattern must survive write_trace")
-        finally:
-            raw.PATTERNS_FILE = orig
+        }
+        ok = raw.write_trace(trace, patterns_path=self.patterns_file)
+        self.assertTrue(ok)
+        patterns = parse_existing_safe(self.patterns_file)
+        self.assertEqual(len(patterns), 1, "count=1 pattern must survive write_trace")
+
+    def test_write_trace_isolates_tmp_file(self) -> None:
+        """patterns_path redirects output away from the production file."""
+        import reflexion_auto_writer as raw
+        trace = {
+            "final": {
+                "failure_pattern": {
+                    "category": "runtime",
+                    "skill": "qcloud-redis-ops",
+                    "command": "DescribeInstances",
+                    "error": "tmp isolation probe",
+                    "fix": "redirect",
+                    "count": 1,
+                }
+            }
+        }
+        self.assertTrue(raw.write_trace(trace, patterns_path=self.patterns_file))
+        self.assertIn("tmp isolation probe", self.patterns_file.read_text(encoding="utf-8"))
 
 
 class TestDemotionIntegration(unittest.TestCase):
@@ -349,7 +361,7 @@ class TestDemotionIntegration(unittest.TestCase):
             # Store many patterns to force eviction
             for i in range(160):
                 store_failure_pattern(
-                    skill=f"qcloud-popular-ops",
+                    skill="qcloud-popular-ops",
                     command=f"op{i}",
                     error=f"error{i}",
                     resolution=f"fix{i}",

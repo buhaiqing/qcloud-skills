@@ -588,7 +588,7 @@ class TestReflexionEndToEnd(unittest.TestCase):
                     "--root", str(tmp_path),
                     "--skill", "qcloud-cvm-ops",
                     "--request", "test request",
-                    "--command", 'tccli cvm TerminateInstances',
+                    "--command", 'tccli cvm TerminateInstances --confirmed',
                     "--critic-json", str(critic_file),
                 ])
                 # TerminateInstances is destructive; satisfy the Phase-3 human
