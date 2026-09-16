@@ -53,14 +53,18 @@ def _today() -> str:
 
 
 def pick_root_cause(skill: str) -> dict[str, Any] | None:
-    """Highest-count failure pattern for a skill across hot/warm/cold layers."""
+    """Highest-count failure pattern for a skill across hot/warm/cold layers.
+
+    Keys from load_all_layers() are tuples (category, skill_name, command_norm, error).
+    Match by skill field inside the pattern dict, not by tuple prefix.
+    """
     best: dict[str, Any] | None = None
     for layer in load_all_layers():
         for key, pattern in (layer or {}).items():
-            if not key.startswith(f"{skill}|"):
+            if pattern.get("skill", "").strip() != skill:
                 continue
             if best is None or int(pattern.get("count", 0)) > int(best.get("count", 0)):
-                best = {**pattern, "_key": key}
+                best = {**pattern, "_key": "|".join(str(k) for k in key)}
     return best
 
 
