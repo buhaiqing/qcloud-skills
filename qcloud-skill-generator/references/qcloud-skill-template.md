@@ -249,6 +249,12 @@ When `tccli` CLI does not support a specific operation, use `tencentcloud-sdk-py
 #!/usr/bin/env python3
 """
 SDK fallback script for [Product] Create[Resource]
+
+Tool-grounding integration (P1-3):
+  Before executing, validate params against the skill's tool-call-grounding.md
+  schema reference (see references/tool-call-grounding.md §2 for registration pattern).
+  Use GroundingDetector to catch tool_not_found, param_out_of_range, and
+  state_not_satisfied errors before they reach the cloud.
 """
 import os
 import json
@@ -283,6 +289,12 @@ def main():
 if __name__ == "__main__":
     main()
 ```
+
+> **Tool-grounding**: Every SDK fallback script should integrate the skill's
+> `references/tool-call-grounding.md` for parameter validation and state-dependency
+> checks. See `references/tool-call-grounding.md` §2 for `register()` / `validate_call()`
+> usage and §3 for `StateTracker` / `can_call()` patterns. This reduces
+> hallucinated parameters and prevents invalid state transitions.
 
 Execute:
 ```bash
