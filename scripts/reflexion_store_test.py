@@ -262,5 +262,52 @@ class TestReflexionStore(unittest.TestCase):
         self.assertNotEqual(k1, k2)
 
 
+class TestDemotionIntegration(unittest.TestCase):
+    """P1-2: evicted patterns demote to warm/cold layers instead of being lost."""
+
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.temp_path = Path(self.temp_dir.name)
+        self.hot = self.temp_path / "failure-patterns.md"
+        self.warm = self.temp_path / "failure-patterns-warm.md"
+        self.cold = self.temp_path / "failure-patterns-cold.md"
+
+    def tearDown(self) -> None:
+        self.temp_dir.cleanup()
+
+    def test_evicted_patterns_demote_to_warm(self) -> None:
+        """When hot exceeds limit, lowest-count patterns go to warm."""
+        # Override the module-level paths so demotion finds our temp files
+        import reflexion_store as rs
+        orig_hot = rs._HOT_PATH
+        orig_warm = rs._WARM_PATH
+        orig_cold = rs._COLD_PATH
+        rs._HOT_PATH = self.hot
+        rs._WARM_PATH = self.warm
+        rs._COLD_PATH = self.cold
+        try:
+            # Store many patterns to force eviction
+            for i in range(160):
+                store_failure_pattern(
+                    skill=f"qcloud-popular-ops",
+                    command=f"op{i}",
+                    error=f"error{i}",
+                    resolution=f"fix{i}",
+                    path=self.hot,
+                )
+            # The lowest-count (count=1) patterns should have been demoted to warm
+            hot_patterns = parse_existing_safe(self.hot)
+            warm_patterns = parse_existing_safe(self.warm) if self.warm.exists() else {}
+            self.assertLess(len(hot_patterns), 160, "hot should have been pruned")
+            # Demoted patterns should be in warm
+            self.assertGreater(len(warm_patterns), 0, "warm should have received demoted patterns")
+        finally:
+            rs._HOT_PATH = orig_hot
+            rs._WARM_PATH = orig_warm
+            rs._COLD_PATH = orig_cold
+
+
+
+
 if __name__ == "__main__":
     unittest.main()

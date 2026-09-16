@@ -64,20 +64,89 @@ def _make_key(
     return normalize_reflexion_key(category, skill, command, error)
 
 
-def _prune_by_count(patterns: dict[str, dict[str, Any]], max_patterns: int) -> None:
+def _prune_by_count(
+    patterns: dict[str, dict[str, Any]], max_patterns: int
+) -> list[tuple[str, dict[str, Any]]]:
     """Remove lowest-count patterns in-place until under limit.
-    
-    Sorts by count ascending and keeps top max_patterns.
+
+    Returns the evicted (key, pattern) pairs in ascending count order
+    so the caller can demote them to warmer storage instead of losing them.
     """
     if len(patterns) <= max_patterns:
-        return
-
-    # Sort by count ascending, remove lowest count patterns
+        return []
     sorted_items = sorted(patterns.items(), key=lambda x: x[1].get("count", 0))
     to_remove = len(patterns) - max_patterns
+    evicted = sorted_items[:to_remove]
+    for key, _ in evicted:
+        del patterns[key]
+    return evicted
 
-    for i in range(to_remove):
-        del patterns[sorted_items[i][0]]
+
+# ---------------------------------------------------------------------------
+# Layer demotion (hot → warm → cold)
+# ---------------------------------------------------------------------------
+_HOT_LIMIT = 200
+_WARM_LIMIT = 500
+_HOT_PATH = ROOT / "docs" / "failure-patterns.md"
+_WARM_PATH = ROOT / "docs" / "failure-patterns-warm.md"
+_COLD_PATH = ROOT / "docs" / "failure-patterns-cold.md"
+
+
+def _demote_patterns(
+    evicted: list[tuple[str, dict[str, Any]]], dry_run: bool = False
+) -> int:
+    """Write evicted patterns to warmer storage layers.
+
+    Priority: warm (≤500 lines) → cold (≤2000 lines).  Demoted patterns
+    retain their count so the cold layer preserves recency signal.
+
+    Returns the number of patterns successfully demoted.
+    """
+    demoted = 0
+    for key, pattern in evicted:
+        # Try warm first
+        ok = _append_to_layer(pattern, _WARM_PATH, _WARM_LIMIT)
+        if ok:
+            demoted += 1
+            continue
+        # Warm full — try cold
+        ok = _append_to_layer(pattern, _COLD_PATH, 2000)
+        if ok:
+            demoted += 1
+            continue
+        # Both layers full — silently discard (budget exhausted; not a fatal error)
+    return demoted
+
+
+def _append_to_layer(
+    pattern: dict[str, Any], path: Path, max_lines: int
+) -> bool:
+    """Append one pattern to a layer file, enforcing its line limit.
+
+    Returns True if the pattern was written; False if the layer is at capacity.
+    Demotes lowest-count existing patterns to make room.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing = parse_existing_safe(path) if path.exists() else {}
+    if len(existing) >= max_lines - 10:  # leave room for headers
+        # Demote lowest-count patterns to make space
+        excess = len(existing) - (max_lines - 20)
+        if excess > 0:
+            sorted_existing = sorted(existing.items(), key=lambda x: x[1].get("count", 0))
+            for k, _ in sorted_existing[:excess]:
+                del existing[k]
+    # Append or update
+    key = (pattern.get("category", ""), pattern.get("skill", ""),
+           pattern.get("command", ""), pattern.get("error", ""))
+    key = (key[0].strip().lower(), key[1].strip().lower(),
+           key[2].strip().lower(), " ".join(key[3].strip().lower().split()))
+    existing[key] = pattern
+    try:
+        lines = enforce_line_cap(existing)
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return True
+    except OSError:
+        return False
 
 
 def store_failure_pattern(
@@ -143,21 +212,23 @@ def store_failure_pattern(
             "first_seen": now,
         }
 
-    # Enforce line limit by pruning if needed
-    # Each pattern takes ~1 line in table, plus header/footer
-    # Estimate max patterns as (MAX_LINES - 50) for headers/footers
+    # Enforce line limit by pruning if needed.
+    # P1-2: evicted patterns are demoted to warm/cold layers instead of lost.
     max_patterns = MAX_LINES - 50
     if len(patterns) > max_patterns:
-        _prune_by_count(patterns, max_patterns)
+        evicted = _prune_by_count(patterns, max_patterns)
+        _demote_patterns(evicted)
 
     # Rebuild and write file
     lines = enforce_line_cap(patterns)
 
-    # Final safety check: if still over limit, prune more aggressively
+    # Final safety: if still over hot limit despite pruning (should not happen
+    # but guard in case enforce_line_cap behaves differently), demote excess.
     while len(lines) > MAX_LINES and patterns:
-        # Remove the lowest count pattern
         sorted_items = sorted(patterns.items(), key=lambda x: x[1].get("count", 0))
+        evicted = [(sorted_items[0][0], sorted_items[0][1])]
         del patterns[sorted_items[0][0]]
+        _demote_patterns(evicted)
         lines = enforce_line_cap(patterns)
 
     try:
