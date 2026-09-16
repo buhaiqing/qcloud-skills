@@ -52,19 +52,30 @@ def _today() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%d")
 
 
-def pick_root_cause(skill: str) -> dict[str, Any] | None:
+def pick_root_cause(
+    skill: str | None, exclude_keys: set[str] | None = None
+) -> dict[str, Any] | None:
     """Highest-count failure pattern for a skill across hot/warm/cold layers.
 
     Keys from load_all_layers() are tuples (category, skill_name, command_norm, error).
     Match by skill field inside the pattern dict, not by tuple prefix.
+
+    If skill is None, returns the highest-count pattern across all skills
+    (used as fallback when upgrade_signal is "unknown").
+
+    exclude_keys skips patterns by their _key string (used to avoid re-trying
+    patterns whose target file was missing).
     """
     best: dict[str, Any] | None = None
     for layer in load_all_layers():
         for key, pattern in (layer or {}).items():
-            if pattern.get("skill", "").strip() != skill:
+            if skill is not None and pattern.get("skill", "").strip() != skill:
+                continue
+            key_str = "|".join(str(k) for k in key)
+            if exclude_keys and key_str in exclude_keys:
                 continue
             if best is None or int(pattern.get("count", 0)) > int(best.get("count", 0)):
-                best = {**pattern, "_key": "|".join(str(k) for k in key)}
+                best = {**pattern, "_key": key_str}
     return best
 
 
@@ -164,11 +175,32 @@ class SelfEvolutionLoop:
     def _process_skill(self, skill: str) -> LoopOutcome:
         pattern = pick_root_cause(skill)
         if pattern is None:
-            return LoopOutcome(skill, "skipped_no_pattern", "no recurring failure pattern found")
+            # "unknown" signal means a trace had low quality but no skill field.
+            # Fall back: pick the highest-count pattern across ALL skills so the
+            # loop can still produce an outcome when some pattern exists.
+            if skill == "unknown":
+                pattern = pick_root_cause(None)
+            if pattern is None:
+                return LoopOutcome(skill, "skipped_no_pattern", "no recurring failure pattern found")
+            # Use the skill from the pattern dict, not the "unknown" signal
+            skill = pattern.get("skill", skill)
 
-        proposal, detail = self._build_proposal(skill, pattern)
-        if proposal is None:
-            return LoopOutcome(skill, "skipped_no_target" if "missing" in detail else "skipped_duplicate", detail)
+        # If target file is missing, try the next-best pattern across ALL skills
+        # (not just this one). This prevents stub skills from blocking the proposal path.
+        tried_keys: set[str] = set()
+        while True:
+            proposal, detail = self._build_proposal(skill, pattern)
+            if proposal is not None:
+                break
+            if "missing" not in detail:
+                return LoopOutcome(skill, "skipped_duplicate", detail)
+            # Target missing — try next-best pattern across all skills
+            tried_keys.add(pattern.get("_key", ""))
+            next_pattern = pick_root_cause(None, exclude_keys=tried_keys)
+            if next_pattern is None:
+                return LoopOutcome(skill, "skipped_no_target", "no skill has a references/troubleshooting.md")
+            pattern = next_pattern
+            skill = pattern.get("skill", skill)
 
         ok, gate_detail = self.gate_fn(self.root)
         if not ok:

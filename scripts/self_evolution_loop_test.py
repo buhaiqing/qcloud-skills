@@ -44,7 +44,7 @@ REPORT = {"upgrade_signal": [SKILL]}
 class SelfEvolutionLoopTest(unittest.TestCase):
     def setUp(self) -> None:
         self._orig_pick = sel.pick_root_cause
-        sel.pick_root_cause = lambda skill: dict(PATTERN)
+        sel.pick_root_cause = lambda skill, **kwargs: dict(PATTERN)
 
     def tearDown(self) -> None:
         sel.pick_root_cause = self._orig_pick
@@ -113,13 +113,28 @@ class SelfEvolutionLoopTest(unittest.TestCase):
             self.assertFalse(called["wf"])
 
     def test_missing_troubleshooting_target_skips(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            loop = sel.SelfEvolutionLoop(
-                root=Path(tmp),  # no skill dir at all
-                gate_fn=lambda root: (True, "ok"),
-            )
-            summary = loop.run(report_override=dict(REPORT))
-            self.assertEqual(summary["outcomes"][0]["status"], "skipped_no_target")
+        # Patch pick_root_cause: first call returns PATTERN (target missing),
+        # second call (exclude_keys populated) returns None → exhausts loop.
+        orig = sel.pick_root_cause
+        exhausted = {"called": False}
+
+        def fake_pick(skill, exclude_keys=None):
+            if exhausted["called"]:
+                return None
+            exhausted["called"] = True
+            return dict(PATTERN)
+
+        try:
+            sel.pick_root_cause = fake_pick
+            with tempfile.TemporaryDirectory() as tmp:
+                loop = sel.SelfEvolutionLoop(
+                    root=Path(tmp),  # no skill dir at all
+                    gate_fn=lambda root: (True, "ok"),
+                )
+                summary = loop.run(report_override=dict(REPORT))
+                self.assertEqual(summary["outcomes"][0]["status"], "skipped_no_target")
+        finally:
+            sel.pick_root_cause = orig
 
     def test_empty_signals_ok(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
