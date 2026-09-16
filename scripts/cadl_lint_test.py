@@ -154,5 +154,66 @@ class RunLintTests(unittest.TestCase):
             self.assertTrue(all(r.get("fixed") for r in report if not r["ok"]))
 
 
+class LintFailurePatternsTests(unittest.TestCase):
+    def test_missing_file_returns_true(self) -> None:
+        ok, msg = cl.lint_failure_patterns(Path("/nonexistent/failure-patterns.md"))
+        self.assertTrue(ok)
+
+    def test_valid_patterns_ok(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "failure-patterns.md"
+            path.write_text(
+                "## 1. CLI Parameter\n\n"
+                "| Skill | Category | Command | Error Pattern | Fix | Count |\n"
+                "| --- | --- | --- | --- | --- | --- |\n"
+                "| qcloud-cvm-ops | cli_parameter | tccli cvm RunInstances | InvalidParameter | Use JSON array | 3 |\n",
+                encoding="utf-8",
+            )
+            ok, msg = cl.lint_failure_patterns(path)
+            self.assertTrue(ok)
+            self.assertIn("validated ok", msg)
+
+    def test_missing_required_field_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "failure-patterns.md"
+            path.write_text(
+                "## 1. CLI Parameter\n\n"
+                "| Skill | Category | Command | Error Pattern | Fix | Count |\n"
+                "| --- | --- | --- | --- | --- | --- |\n"
+                "| qcloud-cvm-ops | cli_parameter | tccli cvm RunInstances | MissingParam | ` ` | 1 |\n",
+                encoding="utf-8",
+            )
+            ok, msg = cl.lint_failure_patterns(path)
+            self.assertFalse(ok)
+            self.assertIn("missing fields", msg)
+
+    def test_count_lt_1_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "failure-patterns.md"
+            path.write_text(
+                "## 1. CLI Parameter\n\n"
+                "| Skill | Category | Command | Error Pattern | Fix | Count |\n"
+                "| --- | --- | --- | --- | --- | --- | --- |\n"
+                "| qcloud-cvm-ops | cli_parameter | tccli cvm RunInstances | InvalidParameter | Use JSON array | 0 |\n",
+                encoding="utf-8",
+            )
+            ok, msg = cl.lint_failure_patterns(path)
+            self.assertFalse(ok)
+            self.assertIn("count=0", msg)
+
+    def test_seed_pattern_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "failure-patterns.md"
+            path.write_text(
+                "## 1. CLI Parameter\n\n"
+                "| Skill | Category | Command | Error Pattern | Fix | Count |\n"
+                "| --- | --- | --- | --- | --- | --- |\n"
+                "| _seed | cli_parameter | | | | 0 |\n",
+                encoding="utf-8",
+            )
+            ok, msg = cl.lint_failure_patterns(path)
+            self.assertTrue(ok)  # _seed row is skipped
+
+
 if __name__ == "__main__":
     unittest.main()

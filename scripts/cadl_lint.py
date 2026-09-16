@@ -23,6 +23,8 @@ import json
 import sys
 from pathlib import Path
 
+from _failure_pattern_store import parse_existing
+
 # The hook phrase. Full-width punctuation and brackets — change in AGENTS.md first.
 CANONICAL_HOOK = (
     "> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」"
@@ -126,6 +128,45 @@ def run_lint(paths: list[Path], fix: bool = False) -> tuple[int, list[dict]]:
     return (1 if failures else 0, report)
 
 
+def lint_failure_patterns(path: Path) -> tuple[bool, str]:
+    """Validate failure-patterns.md row format.
+
+    Returns (ok, message).  Patterns with _seed=true are skipped (generated seeds,
+    not real failures).  Patterns with count < 1 are flagged.
+    """
+    patterns = parse_existing(path)
+    if not patterns:
+        return (True, "no patterns found (ok)")
+
+    REQUIRED = ("category", "skill", "command", "error", "fix", "count")
+    errors: list[str] = []
+
+    for key, pat in patterns.items():
+        skill = pat.get("skill", "")
+        # Skip generated seeds — they are not real failures.
+        if skill.endswith("_seed") or "_seed=true" in skill or pat.get("reusable") is False:
+            continue
+
+        missing = [f for f in REQUIRED if not str(pat.get(f, "")).strip()]
+        if missing:
+            errors.append(
+                f"  {skill!r} row missing fields: {', '.join(missing)}"
+            )
+
+        try:
+            count = int(pat.get("count", 0))
+        except ValueError:
+            count = 0
+        if count < 1:
+            errors.append(f"  {skill!r} has count={count} (must be >= 1 for real failures)")
+
+    if errors:
+        lines = "\n".join(errors)
+        return (False, f"failure-patterns validation failed:\n{lines}")
+    total = len(patterns)
+    return (True, f"{total} pattern(s) validated ok")
+
+
 def _print_report(report: list[dict]) -> None:
     if not report:
         print("(no SKILL.md found)")
@@ -154,7 +195,19 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Lint exactly this skill (matches `<skill>/SKILL.md`).",
     )
+    parser.add_argument(
+        "--check-patterns",
+        action="store_true",
+        help="Validate failure-patterns.md row format (category/skill/command/error/fix/count).",
+    )
     args = parser.parse_args(argv)
+
+    # --check-patterns is orthogonal to skill-file linting.
+    if args.check_patterns:
+        patterns_path = ROOT / "docs" / "failure-patterns.md"
+        ok, msg = lint_failure_patterns(patterns_path)
+        print(f"PATTERNS {msg}")
+        return 0 if ok else 1
 
     if args.skill:
         target = ROOT / args.skill / "SKILL.md"
