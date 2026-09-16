@@ -74,6 +74,10 @@ def check_scenario(scenario: dict, skill_dir: Path) -> list[str]:
         return ["scenario missing 'expected'"]
     fixture_rel = expected.get("fixture")
     if not fixture_rel:
+        # Seed files (generate_golden_seeds.py) have fixture:null by design.
+        # Skip them — they are scaffolding, not regressions.
+        if scenario.get("_seed"):
+            return []  # SKIP
         return ["scenario missing 'expected.fixture'"]
     fixture_path = skill_dir / fixture_rel
     try:

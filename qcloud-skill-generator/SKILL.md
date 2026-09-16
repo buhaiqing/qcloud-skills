@@ -222,7 +222,8 @@ C1-C6 全通过？
 | C4 | Well-Architected | `grep -c "Well-Architected Framework" SKILL.md` | ≥ 1 match | Add Well-Architected Framework table |
 | C5 | Variables | `grep -c "^## Variables" SKILL.md` | ≥ 1 match | Add Variables section with `{{env.*}}`/`{{user.*}}`/`{{output.*}}` |
 | C6 | Token Efficiency | `grep -c "TE-[1-7]" SKILL.md` | ≥ 1 TE rule applied | Apply Token Efficiency rules per [Token Efficiency Requirements](#token-efficiency-requirements-p0) |
-| C7 | **GCL Quality Gate** (when skill is GCL `required`/`recommended`) | `[ -f references/rubric.md ] && [ -f references/prompt-templates.md ] && grep -q "## Quality Gate (GCL)" SKILL.md` | All three checks pass | Scaffold rubric + prompt-templates from `qcloud-cvm-ops/references/{rubric,prompt-templates}.md`; add `## Quality Gate (GCL)` section to SKILL.md per [AGENTS.md §10](../../AGENTS.md#10-generator-critic-loop-gcl--adversarial-quality-gate) |
+| C7 | **GCL Quality Gate** (when skill is GCL `required`/`recommended`) | `[ -f references/rubric.md ] && [ -f references/prompt-templates.md ] && grep -q "## Quality Gate (GCL)" SKILL.md` | All three checks pass | Scaffold rubric + prompt-templates from `qcloud-cvm-ops/references/{rubric,prompt-templates}.md`; add `## Quality Gate (GCL)` section to SKILL.md per [AGENTS.md §10](../../AGENTS.md#10-generator-critic-loop-gcl--adversarialquality-gate) |
+| C8 | **Golden / Trust** | `ls assets/golden/ | grep -c seed_` | ≥ 5 seed files exist after `generate_golden_seeds.py` | After directory scaffold: `python3 scripts/generate_golden_seeds.py`; replace `<REPLACE_WITH_REAL_TCCLI_ACTION_FOR_*>` placeholders with real actions from Step 2; run `sandbox_e2e.py` to verify |
 
 ### Self-Remediation Template (自动修复模板)
 
@@ -563,7 +564,8 @@ qcloud-[product]-ops/
 │   └── idempotency-checklist.md  # When retries/automation required
 ├── assets/
 │   ├── example-config.yaml
-│   └── eval_queries.json         # MANDATORY: trigger accuracy eval queries
+│   ├── eval_queries.json         # MANDATORY: trigger accuracy eval queries
+│   └── golden/                   # Auto-seeded by generate_golden_seeds.py (Step 6)
 ```
 
 Add `references/idempotency-checklist.md` when retries or automation require idempotent behavior.
@@ -621,6 +623,21 @@ Run the [P0/P1 Checklist](#p0--must-pass) below against the generated skill. Run
 4. Re-verify the full checklist
 
 **Re-verify after fixes — do not skip re-runs.**
+
+**Golden seed generation (Trust dimension):**
+After the directory is scaffolded, generate golden regression fixtures:
+```bash
+python3 scripts/generate_golden_seeds.py
+```
+This creates `assets/golden/seed_{list,describe_one,create,update,delete}.json` with
+placeholder actions (`<REPLACE_WITH_REAL_TCCLI_ACTION_FOR_*>`). Authors replace the
+placeholders with real tccli action names from Step 2. Run the golden test to verify:
+```bash
+python3 scripts/sandbox_e2e.py qcloud-[product]-ops
+```
+Seed files with `<REPLACE_WITH...>` placeholders will produce `_SKIP` results (exit 0,
+not a regression) — they are scaffolding, not regressions. Once placeholders are replaced,
+assertions run for real.
 
 ---
 
@@ -792,9 +809,9 @@ tree), not cloud resources.
 ### Why this skill is `optional` (not `required`)
 
 The meta-skill **does not mutate cloud resources**. Its output is a skill
-checked into git. Safety is enforced by the **build-time** Charter C1-C7
+checked into git. Safety is enforced by the **build-time** Charter C1-C8
 self-check + 2-round self-review (already mandatory above) and by the
-**Charter C7 enforcement** that requires generated skills to ship with their
+**Charter C7** GCL quality gate that requires generated skills to ship with their
 own Tier A rubric.md + prompt-templates.md + Quality Gate chapter. The GCL
 loop on this meta-skill is therefore a **double-check**: it verifies that
 the Charter was followed during generation.
@@ -805,7 +822,7 @@ the Charter was followed during generation.
    recovery: replace literal with `{{env.*}}` placeholder
 2. **`current_iter >= max_iterations`** ⇒ return best-so-far + unresolved
    Charter violations in `final.unresolved`
-3. **All Charter C1-C7 checks pass** ⇒ **PASS**
+3. **All Charter C1-C8 checks pass** ⇒ **PASS**
 4. **Otherwise** ⇒ **RETRY** with Critic's `charter_violations` injected
 
 ### Meta-skill-specific safety rules (rubric §4)
