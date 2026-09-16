@@ -127,6 +127,14 @@ class SelfEvolutionLoop:
     def run(self, report_override: dict[str, Any] | None = None) -> dict[str, Any]:
         report = report_override or skill_quality_score.build_report(self.root)
         signals = list((report or {}).get("upgrade_signal") or [])[: self.max_skills]
+        # When upgrade_signal is empty but failure-patterns.md has real patterns,
+        # inject the top pattern's skill so the loop can still act on reflexion data.
+        if not signals:
+            top = pick_root_cause(None)
+            if top:
+                skill_from_pattern = top.get("skill", "")
+                if skill_from_pattern:
+                    signals = [skill_from_pattern]
         outcomes = [self._process_skill(skill) for skill in signals]
         failed = [o for o in outcomes if o.status in ("failed", "gate_failed")]
         return {

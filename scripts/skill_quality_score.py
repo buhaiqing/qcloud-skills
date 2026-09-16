@@ -146,9 +146,17 @@ def _last_scores(trace: dict[str, Any]) -> dict[str, float]:
 
 
 def _by_skill(traces: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Bucket traces by skill, skipping traces with no skill field.
+
+    Internal tool traces (e.g. KPI enforcement, recursive-improvement) do not
+    have a skill field and must not pollute the 'unknown' bucket. Traces with
+    an empty/null skill are similarly excluded.
+    """
     bucket: dict[str, list[dict[str, Any]]] = {}
     for t in traces:
-        skill = t.get("skill", "unknown")
+        skill = t.get("skill")
+        if not skill:  # None or "" — internal/tool trace, skip
+            continue
         bucket.setdefault(skill, []).append(t)
     return bucket
 
@@ -195,7 +203,9 @@ def _drift_summary(traces: list[dict[str, Any]]) -> dict[str, int]:
     """
     result: dict[str, int] = {}
     for t in traces:
-        skill = t.get("skill", "unknown")
+        skill = t.get("skill")
+        if not skill:
+            continue
         scores = _last_scores(t)
         degraded = sum(1 for d in RUBRIC_DIMS if scores.get(d, 1.0) < 0.6)
         result[skill] = result.get(skill, 0) + degraded
@@ -297,7 +307,9 @@ def aggregate_skill_scores(
     by_skill_traces = _by_skill(traces)
     by_skill_evidence: dict[str, list[dict[str, Any]]] = {}
     for r in all_evidence:
-        skill = r.get("skill", "unknown")
+        skill = r.get("skill")
+        if not skill:
+            continue
         by_skill_evidence.setdefault(skill, []).append(r)
 
     skills: dict[str, dict[str, Any]] = {}
