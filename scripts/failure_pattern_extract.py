@@ -604,6 +604,7 @@ def _emit_store(patterns: dict[str, dict[str, Any]]) -> list[str]:
             lines.append(
                 f"| `{skill}` | `{command}` | {error} | {fix} | {count} | {last_seen} | {severity} | {sources} |"
             )
+        lines.append("")  # blank line: without it the next "## " is absorbed into this table
 
     # Usage guidelines (always kept)
     lines.extend([

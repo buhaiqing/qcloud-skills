@@ -835,6 +835,21 @@ class TestLineCapEnforcement(unittest.TestCase):
             "sources must survive a write/read round trip",
         )
 
+    def test_every_section_heading_is_preceded_by_a_blank_line(self) -> None:
+        """A table's last row must not swallow the next "## " section heading."""
+        patterns = self._patterns(1)
+        patterns[("qcloud-skill-9-ops", "cmd9", "err9")] = {
+            **next(iter(patterns.values())),
+            "category": "cli_parameter",
+            "skill": "qcloud-skill-9-ops",
+            "command": "cmd9",
+            "error": "err9",
+        }
+        lines = enforce_line_cap(patterns)
+        for i, line in enumerate(lines):
+            if line.startswith("## "):
+                self.assertEqual(lines[i - 1], "", f"{line!r} is glued to the line above")
+
 
 if __name__ == "__main__":
     unittest.main()
