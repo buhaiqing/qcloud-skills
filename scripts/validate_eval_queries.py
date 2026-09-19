@@ -9,6 +9,14 @@ Per-skill coverage is enforced: at least ``--min-positive`` cases with
 ``should_trigger=true`` and at least ``--min-negative`` with ``false``
 (default 2/2, matching the AGENTS.md 2-round self-review standard).
 
+The owning-skill label contract is enforced too: a positive case declares the
+skill it expects to be routed to, and KPI#7 scores a positive as correct only
+when the router picks the *owning directory*. A positive whose ``expected_skill``
+(or legacy ``skill``) names a sibling would therefore be scored as a router miss
+even when the router delegated correctly — the metric's ground-truth assumption
+made unfalsifiable. Cross-skill delegation is first-class in AGENTS.md, so such
+a case must state itself some other way; here it is an error.
+
 Exit 0 when every skill passes; exit 1 with a per-file error list otherwise.
 
 Usage:
@@ -63,6 +71,15 @@ def _validate_file(path: Path, min_positive: int, min_negative: int) -> list[str
             errors.append(f"{label}: 'should_trigger' must be a boolean (true/false)")
         elif should_trigger:
             positives += 1
+            owner = path.parent.parent.name
+            declared = case.get("expected_skill") or case.get("skill")
+            if declared and declared != owner:
+                errors.append(
+                    f"{label}: positive declares expected_skill={declared!r} but owns"
+                    f" {owner!r}; KPI#7 scores positives against the owning directory"
+                    f" (harness_router.confusion_matrix), so this case would be"
+                    f" counted as a router miss even if delegation is correct"
+                )
         else:
             negatives += 1
 

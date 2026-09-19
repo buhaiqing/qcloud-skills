@@ -49,11 +49,15 @@ python3 scripts/gcl_runner.py --check --request "..." --command "..." \
 ## Verification
 
 ```bash
-python3 scripts/validate_evidence_schema.py audit-results/evidence-*.json audit-results/evidence-local.jsonl
-# expect: "OK: N record(s) valid"
+python3 scripts/validate_evidence_schema.py --min-records 10 --max-age-days 90 audit-results/evidence-*.json*
+# expect: "OK: N record(s) valid, M aged-out (…)" with N >= the floor
 make kpi-gates | grep KPI#1
 # expect: ✅ pass for both KPI#1 and the destructive sub-row
 ```
+
+If the gate reports `no evidence stream` or `0 fresh record(s)` instead, the
+fault is evidence supply, not the token binding — see
+[kpi1 runbook § V4/V5](./kpi1-leak-checked-failure.md) (same gate row).
 
 See also: [spec-drift-gate.md § 2. Source drift](../spec-drift-gate.md#2-source-drift) for
 how this gap was introduced (plan_hash hardcoded to None in the original

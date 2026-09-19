@@ -49,6 +49,13 @@ jobs:
       - name: Lint Python in Markdown code blocks
         run: python3 scripts/check_markdown_python.py --root .
       - name: GCL runner smoke test (structural critic, stubbed tccli)
+        env:
+          # Unique run_id: the smoke record must land in its own
+          # audit-results/evidence-ci-smoke-<run_id>.jsonl file. Without this the
+          # run_id falls back to "local" (scripts/gcl_runner.py) and CI writes the
+          # very stream the KPI#1/#2 safety gate reads — i.e. the gate would audit
+          # a record this same job minted seconds earlier.
+          HARNESS_RUN_ID: ci-smoke-${{ github.run_id }}
         run: |
           set -euo pipefail
           # gcl_runner only executes `tccli`; an `echo ...` command is rejected
@@ -100,11 +107,20 @@ jobs:
         continue-on-error: true
         # NOTE: script outputs to stdout/stderr only; does not block merges
 
-      - name: KPI gates (KPI#1/#2 safety, KPI#3 golden, KPI#7 router accuracy)
+      - name: KPI gates (KPI#3 golden, KPI#7 router accuracy; KPI#1/#2 needs the local evidence stream)
+        env:
+          # KPI#1/#2 is SKIPPED here, deliberately and visibly: audit-results/ is
+          # gitignored, so a CI checkout has no evidence stream and the only
+          # records present would be the smoke-test one above. The gate refuses to
+          # grade a synthetic single record as evidence (that was the round-1
+          # defect) and fails closed instead; GATE_REQUIRE_EVIDENCE=0 is the
+          # documented escape for an evidence-free environment. KPI#1/#2 is
+          # enforced for real on a machine that has run the harness.
+          GATE_REQUIRE_EVIDENCE: "0"
         run: python3 scripts/check_kpi_gates.py
         # NOTE: blocking. Same script the local `make kpi-gates` target runs;
         # thresholded (assets/shared/thresholds.json), so a router-accuracy or
-        # evidence-safety regression fails the build.
+        # golden-coverage regression fails the build.
 
       - name: Compounding-engineering checks
         run: |

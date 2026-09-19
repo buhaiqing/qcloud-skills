@@ -14,11 +14,22 @@ for nullable). Also enforces two KPI safety rules:
   KPI#2: if safety.destructive is true then safety.token must be present (not null).
 
 Exit codes: 0 = all valid, 1 = validation error(s), 2 = usage error.
+
+Freshness and floor (`--max-age-days` / `--min-records`):
+- `--max-age-days N` splits the read records into *fresh* (provenance.captured_at
+  within N days) and *aged-out*. Safety rules still apply to every record read —
+  a destructive op without a token is a violation whenever it happened — but only
+  fresh records are counted as evidence of current behaviour, so a 2019 stream
+  can no longer keep a safety gate green forever.
+- `--min-records N` fails (exit 1) when fewer than N fresh records were read: a
+  present-but-empty stream is a gap in the audit trail, not a clean bill of health.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -99,13 +110,44 @@ def _parse_jsonl(path: str, text: str, errors: list) -> list:
     return records
 
 
+def _captured_at(record: dict) -> datetime | None:
+    """provenance.captured_at as an aware UTC datetime, or None if unusable."""
+    if not isinstance(record, dict):
+        return None
+    value = (record.get("provenance") or {}).get("captured_at")
+    if not isinstance(value, str):
+        return None
+    try:
+        # py311 fromisoformat accepts the trailing "Z" that evidence_kernel writes.
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
+
 def main(argv: list) -> int:
-    if len(argv) < 2:
-        sys.stderr.write("usage: validate_evidence_schema.py <file.json|file.jsonl> [...]\n")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("files", nargs="*", help=".json (record or array) / .jsonl files")
+    parser.add_argument("--max-age-days", type=float, default=None,
+                        help="Count only records captured within N days as evidence")
+    parser.add_argument("--min-records", type=int, default=0,
+                        help="Fail when fewer than N fresh records were read")
+    args = parser.parse_args(argv[1:])
+    if not args.files:
+        sys.stderr.write(
+            "usage: validate_evidence_schema.py [--max-age-days N] [--min-records N]"
+            " <file.json|file.jsonl> [...]\n"
+        )
         return 2
     errors: list = []
-    count = 0
-    for path in argv[1:]:
+    fresh: list = []
+    aged = 0
+    cutoff = (
+        datetime.now(UTC) - timedelta(days=args.max_age_days)
+        if args.max_age_days is not None
+        else None
+    )
+    for path in args.files:
         try:
             text = Path(path).read_text(encoding="utf-8")
         except OSError as exc:
@@ -120,14 +162,34 @@ def main(argv: list) -> int:
                 errors.append(f"{path}: cannot read/parse JSON ({exc})")
                 continue
             records = data if isinstance(data, list) else [data]
-        count += len(records)
         for i, rec in enumerate(records):
             validate_record(rec, i, errors)
+            if cutoff is None:
+                fresh.append(rec)
+                continue
+            ts = _captured_at(rec)
+            if ts is None:
+                # An unprovable timestamp cannot be counted as fresh; refusing it
+                # is the only fail-closed reading (a null captured_at would
+                # otherwise be indefinitely fresh).
+                errors.append(
+                    f"{path}: record[{i}].provenance.captured_at: missing/unparseable,"
+                    f" cannot prove freshness within {args.max_age_days:g} day(s)"
+                )
+            elif ts < cutoff:
+                aged += 1
+            else:
+                fresh.append(rec)
+    if len(fresh) < args.min_records:
+        errors.append(
+            f"only {len(fresh)} fresh record(s) read; --min-records floor is {args.min_records}"
+        )
     if errors:
         for err in errors:
             print(f"FAIL {err}")
         return 1
-    print(f"OK: {count} record(s) valid")
+    suffix = f", {aged} aged-out (>{args.max_age_days:g}d)" if cutoff is not None else ""
+    print(f"OK: {len(fresh)} record(s) valid{suffix}")
     return 0
 
 

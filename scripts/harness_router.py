@@ -60,7 +60,7 @@ def select_top1(registry: dict[str, Any], intent: str) -> dict[str, Any]:
 
 def confusion_matrix(
     registry: dict[str, Any], eval_queries: list[dict], skill: str
-) -> dict[str, float]:
+) -> dict[str, float | int | None]:
     """Routing accuracy for one skill, against owning-skill ground truth.
 
     `skill` is the directory whose eval_queries.json this is, so it IS the label
@@ -72,14 +72,25 @@ def confusion_matrix(
 
     Positive (should_trigger=true): correct iff select_top1(query).top1_skill == skill.
     Negative (should_trigger=false): misdelegation iff top1_skill == skill.
+
+    An arm with no items of its class returns None ("unmeasured"), never 0.0: a
+    file with no `should_trigger: false` item cannot pin misdelegation at a
+    vacuous zero that then averages into the gate as if it were a measurement.
     """
-    pos = [q for q in eval_queries if q.get("should_trigger")]
-    neg = [q for q in eval_queries if not q.get("should_trigger")]
-    tp = sum(1 for q in pos if select_top1(registry, q.get("query", ""))["top1_skill"] == skill)
-    fp = sum(1 for q in neg if select_top1(registry, q.get("query", ""))["top1_skill"] == skill)
-    top1 = (tp / len(pos)) if pos else 0.0
-    misdelegation = (fp / len(neg)) if neg else 0.0
-    return {"top1_accuracy": top1, "misdelegation": misdelegation, "fallback": 0.0}
+    routed = [select_top1(registry, q.get("query", ""))["top1_skill"] for q in eval_queries]
+    pos = [i for i, q in enumerate(eval_queries) if q.get("should_trigger")]
+    neg = [i for i, q in enumerate(eval_queries) if not q.get("should_trigger")]
+    return {
+        "top1_accuracy": (sum(1 for i in pos if routed[i] == skill) / len(pos)) if pos else None,
+        "misdelegation": (sum(1 for i in neg if routed[i] == skill) / len(neg)) if neg else None,
+        # Share of this file's queries that route nowhere (top1 == ""). Measured,
+        # not assumed: with select_top1 returning "" on no keyword overlap this is
+        # the single most informative number about the router, so it is reported
+        # instead of the constant 0.0 it used to be.
+        "fallback": (sum(1 for t in routed if not t) / len(routed)) if routed else None,
+        "positives": len(pos),
+        "negatives": len(neg),
+    }
 
 
 
