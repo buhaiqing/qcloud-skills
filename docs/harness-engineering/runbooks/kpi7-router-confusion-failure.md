@@ -7,11 +7,15 @@
 ```
 ❌ fail | KPI#7 router confusion matrix | missing skill-registry.json; run build_skill_registry --emit first
 ❌ fail | KPI#7 router confusion matrix | no skill produced a confusion matrix (missing eval_queries.json everywhere)
+❌ fail | KPI#7 router confusion matrix | 31/31 skills scored; avg top1=8.90% avg misdelegation=7.85% — below ratchet 10.00%
+❌ fail | KPI#7 router confusion matrix | 31/31 skills scored; avg top1=14.59% avg misdelegation=45.00% — above derived misdelegation bound 30.00%
 ```
 
 Or — when KPI#7 passes but the avg `top1_accuracy` drops sharply vs
-`audit-results/router-confusion.json` history — the gate is a
-no-threshold KPI, so it does not block CI today, but the trend matters.
+`audit-results/router-confusion.json` history — the gate is thresholded
+(`assets/shared/thresholds.json`: ratchet 0.10, target 0.70) and **blocks
+CI**, so a drop below the ratchet fails the build while a drop that stays
+above it is only visible in the detail string and the trend.
 
 ## First diagnosis
 
@@ -63,9 +67,12 @@ make kpi-gates         # re-run gate
 ```bash
 make kpi-gates | grep KPI#7
 # expect: ✅ pass — "<N>/31 skills scored; avg top1=X.XX% avg misdelegation=Y.YY%"
+#         plus "(BELOW TARGET 70.00% — …)" while the router is below target
 diff <(jq -S . audit-results/router-confusion.json) /tmp/last-known.json
 # expect: small delta, not a cliff
 ```
 
 See also: [kpi-pattern.md § Case study](../kpi-pattern.md#case-study-scoring-qcloud-skills-kpis-against-the-8-attributes) for what
-counts as a healthy baseline (today: avg top1=14.72%, misdelegation=2.15%).
+counts as a healthy baseline. Today (measured against owning-skill ground truth,
+not the phantom `intent` key): avg top1=14.59%, misdelegation=7.85% — the ratchet
+is 10.00%, the target 0.70.

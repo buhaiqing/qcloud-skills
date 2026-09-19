@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Validate EvidenceRecord JSON files against docs/evidence-kernel-schema.json.
 
+Accepts `.json` (a single record or an array of records) and `.jsonl` (one
+record per line — the stream scripts/evidence_kernel.py appends to). Reading
+JSONL here is a smaller diff than collecting lines into a temp JSON file in the
+caller, and it keeps the KPI#1/#2 rules in this one authoritative validator.
+
 Stdlib-only minimal draft-07 validation: required fields present, enum values,
 and type checks (string/integer/number/boolean/object/array; type may be a list
 for nullable). Also enforces two KPI safety rules:
@@ -80,27 +85,49 @@ def validate_record(record: dict, idx: int, errors: list) -> None:
         )
 
 
+def _parse_jsonl(path: str, text: str, errors: list) -> list:
+    """One EvidenceRecord per non-blank line. A malformed line is an error, never
+    a silent skip — a gap in the audit stream must fail the gate, not shrink it."""
+    records = []
+    for lineno, line in enumerate(text.splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError as exc:
+            errors.append(f"{path}:{lineno}: cannot parse JSONL line ({exc})")
+    return records
+
+
 def main(argv: list) -> int:
     if len(argv) < 2:
-        sys.stderr.write("usage: validate_evidence_schema.py <file.json> [more.json ...]\n")
+        sys.stderr.write("usage: validate_evidence_schema.py <file.json|file.jsonl> [...]\n")
         return 2
     errors: list = []
     count = 0
     for path in argv[1:]:
         try:
-            data = json.loads(Path(path).read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            errors.append(f"{path}: cannot read/parse JSON ({exc})")
+            text = Path(path).read_text(encoding="utf-8")
+        except OSError as exc:
+            errors.append(f"{path}: cannot read ({exc})")
             continue
-        records = data if isinstance(data, list) else [data]
-        count += 1
+        if path.endswith(".jsonl"):
+            records = _parse_jsonl(path, text, errors)
+        else:
+            try:
+                data = json.loads(text)
+            except json.JSONDecodeError as exc:
+                errors.append(f"{path}: cannot read/parse JSON ({exc})")
+                continue
+            records = data if isinstance(data, list) else [data]
+        count += len(records)
         for i, rec in enumerate(records):
             validate_record(rec, i, errors)
     if errors:
         for err in errors:
             print(f"FAIL {err}")
         return 1
-    print(f"OK: {count} file(s) valid")
+    print(f"OK: {count} record(s) valid")
     return 0
 
 

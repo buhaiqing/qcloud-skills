@@ -100,6 +100,12 @@ jobs:
         continue-on-error: true
         # NOTE: script outputs to stdout/stderr only; does not block merges
 
+      - name: KPI gates (KPI#1/#2 safety, KPI#3 golden, KPI#7 router accuracy)
+        run: python3 scripts/check_kpi_gates.py
+        # NOTE: blocking. Same script the local `make kpi-gates` target runs;
+        # thresholded (assets/shared/thresholds.json), so a router-accuracy or
+        # evidence-safety regression fails the build.
+
       - name: Compounding-engineering checks
         run: |
           set -euo pipefail

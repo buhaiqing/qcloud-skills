@@ -162,6 +162,7 @@ Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` addition
 | L20 | unittest buffer=False: print-capable funcs leak stdout | Wrap with `contextlib.redirect_stdout(io.StringIO())` |
 | L21 | Governance/evaluator fallbacks MUST be deny-by-default | No-match policy rule → `human_approval`, never `auto_confirm`; empty SLO samples → N/A + breach, never 1.0 |
 | L22 | GCL 终轮若仅剩「描述精确化 / L* 引用补齐」类 MAJOR（无新逻辑），可省 Critic，由主 Agent fact-check 替代 | 判据：改动不含控制流/接口/算法 → 省 Critic；主 Agent 用 3-5 条命令复核数字与引用真实性（如 `grep -c '^\| L1 '` 验证引用非幻觉）。实证：2026-09-06 R3 4 MAJOR 全为此类，省一轮 Critic，主 Agent 5 条命令复核 4/4 通过、零幻觉引用 |
+| L24 | 指标读取语料中普遍缺失的字段会退化为常量，而**无阈值的 gate 会把这个常量报成 PASS**（假绿）。实证：KPI#7 读 `q["intent"]`，29/31 语料无该键 → top1 恒为 0.0，gate 却打印 14.72% 并 PASS；按 owning-skill 真值实测仅 10.3%（48/466） | 指标落地前先统计该字段的**存在率**（逐条统计，如 `grep -c`）/ 确认 ground truth 来自语料本身而非可选键；gate 必须带阈值，阈值取自**实测基线**而非估计；低于 target 时即使 pass 也显式打印差距 |
 
 ## Adding or modifying a skill
 

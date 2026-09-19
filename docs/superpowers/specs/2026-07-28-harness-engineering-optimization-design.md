@@ -251,3 +251,12 @@ data in owning skill's `assets/`.
 - Rewriting existing GCL/worktree/CADL rules.
 - Live-cloud execution paths (fixtures only; tccli stays primary for real runs).
 - Per-skill UI/dashboards beyond the maturity report JSON.
+
+## CR `kpi-gate-integrity` — the gate must measure what it claims (2026-09)
+
+Revises Phase 4 KPI#7's metric/threshold and Phase 3's KPI#1/#2 evidence scope only; no router-algorithm change (accuracy work needs embeddings/LLM — YAGNI). Bullets are one line each to respect the ≤15-line note budget.
+- **F1** `confusion_matrix` labels with the **owning skill dir** (`select_top1(query).top1_skill == skill`), not the per-item `intent` key absent from 29/31 `eval_queries.json`; that lookup pinned top1/misdelegation to a structural `0.0` while the gate printed a different (14.72%) quantity and passed. Honest baseline: 14.59% per-skill avg, 12.40% pooled (46/371), 22/31 at 0.0 — 10.3% (48/466) across all 36 skill dirs. `_top1_has_intent` deleted; `eval_queries.json` needs no new field.
+- **F2** `select_top1` returns `""` when the best score is `<= 0` (before: silently the alphabetically-first skill, so `qcloud-agsx-ops` caught every unmatched query); the alphabetical tie-break for positive scores is unchanged.
+- **F3** KPI#7 is now thresholded from `assets/shared/thresholds.json` — `router_min_top1_accuracy` 0.10 (ratchet at the measured baseline) and `router_target_top1_accuracy` 0.70. Fails below the ratchet, above the derived `1 - target` misdelegation budget, or when fewer than half the registry skills yield a measurement; a below-target pass prints the gap instead of a bare ✅.
+- **F4** KPI#1/#2 validate `evidence-*.json` **and** the real `evidence-local.jsonl` stream (550 records measured in 0.08s; the `.json` glob alone enforced 1 of 550). `validate_evidence_schema.py` reads JSONL line-by-line, a malformed line is a fail, and it reports record counts, not file counts.
+- **F5** blocking CI step "KPI gates" in `.github/workflows/validate-skills.yml` (previously no workflow invoked the gate). **F6** +9 unit tests (`harness_router_test`, new `check_kpi_gates_test`). **F7/F8** the drift this CR created or revealed is closed in `kpi-pattern.md`, the KPI#7 runbook and AGENTS.md CADL `L24`.

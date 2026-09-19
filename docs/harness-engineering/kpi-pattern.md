@@ -56,20 +56,40 @@ removed fallback, raised threshold.
 
 ```yaml
 observable:    audit-results/router-confusion.json (per skill)
-threshold:     "no target — observable only"   # see note below
+threshold:     ">=0.10 ratchet (target 0.70)"  # assets/shared/thresholds.json
 source:        scripts/harness_router.py:confusion_matrix
 skip_when:     skill has no assets/eval_queries.json
 aggregation:   kpi-gate-report.json (avg across skills)
 failure_mode:  Improve intent_keywords in qcloud-*-ops/SKILL.md frontmatter
-ci_hook:       make kpi-gates
+               (runbook: runbooks/kpi7-router-confusion-failure.md)
+ci_hook:       make kpi-gates; CI step "KPI gates" in
+               .github/workflows/validate-skills.yml (blocking)
 drift_check:   none — definition is self-evident
 ```
 
-> ⚠️ **Threshold-less KPIs are an open question, not a settled rule.**
-> Writing `"no target"` is one option; some teams prefer to skip the KPI
-> gate entirely until a target exists. The author has not yet seen enough
-> data to recommend one over the other. See
-> [spec-drift-gate.md](./spec-drift-gate.md) for how to detect when an
+**Metric-integrity case study (2026-09):** KPI#7 used to be threshold-less *and*
+its metric was a constant. `harness_router.confusion_matrix` decided correctness
+by looking up `q["intent"]` in the top-1 skill's `intent_keywords`, but only 7 of
+36 `eval_queries.json` files carry an `intent` key — for the other 29 the lookup
+compared `None`, so `top1_accuracy` and `misdelegation` were structurally `0.0`.
+(Same split on the 31-skill executable registry: 29 of 31 files carry none.)
+The gate printed `avg top1=14.72%` (a different, phantom quantity) and returned
+**PASS** with no threshold to cross. Measured honestly against owning-skill
+ground truth the same router scores **10.3% (48/466 positive queries)**, with 26
+skills at 0.0. Same lesson as the KPI#3 drift case study above: *a KPI that
+passes while measuring nothing is worse than no KPI* — the anti-pattern below.
+The metric was rebuilt on owning-skill labels and ratcheted at the measured
+baseline (0.10) with an explicit 0.70 target whose gap is printed on every run.
+
+> ⚠️ **Threshold-less KPIs are settled here: don't ship one.**
+> The "observable only" option was the state this KPI shipped in, and the result
+> was a ✅ that survived months of telling nobody anything — the *KPI that always
+> passes* anti-pattern listed below, reached through the threshold door instead of
+> the drift door. A threshold taken from the **measured baseline** (even a bad
+> one) is strictly better than no threshold: it makes today's number the floor
+> and turns every regression into a failure. If the current value is nowhere near
+> a useful target, ratchet at the baseline *and* print the gap against the target
+> — see [spec-drift-gate.md](./spec-drift-gate.md) for detecting when an
 > "observable only" KPI has silently stopped being useful.
 
 ## Anti-patterns
@@ -93,12 +113,12 @@ that `make kpi-gates` actually enforces today (Sep 2026), the matrix is:
 | Attribute | KPI#1 leak | KPI#2 token | KPI#3 golden | KPI#7 router |
 |-----------|------------|-------------|--------------|--------------|
 | Observable | ✅ | ✅ | ✅ | ✅ |
-| Thresholded | ✅ | ✅ | ✅ | ⚠️ no target |
+| Thresholded | ✅ | ✅ | ✅ | ✅ ratchet 0.10, target 0.70 (gap printed) |
 | Authoritative source | ✅ | ✅ | ✅ | ✅ |
 | Skip-aware | ✅ | ✅ | ✅ | ⚠️ never skips in practice |
 | Aggregatable | ✅ | ✅ | ✅ | ✅ |
 | Failure-mode-defined | ✅ [rb1](./runbooks/kpi1-leak-checked-failure.md) | ✅ [rb2](./runbooks/kpi2-destructive-token-plan-hash-failure.md) | ✅ [rb3](./runbooks/kpi3-golden-coverage-failure.md) | ✅ [rb7](./runbooks/kpi7-router-confusion-failure.md) |
-| CI-hooked | ✅ | ✅ | ✅ | ✅ |
+| CI-hooked | ✅ | ✅ | ✅ | ✅ `make kpi-gates`, **blocking** CI step "KPI gates" in `validate-skills.yml` |
 | Drift-detectable | ⚠️ | ⚠️ | ✅ | ⚠️ |
 
 **Observations:**
@@ -113,9 +133,11 @@ that `make kpi-gates` actually enforces today (Sep 2026), the matrix is:
    recover from a Golden regression.
    *(Resolved 2026-09: see [./runbooks/](./runbooks/) — each KPI now has
    a concrete runbook with file paths, commands, and verification steps.)*
-3. **KPI#7's "no target" is honest.** Better to admit a missing target
-   than to invent one. The threshold-less-KPI note above flags this as
-   an open question.
+3. **KPI#7's ⚠️ rows were real, and are now closed.** The missing target was
+   not a display problem: with no threshold, nothing forced anyone to notice
+   that the metric underneath was a constant (see the metric-integrity case
+   study above). It now ratchets at the measured baseline (0.10) against a 0.70
+   target, and prints the gap while it sits below target.
 4. **Drift detection is uneven.** Only KPI#3 has a working
    drift-detector (the threshold-drift case in
    [spec-drift-gate.md](./spec-drift-gate.md)). The other three could

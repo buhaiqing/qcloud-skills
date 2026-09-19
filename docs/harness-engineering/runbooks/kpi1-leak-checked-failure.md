@@ -56,8 +56,8 @@ grep 'leak_checked.*is not True\|leak_checked.*== True' scripts/validate_evidenc
 ## Verification
 
 ```bash
-python3 scripts/validate_evidence_schema.py audit-results/evidence-*.json
-# expect: "OK: N file(s) valid"
+python3 scripts/validate_evidence_schema.py audit-results/evidence-*.json audit-results/evidence-local.jsonl
+# expect: "OK: N record(s) valid"
 make kpi-gates | grep KPI#1
 # expect: ✅ pass
 ```
