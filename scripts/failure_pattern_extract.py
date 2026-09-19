@@ -3,9 +3,9 @@
 
 Reads ``audit-results/gcl-trace-*.json`` (or ``--input`` paths),
 extracts each trace's ``failure_pattern`` field, deduplicates against
-``docs/failure-patterns.md`` (match by skill + command + error),
-increments count on duplicates, appends new patterns, and enforces the
-200-line cap by pruning count < 3.
+``docs/failure-patterns.md`` (match by skill + command + error), counts the
+distinct traces that reported each pattern, and enforces the 200-line cap by
+dropping the least-recurring rows.
 
 Usage:
   python3 scripts/failure_pattern_extract.py              # update in-place
@@ -24,6 +24,7 @@ import argparse
 import json
 import re
 import sys
+from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -191,42 +192,89 @@ def extract_failure_patterns(traces: list[Path]) -> list[dict[str, Any]]:
     return found
 
 
+def pattern_key(p: dict[str, Any]) -> tuple[str, str, str] | None:
+    """Dedup key (skill, command, error) for a raw failure_pattern.
+
+    Returns None when ``skill`` is empty — such a pattern has no home in the
+    store and every consumer (merge, the R3 gate, prune exemptions) drops it.
+    """
+    skill = (p.get("skill") or "").strip()
+    if not skill:
+        return None
+    return (skill, (p.get("command") or "").strip(), (p.get("error") or "").strip())
+
+
+def source_of(p: dict[str, Any]) -> str:
+    """The GCL run (trace file) that observed a raw failure_pattern.
+
+    ``_source`` is a trace filename, optionally suffixed ``#iter-N`` by
+    ``extract_failure_patterns``. The suffix is dropped: one GCL run is one
+    observation, however many of its iterations reported the same failure.
+    Without that, a single run could manufacture a count on its own.
+    """
+    return (p.get("_source") or "").strip().split("#", 1)[0]
+
+
 def merge(
     existing: dict[str, dict[str, Any]],
     new: list[dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
-    """Merge new patterns into existing. Increment count on duplicate keys."""
+    """Merge new patterns into existing.
+
+    ``count`` is the number of DISTINCT trace sources (``_source``) that have
+    observed the pattern — never the number of times this function ran. A
+    re-scan of the same corpus is therefore a no-op, while a new GCL run
+    reporting the same failure adds exactly 1. Callers that pass patterns
+    without a ``_source`` (programmatic use) keep the legacy per-observation
+    increment.
+    """
     for p in new:
-        raw_skill = p.get("skill") or ""
-        command = (p.get("command") or "").strip()
-        error = (p.get("error") or "").strip()
-        if not raw_skill.strip():
+        key = pattern_key(p)
+        if key is None:
             continue
-        skill = raw_skill.strip()
-        key = (skill, command, error)
+        src = source_of(p)
         now = datetime.now().strftime("%Y-%m")
-        if key in existing:
-            existing[key]["count"] = existing[key].get("count", 0) + 1
-            existing[key]["last_seen"] = now  # P0-C: update on every hit
-        else:
+        entry = existing.get(key)
+        if entry is None:
             existing[key] = {
                 "category": p.get("category", "runtime"),
-                "skill": skill,
-                "command": command,
-                "error": error,
+                "skill": key[0],
+                "command": key[1],
+                "error": key[2],
                 "fix": p.get("fix", "—") or "—",
                 "count": 1,
+                "sources": {src} if src else set(),
                 "reusable": p.get("reusable", True),
                 "first_seen": now,
                 "last_seen": now,  # P0-C
                 "severity": p.get("severity", "minor"),
             }
+            continue
+        sources = entry.setdefault("sources", set())
+        if src:
+            sources.add(src)
+        entry["count"] = len(sources) if sources else entry.get("count", 0) + 1
+        entry["last_seen"] = now  # P0-C: update on every hit
     return existing
 
 
-def prune_low_frequency(patterns: dict[str, dict[str, Any]], min_count: int = 3) -> None:
-    """Remove patterns with count < min_count (in-place)."""
-    dead = [k for k, v in patterns.items() if v.get("count", 0) < min_count]
+def prune_low_frequency(
+    patterns: dict[str, dict[str, Any]],
+    min_count: int = 3,
+    exclude: Iterable[tuple[str, str, str]] = (),
+) -> None:
+    """Remove patterns with count < min_count (in-place).
+
+    ``exclude`` lists keys observed in the current run; they are never pruned,
+    however low their count. A pattern seen now has demonstrably NOT stopped
+    recurring, and retiring it in the same transaction that records it makes
+    ``count`` unable to ever reach ``min_count`` — see docs/reflexion-memory.md §10.
+    """
+    keep = set(exclude)
+    dead = [
+        k for k, v in patterns.items()
+        if v.get("count", 0) < min_count and k not in keep
+    ]
     for k in dead:
         del patterns[k]
 
@@ -489,25 +537,25 @@ def save_layer(
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def enforce_line_cap(patterns: dict[str, dict[str, Any]]) -> list[str]:
-    """Rebuild failure-patterns.md content, enforcing ~200 line cap."""
+def _emit_store(patterns: dict[str, dict[str, Any]]) -> list[str]:
+    """Render the store markdown: header + one table per non-empty category."""
     now = datetime.now().strftime("%Y-%m-%d")
 
     sections = {
         "## 1. CLI Parameter Errors": [
-            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity"
+            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity", "Sources"
         ],
         "## 2. Skill Generation Issues": [
-            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity"
+            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity", "Sources"
         ],
         "## 3. Cross-Skill Composition Failures": [
-            "Skill", "Command", "Error Pattern", "Resolution", "Count", "LastSeen", "Severity"
+            "Skill", "Command", "Error Pattern", "Resolution", "Count", "LastSeen", "Severity", "Sources"
         ],
         "## 4. Runtime Execution Patterns": [
-            "Skill", "Operation", "Error Pattern", "Root Cause", "Count", "LastSeen", "Severity"
+            "Skill", "Operation", "Error Pattern", "Root Cause", "Count", "LastSeen", "Severity", "Sources"
         ],
         "## 5. Token Efficiency Violations": [
-            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity"
+            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity", "Sources"
         ],
     }
 
@@ -531,7 +579,8 @@ def enforce_line_cap(patterns: dict[str, dict[str, Any]]) -> list[str]:
         "> **Purpose**: Structured failure memory extracted from GCL traces and Self-Review records.",
         "> Agents can optionally load this file during Pre-flight to 预防 (prevent) known errors.",
         f"> **Updated**: {now} ({sum(p['count'] for p in patterns.values())} total hits across all patterns).",
-        "> **Token budget**: ≤ 200 lines. When exceeded, prune patterns with count < 3.",
+        f"> **Token budget**: ≤ {MAX_LINES} lines, enforced — when exceeded, the least-recurring rows are dropped.",
+        "> **Count**: distinct GCL runs (traces) that reported the pattern; re-scans do not inflate it.",
         "",
     ]
 
@@ -551,7 +600,10 @@ def enforce_line_cap(patterns: dict[str, dict[str, Any]]) -> list[str]:
             count = p.get("count", 0)
             last_seen = p.get("last_seen", p.get("first_seen", "—")) or "—"  # P0-C
             severity = p.get("severity", "minor") or "minor"  # P0-C
-            lines.append(f"| `{skill}` | `{command}` | {error} | {fix} | {count} | {last_seen} | {severity} |")
+            sources = " ".join(sorted(p.get("sources") or ())) or "—"
+            lines.append(
+                f"| `{skill}` | `{command}` | {error} | {fix} | {count} | {last_seen} | {severity} | {sources} |"
+            )
 
     # Usage guidelines (always kept)
     lines.extend([
@@ -592,6 +644,33 @@ def enforce_line_cap(patterns: dict[str, dict[str, Any]]) -> list[str]:
         "```",
     ])
 
+    return lines
+
+
+def enforce_line_cap(patterns: dict[str, dict[str, Any]]) -> list[str]:
+    """Rebuild failure-patterns.md content, enforcing the MAX_LINES cap.
+
+    AGENTS.md makes "≤ 200 lines" a P0 constraint, so the cap is *applied*
+    rather than warned about: while the rendered file overflows, the least
+    valuable rows (lowest count, then oldest last_seen) are dropped from
+    ``patterns``. ``patterns`` is mutated in place so the caller's own
+    counters (Total patterns / Total hits) describe what was written.
+    """
+    lines = _emit_store(patterns)
+    if len(lines) > MAX_LINES:
+        ranked = sorted(
+            patterns.items(),
+            key=lambda kv: (
+                kv[1].get("count", 0),
+                str(kv[1].get("last_seen") or kv[1].get("first_seen") or ""),
+                str(kv[0]),
+            ),
+        )
+        for key, _entry in ranked:
+            del patterns[key]
+            lines = _emit_store(patterns)
+            if len(lines) <= MAX_LINES:
+                break
     return lines
 
 
@@ -697,21 +776,21 @@ def main() -> int:
         # Legacy single-file storage
         merged = merge(existing.copy(), new_patterns)
         new_count = len(merged) - existing_count
-        prune_low_frequency(merged, min_count=args.min_count)
+        # Same aging policy as reflexion_auto_writer._bulk_update: a pattern
+        # observed in this run is never pruned, however low its count.
+        observed = {k for p in new_patterns if (k := pattern_key(p))}
+        prune_low_frequency(merged, min_count=args.min_count, exclude=observed)
         pruned = existing_count + new_count - len(merged)
+        kept = len(merged)
         lines = enforce_line_cap(merged)
-        if len(lines) > MAX_LINES + 10:
-            print(
-                f"WARN: output {len(lines)} lines exceeds cap ({MAX_LINES}). "
-                f"Consider raising --min-count or archiving older patterns.",
-                file=sys.stderr
-            )
+        dropped = kept - len(merged)
         total_hits = sum(p["count"] for p in merged.values())
         print(
             f"Traces scanned:     {len(trace_paths)}",
             f"New patterns:        {new_count}",
             f"Count increments:    {len(merged) - existing_count - new_count + (existing_count - len([k for k in existing if k in merged]))}",
             f"Pruned (count<{args.min_count}): {pruned}",
+            f"Dropped (cap {MAX_LINES}):   {dropped}",
             f"Total patterns:      {len(merged)}",
             f"Total hits:          {total_hits}",
             f"Output lines:        {len(lines)}",

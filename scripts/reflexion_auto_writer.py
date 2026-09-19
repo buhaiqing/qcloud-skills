@@ -19,8 +19,10 @@ Exit codes:
   0  success (incl. no-op when no failure_pattern in any trace)
   1  no traces / no patterns found
   2  parse error in failure-patterns.md
-  3  self-verify failure (V1-V5 from failure_pattern_extract); or patterns were
-     found in traces but the store ended up empty (see the R3 gate below)
+  3  R3 gate: patterns were found in traces but the store does not hold every
+     one of them (see the gate in _bulk_update). A --dry-run preview never
+     returns 3 — it changes nothing, so it only reports what the next real run
+     would do.
 """
 
 from __future__ import annotations
@@ -41,6 +43,7 @@ from failure_pattern_extract import (
     extract_failure_patterns,
     merge,
     parse_existing,
+    pattern_key,
     prune_low_frequency,
 )
 
@@ -87,10 +90,12 @@ def write_trace(
             try:
                 existing = parse_existing(target)
                 merged = merge(existing.copy(), [fp])
-                # Do NOT prune low-count patterns here — store_failure_pattern()
-                # handles capacity via _prune_by_count + _demote_patterns when the
-                # hot layer exceeds ~150 patterns. A count=1 pattern must survive
-                # its first write so it can be observed and incremented on recurrence.
+                # Two deliberate asymmetries with _bulk_update():
+                #  - no prune here: one trace cannot tell whether a stored pattern
+                #    stopped recurring — only a scan of the whole corpus can;
+                #  - no empty-store gate: this path is allowed to be a no-op.
+                # Both paths enforce the line cap, and both count DISTINCT traces
+                # via merge(), so re-writing the same trace changes nothing.
                 lines = enforce_line_cap(merged)
                 f.seek(0)
                 f.write("\n".join(lines) + "\n")
@@ -116,50 +121,68 @@ def _bulk_update(trace_paths: list[Path], dry_run: bool, min_count: int) -> int:
 
     existing = parse_existing(PATTERNS_FILE)
     existing_count = len(existing)
-    # --min-count is an AGING policy: retire patterns that have stopped
-    # recurring. It must never act as a first-write filter — a pattern observed
-    # for the first time has count == 1, so pruning AFTER the merge deletes it in
-    # the very run that records it (count can then never reach min_count) and the
-    # store is structurally incapable of learning anything. write_trace() carries
-    # the same policy; commit 4e8e77b fixed it there and left this call behind.
-    prune_low_frequency(existing, min_count=min_count)
+    # Every dedup key this run actually observed. --min-count is an AGING
+    # policy: it retires patterns that have STOPPED recurring, so it must never
+    # touch a key the current corpus reports. Pruning an observed key deletes it
+    # in the very run that records it, and count can then never reach min_count
+    # (see docs/reflexion-memory.md §10).
+    observed = {k for p in new_patterns if (k := pattern_key(p))}
+    prune_low_frequency(existing, min_count=min_count, exclude=observed)
     retired = existing_count - len(existing)
     kept_count = len(existing)
     merged = merge(existing, new_patterns)
     new_count = len(merged) - kept_count
+    # R3: a reflexion loop that silently drops what it just read is not a
+    # success. Asserted before the cap, which drops rows deliberately.
+    missing = sorted(observed - set(merged))
+    kept = len(merged)
     lines = enforce_line_cap(merged)
-
-    if len(lines) > MAX_LINES + 10:
-        print(
-            f"WARN: output {len(lines)} lines exceeds cap ({MAX_LINES}). "
-            f"Raise --min-count or archive older patterns.",
-            file=sys.stderr,
-        )
+    dropped = kept - len(merged)
 
     total_hits = sum(p["count"] for p in merged.values())
     print(
         f"Traces scanned:        {len(trace_paths)}",
         f"New patterns:          {new_count}",
         f"Retired (count<{min_count}):  {retired}",
+        f"Dropped (cap {MAX_LINES}):    {dropped}",
         f"Total patterns:        {len(merged)}",
         f"Total hits:            {total_hits}",
         f"Output lines:          {len(lines)}",
         sep="\n",
     )
 
-    # R3: a reflexion loop that stores nothing must not look like success.
-    if not merged:
+    if dry_run:
+        print("\n[dry-run] Would update:", PATTERNS_FILE.relative_to(ROOT))
+        if missing:
+            print(
+                "[dry-run] WARNING: the next real run would drop "
+                f"{len(missing)} observed pattern(s): "
+                + ", ".join(f"{s}:{c}:{e}" for s, c, e in missing[:5]),
+                file=sys.stderr,
+            )
+        elif not merged:
+            print(
+                "[dry-run] WARNING: the next real run would leave the store empty.",
+                file=sys.stderr,
+            )
+        return 0
+
+    if missing:
         print(
-            f"REFLEXION STORE IS EMPTY despite {len(new_patterns)} pattern(s) found in traces "
-            "— check --min-count against pattern recurrence; a first-seen pattern must never be "
-            "pruned. Patterns carrying an empty 'skill' are also dropped by merge().",
+            f"REFLEXION GATE: {len(missing)} pattern(s) found in traces are missing from the "
+            "store: " + ", ".join(f"{s}:{c}:{e}" for s, c, e in missing[:5])
+            + ". merge() must store every pattern with a non-empty 'skill'.",
             file=sys.stderr,
         )
         return 3
 
-    if dry_run:
-        print("\n[dry-run] Would update:", PATTERNS_FILE.relative_to(ROOT))
-        return 0
+    if not merged:
+        print(
+            f"REFLEXION STORE IS EMPTY despite {len(new_patterns)} pattern(s) found in traces "
+            "— every one of them carries an empty 'skill' and is dropped by merge().",
+            file=sys.stderr,
+        )
+        return 3
 
     PATTERNS_FILE.parent.mkdir(parents=True, exist_ok=True)
     PATTERNS_FILE.touch(exist_ok=True)

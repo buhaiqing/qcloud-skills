@@ -53,15 +53,15 @@ Each pattern in `docs/failure-patterns.md` follows this structure:
 | `command` | string | ❌ | The command that failed (for CLI errors) |
 | `error` | string | ✅ | Error message or pattern description |
 | `fix` | string | ✅ | How to fix or prevent this error |
-| `count` | int | ✅ | Frequency count (pruned when < 3) |
+| `count` | int | ✅ | Distinct GCL runs (traces) that reported the pattern; a stored key absent from the current corpus is retired when `count < 3` |
 | `reusable` | bool | ✅ | Whether this pattern is generalizable |
 
 ## 4. Maintenance Rules
 
 | Rule | Description |
 |------|-------------|
-| **Token budget** | `docs/failure-patterns.md` ≤ 200 lines. When exceeded, prune patterns with `count < 3` |
-| **Dedup** | Before adding, check if pattern exists (match by `skill` + `command` + `error`). If exists, increment `count` |
+| **Token budget** | `docs/failure-patterns.md` ≤ 200 lines, enforced by dropping the least-recurring rows |
+| **Dedup** | Before adding, check if pattern exists (match by `skill` + `command` + `error`). If it exists, add this trace to its `sources`; `count` follows the source set (§10) |
 | **Source** | Patterns come from: (1) GCL trace `failure_pattern` field, (2) lessons learned captured after Self-Review Round 1/2 findings |
 | **Review** | Patterns are reviewed monthly. Patterns with `count ≥ 10` are candidates for promotion to Anti-Patterns sections |
 
@@ -128,19 +128,41 @@ Two paths write `docs/failure-patterns.md`: `write_trace()` (single trace, calle
 `gcl_runner.py`) and `_bulk_update()` (the CLI with no `--input` — `make reflexion-update`,
 part of `make all`).
 
-**Invariant: a pattern is never deleted on the run that first records it.** A first
-observation has `count == 1`, so pruning it in that same transaction makes `count` unable
-to ever reach `--min-count` and the store can never accumulate anything. `--min-count` is
-therefore an aging policy only: it retires patterns already in the store that have stopped
-recurring, applied *before* the merge — never to the merged result. A run that finds
-patterns in traces but ends with an empty store exits non-zero instead of reporting that
-as a clean zero-summary.
+**Invariant 1 — a pattern observed in the current run is never pruned in that run.**
+`_bulk_update()` prunes the stored patterns via
+`prune_low_frequency(existing, min_count, exclude=observed)`, where `observed` is the set of
+dedup keys this run found in the traces. A pattern the run just read has demonstrably *not*
+stopped recurring, so retiring it — before or after the merge — would delete it in the very
+transaction that records it and `count` could never reach `--min-count`. `--min-count`
+therefore only retires keys **absent from this run's corpus**.
 
-**Both paths must share this policy.** Commit `4e8e77b` fixed it in `write_trace()` only;
-the identical `prune_low_frequency(merged, ...)` call in `_bulk_update()` survived, so the
-bulk path — the one CI runs — deleted every first-seen pattern.
+**Invariant 2 — `count` is the number of distinct GCL runs that reported the pattern.**
+`merge()` keeps the set of trace names (`_source`) seen per key and sets
+`count = len(sources)`. Re-scanning the same corpus is a byte-for-byte no-op; a new GCL run
+reporting the same failure adds exactly 1. The count is *not* "how often the extractor
+ran", so it must never be produced by incrementing a stored value per occurrence. The
+`Sources` column in the store carries that set; a row written before that column existed
+has none, and the first run over a real corpus replaces its count with the truth — the old
+counts were run-multiplicity fiction.
 
-**Measured (2026-09-19), bulk dry-run over 78 `gcl-trace-*.json` from an empty store:**
-`New patterns: 1 / Pruned: 1 / Total patterns: 0 / Total hits: 0` before;
-`New patterns: 1 / Retired: 0 / Total patterns: 1 / Total hits: 1` after. Regression tests:
-`reflexion_store_test.TestBulkUpdateFirstSeenSurvival`.
+**Invariant 3 — the ≤ 200 line budget is enforced, not warned about.** `enforce_line_cap()`
+drops the least valuable rows (lowest `count`, then oldest `last_seen`) until the rendered
+file fits, so the cap cannot be exceeded and the caller's `Total patterns` / `Total hits`
+describe what was written.
+
+**Invariant 4 — the R3 gate asserts the real loss, not only a total wipeout.** A run that
+found a pattern in the traces but does not hold its key afterwards exits 3 and names the
+missing keys. The "store is empty" case is reported as a secondary branch (it is what an
+all-empty-`skill` corpus produces, since `merge()` drops those). A `--dry-run` never returns
+3: it changes nothing, so it only warns in the future tense about what the next real run
+would do.
+
+**The two paths do NOT share all of this.** `write_trace()` never prunes — one trace cannot
+tell whether a stored pattern stopped recurring — and has no empty-store gate; it is allowed
+to be a no-op. Both paths count distinct traces and both enforce the line cap.
+
+**History.** `4e8e77b` fixed prune-before-first-write in `write_trace()` only; `9bca8fc`
+moved the same call in `_bulk_update()` before the merge but still pruned keys the run had
+just observed, which reset `count` to 1 on every run; and counts accumulated per occurrence,
+so they grew with the number of runs. Regression tests: `reflexion_store_test`
+(`TestBulkUpdateFirstSeenSurvival`, `TestLineCapEnforcement`).

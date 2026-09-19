@@ -2,9 +2,16 @@
 
 > **Purpose**: Structured failure memory extracted from GCL traces and Self-Review records.
 > Agents can optionally load this file during Pre-flight to 预防 (prevent) known errors.
-> **Updated**: 2026-09-07 (0 total hits across all patterns).
-> **Token budget**: ≤ 200 lines. When exceeded, prune patterns with count < 3.
+> **Updated**: 2026-09-19 (2 total hits across all patterns).
+> **Token budget**: ≤ 200 lines, enforced — when exceeded, the least-recurring rows are dropped.
+> **Count**: distinct GCL runs (traces) that reported the pattern; re-scans do not inflate it.
 
+## 4. Runtime Execution Patterns
+
+| Skill | Operation | Error Pattern | Root Cause | Count | LastSeen | Severity | Sources |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `qcloud-cvm-ops` | `echo mock-cvm-output` | correctness=0.00<0.5 | Generator exit_code=-2; fix command or credentials | 1 | 2026-09 | major | gcl-trace-20260831-165139.json |
+| `qcloud-test-ops` | `tccli cvm DescribeInstances` | idempotency=0.00<0.5 | set ClientToken | 1 | 2026-09 | major | gcl-trace-20260919-155113.json |
 
 ## Usage Guidelines
 

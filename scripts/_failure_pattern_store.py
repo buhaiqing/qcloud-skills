@@ -114,6 +114,12 @@ def parse_existing(path: Path) -> dict[str, dict[str, Any]]:
                     row.get("resolution", row.get("rootcause", row.get("root cause", ""))),
                 ).strip(),
                 "count": count,
+                # Distinct GCL runs that reported this pattern (see merge()).
+                # "—" is the emitted placeholder for "no sources recorded".
+                "sources": {
+                    s for s in row.get("sources", "").replace(",", " ").split()
+                    if s and s not in ("—", "-")
+                },
                 "reusable": row.get("reusable", "true").strip().lower() == "true",
                 "first_seen": row.get("first_seen", ""),
                 "last_seen": row.get("lastseen", row.get("first_seen", "")),

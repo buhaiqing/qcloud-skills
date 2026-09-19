@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import json
 import re
@@ -12,7 +13,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from failure_pattern_extract import parse_existing
+from failure_pattern_extract import enforce_line_cap, parse_existing
 from reflexion_store import (
     MAX_LINES,
     normalize_reflexion_key,
@@ -441,11 +442,13 @@ class TestBulkUpdateFirstSeenSurvival(unittest.TestCase):
         )
         return path
 
-    def _bulk(self, trace_paths: list[Path], min_count: int = 3) -> tuple[int, str, str]:
+    def _bulk(
+        self, trace_paths: list[Path], min_count: int = 3, dry_run: bool = False
+    ) -> tuple[int, str, str]:
         """Run the bulk path under stdout/stderr capture. Returns (rc, out, err)."""
         out, err = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            rc = self.raw._bulk_update(trace_paths, dry_run=False, min_count=min_count)
+            rc = self.raw._bulk_update(trace_paths, dry_run=dry_run, min_count=min_count)
         return rc, out.getvalue(), err.getvalue()
 
     @staticmethod
@@ -494,17 +497,23 @@ class TestBulkUpdateFirstSeenSurvival(unittest.TestCase):
     # -- the aging policy --min-count must keep ---------------------------
 
     def test_preexisting_count1_pattern_is_retired(self) -> None:
-        """--min-count still ages out a stored pattern that stopped recurring."""
-        first = self._trace(
+        """--min-count ages out only what stopped recurring — asserted differentially.
+
+        An `assertNotIn` alone holds even when everything is deleted, so the same
+        run must also show a recurring pattern surviving with its count intact.
+        """
+        stale = self._trace(
             "gcl-trace-a.json", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter"
         )
-        self.assertEqual(self._bulk([first])[0], 0)
-        # Second run scans a different trace only → the count=1 pattern above has
-        # not recurred and must be aged out.
-        second = self._trace(
+        first_hit = self._trace(
             "gcl-trace-b.json", "qcloud-redis-ops", "DescribeInstances", "ResourceNotFound"
         )
-        rc, _out, _err = self._bulk([second])
+        second_hit = self._trace(
+            "gcl-trace-c.json", "qcloud-redis-ops", "DescribeInstances", "ResourceNotFound"
+        )
+        self.assertEqual(self._bulk([stale, first_hit])[0], 0)
+        # Run 2 re-scans only the recurrence → the stale pattern is unobserved.
+        rc, _out, _err = self._bulk([second_hit])
         self.assertEqual(rc, 0)
 
         patterns = parse_existing(self.patterns_file)
@@ -513,7 +522,9 @@ class TestBulkUpdateFirstSeenSurvival(unittest.TestCase):
             patterns,
             "a stored count=1 pattern that did not recur must be retired",
         )
-        self.assertIn(("qcloud-redis-ops", "DescribeInstances", "ResourceNotFound"), patterns)
+        key = ("qcloud-redis-ops", "DescribeInstances", "ResourceNotFound")
+        self.assertIn(key, patterns, "a pattern the run still observes must survive")
+        self.assertEqual(patterns[key]["count"], 2, "surviving count must not be reset")
         self.assertEqual(len(patterns), 1)
 
     def test_min_count_1_retires_nothing(self) -> None:
@@ -600,6 +611,154 @@ class TestBulkUpdateFirstSeenSurvival(unittest.TestCase):
         self.assertEqual(rc, 1, "pre-existing contract: 1 = no patterns found")
         self.assertNotIn("REFLEXION STORE IS EMPTY", err)
 
+    # -- counting is a function of the corpus, not of the run count --------
+
+    def test_cross_run_accumulation_is_not_a_first_write_filter(self) -> None:
+        """A failure recurring in a LATER run must raise the count, never reset it.
+
+        R2's fix moved the prune before the merge, which stopped deleting the
+        pattern before it was written — but still deleted it on the next run and
+        re-created it at count 1, so --min-count stayed a first-write filter
+        delayed by one run and the count could never reach it.
+        """
+        key = ("qcloud-cvm-ops", "TerminateInstances", "MissingParameter")
+        first = self._trace(
+            "gcl-trace-a.json", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter"
+        )
+        second = self._trace(
+            "gcl-trace-b.json", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter"
+        )
+        for expected, trace in enumerate((first, second), start=1):
+            rc, _out, err = self._bulk([trace])
+            self.assertEqual(rc, 0, err)
+            self.assertEqual(
+                parse_existing(self.patterns_file)[key]["count"],
+                expected,
+                "--min-count must not delete a pattern the run just observed",
+            )
+
+        before = hashlib.sha256(self.patterns_file.read_bytes()).hexdigest()
+        rc, _out, err = self._bulk([second])
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(
+            hashlib.sha256(self.patterns_file.read_bytes()).hexdigest(),
+            before,
+            "re-processing the same corpus must be a byte-for-byte no-op",
+        )
+
+    def test_three_runs_over_one_corpus_are_idempotent(self) -> None:
+        """Counts track the corpus; running the extractor again must add nothing."""
+        traces = [
+            self._trace(
+                f"gcl-trace-{n}.json", "qcloud-redis-ops", "DescribeInstances", "ResourceNotFound"
+            )
+            for n in ("a", "b", "c")
+        ]
+        digests, hits = set(), set()
+        for _ in range(3):
+            rc, out, err = self._bulk(traces)
+            self.assertEqual(rc, 0, err)
+            digests.add(hashlib.sha256(self.patterns_file.read_bytes()).hexdigest())
+            hits.add(self._reported(out)["Total hits"])
+
+        self.assertEqual(len(digests), 1, "the store must not change on a re-run")
+        self.assertEqual(hits, {3}, "Total hits must be the corpus hit count, not runs x hits")
+
+    def test_pre_upgrade_counts_are_replaced_by_the_true_count(self) -> None:
+        """Counts written before the sources column existed were run-multiplicity
+        fiction; the first run over a real corpus replaces them with the truth."""
+        self.patterns_file.write_text(
+            "## 4. Runtime Execution Patterns\n\n"
+            "| Skill | Operation | Error Pattern | Root Cause | Count | LastSeen | Severity |\n"
+            "| --- | --- | --- | --- | --- | --- | --- |\n"
+            "| `qcloud-cvm-ops` | `TerminateInstances` | MissingParameter | fix | 9 | 2026-09 | major |\n",
+            encoding="utf-8",
+        )
+        trace = self._trace(
+            "gcl-trace-a.json", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter"
+        )
+        rc, _out, err = self._bulk([trace])
+        self.assertEqual(rc, 0, err)
+
+        patterns = parse_existing(self.patterns_file)
+        self.assertEqual(
+            patterns[("qcloud-cvm-ops", "TerminateInstances", "MissingParameter")]["count"],
+            1,
+            "one trace observed the pattern, so the count is 1 regardless of what was stored",
+        )
+
+    def test_write_trace_counts_each_trace_once(self) -> None:
+        """The single-trace path must be idempotent per trace file too."""
+        trace = {
+            "final": {
+                "failure_pattern": {
+                    "category": "runtime",
+                    "skill": "qcloud-redis-ops",
+                    "command": "DescribeInstances",
+                    "error": "Resource not found",
+                    "fix": "Check resource ID",
+                }
+            }
+        }
+        source = self.tmp / "gcl-trace-a.json"
+        source.write_text("{}", encoding="utf-8")
+        for _ in range(3):
+            self.assertTrue(
+                self.raw.write_trace(trace, trace_path=source, patterns_path=self.patterns_file)
+            )
+
+        patterns = parse_existing(self.patterns_file)
+        self.assertEqual(
+            patterns[("qcloud-redis-ops", "DescribeInstances", "Resource not found")]["count"],
+            1,
+            "writing the same trace three times is one observation, not three",
+        )
+
+    # -- R3: the gate asserts the real invariant --------------------------
+
+    def test_gate_names_an_observed_pattern_merge_dropped(self) -> None:
+        """A PARTIAL loss must fail by name, not pass because others survived."""
+        dropped = self._trace(
+            "gcl-trace-a.json", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter"
+        )
+        kept = self._trace(
+            "gcl-trace-b.json", "qcloud-redis-ops", "DescribeInstances", "ResourceNotFound"
+        )
+        real_merge = self.raw.merge
+        self.raw.merge = lambda existing, new: real_merge(
+            existing, [p for p in new if p.get("skill") != "qcloud-cvm-ops"]
+        )
+        try:
+            rc, out, err = self._bulk([dropped, kept])
+        finally:
+            self.raw.merge = real_merge
+
+        self.assertEqual(rc, 3, "losing an observed pattern must not look like success")
+        self.assertIn("qcloud-cvm-ops:TerminateInstances:MissingParameter", err)
+        self.assertEqual(self._reported(out)["Total patterns"], 1)
+
+    def test_dry_run_reports_instead_of_failing(self) -> None:
+        """--dry-run writes nothing, so it must not return the gate code."""
+        unmergeable = self.tmp / "gcl-trace-unmergeable.json"
+        unmergeable.write_text(
+            json.dumps({
+                "final": {
+                    "failure_pattern": {
+                        "category": "runtime",
+                        "skill": "",
+                        "command": "TerminateInstances",
+                        "error": "MissingParameter",
+                    }
+                }
+            }),
+            encoding="utf-8",
+        )
+        rc, out, err = self._bulk([unmergeable], dry_run=True)
+        self.assertEqual(rc, 0, "a read-only preview must not fail")
+        self.assertIn("[dry-run] Would update:", out)
+        self.assertIn("would leave the store empty", err)
+        self.assertFalse(self.patterns_file.exists(), "a dry run must not create the store")
+
     # -- CLI wiring --------------------------------------------------------
 
     def test_cli_min_count_flag_reaches_bulk_update(self) -> None:
@@ -619,6 +778,62 @@ class TestBulkUpdateFirstSeenSurvival(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("Retired (count<1):  0", out.getvalue())
         self.assertEqual(len(parse_existing(self.patterns_file)), 1)
+
+
+class TestLineCapEnforcement(unittest.TestCase):
+    """AGENTS.md makes "≤200 lines" a P0 constraint: it must be applied, not warned."""
+
+    @staticmethod
+    def _patterns(n: int) -> dict[tuple[str, str, str], dict]:
+        """n distinct patterns, count 1..n, all in one category."""
+        return {
+            (f"qcloud-skill-{i}-ops", f"cmd{i}", f"err{i}"): {
+                "category": "runtime",
+                "skill": f"qcloud-skill-{i}-ops",
+                "command": f"cmd{i}",
+                "error": f"err{i}",
+                "fix": "fix it",
+                "count": i + 1,
+                "last_seen": "2026-09",
+                "sources": {"gcl-trace-x.json"},
+            }
+            for i in range(n)
+        }
+
+    def test_cap_is_enforced_by_dropping_the_least_recurring_rows(self) -> None:
+        patterns = self._patterns(200)
+        lines = enforce_line_cap(patterns)
+
+        self.assertLessEqual(len(lines), MAX_LINES, "the emitted store must fit the cap")
+        self.assertGreater(len(lines), MAX_LINES - 10, "the cap must be filled, not emptied")
+        kept = sorted(p["count"] for p in patterns.values())
+        self.assertLess(len(kept), 200, "rows must actually have been dropped")
+        self.assertEqual(
+            kept,
+            list(range(200 - len(kept) + 1, 201)),
+            "the dropped rows must be the least recurring ones",
+        )
+
+    def test_small_store_is_untouched(self) -> None:
+        patterns = self._patterns(3)
+        lines = enforce_line_cap(patterns)
+        self.assertEqual(len(patterns), 3, "nothing may be dropped below the cap")
+        self.assertLessEqual(len(lines), MAX_LINES)
+
+    def test_sources_column_round_trips(self) -> None:
+        patterns = self._patterns(2)
+        lines = enforce_line_cap(patterns)
+        self.assertTrue(any("| Sources |" in ln for ln in lines), "the column must be emitted")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "failure-patterns.md"
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            reloaded = parse_existing(path)
+        self.assertEqual(
+            reloaded[("qcloud-skill-0-ops", "cmd0", "err0")]["sources"],
+            {"gcl-trace-x.json"},
+            "sources must survive a write/read round trip",
+        )
 
 
 if __name__ == "__main__":
