@@ -121,3 +121,26 @@ Known failure patterns for this skill:
 ## 9. Changelog
 
 Reflexion changes are tracked in the unified runtime-quality changelog in `docs/gcl-spec.md` §12.
+
+## 10. Write-Path Invariants (`--min-count` is an aging policy)
+
+Two paths write `docs/failure-patterns.md`: `write_trace()` (single trace, called by
+`gcl_runner.py`) and `_bulk_update()` (the CLI with no `--input` — `make reflexion-update`,
+part of `make all`).
+
+**Invariant: a pattern is never deleted on the run that first records it.** A first
+observation has `count == 1`, so pruning it in that same transaction makes `count` unable
+to ever reach `--min-count` and the store can never accumulate anything. `--min-count` is
+therefore an aging policy only: it retires patterns already in the store that have stopped
+recurring, applied *before* the merge — never to the merged result. A run that finds
+patterns in traces but ends with an empty store exits non-zero instead of reporting that
+as a clean zero-summary.
+
+**Both paths must share this policy.** Commit `4e8e77b` fixed it in `write_trace()` only;
+the identical `prune_low_frequency(merged, ...)` call in `_bulk_update()` survived, so the
+bulk path — the one CI runs — deleted every first-seen pattern.
+
+**Measured (2026-09-19), bulk dry-run over 78 `gcl-trace-*.json` from an empty store:**
+`New patterns: 1 / Pruned: 1 / Total patterns: 0 / Total hits: 0` before;
+`New patterns: 1 / Retired: 0 / Total patterns: 1 / Total hits: 1` after. Regression tests:
+`reflexion_store_test.TestBulkUpdateFirstSeenSurvival`.

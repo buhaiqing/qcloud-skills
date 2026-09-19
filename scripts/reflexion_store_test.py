@@ -3,10 +3,16 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
+import json
+import re
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
+from failure_pattern_extract import parse_existing
 from reflexion_store import (
     MAX_LINES,
     normalize_reflexion_key,
@@ -379,6 +385,240 @@ class TestDemotionIntegration(unittest.TestCase):
             rs._COLD_PATH = orig_cold
 
 
+
+
+class TestBulkUpdateFirstSeenSurvival(unittest.TestCase):
+    """R2: the BULK CLI path (_bulk_update) must not filter first-seen patterns.
+
+    Commit 4e8e77b fixed prune-before-first-write in write_trace() only. The
+    identical call in _bulk_update() kept deleting count=1 patterns on the run
+    that first observed them, so with --min-count 3 (the default) no pattern
+    could ever reach count 3 and the store was permanently empty. Measured on
+    the real corpus: 78 traces → "New patterns: 1 / Pruned: 1 / Total: 0".
+
+    These tests drive _bulk_update() directly with PATTERNS_FILE/ROOT redirected
+    into a tmp dir — the repo's real docs/failure-patterns.md is never touched.
+    """
+
+    def setUp(self) -> None:
+        import reflexion_auto_writer as raw
+
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.tmp = Path(self.temp_dir.name)
+        self.patterns_file = self.tmp / "failure-patterns.md"
+        self.raw = raw
+        self._orig_root = raw.ROOT
+        self._orig_patterns_file = raw.PATTERNS_FILE
+        # _bulk_update prints PATTERNS_FILE.relative_to(ROOT) → both must point
+        # at the same tmp dir, or the summary raise ValueError.
+        raw.ROOT = self.tmp
+        raw.PATTERNS_FILE = self.patterns_file
+
+    def tearDown(self) -> None:
+        self.raw.ROOT = self._orig_root
+        self.raw.PATTERNS_FILE = self._orig_patterns_file
+        self.temp_dir.cleanup()
+
+    # -- helpers ----------------------------------------------------------
+
+    def _trace(self, name: str, skill: str, command: str, error: str) -> Path:
+        """Write a GCL-shaped trace whose final block carries a failure_pattern."""
+        path = self.tmp / name
+        path.write_text(
+            json.dumps({
+                "final": {
+                    "failure_pattern": {
+                        "category": "runtime",
+                        "skill": skill,
+                        "command": command,
+                        "error": error,
+                        "fix": "fix it",
+                        "reusable": True,
+                    }
+                }
+            }),
+            encoding="utf-8",
+        )
+        return path
+
+    def _bulk(self, trace_paths: list[Path], min_count: int = 3) -> tuple[int, str, str]:
+        """Run the bulk path under stdout/stderr capture. Returns (rc, out, err)."""
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = self.raw._bulk_update(trace_paths, dry_run=False, min_count=min_count)
+        return rc, out.getvalue(), err.getvalue()
+
+    @staticmethod
+    def _reported(out: str) -> dict[str, int]:
+        """Parse the printed summary counters into real ints."""
+        return {
+            label: int(value)
+            for label, value in re.findall(
+                r"(New patterns|Total patterns|Total hits):\s+(\d+)", out
+            )
+        }
+
+    # -- first-seen survival ----------------------------------------------
+
+    def test_first_seen_pattern_survives_bulk_run(self) -> None:
+        """A first-ever failure_pattern must be present with count == 1 after a bulk run."""
+        trace = self._trace(
+            "gcl-trace-a.json", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter"
+        )
+        rc, _out, err = self._bulk([trace])
+        self.assertEqual(rc, 0, f"clean bulk run must exit 0 (stderr: {err})")
+
+        patterns = parse_existing(self.patterns_file)
+        self.assertEqual(len(patterns), 1, "first-seen count=1 pattern must survive the bulk run")
+        self.assertEqual(
+            patterns[("qcloud-cvm-ops", "TerminateInstances", "MissingParameter")]["count"],
+            1,
+        )
+
+    def test_same_pattern_in_two_traces_counts_two(self) -> None:
+        """Recurrence across two traces accumulates instead of being pruned."""
+        traces = [
+            self._trace("gcl-trace-a.json", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter"),
+            self._trace("gcl-trace-b.json", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter"),
+        ]
+        rc, _out, _err = self._bulk(traces)
+        self.assertEqual(rc, 0)
+
+        patterns = parse_existing(self.patterns_file)
+        self.assertEqual(len(patterns), 1)
+        self.assertEqual(
+            patterns[("qcloud-cvm-ops", "TerminateInstances", "MissingParameter")]["count"],
+            2,
+        )
+
+    # -- the aging policy --min-count must keep ---------------------------
+
+    def test_preexisting_count1_pattern_is_retired(self) -> None:
+        """--min-count still ages out a stored pattern that stopped recurring."""
+        first = self._trace(
+            "gcl-trace-a.json", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter"
+        )
+        self.assertEqual(self._bulk([first])[0], 0)
+        # Second run scans a different trace only → the count=1 pattern above has
+        # not recurred and must be aged out.
+        second = self._trace(
+            "gcl-trace-b.json", "qcloud-redis-ops", "DescribeInstances", "ResourceNotFound"
+        )
+        rc, _out, _err = self._bulk([second])
+        self.assertEqual(rc, 0)
+
+        patterns = parse_existing(self.patterns_file)
+        self.assertNotIn(
+            ("qcloud-cvm-ops", "TerminateInstances", "MissingParameter"),
+            patterns,
+            "a stored count=1 pattern that did not recur must be retired",
+        )
+        self.assertIn(("qcloud-redis-ops", "DescribeInstances", "ResourceNotFound"), patterns)
+        self.assertEqual(len(patterns), 1)
+
+    def test_min_count_1_retires_nothing(self) -> None:
+        """--min-count 1 disables aging entirely: nothing may be retired."""
+        first = self._trace(
+            "gcl-trace-a.json", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter"
+        )
+        self.assertEqual(self._bulk([first])[0], 0)
+        second = self._trace(
+            "gcl-trace-b.json", "qcloud-redis-ops", "DescribeInstances", "ResourceNotFound"
+        )
+        rc, out, _err = self._bulk([second], min_count=1)
+        self.assertEqual(rc, 0)
+        self.assertIn("Retired (count<1):  0", out)
+
+        patterns = parse_existing(self.patterns_file)
+        self.assertEqual(len(patterns), 2, "min-count=1 must retire nothing")
+        self.assertEqual(
+            patterns[("qcloud-cvm-ops", "TerminateInstances", "MissingParameter")]["count"],
+            1,
+        )
+
+    # -- reported numbers must equal the real file -------------------------
+
+    def test_reported_counts_match_file_contents(self) -> None:
+        """Summary counters must equal the counts actually written to the store."""
+        traces = [
+            self._trace("gcl-trace-a.json", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter"),
+            self._trace("gcl-trace-b.json", "qcloud-redis-ops", "DescribeInstances", "ResourceNotFound"),
+            self._trace("gcl-trace-c.json", "qcloud-redis-ops", "DescribeInstances", "ResourceNotFound"),
+        ]
+        rc, out, _err = self._bulk(traces)
+        self.assertEqual(rc, 0)
+
+        patterns = parse_existing(self.patterns_file)
+        reported = self._reported(out)
+        self.assertEqual(reported["New patterns"], 2)
+        self.assertEqual(reported["Total patterns"], 2)
+        self.assertEqual(reported["Total hits"], 3)
+        # populated values, not just key presence (AGENTS.md L5)
+        self.assertEqual(reported["Total patterns"], len(patterns))
+        self.assertEqual(reported["Total hits"], sum(p["count"] for p in patterns.values()))
+        self.assertEqual(sorted(p["count"] for p in patterns.values()), [1, 2])
+
+    # -- R3: the empty-store gate -----------------------------------------
+
+    def test_empty_store_gate_fires(self) -> None:
+        """Patterns found in traces but 0 stored must be loud and non-zero."""
+        unmergeable = self.tmp / "gcl-trace-unmergeable.json"
+        unmergeable.write_text(
+            json.dumps({
+                "final": {
+                    "failure_pattern": {
+                        "category": "runtime",
+                        "skill": "",  # dropped by merge() → nothing can be stored
+                        "command": "TerminateInstances",
+                        "error": "MissingParameter",
+                    }
+                }
+            }),
+            encoding="utf-8",
+        )
+        rc, out, err = self._bulk([unmergeable])
+        self.assertNotEqual(rc, 0, "empty store despite patterns found must not look like success")
+        self.assertIn("REFLEXION STORE IS EMPTY", err)
+        self.assertIn("Total patterns:        0", out)
+        self.assertEqual(parse_existing(self.patterns_file), {})
+
+    def test_empty_store_gate_silent_on_clean_run(self) -> None:
+        """A run that does store a pattern stays silent and exits 0."""
+        trace = self._trace(
+            "gcl-trace-a.json", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter"
+        )
+        rc, out, err = self._bulk([trace])
+        self.assertEqual(rc, 0)
+        self.assertNotIn("REFLEXION STORE IS EMPTY", err)
+        self.assertEqual(self._reported(out)["Total patterns"], 1)
+
+    def test_gate_silent_when_no_patterns_in_traces(self) -> None:
+        """Genuinely-nothing-to-do: no failure_pattern anywhere → no empty-store alarm."""
+        trace = self.tmp / "gcl-trace-clean.json"
+        trace.write_text(json.dumps({"final": {"status": "ok"}}), encoding="utf-8")
+        rc, _out, err = self._bulk([trace])
+        self.assertEqual(rc, 1, "pre-existing contract: 1 = no patterns found")
+        self.assertNotIn("REFLEXION STORE IS EMPTY", err)
+
+    # -- CLI wiring --------------------------------------------------------
+
+    def test_cli_min_count_flag_reaches_bulk_update(self) -> None:
+        """main() must forward --min-count into the bulk path."""
+        trace = self._trace(
+            "gcl-trace-a.json", "qcloud-cvm-ops", "TerminateInstances", "MissingParameter"
+        )
+        original_argv = sys.argv
+        sys.argv = ["reflexion_auto_writer.py", "--input", str(trace), "--min-count", "1"]
+        try:
+            out, err = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                rc = self.raw.main()
+        finally:
+            sys.argv = original_argv
+
+        self.assertEqual(rc, 0)
+        self.assertIn("Retired (count<1):  0", out.getvalue())
+        self.assertEqual(len(parse_existing(self.patterns_file)), 1)
 
 
 if __name__ == "__main__":

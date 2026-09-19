@@ -19,7 +19,8 @@ Exit codes:
   0  success (incl. no-op when no failure_pattern in any trace)
   1  no traces / no patterns found
   2  parse error in failure-patterns.md
-  3  self-verify failure (V1-V5 from failure_pattern_extract)
+  3  self-verify failure (V1-V5 from failure_pattern_extract); or patterns were
+     found in traces but the store ended up empty (see the R3 gate below)
 """
 
 from __future__ import annotations
@@ -115,10 +116,17 @@ def _bulk_update(trace_paths: list[Path], dry_run: bool, min_count: int) -> int:
 
     existing = parse_existing(PATTERNS_FILE)
     existing_count = len(existing)
-    merged = merge(existing.copy(), new_patterns)
-    new_count = len(merged) - existing_count
-    prune_low_frequency(merged, min_count=min_count)
-    pruned = existing_count + new_count - len(merged)
+    # --min-count is an AGING policy: retire patterns that have stopped
+    # recurring. It must never act as a first-write filter — a pattern observed
+    # for the first time has count == 1, so pruning AFTER the merge deletes it in
+    # the very run that records it (count can then never reach min_count) and the
+    # store is structurally incapable of learning anything. write_trace() carries
+    # the same policy; commit 4e8e77b fixed it there and left this call behind.
+    prune_low_frequency(existing, min_count=min_count)
+    retired = existing_count - len(existing)
+    kept_count = len(existing)
+    merged = merge(existing, new_patterns)
+    new_count = len(merged) - kept_count
     lines = enforce_line_cap(merged)
 
     if len(lines) > MAX_LINES + 10:
@@ -132,12 +140,22 @@ def _bulk_update(trace_paths: list[Path], dry_run: bool, min_count: int) -> int:
     print(
         f"Traces scanned:        {len(trace_paths)}",
         f"New patterns:          {new_count}",
-        f"Pruned (count<{min_count}):  {pruned}",
+        f"Retired (count<{min_count}):  {retired}",
         f"Total patterns:        {len(merged)}",
         f"Total hits:            {total_hits}",
         f"Output lines:          {len(lines)}",
         sep="\n",
     )
+
+    # R3: a reflexion loop that stores nothing must not look like success.
+    if not merged:
+        print(
+            f"REFLEXION STORE IS EMPTY despite {len(new_patterns)} pattern(s) found in traces "
+            "— check --min-count against pattern recurrence; a first-seen pattern must never be "
+            "pruned. Patterns carrying an empty 'skill' are also dropped by merge().",
+            file=sys.stderr,
+        )
+        return 3
 
     if dry_run:
         print("\n[dry-run] Would update:", PATTERNS_FILE.relative_to(ROOT))
@@ -168,7 +186,10 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="Print diff, no write")
     parser.add_argument(
         "--min-count", type=int, default=3,
-        help="Prune patterns with count below this threshold (default: 3)",
+        help=(
+            "Aging policy: retire stored patterns whose count stayed below this "
+            "threshold. Never filters a pattern first observed in this run (default: 3)"
+        ),
     )
     parser.add_argument("--json", action="store_true", help="Emit machine-readable summary")
     args = parser.parse_args()
