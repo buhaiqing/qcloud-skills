@@ -23,8 +23,11 @@ from typing import Any
 
 import requests
 
+from _failure_pattern_store import HOT_PATH
+
 ROOT = Path(__file__).resolve().parents[1]
-FAILURE_PATTERNS_PATH = ROOT / "docs" / "failure-patterns.md"
+# Declared once, in _failure_pattern_store; every writer of the store reads it.
+FAILURE_PATTERNS_PATH = HOT_PATH
 TRACES_DIR = ROOT / ".runtime" / "traces"
 
 

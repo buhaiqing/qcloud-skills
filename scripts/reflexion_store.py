@@ -13,12 +13,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-# Import from failure_pattern_extract for parsing existing patterns
+from _failure_pattern_store import HOT_LIMIT, HOT_PATH
 from failure_pattern_extract import enforce_line_cap, parse_existing
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_STORE_PATH = ROOT / "docs" / "failure-patterns.md"
-MAX_LINES = 200
+# Store path and cap are declared once, in _failure_pattern_store (the cap comes
+# from assets/shared/thresholds.json). These names stay public here.
+DEFAULT_STORE_PATH = HOT_PATH
+MAX_LINES = HOT_LIMIT
 
 
 def normalize_reflexion_key(
@@ -85,9 +87,8 @@ def _prune_by_count(
 # ---------------------------------------------------------------------------
 # Layer demotion (hot → warm → cold)
 # ---------------------------------------------------------------------------
-_HOT_LIMIT = 200
 _WARM_LIMIT = 500
-_HOT_PATH = ROOT / "docs" / "failure-patterns.md"
+_HOT_PATH = HOT_PATH
 _WARM_PATH = ROOT / "docs" / "failure-patterns-warm.md"
 _COLD_PATH = ROOT / "docs" / "failure-patterns-cold.md"
 

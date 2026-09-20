@@ -23,7 +23,7 @@ import json
 import sys
 from pathlib import Path
 
-from _failure_pattern_store import parse_existing
+from _failure_pattern_store import HOT_PATH, parse_existing
 
 # The hook phrase. Full-width punctuation and brackets — change in AGENTS.md first.
 CANONICAL_HOOK = (
@@ -35,6 +35,9 @@ CANONICAL_HOOK = (
 META_SKILL_DIR = "qcloud-skill-generator"
 
 ROOT = Path(__file__).resolve().parents[1]
+AGENTS_MD = ROOT / "AGENTS.md"
+# Shared thresholds (TE-4): the AGENTS.md line cap is declared there, not here.
+THRESHOLDS = ROOT / "assets" / "shared" / "thresholds.json"
 
 
 def _last_nonblank_line(text: str) -> str:
@@ -167,6 +170,48 @@ def lint_failure_patterns(path: Path) -> tuple[bool, str]:
     return (True, f"{total} pattern(s) validated ok")
 
 
+def lint_agents_md_budget(
+    agents_md: Path = AGENTS_MD,
+    thresholds: Path = THRESHOLDS,
+) -> tuple[bool, str]:
+    """Enforce the root AGENTS.md line budget.
+
+    AGENTS.md is loaded into every session, so its length is a cost paid on every
+    task; the cap is declared in assets/shared/thresholds.json
+    (`agents_md_max_lines`, AGENTS.md §进度文档维护规范) and enforced here.
+
+    Returns (ok, message). Unusable configuration is a *failure*, not a skip:
+    an unreadable threshold must never read as "within budget".
+    """
+    try:
+        lines = len(agents_md.read_text(encoding="utf-8").splitlines())
+    except (OSError, UnicodeDecodeError) as exc:
+        return (False, f"AGENTS BUDGET FAILED — {agents_md}: cannot read ({exc})")
+
+    try:
+        max_lines = json.loads(thresholds.read_text(encoding="utf-8"))["agents_md_max_lines"]
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        return (
+            False,
+            f"AGENTS BUDGET FAILED — {thresholds}: cannot read "
+            f"agents_md_max_lines ({exc})",
+        )
+    if isinstance(max_lines, bool) or not isinstance(max_lines, int):
+        return (
+            False,
+            f"AGENTS BUDGET FAILED — {thresholds}: agents_md_max_lines must be an "
+            f"int, got {max_lines!r}",
+        )
+
+    if lines > max_lines:
+        return (
+            False,
+            f"AGENTS BUDGET FAILED — {agents_md.name} is {lines} lines "
+            f"(max {max_lines}); move detail to the linked docs",
+        )
+    return (True, f"AGENTS BUDGET ok ({lines}/{max_lines} lines)")
+
+
 def _print_report(report: list[dict]) -> None:
     if not report:
         print("(no SKILL.md found)")
@@ -204,8 +249,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # --check-patterns is orthogonal to skill-file linting.
     if args.check_patterns:
-        patterns_path = ROOT / "docs" / "failure-patterns.md"
-        ok, msg = lint_failure_patterns(patterns_path)
+        ok, msg = lint_failure_patterns(HOT_PATH)
         print(f"PATTERNS {msg}")
         return 0 if ok else 1
 
@@ -219,9 +263,19 @@ def main(argv: list[str] | None = None) -> int:
         paths = iter_skill_files(ROOT)
 
     exit_code, report = run_lint(paths, fix=args.fix)
+
+    # Default path: also enforce the AGENTS.md line budget. It is a gate, not
+    # context — a repo that outgrows its budget fails the lint.
+    budget: dict | None = None
+    if args.skill is None:
+        budget_ok, budget_msg = lint_agents_md_budget()
+        budget = {"ok": budget_ok, "message": budget_msg}
+        if not budget_ok:
+            exit_code = 1
+
     if args.json:
         print(json.dumps(
-            {"ok": exit_code == 0, "fix": args.fix, "skills": report},
+            {"ok": exit_code == 0, "fix": args.fix, "agents_md_budget": budget, "skills": report},
             ensure_ascii=False,
             indent=2,
         ))
@@ -230,6 +284,8 @@ def main(argv: list[str] | None = None) -> int:
         verb = "FIX  REPORT" if args.fix else "LINT REPORT"
         print(f"CADL {verb} — {len(report)} skill(s) scanned, {failed} failing")
         _print_report(report)
+        if budget is not None:
+            print(budget["message"])
     return exit_code
 
 

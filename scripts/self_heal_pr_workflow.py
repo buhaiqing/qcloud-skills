@@ -19,6 +19,8 @@ from pathlib import Path
 
 import requests
 
+from _failure_pattern_store import HOT_PATH
+
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
@@ -53,8 +55,7 @@ class PRWorkflowResult:
 # Helpers
 # ---------------------------------------------------------------------------
 
-_ROOT = Path(__file__).resolve().parents[1]
-_FAILURE_PATTERNS_PATH = _ROOT / "docs" / "failure-patterns.md"
+_FAILURE_PATTERNS_PATH = HOT_PATH
 
 
 def _repo_info(repo_path: str = ".") -> tuple[str, str]:

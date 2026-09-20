@@ -26,7 +26,18 @@ jobs:
           version: 0.11.8
           args: check --output-format=github .
 
-      - name: Validate SKILL.md frontmatter
+      - name: Validate SKILL.md frontmatter (full corpus)
+        run: python3 scripts/validate_skills_frontmatter.py
+        # NOTE: `--git-diff` runs ONLY the version-bump gate — main() returns
+        # before the field checks — so wiring that mode alone left the required
+        # fields unguarded in CI: a SKILL.md with `environment:` deleted and its
+        # version bumped passed this job (reproduced 2026-09-20). This step is
+        # the field gate; the next one is the bump gate. Both are needed.
+        # The fire/silent proof for this mode lives in
+        # scripts/validate_skills_frontmatter_test.py (committed fixtures under
+        # scripts/fixtures/frontmatter/), so it runs in CI and locally alike.
+
+      - name: Validate SKILL.md version bumps (diff scope)
         run: >-
           python3 scripts/validate_skills_frontmatter.py
           --git-diff ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || 'origin/main' }}
@@ -76,9 +87,26 @@ jobs:
             --structural-critic-only
           python3 scripts/gcl_trace_aggregate.py --since-hours 168
 
-      - name: Script unit tests
-        run: |
-          cd scripts && python3 -m unittest discover -p "*_test.py" -v
+      - name: Install pytest (pinned to the local runner version)
+        run: python3 -m pip install --disable-pip-version-check "pytest==7.4.4"
+
+      - name: Script unit tests (pytest — collects both naming conventions)
+        run: python3 -m pytest scripts -q
+        # NOTE: the previous runner, `unittest discover -p "*_test.py"`, silently
+        # skipped 292 of the 981 tests: 274 lived in `test_*.py` files (unittest's
+        # own default pattern is `test*.py`, which the explicit -p overrode) and
+        # ~18 more were pytest-style tests inside correctly-named files that
+        # unittest cannot execute at all. pytest collects both patterns and both
+        # styles, so the runner — not the file name — decides what executes.
+
+      - name: Test collection floor (no orphan test files)
+        run: python3 scripts/check_test_collection.py
+        # NOTE: pytest exits non-zero when it collects nothing, which covers a
+        # total collapse. This gate covers the partial case — a stray
+        # conftest/pyproject deselecting most of the suite, or a new test file
+        # named outside both patterns — by asserting the collected count against
+        # assets/shared/thresholds.json:tests_min_collected and by requiring
+        # every test file to appear in pytest's collected node ids.
 
       - name: GCL alarm wire plan (no mutations)
         run: |
@@ -149,11 +177,28 @@ jobs:
         # NOTE: blocking. Same script the local `make kpi-gates` target runs;
         # thresholded (assets/shared/thresholds.json), so a router-accuracy,
         # golden-coverage or registry-shrink regression fails the build.
-        # Blocking is a property of this step, NOT of the workflow run: this is
-        # step 16 of 17 named steps, and Actions aborts the job at the first
-        # non-`continue-on-error` failure, so a red earlier step silently skips
-        # this one. A green workflow therefore means "nothing upstream was red",
-        # not "the KPI gate passed" — read the step list, not the run badge.
+        # Blocking is a property of this step, NOT of the workflow run: it is not
+        # the first blocking step in the job, and Actions aborts the job at the
+        # first non-`continue-on-error` failure, so a red earlier step silently
+        # skips this one. A green workflow therefore means "nothing upstream was
+        # red", not "the KPI gate passed" — read the step list, not the run badge.
+        # (This note used to pin "step 16 of 17"; the number drifted the moment a
+        # step was added, which is the drift this repo keeps re-learning.)
+
+      - name: Gate wiring (both ends of every contract)
+        run: python3 scripts/check_gate_wiring.py
+        # NOTE: asserts the seams this repo keeps losing: a script that calls
+        # itself a CI gate must have an automation caller; every `gates:` entry in
+        # assets/shared/validation_commands.yaml must exist and be wired; every
+        # thresholds.json key must have a consumer; the reflexion store path must
+        # be declared in exactly one module. Each rule was proven to fire and to
+        # stay silent in scripts/check_gate_wiring_test.py.
+
+      - name: Error table structure
+        run: python3 scripts/validate_error_tables.py
+        # NOTE: this script's docstring called itself a "CI gate" while no
+        # workflow, Makefile or pre-commit hook referenced it — a false
+        # guarantee. It is now wired here and in `make error-tables`.
 
       - name: Compounding-engineering checks
         run: |

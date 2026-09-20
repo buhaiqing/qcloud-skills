@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -15,11 +16,43 @@ ROOT = Path(__file__).resolve().parents[1]
 HOT_PATH = ROOT / "docs" / "failure-patterns.md"
 WARM_PATH = ROOT / "docs" / "failure-patterns-warm.md"
 COLD_PATH = ROOT / "docs" / "failure-patterns-cold.md"
-HOT_LIMIT = 200
 WARM_LIMIT = 500
 COLD_LIMIT = 2000
 SILENCE_THRESHOLD_DAYS = 30
 COLD_THRESHOLD_DAYS = 90
+
+# Shared thresholds (TE-4): the hot layer's line budget is declared once, in
+# assets/shared/thresholds.json, and read here — not restated by every module
+# that writes the store.
+_THRESHOLDS_PATH = ROOT / "assets" / "shared" / "thresholds.json"
+_FALLBACK_HOT_LIMIT = 200
+
+
+def _reflexion_max_lines() -> int:
+    """`reflexion_max_lines` from the shared thresholds, else fallback + warning.
+
+    Never raises: an unreadable or malformed thresholds file must not stop a
+    caller from storing a pattern — the store matters more than the config that
+    sizes it. The fallback is the historical 200-line cap.
+    """
+    def fallback(reason: str) -> int:
+        print(
+            f"warning: {_THRESHOLDS_PATH}: {reason}; using "
+            f"reflexion_max_lines={_FALLBACK_HOT_LIMIT}",
+            file=sys.stderr,
+        )
+        return _FALLBACK_HOT_LIMIT
+
+    try:
+        raw = json.loads(_THRESHOLDS_PATH.read_text(encoding="utf-8"))["reflexion_max_lines"]
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        return fallback(f"cannot read ({exc})")
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        return fallback(f"reflexion_max_lines must be an int, got {raw!r}")
+    return raw
+
+
+HOT_LIMIT = _reflexion_max_lines()
 
 # ---------------------------------------------------------------------------
 # Markdown table parsing (shared logic)

@@ -1,4 +1,4 @@
-.PHONY: validate registry golden kpi kpi-gates manifest all reflexion-update replay-smoke l4-gate compounding-checks routing-check
+.PHONY: validate registry golden kpi kpi-gates manifest all reflexion-update replay-smoke l4-gate compounding-checks routing-check tests test-collection gate-wiring error-tables
 
 routing-check:
 	@echo "=== Blueprint routing decision self-check ==="
@@ -10,6 +10,24 @@ routing-check:
 
 validate:
 	python3 scripts/validate_local.py
+
+tests:
+	python3 -m pytest scripts -q
+
+# Asserts the collected-test count against assets/shared/thresholds.json
+# (tests_min_collected) and that no test file is invisible to the runner.
+test-collection:
+	python3 scripts/check_test_collection.py
+
+# Asserts both ends of every harness contract: self-declared CI gates are wired,
+# every `gates:` entry in assets/shared/validation_commands.yaml exists and is
+# wired, every thresholds.json key has a consumer, and the reflexion store path
+# is declared once.
+gate-wiring:
+	python3 scripts/check_gate_wiring.py
+
+error-tables:
+	python3 scripts/validate_error_tables.py
 
 compounding-checks:
 	python3 scripts/check_spec_file_refs.py
@@ -50,5 +68,5 @@ replay-smoke:
 l4-gate:
 	python3 scripts/l4_metrics_tracker.py --gate --min-traces 5
 
-all: validate registry golden kpi kpi-gates manifest reflexion-update
+all: validate tests test-collection gate-wiring error-tables registry golden kpi kpi-gates manifest reflexion-update
 	@echo "Harness Evidence gates passed"

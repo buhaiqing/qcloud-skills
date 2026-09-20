@@ -10,7 +10,7 @@ Collection of Tencent Cloud AI Agent skills (OpenSpec) for ops runbooks. Each sk
 qcloud-skills/
   scripts/                     # Shared executables: validate_*, gcl_runner, gcl_trace_aggregate
   audit-results/               # Runtime output (gitignored)
-  qcloud-[product]-ops/        # 34 skill directories
+  qcloud-[product]-ops/        # 31 skill directories
     SKILL.md                   # YAML frontmatter + Markdown runbook
     assets/
       eval_queries.json        # Intent classification test set
@@ -125,7 +125,10 @@ Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` addition
   - `validate_gcl` — GCL rubric/prompt/Quality Gate
   - `validate_cadl` — CADL hook compliance
   - `validate_python` — Python files (ruff)
-  - `script_tests` — Script unit tests
+  - `script_tests` — Script unit tests (**pytest**, pinned 7.4.4 in CI). It collects both `test_*.py` and `*_test.py`; the retired `unittest discover -p "*_test.py"` silently skipped 292 of 981 tests.
+  - `test_collection` — Collected-test floor (`thresholds.json:tests_min_collected`) + no orphan test files
+  - `gate_wiring` — Both ends of every contract (dead gates / manifest / single-declaration seams)
+  - `error_tables` — Error-table structure per skill
   - `validate_links` / `validate_markdown_python` — Markdown specs/links/Python blocks
   - `gcl_smoke` + `gcl_trace_aggregate` — GCL smoke + trace aggregation
   - `skill_quality_score` — Skill quality score / upgrade signal
@@ -165,6 +168,7 @@ Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` addition
 | L24 | 指标读取语料中普遍缺失的字段会退化为常量，而**无阈值的 gate 会把这个常量报成 PASS**（假绿）。实证：KPI#7 读 `q["intent"]`，29/36 语料无该键（注册表 31 个 skill 口径为 24/31）→ top1 恒为 0.0，gate 却打印 14.72% 并 PASS；按 owning-skill 真值实测仅 9.87%（46/466，口径为全部 36 个 skill 目录） | 指标落地前先统计该字段的**存在率**（逐条统计，如 `grep -c`）/ 确认 ground truth 来自语料本身而非可选键；gate 必须带阈值，阈值取自**实测基线**而非估计；低于 target 时即使 pass 也显式打印差距 |
 | L25 | **每个契约都有两端（生产者↔消费者、声明↔接线、规范↔实现），而不校验接缝时两端必然漂移，且漂移不可见。** 实证：一次审计中 10 个缺陷**全部是同一个缺陷**——`evidence_kernel` 写 `.jsonl` 而 gate glob `.json`；`Makefile` 定义 9 个门禁而无一 workflow 调用 `make`；`validate_error_tables.py` 自称 "CI gate" 却零接线；14 个测试叫 `test_*.py` 而 discover 用 `-p "*_test.py"`（静默排除 257 个测试）；AGENTS.md 写 "≥10 错误码" 而 validator 只查结构不查数量 | ① **修复必须打在构建实际执行的那条路径上**：`4e8e77b` 正确诊断了 bug 却只修了 `write_trace()`，而 `make all` 走的 `_bulk_update()` 原封不动——为修好的路径写了测试并通过，构建执行的那条仍在删光一切。改前先确认「谁真正调用这个函数」。② **主观保证不是证据**：两轮修复均在「测试全绿」状态下带着 BLOCKER，唯一有效证据是**把修复 revert 掉并证明测试会失败**。③ 新门禁必须同时证明「会开火」与「会静默」（见 L6），并落一个「门禁接线」检查器，否则第 4 条同类漂移必然出现 |
 | L26 | **验证 CI「已修复」必须用 CI 自己的工具版本、且从第 1 步开始。** 实证：CI 第 1 步 ruff pin `0.11.8` 报 **99** 个错误，而本机 ruff `0.16.1` 报 **0** —— 因为 `ruff.toml` 没写 `select`，各版本套用各自的默认规则集（0.16.x 默认不再选 E4/E7；实测 `--select E402` 仍能检出）。据此误判「已修复」两次：一次从 **step 81** 起验证（跳过 step 1），一次用错版本。**升级 pin 到本机版本是被否决的方案 —— 那会静默丢掉 E4/E7 全部覆盖。** 正确修法：显式写 `select` 把覆盖范围钉死，再有理由地 `ignore` 具体规则 | ① 改 CI 前先读 workflow 的**第 1 步**是什么、pin 了什么版本；② 用 `uvx <tool>@<pinned-version>` 复现 CI 环境，不要用本机版本；③ 验证时**从第 1 步往下走**，不要从你刚改的那一步开始 —— 后者会得出「链路已通」的假结论（本会话实际发生）；④ 工具版本与配置不匹配时，先问「是代码错了还是检查器的默认集变了」，优先钉住配置而非升级版本 |
+| L27 | **「跑绿了」不等于「跑到了」；测试运行器与文件命名是两个必须对齐的契约。** 实证：`unittest discover -p "*_test.py"` 与 `test_*.py` 命名不匹配 → **292/981（30%）测试从未执行**（274 个在 `test_*.py`；另有 ~18 个是正确命名文件内的 pytest 风格测试，unittest 根本不能跑）；同一批测试用 pytest 收集即 981 全绿。修法：换用能同时收集两种模式/两种风格的运行器（pytest，CI pin 7.4.4），并把收集数写成棘轮 `thresholds.json:tests_min_collected`；门禁 `check_test_collection.py` 另断言「每个测试文件都出现在收集到的 node id 中」 | ① 换运行器前先统计「命名模式 × 测试风格」二维矩阵，别假设默认模式覆盖你的命名；② 新增门禁的判据必须排除它自己的测试文件 —— `check_gate_wiring` W3b 首版把 checker 自身测试（fixture 内构造同名字面量）判成违规，自我误报；③ 火侧证明放进测试（`validate_skills_frontmatter_test.py::CommittedFixtureFireTests`），不要放进 CI 的 shell 片段 —— 同一证明写两遍就是漂移的起点；④ 断言按**名字**取不要按下标：`steps[7].argv` 在插入一步后必红，产出的是噪音不是信号 |
 
 ## Adding or modifying a skill
 
@@ -174,7 +178,7 @@ Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` addition
 
 ## Files that do NOT exist
 
-- No repo-root `assets/` directory.
+- No repo-root `assets/` directory **other than** `assets/shared/` (tracked shared constants: `thresholds.json`, `validation_commands.yaml`, `destructive_verbs.json`, `skill_budgets.json`, `tcloud_*.json`).
 - No repo-root `package.json` or non-stdlib test runner (except listed scripts in `scripts/` and `.github/workflows/validate-skills.yml`). A repo-root `Makefile` exists as the harness convergence entry point (validate/registry/golden/kpi/manifest/all) — it is NOT a repo build system.
 - No agent-specific config files (e.g. `CLAUDE.md`, `opencode.json`, `.cursorrules`, and similar per-agent artifacts).
 - Agent runtime state dirs (e.g. `.omc/`, `.omo/`, `.codebuddy/`, and similar) are gitignored.

@@ -42,11 +42,14 @@ from _failure_pattern_store import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-PATTERNS_FILE = ROOT / "docs" / "failure-patterns.md"
+# The store path and its line cap are declared once, in _failure_pattern_store
+# (which reads the cap from assets/shared/thresholds.json). These aliases keep
+# the public names this module's callers import.
+PATTERNS_FILE = HOT_PATH
 AUDIT_DIR = ROOT / "audit-results"
 
 CATEGORIES = ("cli_parameter", "skill_generation", "cross_skill", "runtime", "token_efficiency")
-MAX_LINES = 200
+MAX_LINES = HOT_LIMIT
 
 # Error category taxonomy for cross-skill aggregation
 ERROR_CATEGORIES = (
@@ -731,6 +734,11 @@ def _display(path: Path, root: Path) -> Path:
 # ---------------------------------------------------------------------------
 
 def main() -> int:
+    """Update docs/failure-patterns.md (PATTERNS_FILE) from the GCL trace corpus.
+
+    Keeps the writer list in docs/reflexion-memory.md §10 honest: this function
+    writes the store, so it names it.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--input", nargs="*", help="Trace file(s) or glob under --root")

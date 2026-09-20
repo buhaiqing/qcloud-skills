@@ -14,12 +14,13 @@ license = {text = "MIT"}
 [tool.setuptools.packages.find]
 where = ["."]
 
-[tool.ruff]
-target-version = "py311"
-line-length = 100
-
-[tool.ruff.lint]
-select = ["ALL"]
+# No [tool.ruff] section on purpose: this subtree inherits the root ruff.toml,
+# whose explicit `select` is the repo's enforceable rule set. The previous
+# `select = ["ALL"]` here was only *partly* in effect (critic-M2, 2026-09-20) and
+# made the tree's lint result depend on the installed ruff version: ruff 0.16.x
+# enables PLR0917 (which 0.11.8, the CI pin, does not know), so `ruff check .`
+# was red locally while CI stayed green — killing `validate_local` at step 0.
+# Making the intent explicit is the fix the prior audit asked for.
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
