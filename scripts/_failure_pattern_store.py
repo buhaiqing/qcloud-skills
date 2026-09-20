@@ -37,22 +37,37 @@ _SECTION_CAT: dict[str, str] = {
 }
 
 
-# Characters that are significant to the pipe-table format. A backslash only
-# escapes one of these, so ordinary backslashes in trace text pass through.
-_ESCAPABLE = "\\|`"
+# The characters a backslash may escape, mapped to the letter that stands for
+# them after that backslash. Every other backslash in trace text is a literal,
+# so file paths survive. ``\n``/``\r`` are in the table because
+# ``parse_existing`` reads the file line by line: a raw newline used to split
+# the row, and the pattern vanished from the store while the writer still
+# reported success.
+_ESCAPES: dict[str, str] = {"\\": "\\", "|": "|", "`": "`", "\n": "n", "\r": "r"}
+# Inverse of _ESCAPES, keyed by the character after the backslash.
+_UNESCAPES: dict[str, str] = {letter: ch for ch, letter in _ESCAPES.items()}
+# Characters that can legally follow a backslash: what _parse_table_row must
+# keep glued together so an escaped pipe is not mistaken for a delimiter.
+_ESCAPABLE = "".join(_UNESCAPES)
 
 
 def escape_cell(text: Any) -> str:
     """Encode a value so it survives one write/read cycle of a pipe table.
 
     Inverse of ``unescape_cell``. A raw ``|`` splits the row (shifting every
-    later column into the wrong header), and a raw backtick flips the parser's
-    backtick state, which defeats the pipe check for the rest of the row. Trace
-    text reaches these cells verbatim — ``command`` is the executed shell
-    command, so pipelines and quoted params are ordinary — hence escaping
-    rather than assuming the payload is tame.
+    later column into the wrong header), a raw backtick flips the parser's
+    backtick state, which defeats the pipe check for the rest of the row, and a
+    raw newline ends the row outright. Trace text reaches these cells verbatim —
+    ``command`` is the executed shell command, ``error`` is a raw exception
+    string — hence escaping rather than assuming the payload is tame.
+
+    Backslashes are doubled first, so a later replacement's own backslashes are
+    never re-escaped.
     """
-    return str(text).replace("\\", "\\\\").replace("|", "\\|").replace("`", "\\`")
+    out = str(text)
+    for ch, letter in _ESCAPES.items():
+        out = out.replace(ch, "\\" + letter)
+    return out
 
 
 def unescape_cell(text: str) -> str:
@@ -60,8 +75,8 @@ def unescape_cell(text: str) -> str:
     out: list[str] = []
     i = 0
     while i < len(text):
-        if text[i] == "\\" and i + 1 < len(text) and text[i + 1] in _ESCAPABLE:
-            out.append(text[i + 1])
+        if text[i] == "\\" and i + 1 < len(text) and text[i + 1] in _UNESCAPES:
+            out.append(_UNESCAPES[text[i + 1]])
             i += 2
         else:
             out.append(text[i])
@@ -69,12 +84,33 @@ def unescape_cell(text: str) -> str:
     return "".join(out)
 
 
+def _decode_cell(cell: str) -> str:
+    """Turn one raw table cell into the value that was written.
+
+    One *balanced* backtick wrapper is dropped before unescaping, never after.
+    ``escape_cell`` guarantees no unescaped backtick appears in the payload, so
+    a cell that both starts and ends with one can only be a wrapper: the check
+    cannot eat a value's own trailing backtick. Doing it in the other order (the
+    previous shape, ``strip("`")`` on still-escaped text) removed that trailing
+    backtick and orphaned its escape, silently rewriting ``error`` — part of the
+    dedup key — so the same failure re-keyed as a new row on every scan.
+
+    Leading/trailing whitespace is stripped, which makes the dedup key
+    whitespace-normalised: ``' lead '`` and ``'lead'`` are one pattern, and
+    ``merge``/``pattern_key`` strip the same way.
+    """
+    text = cell.strip()
+    if len(text) >= 2 and text[0] == "`" and text[-1] == "`":
+        text = text[1:-1]
+    return unescape_cell(text).strip()
+
+
 def _parse_table_row(line: str) -> list[str]:
     """Split a markdown table row into its inner cells.
 
     Pipes are honoured only outside backticks, backticks and pipes can be
     escaped, and the empty cells produced by the row's own leading/trailing
-    ``|`` are dropped. Every returned cell is already unescaped, so callers see
+    ``|`` are dropped. Every returned cell is already decoded, so callers see
     the value that was written.
     """
     cells, current = [], ""
@@ -96,7 +132,7 @@ def _parse_table_row(line: str) -> list[str]:
         current += ch
         i += 1
     cells.append(current)
-    return [unescape_cell(c.strip().strip("`")) for c in cells[1:-1]]
+    return [_decode_cell(c) for c in cells[1:-1]]
 
 
 def _parse_sources(cell: str) -> set[str]:

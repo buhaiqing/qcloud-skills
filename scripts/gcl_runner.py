@@ -724,11 +724,14 @@ def _post_persist_reflexion(root: Path, trace: dict[str, Any], path: Path) -> No
 
     The destination is derived from ``root``, not from the reflexion module's
     repo-global PATTERNS_FILE: a run against a temp root (tests, dry-runs) must
-    not mutate the committed, agent-facing store. ``path`` is the trace path and
-    is positional second — see write_trace's signature.
+    not mutate the committed, agent-facing store. ``write_trace`` has no
+    destination default, so this is the only way in — see its signature.
+    ``path`` is the trace path and is positional second.
     """
     try:
-        _reflexion_write_trace(trace, path, root / "docs" / "failure-patterns.md")
+        _reflexion_write_trace(
+            trace, path, patterns_path=root / "docs" / "failure-patterns.md"
+        )
     except Exception:  # noqa: BLE001, S110 - reflexion must never break GCL
         pass
 

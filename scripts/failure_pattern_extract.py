@@ -15,7 +15,6 @@ Usage:
 Exit codes:
   0  success
   1  no traces / no patterns found
-  2  parse error in failure-patterns.md
 """
 
 from __future__ import annotations
@@ -103,37 +102,82 @@ def derive_error_category(error: str, category: str) -> str:
 
     return "unknown"
 
+
 # ---------------------------------------------------------------------------
-# Markdown table emit
+# The one table schema
 # ---------------------------------------------------------------------------
+# Every writer of a failure-pattern table emits these columns. Two emitters with
+# two schemas was the whole of CR-3's count-collapse: `--layered` wrote a
+# 7-column table with no `Sources`, so parse_existing set
+# _sources_recorded=False, merge() computed unattributed=0, and the next merge
+# replaced each stored count with len(sources). A row must not mean two
+# different things depending on which flag wrote it, so there is one schema and
+# both emitters read it from here.
+_SECTION_HEADERS: dict[str, list[str]] = {
+    "## 1. CLI Parameter Errors": [
+        "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity", "Sources"
+    ],
+    "## 2. Skill Generation Issues": [
+        "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity", "Sources"
+    ],
+    "## 3. Cross-Skill Composition Failures": [
+        "Skill", "Command", "Error Pattern", "Resolution", "Count", "LastSeen", "Severity", "Sources"
+    ],
+    "## 4. Runtime Execution Patterns": [
+        "Skill", "Operation", "Error Pattern", "Root Cause", "Count", "LastSeen", "Severity", "Sources"
+    ],
+    "## 5. Token Efficiency Violations": [
+        "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity", "Sources"
+    ],
+}
 
-def emit_table(patterns: dict[str, dict[str, Any]], sections: dict[str, list[str]]) -> str:
-    """Rebuild the markdown table sections from in-memory patterns."""
+_SECTION_FOR_CATEGORY = {
+    "cli_parameter": "## 1. CLI Parameter Errors",
+    "skill_generation": "## 2. Skill Generation Issues",
+    "cross_skill": "## 3. Cross-Skill Composition Failures",
+    "runtime": "## 4. Runtime Execution Patterns",
+    "token_efficiency": "## 5. Token Efficiency Violations",
+}
 
-    def table_rows(category_filter: str) -> list[str]:
-        rows = []
-        for key, p in sorted(patterns.items(), key=lambda x: (-x[1]["count"], x[0][0])):
-            if p["category"] != category_filter:
-                continue
-            skill = p["skill"] or "—"
-            command = p["command"] or "—"
-            error = p["error"] or "—"
-            fix = p.get("fix", "—") or "—"
-            count = p.get("count", 0)
-            rows.append(
-                f"| `{skill}` | `{command}` | {error} | {fix} | {count} |"
-            )
-        return rows
 
-    lines = []
-    for section_title, headers in sections.items():
-        lines.append(f"\n{section_title}")
-        lines.append("")
-        lines.append("| " + " | ".join(headers) + " |")
-        lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
-        for row in table_rows(section_title.split("|")[1].strip()):
-            lines.append(row)
-    return "\n".join(lines)
+def _group_by_section(
+    patterns: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, dict[str, Any]]]:
+    """Bucket patterns by the section that renders them (unknown → runtime)."""
+    by_section: dict[str, dict[str, dict[str, Any]]] = {s: {} for s in _SECTION_HEADERS}
+    for key, p in patterns.items():
+        section = _SECTION_FOR_CATEGORY.get(
+            p.get("category", "runtime"), _SECTION_FOR_CATEGORY["runtime"]
+        )
+        by_section[section][key] = p
+    return by_section
+
+
+def _render_row(p: dict[str, Any]) -> str:
+    """Render one pattern as an 8-column table row (see _SECTION_HEADERS).
+
+    Every cell an emitter fills is escaped, including `last_seen` and
+    `severity`, which come straight from the trace. One unescaped odd backtick
+    in `severity` used to flip the parser's backtick state, so the rest of the
+    row stopped splitting and the row's `Sources` cell was swallowed: the
+    provenance was destroyed while its `count` stayed put, permanently breaking
+    `count = len(sources) + unattributed`.
+
+    `Sources` is a JSON array in one cell: a space-joined list cannot be split
+    back into the names that went in, so a trace filename containing a space
+    inflated `count` on every re-scan. `—` means "no sources recorded".
+    """
+    sources = sorted(p.get("sources") or ())
+    return (
+        f"| `{escape_cell(p.get('skill') or '—')}`"
+        f" | `{escape_cell(p.get('command', p.get('operation')) or '—')}`"
+        f" | {escape_cell(p.get('error', p.get('root cause')) or '—')}"
+        f" | {escape_cell(p.get('fix', p.get('resolution')) or '—')}"
+        f" | {p.get('count', 0)}"
+        f" | {escape_cell(p.get('last_seen', p.get('first_seen')) or '—')}"
+        f" | {escape_cell(p.get('severity') or 'minor')}"
+        f" | {escape_cell(json.dumps(sources, ensure_ascii=False)) if sources else '—'} |"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -231,18 +275,18 @@ def merge(
 
     ``count`` is thus reconciled as ``len(sources) + unattributed``, where
     ``unattributed`` is whatever the stored count exceeded the stored source
-    set. Three writers share this file, and only two of them record sources:
+    set. Five writers share this file (the full, machine-checked list is in
+    docs/reflexion-memory.md §10) and only three of them record sources — this
+    module's CLI, ``reflexion_auto_writer.write_trace`` and
+    ``reflexion_auto_writer._bulk_update``. The other two,
+    ``reflexion_store.store_failure_pattern`` and
+    ``self_heal_pr_workflow.SelfHealPRWorkflow._deduplicate_pattern``, are sinks
+    with no trace to attribute: one increments per call, the other decrements.
 
-      1. ``failure_pattern_extract.main`` — this module's CLI (legacy path);
-      2. ``reflexion_auto_writer`` — ``write_trace`` (single GCL run) and
-         ``_bulk_update`` (whole corpus); both funnel through here;
-      3. ``reflexion_store.store_failure_pattern`` — the qcloud-copilot sink,
-         which increments per call and records no source at all.
-
-    (3) is why the remainder must be carried: its rows have ``sources == {}``,
-    so deriving ``count`` from the source set alone would reset them to 1.
-    A row whose count exceeds its sources is not corrupt — it carries evidence
-    from a sink that has no trace to attribute.
+    The sinks are why the remainder must be carried: their rows have
+    ``sources == {}``, so deriving ``count`` from the source set alone would
+    reset them to 1. A row whose count exceeds its sources is not corrupt — it
+    carries evidence from a sink that has no trace to attribute.
 
     The remainder is only honoured when the row's table declares a Sources
     column (``_sources_recorded``). Rows written before that column existed
@@ -350,6 +394,13 @@ def merge_failure_batch(
       3. Silence hot: over HOT_LIMIT → oldest last_seen to warm
       4. Silence warm: over WARM_LIMIT → oldest last_seen to cold
       5. Cold cap: over COLD_LIMIT → prune lowest count
+
+    HOT_LIMIT counts *rows*, not lines, because this is the layered store: the
+    200-line budget belongs to the single-file store (`enforce_line_cap`), which
+    this path does not use. The two budgets are independent and deliberately so
+    — a line-capped writer holds ~130 rows, so comparing its row count against
+    HOT_LIMIT would never fire. Here it does: `--layered` accumulates to the row
+    cap and demotes.
     """
     for p in new:
         raw_skill = p.get("skill") or ""
@@ -500,37 +551,16 @@ def emit_layer(
     title: str,
     note: str = "",
 ) -> list[str]:
-    """Emit one layer's md content (used for hot/warm/cold output)."""
+    """Emit one layer's md content (used for hot/warm/cold output).
+
+    Same 8-column schema as the store (``_SECTION_HEADERS``) — the hot layer's
+    file *is* ``docs/failure-patterns.md``, so a layer table that dropped the
+    ``Sources`` column would make the next merge recompute every count from
+    ``len(sources)`` alone.
+    """
     now = _today()
-    sections = {
-        "## 1. CLI Parameter Errors": [
-            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity"
-        ],
-        "## 2. Skill Generation Issues": [
-            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity"
-        ],
-        "## 3. Cross-Skill Composition Failures": [
-            "Skill", "Command", "Error Pattern", "Resolution", "Count", "LastSeen", "Severity"
-        ],
-        "## 4. Runtime Execution Patterns": [
-            "Skill", "Operation", "Error Pattern", "Root Cause", "Count", "LastSeen", "Severity"
-        ],
-        "## 5. Token Efficiency Violations": [
-            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity"
-        ],
-    }
-    section_map = {
-        "cli_parameter": "## 1. CLI Parameter Errors",
-        "skill_generation": "## 2. Skill Generation Issues",
-        "cross_skill": "## 3. Cross-Skill Composition Failures",
-        "runtime": "## 4. Runtime Execution Patterns",
-        "token_efficiency": "## 5. Token Efficiency Violations",
-    }
-    by_section: dict[str, dict[str, dict[str, Any]]] = {s: {} for s in sections}
-    for key, p in patterns.items():
-        cat = p.get("category", "runtime")
-        section = section_map.get(cat, "## 4. Runtime Execution Patterns")
-        by_section[section][key] = p
+    sections = _SECTION_HEADERS
+    by_section = _group_by_section(patterns)
 
     total_hits = sum(p.get("count", 0) for p in patterns.values())
     lines = [
@@ -549,19 +579,8 @@ def emit_layer(
         lines.append("")
         lines.append("| " + " | ".join(headers) + " |")
         lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
-        for key, p in sorted(table_patterns.items(), key=lambda x: (-x[1].get("count", 0), x[0][0])):
-            skill = p.get("skill", "—") or "—"
-            command = p.get("command", p.get("operation", "—")) or "—"
-            error = p.get("error", p.get("root cause", "—")) or "—"
-            fix = p.get("fix", p.get("resolution", "—")) or "—"
-            count = p.get("count", 0)
-            last_seen = p.get("last_seen", p.get("first_seen", "—")) or "—"
-            severity = p.get("severity", "minor") or "minor"
-            lines.append(
-                f"| `{escape_cell(skill)}` | `{escape_cell(command)}` | "
-                f"{escape_cell(error)} | {escape_cell(fix)} | "
-                f"{count} | {last_seen} | {severity} |"
-            )
+        for _key, p in sorted(table_patterns.items(), key=lambda x: (-x[1].get("count", 0), x[0][0])):
+            lines.append(_render_row(p))
     return lines
 
 
@@ -580,37 +599,8 @@ def _emit_store(patterns: dict[str, dict[str, Any]]) -> list[str]:
     """Render the store markdown: header + one table per non-empty category."""
     now = datetime.now().strftime("%Y-%m-%d")
 
-    sections = {
-        "## 1. CLI Parameter Errors": [
-            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity", "Sources"
-        ],
-        "## 2. Skill Generation Issues": [
-            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity", "Sources"
-        ],
-        "## 3. Cross-Skill Composition Failures": [
-            "Skill", "Command", "Error Pattern", "Resolution", "Count", "LastSeen", "Severity", "Sources"
-        ],
-        "## 4. Runtime Execution Patterns": [
-            "Skill", "Operation", "Error Pattern", "Root Cause", "Count", "LastSeen", "Severity", "Sources"
-        ],
-        "## 5. Token Efficiency Violations": [
-            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity", "Sources"
-        ],
-    }
-
-    # Split patterns into sections by category
-    by_section: dict[str, dict[str, dict[str, Any]]] = {s: {} for s in sections}
-    section_map = {
-        "cli_parameter": "## 1. CLI Parameter Errors",
-        "skill_generation": "## 2. Skill Generation Issues",
-        "cross_skill": "## 3. Cross-Skill Composition Failures",
-        "runtime": "## 4. Runtime Execution Patterns",
-        "token_efficiency": "## 5. Token Efficiency Violations",
-    }
-    for key, p in patterns.items():
-        cat = p.get("category", "runtime")
-        section = section_map.get(cat, "## 4. Runtime Execution Patterns")
-        by_section[section][key] = p
+    sections = _SECTION_HEADERS
+    by_section = _group_by_section(patterns)
 
     lines: list[str] = [
         "# Failure Patterns — Reflexion Memory",
@@ -632,24 +622,8 @@ def _emit_store(patterns: dict[str, dict[str, Any]]) -> list[str]:
         lines.append("")
         lines.append("| " + " | ".join(headers) + " |")
         lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
-        for key, p in sorted(table_patterns.items(), key=lambda x: (-x[1]["count"], x[0][0])):
-            skill = p["skill"] or "—"
-            command = p.get("command", p.get("operation", "—")) or "—"
-            error = p.get("error", p.get("root cause", "—")) or "—"
-            fix = p.get("fix", p.get("resolution", "—")) or "—"
-            count = p.get("count", 0)
-            last_seen = p.get("last_seen", p.get("first_seen", "—")) or "—"  # P0-C
-            severity = p.get("severity", "minor") or "minor"  # P0-C
-            # One cell, JSON-encoded: a space-joined list cannot be re-split
-            # into the names that went in, so a filename containing a space
-            # used to inflate count on every re-scan. _parse_sources reverses
-            # this; "—" means "no sources recorded".
-            sources = sorted(p.get("sources") or ())
-            sources = escape_cell(json.dumps(sources, ensure_ascii=False)) if sources else "—"
-            lines.append(
-                f"| `{escape_cell(skill)}` | `{escape_cell(command)}` | {escape_cell(error)} | "
-                f"{escape_cell(fix)} | {count} | {last_seen} | {severity} | {sources} |"
-            )
+        for _key, p in sorted(table_patterns.items(), key=lambda x: (-x[1]["count"], x[0][0])):
+            lines.append(_render_row(p))
         lines.append("")  # blank line: without it the next "## " is absorbed into this table
 
     # Usage guidelines (always kept)
@@ -748,7 +722,11 @@ def main() -> int:
     )
     parser.add_argument(
         "--min-count", type=int, default=3,
-        help="Prune patterns with count below this threshold (default: 3)"
+        help=(
+            "Retires stored patterns absent from this run's corpus whose count "
+            "is below the threshold (default: 3). Never retires a key this run "
+            "observed — see docs/reflexion-memory.md §10"
+        ),
     )
     parser.add_argument(
         "--layered", action="store_true",

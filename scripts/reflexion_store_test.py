@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import ast
 import contextlib
 import hashlib
 import io
@@ -643,7 +644,8 @@ class TestBulkUpdateFirstSeenSurvival(unittest.TestCase):
         self.assertEqual(
             hashlib.sha256(self.patterns_file.read_bytes()).hexdigest(),
             before,
-            "re-processing the same corpus must be a byte-for-byte no-op",
+            "re-processing the same corpus must be a byte-for-byte no-op "
+            "(same day — the rendered header embeds today's date)",
         )
 
     def test_three_runs_over_one_corpus_are_idempotent(self) -> None:
@@ -664,13 +666,21 @@ class TestBulkUpdateFirstSeenSurvival(unittest.TestCase):
         self.assertEqual(len(digests), 1, "the store must not change on a re-run")
         self.assertEqual(hits, {3}, "Total hits must be the corpus hit count, not runs x hits")
 
-    def test_observed_patterns_evicted_by_the_cap_fail_the_gate(self) -> None:
+    def test_observed_patterns_evicted_by_the_cap_are_reported_not_fatal(self) -> None:
         """The R3 gate must run AFTER the line cap: the cap is the loss path.
 
         Computed first, `missing` was structurally empty — both sides call
         pattern_key() on the same new_patterns list — while the cap evicted
         observed keys and the run still exited 0, so a GCL run could not tell
         that its own corpus had been truncated.
+
+        The report is what the gate owes: loud, after the cap, naming the keys.
+        It is deliberately NOT fatal for a cap-evicted key — merge() accepts
+        every key `observed` holds, so that loss is the designed 200-line budget
+        doing its job, and returning 3 made `make reflexion-update` (part of
+        `make all`) permanently red on a large corpus with no remedy an operator
+        could apply. Loss the cap cannot explain still exits 3; see
+        test_gate_names_an_observed_pattern_merge_dropped.
         """
         traces = [
             self._trace(f"gcl-trace-{i:03d}.json", "qcloud-bulk-ops", f"cmd{i}", f"err{i}")
@@ -680,9 +690,68 @@ class TestBulkUpdateFirstSeenSurvival(unittest.TestCase):
 
         dropped = int(re.search(r"Dropped \(cap \d+\):\s+(\d+)", out).group(1))
         self.assertGreater(dropped, 0, "the fixture must actually overflow the cap")
-        self.assertEqual(rc, 3, f"a capped-away observed pattern must not exit 0 (stderr: {err})")
-        self.assertIn("REFLEXION GATE", err)
+        self.assertEqual(rc, 0, f"a full store is not a failure (stderr: {err})")
+        self.assertIn("REFLEXION GATE (non-fatal)", err)
         self.assertIn("qcloud-bulk-ops", err, "the dropped keys must be reported by name")
+
+    def test_write_trace_requires_an_explicit_destination(self) -> None:
+        """The store must be unreachable without naming it — a signature, not a convention.
+
+        The doc claimed "a run against a temporary root cannot mutate the
+        shipped file", but the code defaulted `patterns_path` to the module's
+        PATTERNS_FILE: one call that omitted it rewrote the committed store
+        (sha ea524363611f -> ae54c1283c2c). There is no default any more.
+        """
+        trace = {
+            "final": {
+                "failure_pattern": {
+                    "category": "runtime",
+                    "skill": "qcloud-sink-ops",
+                    "command": "cmd",
+                    "error": "err",
+                    "fix": "fix",
+                }
+            }
+        }
+        with self.assertRaises(TypeError):
+            self.raw.write_trace(trace)  # type: ignore[call-arg]
+
+    def test_write_trace_names_the_pattern_the_cap_dropped(self) -> None:
+        """`True` means the write happened, not that this pattern is in the store.
+
+        `evicted` is computed from the pre-existing keys only, so the eviction
+        report could not name the newcomer — the one row the caller was writing.
+        """
+        full = TestLineCapEnforcement._patterns(200)
+        self.patterns_file.write_text(
+            "\n".join(enforce_line_cap(full, max_lines=10**6)) + "\n", encoding="utf-8"
+        )
+        self.assertGreater(len(parse_existing(self.patterns_file)), 100)
+
+        trace = {
+            "final": {
+                "failure_pattern": {
+                    "category": "runtime",
+                    "skill": "qcloud-newcomer-ops",
+                    "command": "cmd",
+                    "error": "err",
+                    "fix": "fix",
+                    "count": 1,
+                }
+            }
+        }
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            written = self.raw.write_trace(trace, patterns_path=self.patterns_file)
+
+        self.assertTrue(written, "the write did happen")
+        self.assertNotIn(
+            ("qcloud-newcomer-ops", "cmd", "err"),
+            parse_existing(self.patterns_file),
+            "precondition: the cap must have dropped the newcomer for this to mean anything",
+        )
+        self.assertIn("qcloud-newcomer-ops:cmd:err", err.getvalue())
+        self.assertIn("stored NOWHERE", err.getvalue())
 
     def test_pre_upgrade_counts_are_replaced_by_the_true_count(self) -> None:
         """Counts written before the sources column existed were run-multiplicity
@@ -1002,6 +1071,87 @@ class TestLineCapEnforcement(unittest.TestCase):
         for i, line in enumerate(lines):
             if line.startswith("## "):
                 self.assertEqual(lines[i - 1], "", f"{line!r} is glued to the line above")
+
+
+# ---------------------------------------------------------------------------
+# The documented writer list must match the code
+# ---------------------------------------------------------------------------
+
+_STORE_FILE = "failure-patterns.md"
+
+
+def _store_writers() -> set[str]:
+    """Functions in scripts/*.py that write docs/failure-patterns.md.
+
+    "Writes the store" is read off the source: the function mentions the store
+    filename, or a module-level name whose value mentions it (PATTERNS_FILE,
+    HOT_PATH, DEFAULT_STORE_PATH, _FAILURE_PATTERNS_PATH), AND it writes. Doc
+    references count, which is how the shared sink is found.
+    """
+    scripts = Path(__file__).resolve().parent
+    writers: set[str] = set()
+    for path in sorted(scripts.glob("*.py")):
+        if path.name.endswith("_test.py") or path.name.startswith("test_"):
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        store_names = {
+            target.id
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            for target in node.targets
+            if isinstance(target, ast.Name) and _STORE_FILE in ast.unparse(node.value)
+        }
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            source = ast.unparse(node)
+            mentions = _STORE_FILE in source or any(n in source for n in store_names)
+            writes = "write_text" in source or ".write(" in source
+            if mentions and writes:
+                writers.add(f"{path.stem}.{node.name}")
+    return writers
+
+
+def _documented_writers() -> set[str]:
+    """The fenced list in docs/reflexion-memory.md §10."""
+    doc = (
+        Path(__file__).resolve().parents[1] / "docs" / "reflexion-memory.md"
+    ).read_text(encoding="utf-8")
+    after = doc.split("<!-- store-writers:", 1)[1]
+    return {
+        line.strip()
+        for line in after.split("```")[1].splitlines()
+        if line.strip()
+    }
+
+
+class TestTheWriterListIsComplete(unittest.TestCase):
+    """`docs/reflexion-memory.md` §10 must name every writer of the store.
+
+    The count was wrong three rounds running ("Three paths write ..." against
+    four, then five) because nothing connected the prose to the code. This test
+    is that connection: add a writer, and the suite fails until the doc names it.
+    """
+
+    def test_documented_writers_match_the_code(self) -> None:
+        self.assertEqual(
+            _documented_writers(),
+            _store_writers(),
+            "docs/reflexion-memory.md §10 and the code disagree about who writes "
+            "docs/failure-patterns.md",
+        )
+
+    def test_every_documented_writer_exists(self) -> None:
+        scripts = Path(__file__).resolve().parent
+        for name in sorted(_documented_writers()):
+            module_name, _, function = name.partition(".")
+            tree = ast.parse((scripts / f"{module_name}.py").read_text(encoding="utf-8"))
+            defined = {
+                node.name
+                for node in ast.walk(tree)
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            }
+            self.assertIn(function, defined, f"{name} is documented but does not exist")
 
 
 # ---------------------------------------------------------------------------

@@ -181,11 +181,12 @@ def store_failure_pattern(
         3. If pattern is new: appends with count=1.
         4. Enforces ≤200 lines limit by pruning lowest-count patterns if needed.
 
-    This is writer (3) of docs/failure-patterns.md; the others are
-    failure_pattern_extract.main and reflexion_auto_writer (write_trace /
-    _bulk_update). It is the only one with no trace to attribute a hit to, so
-    it records no ``sources`` and its increments land in the unattributed
-    remainder that merge() carries over (see failure_pattern_extract.merge).
+    One of the writers of docs/failure-patterns.md; the full list lives in
+    docs/reflexion-memory.md §10 and is machine-checked by
+    reflexion_store_test.TestTheWriterListIsComplete. It is one of the two with
+    no trace to attribute a hit to, so it records no ``sources`` and its
+    increments land in the unattributed remainder that merge() carries over
+    (see failure_pattern_extract.merge).
     """
     # Validate required fields
     if not skill or not skill.strip():
