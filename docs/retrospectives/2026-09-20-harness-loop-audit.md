@@ -170,7 +170,7 @@ Round 1 缺陷      → Round 2 修复        → Round 2 新缺陷
 
 **裁定**：Plan A。CR-3 `artifact-isolation` 修根因（路径隔离 + 格式），不再在旧 CR 上追加补丁。
 
-### D-2（**待您裁定**）CI 是否应对证据流设门禁
+### D-2（✅ 已裁定 **B 案**，2026-09-20，按推荐）CI 是否应对证据流设门禁
 
 Critic-1R2-A 指出 Round 2 实际上**替您选了一个政策而未曾标明这是选择**：
 
@@ -179,7 +179,15 @@ Critic-1R2-A 指出 Round 2 实际上**替您选了一个政策而未曾标明�
 
 **Critic 推荐 B**，理由：`audit-results/` 被 gitignore 后，**一个把 `leak_checked` 改成 false 的 PR，CI 抓不到、本地也抓不到**（本地流里只有 PR 之前的代码铸的记录）。
 
-**编排者倾向 B**，但新增受版本控制的 fixture 属策略决定，**未执行，等裁定**。
+**编排者倾向 B**，但新增受版本控制的 fixture 属策略决定，故上报裁定。
+
+> **裁定结果（2026-09-20）：采纳 B 案**，按编排者推荐执行。
+> CR-4 `kpi-honesty` 据此实现：提交两份 fixture（一份干净 → gate 绿；一份含故意的
+> `leak_checked: false` / 破坏性操作无 token → gate 红，exit 1），两份均须满足
+> `evidence_min_records` 下限并覆盖 aged-out 路径，以满足 **AGENTS.md L6
+> 「新门禁必须同时证明会开火与会静默」**。
+> 同时把 workflow 注释改写为点明 escape 才是真正的控制点（H-14），
+> 并把 `CI-hooked ✅` 一栏改为与事实相符（H-13）。
 
 ## ADR 候选
 
@@ -188,7 +196,7 @@ Critic-1R2-A 指出 Round 2 实际上**替您选了一个政策而未曾标明�
 
 | 候选 | 内容 | 阻塞于 |
 |---|---|---|
-| **ADR 候选 1** | 证据流（`audit-results/evidence-*.jsonl`）应否进入版本控制、由谁生成（CI vs 本地） | D-2 |
+| **ADR 候选 1** | 证据流（`audit-results/evidence-*.jsonl`）的**归属**：D-2 已裁定 CI 改判 fixture（不再依赖集群流），但**集群流本身仍无家可归** —— 它被 gitignore、无轮转、随 `--root` 漂移，而 gate 只读 `ROOT/audit-results`（H-39），因此异 root 运行永不被打分。需决定：集群证据是本地监控信号、集中上报、还是入库 | D-2 部分已决；**H-39 仍开放** |
 | **ADR 候选 2** | Reflexion store 应生成到 `.runtime/`，而 `docs/failure-patterns.md` 降级为**显式提升的快照**（当前它同时是构建产物与受版本控制的 agent 输入，这是 H-09/H-10/H-21 的共同土壤） | CR-3 完成后 |
 
 ## CADL 经验（可复用）
