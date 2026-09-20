@@ -23,7 +23,7 @@ import argparse
 import json
 import re
 import sys
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -260,38 +260,84 @@ def source_of(p: dict[str, Any]) -> str:
     return (p.get("_source") or "").strip().split("#", 1)[0]
 
 
+def _reconcile_count(entry: dict[str, Any], src: str) -> None:
+    """The one count rule: ``count = len(sources) + unattributed``.
+
+    ``src`` is the GCL run (trace) that observed the pattern. A row's count is
+    the number of DISTINCT traces that reported it — never the number of times
+    a merge ran — so a re-scan of an unchanged corpus changes nothing while a
+    new run adds exactly 1.
+
+    ``unattributed`` is whatever the stored count exceeded the stored source
+    set, and it is carried, not recomputed. Five writers share the store (the
+    machine-checked list is in docs/reflexion-memory.md §10) and only three
+    record sources; the other two — ``reflexion_store.store_failure_pattern``
+    and ``self_heal_pr_workflow._deduplicate_pattern`` — are sinks with no trace
+    to attribute. Their rows have ``sources == {}``, so deriving the count from
+    the source set alone would reset them to 1 on the next merge.
+
+    The remainder is honoured only when the row's table declares a Sources
+    column (``_sources_recorded``): rows written before that column existed
+    counted merge() invocations instead of traces, and that fiction yields to
+    the corpus.
+
+    Shared by ``merge()`` and ``merge_failure_batch()``. Two implementations of
+    this rule is precisely the defect CR-3 exists to kill: the layered path's
+    own ``count += 1`` per raw observation inflated ``--layered`` by one per
+    trace per run and recorded no sources at all.
+    """
+    sources = entry.setdefault("sources", set())
+    stored_count = entry.get("count", 0)
+    unattributed = (
+        max(0, stored_count - len(sources))
+        if entry.get("_sources_recorded", True)
+        else 0
+    )
+    if src:
+        sources.add(src)
+        entry["count"] = len(sources) + unattributed
+    else:
+        # No trace to attribute the hit to (programmatic callers). The legacy
+        # per-observation increment, kept so a source-less hit still moves the
+        # count rather than being silently dropped.
+        entry["count"] = stored_count + 1
+
+
+def _new_pattern_entry(
+    key: tuple[str, str, str],
+    p: dict[str, Any],
+    now: str,
+    src: str,
+) -> dict[str, Any]:
+    """The one shape of a newly observed pattern, whichever store writes it."""
+    return {
+        "category": p.get("category", "runtime"),
+        "skill": key[0],
+        "command": key[1],
+        "error": key[2],
+        "fix": p.get("fix", "—") or "—",
+        "count": 1,
+        "sources": {src} if src else set(),
+        "reusable": p.get("reusable", True),
+        "first_seen": now,
+        "last_seen": now,
+        "severity": p.get("severity", "minor"),
+    }
+
+
 def merge(
     existing: dict[str, dict[str, Any]],
     new: list[dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
-    """Merge new patterns into existing.
+    """Merge new patterns into existing (single-file store).
 
-    ``count`` is the number of DISTINCT trace sources (``_source``) that have
-    observed the pattern — never the number of times this function ran. A
-    re-scan of the same corpus is therefore a no-op, while a new GCL run
-    reporting the same failure adds exactly 1. Callers that pass patterns
-    without a ``_source`` (programmatic use) keep the legacy per-observation
-    increment.
+    Adds each new observation to its row's ``sources`` and reconciles the count
+    through ``_reconcile_count()`` — the same function the layered path uses, so
+    a row means one thing whichever flag wrote it. ``pattern_key()`` decides
+    what "the same pattern" is here and in ``merge_failure_batch()`` too.
 
-    ``count`` is thus reconciled as ``len(sources) + unattributed``, where
-    ``unattributed`` is whatever the stored count exceeded the stored source
-    set. Five writers share this file (the full, machine-checked list is in
-    docs/reflexion-memory.md §10) and only three of them record sources — this
-    module's CLI, ``reflexion_auto_writer.write_trace`` and
-    ``reflexion_auto_writer._bulk_update``. The other two,
-    ``reflexion_store.store_failure_pattern`` and
-    ``self_heal_pr_workflow.SelfHealPRWorkflow._deduplicate_pattern``, are sinks
-    with no trace to attribute: one increments per call, the other decrements.
-
-    The sinks are why the remainder must be carried: their rows have
-    ``sources == {}``, so deriving ``count`` from the source set alone would
-    reset them to 1. A row whose count exceeds its sources is not corrupt — it
-    carries evidence from a sink that has no trace to attribute.
-
-    The remainder is only honoured when the row's table declares a Sources
-    column (``_sources_recorded``). Rows written before that column existed
-    counted merge() invocations instead of traces, and that fiction must yield
-    to the corpus — so a source-less legacy row is reset to the observed count.
+    Callers that pass patterns without a ``_source`` (programmatic use) keep the
+    legacy per-observation increment; see ``_reconcile_count()``.
     """
     for p in new:
         key = pattern_key(p)
@@ -301,40 +347,9 @@ def merge(
         now = datetime.now().strftime("%Y-%m")
         entry = existing.get(key)
         if entry is None:
-            existing[key] = {
-                "category": p.get("category", "runtime"),
-                "skill": key[0],
-                "command": key[1],
-                "error": key[2],
-                "fix": p.get("fix", "—") or "—",
-                "count": 1,
-                "sources": {src} if src else set(),
-                "reusable": p.get("reusable", True),
-                "first_seen": now,
-                "last_seen": now,  # P0-C
-                "severity": p.get("severity", "minor"),
-            }
+            existing[key] = _new_pattern_entry(key, p, now, src)
             continue
-        sources = entry.setdefault("sources", set())
-        stored_count = entry.get("count", 0)
-        # Counts recorded without a trace of their own are whatever the stored
-        # count exceeds the recorded source set. Carrying that remainder keeps a
-        # sources=={} row from being reset to len(sources)==1 on the next merge,
-        # which is how the third writer's counts used to collapse.
-        #
-        # Only for rows whose table declares a Sources column. Rows from the
-        # pre-Sources format counted merge() invocations rather than traces, so
-        # their count is fiction and the observed truth replaces it.
-        unattributed = (
-            max(0, stored_count - len(sources))
-            if entry.get("_sources_recorded", True)
-            else 0
-        )
-        if src:
-            sources.add(src)
-            entry["count"] = len(sources) + unattributed
-        else:
-            entry["count"] = stored_count + 1
+        _reconcile_count(entry, src)
         entry["last_seen"] = now  # P0-C: update on every hit
     return existing
 
@@ -388,71 +403,53 @@ def merge_failure_batch(
 ) -> tuple[dict, dict, dict]:
     """Merge new failure patterns into hot/warm/cold layers.
 
-    Algorithm (mirrors success_pattern_mine.py merge_batch):
-      1. Substitution: same key → count++, last_seen=today
+    Algorithm:
+      1. Substitution: same key → reconcile count, last_seen=today
       2. Warm revive: key in warm + gap ≤ 30 days → move back to hot
       3. Silence hot: over HOT_LIMIT → oldest last_seen to warm
       4. Silence warm: over WARM_LIMIT → oldest last_seen to cold
       5. Cold cap: over COLD_LIMIT → prune lowest count
 
-    HOT_LIMIT counts *rows*, not lines, because this is the layered store: the
-    200-line budget belongs to the single-file store (`enforce_line_cap`), which
-    this path does not use. The two budgets are independent and deliberately so
-    — a line-capped writer holds ~130 rows, so comparing its row count against
-    HOT_LIMIT would never fire. Here it does: `--layered` accumulates to the row
-    cap and demotes.
+    The key (``pattern_key()``) and the count (``_reconcile_count()``) are the
+    *same* functions ``merge()`` uses — one count rule, not two. This function
+    used to increment ``count`` per raw observation and never record ``sources``
+    at all, so `--layered` grew 6 → 12 → 18 over three runs of one unchanged
+    corpus while the single-file path stayed at 6, and every layered row
+    rendered its ``Sources`` cell as `—`. A row must mean one thing whichever
+    flag wrote it.
+
+    HOT_LIMIT counts *rows*, not lines — but the hot layer's file IS
+    ``docs/failure-patterns.md``, whose 200-**line** budget is a P0 constraint
+    in AGENTS.md. 200 rows render as ~214 lines, so the row cap alone breaches
+    the line cap the file's own header prints. The caller that writes HOT_PATH
+    therefore caps it by lines as well: see ``main()``'s ``--layered`` branch.
+    The warm/cold layers are separate files with no line budget, so there the
+    row cap is the only limit.
     """
     for p in new:
-        raw_skill = p.get("skill") or ""
-        command = (p.get("command") or "").strip()
-        error = (p.get("error") or "").strip()
-        if not raw_skill.strip():
+        key = pattern_key(p)
+        if key is None:
             continue
-        skill = raw_skill.strip()
-        key = (skill, command, error)
+        src = source_of(p)
         now = _today()
-        severity = p.get("severity", "minor")
 
         if key in hot:
-            # Substitution: increment count
-            hot[key]["count"] = hot[key].get("count", 0) + 1
+            # Substitution: add the observing trace, reconcile count
+            _reconcile_count(hot[key], src)
             hot[key]["last_seen"] = now
-        elif key in warm:
+        elif key in warm and (
+            _days_between(warm[key].get("last_seen", ""), now) <= SILENCE_THRESHOLD_DAYS
+        ):
             # Warm revive: gap ≤ 30 days
-            gap = _days_between(warm[key].get("last_seen", ""), now)
-            if gap <= SILENCE_THRESHOLD_DAYS:
-                warm[key]["count"] = warm[key].get("count", 0) + 1
-                warm[key]["last_seen"] = now
-                hot[key] = warm[key]
-                del warm[key]
-            else:
-                # No revive: create new in hot
-                hot[key] = {
-                    "category": p.get("category", "runtime"),
-                    "skill": skill,
-                    "command": command,
-                    "error": error,
-                    "fix": p.get("fix", "—") or "—",
-                    "count": 1,
-                    "reusable": p.get("reusable", True),
-                    "first_seen": now,
-                    "last_seen": now,
-                    "severity": severity,
-                }
+            _reconcile_count(warm[key], src)
+            warm[key]["last_seen"] = now
+            hot[key] = warm[key]
+            del warm[key]
         else:
-            # Fresh entry in hot
-            hot[key] = {
-                "category": p.get("category", "runtime"),
-                "skill": skill,
-                "command": command,
-                "error": error,
-                "fix": p.get("fix", "—") or "—",
-                "count": 1,
-                "reusable": p.get("reusable", True),
-                "first_seen": now,
-                "last_seen": now,
-                "severity": severity,
-            }
+            # Fresh entry in hot. Also reached when the key is in warm but the
+            # gap is too wide to revive; the stale warm copy is left where it is,
+            # unchanged from before.
+            hot[key] = _new_pattern_entry(key, p, now, src)
 
     # Silence eviction: hot cap
     if len(hot) > HOT_LIMIT:
@@ -672,6 +669,7 @@ def _emit_store(patterns: dict[str, dict[str, Any]]) -> list[str]:
 def enforce_line_cap(
     patterns: dict[str, dict[str, Any]],
     max_lines: int = MAX_LINES,
+    render: Callable[[dict[str, dict[str, Any]]], list[str]] | None = None,
 ) -> list[str]:
     """Rebuild failure-patterns.md content, enforcing the ``max_lines`` cap.
 
@@ -685,8 +683,16 @@ def enforce_line_cap(
     (``WARM_LIMIT`` / ``COLD_LIMIT``): otherwise the 200-line hot cap applies
     to it, and the layer's declared capacity is an unreachable ceiling that
     makes demotion destroy memory instead of preserving it.
+
+    ``render`` is the emitter whose line count is capped: ``_emit_store``
+    (single-file store) by default, ``emit_layer`` for the layered hot layer.
+    The two write different tables, so capping one by the other's line count
+    would either under- or over-shoot; the budget is the same P0 constraint
+    either way, because the hot layer's file is the same
+    ``docs/failure-patterns.md``.
     """
-    lines = _emit_store(patterns)
+    emit = render or _emit_store
+    lines = emit(patterns)
     if len(lines) > max_lines:
         ranked = sorted(
             patterns.items(),
@@ -698,10 +704,26 @@ def enforce_line_cap(
         )
         for key, _entry in ranked:
             del patterns[key]
-            lines = _emit_store(patterns)
+            lines = emit(patterns)
             if len(lines) <= max_lines:
                 break
     return lines
+
+
+def _display(path: Path, root: Path) -> Path:
+    """``path`` relative to ``root`` when it is inside it, else ``path``.
+
+    ``--root`` may be relative (``--root .``), and the bare ``relative_to()``
+    this replaces raised ``ValueError`` — *after* the layers had already been
+    written, so a run that had mutated the store reported itself as a crash.
+    Falling back to the absolute path keeps the report honest when the
+    destination really is outside ``--root``: ``--root`` only steers
+    ``collect_traces``, the store is repo-absolute.
+    """
+    try:
+        return path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return path
 
 
 # ---------------------------------------------------------------------------
@@ -784,11 +806,28 @@ def main() -> int:
                 print(f"  {e}", file=sys.stderr)
             if not args.dry_run:
                 return 1
+        # HOT_PATH *is* docs/failure-patterns.md, so the 200-LINE cap AGENTS.md
+        # makes P0 applies here too. HOT_LIMIT caps rows and 200 rows render as
+        # ~214 lines, so the row cap alone breaches the budget this file's own
+        # header prints. Cap the rendered hot layer before the write.
+        hot_note = f"> **Token budget**: ≤ {MAX_LINES} lines."
+        snapshot = dict(hot)
+        enforce_line_cap(
+            hot, MAX_LINES,
+            render=lambda ps: emit_layer(ps, "Hot Layer", hot_note),
+        )
+        # Rows the line cap evicts are demoted, not destroyed — hot → warm is the
+        # same policy the row cap applies above, and it keeps the layered store's
+        # promise (the number of *retained* patterns is not bounded by the
+        # single-file line budget).
+        for key in snapshot.keys() - hot.keys():
+            warm.setdefault(key, snapshot[key])
+        capped = len(snapshot) - len(hot)
         new_hot = len(hot) - old_hot
         total_hits = sum(p.get("count", 0) for p in {**hot, **warm, **cold}.values())
         print(
             f"Traces scanned: {len(trace_paths)}",
-            f"Hot layer:  {len(hot)} (+{new_hot} new)",
+            f"Hot layer:  {len(hot)} (+{new_hot} new, {capped} to warm over the {MAX_LINES}-line cap)",
             f"Warm layer: {len(warm)}",
             f"Cold layer: {len(cold)}",
             f"Total hits: {total_hits}",
@@ -797,15 +836,14 @@ def main() -> int:
         if args.dry_run:
             print(f"\n[dry-run] Would write hot={len(hot)}, warm={len(warm)}, cold={len(cold)}")
             return 0
-        save_layer(HOT_PATH, hot, "Hot Layer",
-                   f"> **Token budget**: ≤ {HOT_LIMIT} lines.")
+        save_layer(HOT_PATH, hot, "Hot Layer", hot_note)
         save_layer(WARM_PATH, warm, "Warm Layer",
                    f"> **Token budget**: ≤ {WARM_LIMIT} lines.")
         save_layer(COLD_PATH, cold, "Cold Layer",
                    f"> **Token budget**: ≤ {COLD_LIMIT} lines.")
-        print(f"Written: {HOT_PATH.relative_to(args.root)}")
-        print(f"Written: {WARM_PATH.relative_to(args.root)}")
-        print(f"Written: {COLD_PATH.relative_to(args.root)}")
+        print(f"Written: {_display(HOT_PATH, args.root)}")
+        print(f"Written: {_display(WARM_PATH, args.root)}")
+        print(f"Written: {_display(COLD_PATH, args.root)}")
     else:
         # Legacy single-file storage
         merged = merge(existing.copy(), new_patterns)
@@ -835,7 +873,7 @@ def main() -> int:
             print("\n".join(lines))
             return 0
         PATTERNS_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        print(f"\nUpdated: {PATTERNS_FILE.relative_to(args.root)}")
+        print(f"\nUpdated: {_display(PATTERNS_FILE, args.root)}")
     return 0
 
 

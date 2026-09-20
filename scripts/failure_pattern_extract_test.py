@@ -464,19 +464,47 @@ class TestOneTableSchema(unittest.TestCase):
         )
         self.assertTrue(any("| Sources |" in ln for ln in layer))
 
-    def test_layered_write_leaves_the_count_intact_on_the_next_merge(self):
-        patterns = self._patterns()
-        key = next(iter(patterns))
+    def test_layered_merge_is_idempotent_over_an_unchanged_corpus(self):
+        """`merge_failure_batch()` — the layered path's only count producer.
+
+        Driven for three runs over one fixed corpus, through the same
+        write → `parse_existing` → merge cycle the CLI performs. The previous
+        shape of this test hand-built `patterns` *including the `sources` set it
+        then asserted on* and never called `merge_failure_batch`, so it read back
+        its own input: the layered path inflated 6 → 12 → 18 while it passed.
+        """
+        key = ("qcloud-layer-ops", "tccli cvm Run", "InvalidParameter: bad")
+        corpus = [
+            {
+                "category": "runtime",
+                "skill": key[0],
+                "command": key[1],
+                "error": key[2],
+                "fix": "fix",
+                "severity": "major",
+                "_source": f"gcl-trace-{n}.json",
+            }
+            for n in "abcdef"
+        ]
+
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "failure-patterns.md"
-            fpe.save_layer(path, patterns, "Hot Layer")
-            reobserved = {**patterns[key], "_source": "gcl-trace-g.json"}
-            merged = fpe.merge(fpe.parse_existing(path), [reobserved])
+            hot: dict = {}
+            counts = []
+            for _run in range(3):
+                hot, _warm, _cold = fpe.merge_failure_batch(
+                    [dict(p) for p in corpus], hot, {}, {}
+                )
+                fpe.save_layer(path, hot, "Hot Layer")
+                hot = fpe.parse_existing(path)  # the next run reads the file back
+                counts.append((hot[key]["count"], len(hot[key]["sources"])))
 
         self.assertEqual(
-            merged[key]["count"], 7, "6 stored sources + 1 new observation, not len(sources)"
+            counts,
+            [(6, 6)] * 3,
+            "one run over an unchanged corpus must not change count, and every "
+            f"distinct trace must survive as a source; got {counts}",
         )
-        self.assertEqual(len(merged[key]["sources"]), 7)
 
 
 if __name__ == "__main__":
