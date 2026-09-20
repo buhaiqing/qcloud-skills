@@ -156,7 +156,7 @@ class RunLintTests(unittest.TestCase):
 
 class LintFailurePatternsTests(unittest.TestCase):
     def test_missing_file_returns_true(self) -> None:
-        ok, msg = cl.lint_failure_patterns(Path("/nonexistent/failure-patterns.md"))
+        ok, _msg = cl.lint_failure_patterns(Path("/nonexistent/failure-patterns.md"))
         self.assertTrue(ok)
 
     def test_valid_patterns_ok(self) -> None:
@@ -211,7 +211,7 @@ class LintFailurePatternsTests(unittest.TestCase):
                 "| _seed | cli_parameter | | | | 0 |\n",
                 encoding="utf-8",
             )
-            ok, msg = cl.lint_failure_patterns(path)
+            ok, _msg = cl.lint_failure_patterns(path)
             self.assertTrue(ok)  # _seed row is skipped
 
 
