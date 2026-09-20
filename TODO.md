@@ -1,5 +1,9 @@
 # 待办事项清单
 
+> **⚠️ 本文档已冻结为历史记录。活跃的未关闭项登记在 →**
+> [`docs/retrospectives/2026-09-20-harness-loop-audit.md`](docs/retrospectives/2026-09-20-harness-loop-audit.md)
+> （2026-09-20 Harness / Loop Engineering 审计：28 项 H-xx 未关闭项、1 项待裁定决策、2 个 ADR 候选）
+
 > 基于磁盘实际状态（2026-07-04 审计），**所有原有 TODO 任务均已完成**。
 > 本文档保留作为历史记录。新任务请从扫描发现的实际问题出发。
 

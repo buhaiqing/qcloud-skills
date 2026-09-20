@@ -162,7 +162,8 @@ Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` addition
 | L20 | unittest buffer=False: print-capable funcs leak stdout | Wrap with `contextlib.redirect_stdout(io.StringIO())` |
 | L21 | Governance/evaluator fallbacks MUST be deny-by-default | No-match policy rule → `human_approval`, never `auto_confirm`; empty SLO samples → N/A + breach, never 1.0 |
 | L22 | GCL 终轮若仅剩「描述精确化 / L* 引用补齐」类 MAJOR（无新逻辑），可省 Critic，由主 Agent fact-check 替代 | 判据：改动不含控制流/接口/算法 → 省 Critic；主 Agent 用 3-5 条命令复核数字与引用真实性（如 `grep -c '^\| L1 '` 验证引用非幻觉）。实证：2026-09-06 R3 4 MAJOR 全为此类，省一轮 Critic，主 Agent 5 条命令复核 4/4 通过、零幻觉引用 |
-| L24 | 指标读取语料中普遍缺失的字段会退化为常量，而**无阈值的 gate 会把这个常量报成 PASS**（假绿）。实证：KPI#7 读 `q["intent"]`，29/31 语料无该键 → top1 恒为 0.0，gate 却打印 14.72% 并 PASS；按 owning-skill 真值实测仅 10.3%（48/466） | 指标落地前先统计该字段的**存在率**（逐条统计，如 `grep -c`）/ 确认 ground truth 来自语料本身而非可选键；gate 必须带阈值，阈值取自**实测基线**而非估计；低于 target 时即使 pass 也显式打印差距 |
+| L24 | 指标读取语料中普遍缺失的字段会退化为常量，而**无阈值的 gate 会把这个常量报成 PASS**（假绿）。实证：KPI#7 读 `q["intent"]`，29/31 语料无该键 → top1 恒为 0.0，gate 却打印 14.72% 并 PASS；按 owning-skill 真值实测仅 9.87%（46/466，口径为全部 36 个 skill 目录） | 指标落地前先统计该字段的**存在率**（逐条统计，如 `grep -c`）/ 确认 ground truth 来自语料本身而非可选键；gate 必须带阈值，阈值取自**实测基线**而非估计；低于 target 时即使 pass 也显式打印差距 |
+| L25 | **每个契约都有两端（生产者↔消费者、声明↔接线、规范↔实现），而不校验接缝时两端必然漂移，且漂移不可见。** 实证：一次审计中 10 个缺陷**全部是同一个缺陷**——`evidence_kernel` 写 `.jsonl` 而 gate glob `.json`；`Makefile` 定义 9 个门禁而无一 workflow 调用 `make`；`validate_error_tables.py` 自称 "CI gate" 却零接线；14 个测试叫 `test_*.py` 而 discover 用 `-p "*_test.py"`（静默排除 257 个测试）；AGENTS.md 写 "≥10 错误码" 而 validator 只查结构不查数量 | ① **修复必须打在构建实际执行的那条路径上**：`4e8e77b` 正确诊断了 bug 却只修了 `write_trace()`，而 `make all` 走的 `_bulk_update()` 原封不动——为修好的路径写了测试并通过，构建执行的那条仍在删光一切。改前先确认「谁真正调用这个函数」。② **主观保证不是证据**：两轮修复均在「测试全绿」状态下带着 BLOCKER，唯一有效证据是**把修复 revert 掉并证明测试会失败**。③ 新门禁必须同时证明「会开火」与「会静默」（见 L6），并落一个「门禁接线」检查器，否则第 4 条同类漂移必然出现 |
 
 ## Adding or modifying a skill
 
