@@ -135,9 +135,10 @@ CR-1 修复后:  avg top1=28.28%（16 个可评分 skill 口径），真实 fall
 `docs/failure-patterns.md` 的 md5 与 `audit-results/evidence-local.jsonl` 行数**双双不变**；
 Critic 另验证 `pytest`（964 passed）与 `gcl_runner --root <tmp>` 两条路径同样不污染仓库副本。
 
-#### D-新. CR-3 Round-1 Critic 发现的新增未关闭项
+#### D-新. CR-3 Round-1 Critic 发现的新增项 —— 状态见本节末尾的「Round-2 复核」
 
-> CR-3 的 Round-2 已派出处理；**这些是本轮新引入/新暴露的，不是历史遗留**。
+> 下表为 Round 1 发现时的原始记录，**保留不改**（证据是历史）；
+> 各条的最新状态以下方「**Round-2 复核结果**」为准。
 
 | ID | 现象 | 证据 | 严重度 |
 |---|---|---|---|
@@ -152,6 +153,49 @@ Critic 另验证 `pytest`（964 passed）与 `gcl_runner --root <tmp>` 两条路
 | **H-37** | 每个单元格的 `.strip()` 抹掉首尾空白与制表符 → 同一故障**改键成新行** | `' lead-trail '` → `'lead-trail'`；`'\ttab'` → `'tab'` | 🟡 |
 | **H-38** | `docs/failure-patterns.md` 表头内嵌当天日期 → 「byte-identical」仅在**同一天内**成立 | `failure_pattern_extract.py:620`；同日两次运行 md5 相同 | 🟡 |
 | **H-39** | 证据已跟随 `gcl_runner --root`，但 `check_kpi_gates.py` 仍读 `ROOT/audit-results` → 异 root 运行的证据**永不被打分**，exit 0 | `gcl_runner.py:899` vs `check_kpi_gates.py:53,130`；**归属 ADR 候选 1** | 🟡 |
+
+#### Round-2 复核结果（Critic-3R2-A / 3R2-B 逐条实测，2026-09-20）
+
+| ID | Round-2 状态 | 关闭证据 |
+|---|---|---|
+| H-29 | ⚠️ **部分** | 8 列共享 schema 落地（`_SECTION_HEADERS` 单一定义，`grep` 确认无第二条列定义路径）；但**语义未统一** → 见 H-40 |
+| H-30 | ✅ 关闭 | 独立 fuzz（含 `severity='a\`b'`、`'a\|b'`、`'a\\b'`）全部精确读回；`_decode_cell` 在反转义前只剥一层**配对的**包装 |
+| H-31 | ✅ 关闭 | `new\nline` 正常往返，零丢行 |
+| H-32 | ✅ 关闭 | `_store_writers() == _documented_writers()` → `EQUAL: True`（5 个）；且**检查可证伪** —— 注入第 6 个写者 → `1 failed` |
+| H-33 | ✅ 关闭，**且已是代码保证而非调用方纪律** | `write_trace()` 现要求 `patterns_path` 为**必填 keyword-only**；省略即 `TypeError`；store sha 前后一致；`gcl_runner.py:729` 按关键字传入 `root/docs/failure-patterns.md` |
+| H-34 | ✅ 关闭 | 超 cap 时为**非致命**（`REFLEXION GATE (non-fatal): … rc=0`），`make reflexion-update` → rc=0；exit-3 仍可达但成因措辞已准确 |
+| H-35 | ✅ 关闭 | `severity='a\`b'` → `sources` 保留、count 正确（原为 `sources=[]`） |
+| **H-36** | 🔴 **未关闭，且恶化** | `HOT_LIMIT=200` 是**行**数，200 行渲染成 **214 行**，**突破 AGENTS.md:208 的 P0「≤200 行」约束**；更糟的是新的非致命 gate 消息**主动推荐 `--layered`** 作为 cap 驱逐的补救 —— 照做等于把「有损但有上限」的 store 换成「无损但无上限」 |
+| H-37 | ✅ 关闭（走 spec 允许的「记录为 key 归一化」路线） | `docs/reflexion-memory.md:193-197` 明确写出归一化语义 |
+| H-38 | ✅ 关闭 | 断言已收窄为「同日」，收窄本身准确 |
+| H-39 | ✅ 按 spec 处理（不修，登记） | `git diff 724afc9..f9e0691 -- scripts/check_kpi_gates.py` 为空；ADR 候选 1 已收窄为「H-39 仍开放」 |
+
+#### Round-2 新暴露项
+
+| ID | 现象 | 证据 | 严重度 |
+|---|---|---|---|
+| **H-40** | `--layered` 走的 `merge_failure_batch()` 是**第二套独立计数实现**：按**原始观测**逐次 `count += 1`，从不调 `source_of()`/`merge()`，**从不建 `sources` 集合** → 既非幂等，又在首次写入时**销毁 provenance**（渲染为 `—`）。膨胀值还会被洗进 `unattributed` 并**永久固化、永不痊愈**：`12 → 18 → 冻结 → 24` | 函数级：同语料 3 次 → `6/12/18` 而 `sources` 键缺失；对照 `merge()` → `6/6/6` 且 `len(sources)=6`。CLI 同样复现 | 🔴 |
+| **H-41** | 那条看似覆盖 `--layered` 的测试是**重言式**：手工构造 `patterns`（**含它随后要断言的 `sources` 集合**）并调 `save_layer()`+`merge()`，**从不调用生产中唯一产生 layered 写入的 `merge_failure_batch()`** → 读回自己的输入。**68/68 全绿，H-40 活着** | `failure_pattern_extract_test.py:467-479` | 🔴 |
+| **H-42** | `merge_failure_batch()` 的**孪生拷贝**有同一缺陷：`success_pattern_mine.py:353` 逐次 `count += 1`，且 `avg_iter` 也被 run-multiplicity 重新加权。`docs/success-patterns.md` **没有 sources 列**，无从交叉校验 | 该函数 docstring 自述「mirrors `success_pattern_mine.py` merge_batch」 | 🟠 |
+| **H-43** | `--layered --root .` 在**已经写完 layers 之后**抛 traceback —— 部分成功被报告为崩溃 | 3R2-B 实测 | 🟡 |
+| **H-44** | `docs/reflexion-memory.md:56` 的 `count ≥ len(sources)` 是**重言式**（`unattributed` 定义即 `max(0, count-len)`，`count` 又被设回 `len+unattributed`），**测不出 H-40 这一类** | 3R2-A 无法构造反例 —— 因该式非可证伪 | 🟡 |
+| **H-45** | 「临时 root 不能改动已提交文件」的表述**作用域被读成通用**：`failure_pattern_extract.py --root <tmp>` 与 `--layered --root <tmp>` 都写**仓库绝对路径**的 store（`--root` 只影响 `collect_traces`） | `failure_pattern_extract.py:837`、`_failure_pattern_store.py:15`(`HOT_PATH`) | 🟡 |
+
+> **往轮备注（供 ADR 候选 1 参考）**：3R2-B 指出工作区中 `scripts/check_kpi_gates.py`
+> 有**未提交改动**，属并发进行的 CR-4，不是 CR-3 越界。
+
+#### 系统性观察：五次「修好一条路径，镜像的那条被漏掉」
+
+| # | 修好 | 漏掉 |
+|---|---|---|
+| 1 | `write_trace()` | `_bulk_update()`（`make all` 实际走的那条） |
+| 2 | 加宽 glob 读 `.jsonl` | 同一改动使 run_id 隔离失效 |
+| 3 | 主 emitter `_emit_store` | 备用 emitter `emit_layer`（`--layered`） |
+| 4 | 给两个 emitter 统一**列** | 备用路径的**计数语义** |
+| 5 | 把计数归一落进 `merge()` | `merge_failure_batch()` 与 `success_pattern_mine` 孪生拷贝 |
+
+**结论：根因是「同一份逻辑存在两份拷贝」，不是某个具体 bug。** 故 CR-3 第 3 轮（§3.3 最后一轮）
+的指令是**消除重复计数实现（one count function, not two）**，而非再补一条路径。
 
 ## 人工决策
 
