@@ -19,13 +19,23 @@ empty, which made truncating the stream *improve* the verdict):
 - KPI#1 and KPI#2 read every `audit-results/evidence-*.json*` file: the
   single-record snapshots, the append-only `evidence-local.jsonl` stream and the
   per-run `evidence-<run_id>.jsonl` files scripts/evidence_kernel.py writes.
+  `GATE_EVIDENCE_GLOB` overrides that pattern to grade one named set instead.
 - The gate FAILS when no evidence file exists, and when fewer than
   `evidence_min_records` *fresh* records were read (`evidence_max_age_days`
   window; see validate_evidence_schema.py). Zero evidence is not evidence.
 - Only `GATE_REQUIRE_EVIDENCE=0` restores the old "skip" behaviour, for a repo
-  that is deliberately evidence-free (CI: the evidence stream is machine-local
-  and gitignored, so `validate-skills.yml` runs the gate with that escape and
-  says so in its step name).
+  that is deliberately evidence-free. It short-circuits *before* any file is
+  read, so it is a total escape, not a floor: the only thing that keeps a
+  green KPI#1/#2 honest is the set being graded. CI therefore does not use it —
+  `validate-skills.yml` stages the committed fixture
+  (`scripts/fixtures/evidence/`) and grades that via `GATE_EVIDENCE_GLOB`, so
+  the verdict cannot come from records the job itself wrote: `audit-results/` on
+  a runner holds no fleet evidence, only whatever earlier steps left there (the
+  workflow's own smoke test writes one record, and its unit-test step minted 17
+  more before it was isolated in 2026-09).
+- KPI#7 also fails when the registry itself shrank below
+  `router_min_registry_skills`: deleting an unroutable skill is otherwise the
+  cheapest way to raise the average.
 - KPI#3 and KPI#7 are always enforced (they only need the registry and the
   existing assets/eval_queries.json ground truth). Thresholds come from
   assets/shared/thresholds.json (TE-4 shared constants).
@@ -61,6 +71,11 @@ EVAL_QUERIES_GLOB = "assets/eval_queries.json"  # relative to each skill dir
 THRESHOLDS = ROOT / "assets" / "shared" / "thresholds.json"
 # Where the runbook that tells the on-call how to close the routing gap lives.
 ROUTER_GAP_ANCHOR = "docs/harness-engineering/runbooks/kpi7-router-confusion-failure.md"
+# The evidence set KPI#1/#2 grades, relative to audit-results/. Overridable per
+# run via GATE_EVIDENCE_GLOB so a caller can name the exact set it means: CI
+# points it at a committed fixture (scripts/fixtures/evidence/) that it copies in
+# itself, so the graded bytes are the caller's, not whatever the directory holds.
+EVIDENCE_GLOB = "evidence-*.json*"
 
 
 class GateConfigError(Exception):
@@ -103,18 +118,24 @@ def _run(cmd: list[str]) -> subprocess.CompletedProcess:
 def kpi1_2_safety() -> tuple[str, str, str]:
     """KPI#1 + #2: evidence safety rules via validate_evidence_schema.
 
-    Every `audit-results/evidence-*.json*` file is validated: the single-record
-    `.json` snapshots AND the per-run `.jsonl` streams that
+    Every file matching `EVIDENCE_GLOB` under audit-results/ is validated: the
+    single-record `.json` snapshots AND the per-run `.jsonl` streams that
     scripts/evidence_kernel.py writes (one record per line, named
     `evidence-<run_id>.jsonl` — the round-1 glob `evidence-*.json` could not
     match those at all, so the fleet's real evidence was never read).
+    `GATE_EVIDENCE_GLOB` narrows that set to one name; CI uses it to grade the
+    committed fixture and nothing else, because on a runner this directory holds
+    no fleet evidence — only records earlier steps wrote (the workflow's smoke
+    test writes one; its unit-test step minted 17 more before it was isolated).
 
     Fail-closed on emptiness: a missing stream, or fewer than
     `evidence_min_records` records inside the `evidence_max_age_days` window, is
     a FAIL. Round 1 returned "skip" (and the validator returned rc 0) for an
     empty stream, so truncating the evidence improved the verdict.
-    `GATE_REQUIRE_EVIDENCE=0` is the documented escape for an evidence-free repo
-    (used by CI, whose evidence stream is machine-local and gitignored).
+    `GATE_REQUIRE_EVIDENCE=0` is the documented escape for a deliberately
+    evidence-free repo. It returns *before* the glob, so it skips an absent, an
+    empty and an aged-out stream alike — it is not a floor and it is not a
+    freshness check; see the module docstring.
 
     Returns (status, detail, note) where status in {pass, fail, skip}.
     """
@@ -122,18 +143,19 @@ def kpi1_2_safety() -> tuple[str, str, str]:
         return (
             "skip",
             "GATE_REQUIRE_EVIDENCE=0 — evidence stream is machine-local/untracked here",
-            "KPI#1/#2 not enforced in this environment",
+            "NOT ENFORCED (KPI#1/#2) — GATE_REQUIRE_EVIDENCE=0",
         )
     cfg = _thresholds()  # GateConfigError -> exit 2, not a KPI failure
     min_records = int(_threshold(cfg, "evidence_min_records"))
     max_age_days = _threshold(cfg, "evidence_max_age_days")
-    evidence_files = sorted(AUDIT.glob("evidence-*.json*"))
+    glob = os.environ.get("GATE_EVIDENCE_GLOB") or EVIDENCE_GLOB
+    evidence_files = sorted(AUDIT.glob(glob))
     if not evidence_files:
         return (
             "fail",
             (
-                f"no evidence stream under {AUDIT.name}/ (need >= {min_records} fresh"
-                f" record(s)); set GATE_REQUIRE_EVIDENCE=0 only if this repo is"
+                f"no evidence stream under {AUDIT.name}/{glob} (need >= {min_records}"
+                f" fresh record(s)); set GATE_REQUIRE_EVIDENCE=0 only if this repo is"
                 f" deliberately evidence-free"
             ),
             "",
@@ -182,6 +204,11 @@ def kpi7_router_confusion() -> tuple[str, str, str]:
     15.21%, and set a bound the movable skills could never trip. Every skill left
     out of the average is named in the detail, so a green row still shows what it
     did not measure.
+
+    Both guards are relative to the registry, so the registry itself is floored
+    (`router_min_registry_skills`): deleting a skill the router cannot route
+    raises both averages, which is a smaller registry being reported as a better
+    router.
     """
     if not REGISTRY.exists():
         # Auto-build the registry rather than requiring a prior step in the pipeline.
@@ -226,6 +253,38 @@ def kpi7_router_confusion() -> tuple[str, str, str]:
         if isinstance(v, dict) and "top1_accuracy" in v and keyworded.get(skill)
     ]
     unmeasured = sorted(set(skills) - {skill for skill, _ in scoreable})
+    # Reference per arm, stated because they are not mirrors: the top1 arm
+    # ratchets at the measured baseline (`router_min_top1_accuracy`, a floor) and
+    # the misdelegation arm at its own measured baseline
+    # (`router_max_misdelegation`, a ceiling). Both come from the same
+    # measurement, so the two arms cannot drift apart; the aspirational
+    # `router_target_top1_accuracy` is only used to print the gap.
+    cfg = _thresholds()
+    min_top1 = _threshold(cfg, "router_min_top1_accuracy")
+    max_misdelegation = _threshold(cfg, "router_max_misdelegation")
+    target_top1 = _threshold(cfg, "router_target_top1_accuracy")
+    min_registry_skills = int(_threshold(cfg, "router_min_registry_skills"))
+    # The registry floor: the two guards below and above are both *relative*, so
+    # deleting the worst skill is the cheapest way to raise the average — drop
+    # qcloud-apigw-ops (top1 0.0) and scoreable becomes 15/30, which clears the
+    # half-guard and reports a *better* top1 and misdelegation than the baseline.
+    # Removing a skill that cannot be routed is not a routing improvement, so the
+    # registry may not shrink below the size the ratchet was measured at.
+    # NOTE: "16/31 scoreable" and "30/30 = half of 30" are each exactly one skill
+    # away from their boundary — with today's fleet both guards sit on the edge,
+    # so this floor and the fleet size must move together.
+    if len(skills) < min_registry_skills:
+        return (
+            "fail",
+            (
+                f"registry has {len(skills)} skill(s), below the recorded floor of"
+                f" {min_registry_skills}; a shrunken registry is not a routing"
+                f" measurement. Lower router_min_registry_skills in"
+                f" assets/shared/thresholds.json in the same commit as a deliberate"
+                f" removal, never as a way to raise this average"
+            ),
+            "",
+        )
     # A measurement covering less than half the registry is not a measurement of
     # the registry — fail rather than report a green on a degenerate sample.
     if len(scoreable) * 2 < len(skills):
@@ -237,16 +296,6 @@ def kpi7_router_confusion() -> tuple[str, str, str]:
             ),
             "",
         )
-    # Reference per arm, stated because they are not mirrors: the top1 arm
-    # ratchets at the measured baseline (`router_min_top1_accuracy`, a floor) and
-    # the misdelegation arm at its own measured baseline
-    # (`router_max_misdelegation`, a ceiling). Both come from the same
-    # measurement, so the two arms cannot drift apart; the aspirational
-    # `router_target_top1_accuracy` is only used to print the gap.
-    cfg = _thresholds()
-    min_top1 = _threshold(cfg, "router_min_top1_accuracy")
-    max_misdelegation = _threshold(cfg, "router_max_misdelegation")
-    target_top1 = _threshold(cfg, "router_target_top1_accuracy")
     top1_arm = [v["top1_accuracy"] for _, v in scoreable if v["top1_accuracy"] is not None]
     misd_arm = [v["misdelegation"] for _, v in scoreable if v["misdelegation"] is not None]
     if not top1_arm or not misd_arm:
@@ -329,15 +378,22 @@ def main() -> int:
     print("| KPI | Status | Detail |")
     print("|---|---|---|")
     failed = 0
-    skipped = 0
     for label, (status, detail, note) in results.items():
         marker = {"pass": "✅", "fail": "❌", "skip": "⏭ ", "informational": "ℹ️ "}[status]
         suffix = f" — {note}" if note else ""
         print(f"| {label} | {marker} {status} | {detail}{suffix} |")
         if status == "fail":
             failed += 1
-        elif status == "skip" or status == "informational":
-            skipped += 1
+    # The escape skip and KPI#8's informational skip are both "skip", but only
+    # one of them is harmless. Summarising them with one word put "informational"
+    # on the last line a CI reader sees, over a skipped *safety* KPI (H-19).
+    informative = sum(
+        1 for _label, (s, _d, note) in results.items()
+        if s in ("skip", "informational") and "NOT ENFORCED" not in note
+    )
+    not_enforced = sum(
+        1 for _label, (_s, _d, note) in results.items() if "NOT ENFORCED" in note
+    )
 
     AUDIT.mkdir(exist_ok=True)
     (AUDIT / "kpi-gate-report.json").write_text(
@@ -353,7 +409,10 @@ def main() -> int:
     if failed:
         print(f"\nKPI GATES FAIL: {failed} enforced KPI(s) failed")
         return 1
-    print(f"\nKPI GATES PASS: enforced KPIs green; {skipped} skipped (informational)")
+    tail = f"{informative} skipped (informational)"
+    if not_enforced:
+        tail += f", {not_enforced} NOT ENFORCED (KPI#1/#2)"
+    print(f"\nKPI GATES PASS: enforced KPIs green; {tail}")
     return 0
 
 

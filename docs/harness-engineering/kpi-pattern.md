@@ -109,7 +109,10 @@ denominator was still wrong: it averaged in 15 skills the router cannot return
 misdelegation against a bound derived from the *aspirational* target
 (`1 - 0.70 = 30%`), i.e. 4× headroom that only the 11 reachable skills could
 ever close. Both ratchets now come from the same measured baseline
-(0.28 / 0.16) and the excluded skills are named in the detail string.
+(0.28 / 0.16) and the excluded skills are named in the detail string. Both sit
+within a percentage point of the measurement they came from (0.28 vs 28.2755%,
+0.16 vs 15.2083%) while a single flipped query moves the average by ≥1.25pp — so
+the ratchet fires on *any* degradation, not on a large one (obs. 8).
 
 > ⚠️ **The ratchet is self-referential — know what that buys.** `router_min_top1_accuracy`
 > and `router_max_misdelegation` live in `assets/shared/thresholds.json`, which
@@ -156,12 +159,12 @@ that `make kpi-gates` actually enforces today (Sep 2026), the matrix is:
 | Attribute | KPI#1 leak | KPI#2 token | KPI#3 golden | KPI#7 router |
 |-----------|------------|-------------|--------------|--------------|
 | Observable | ✅ | ✅ | ✅ | ✅ |
-| Thresholded | ✅ floor: `evidence_min_records` / `evidence_max_age_days` | ✅ same | ✅ | ✅ ratchet 0.28 / ceiling 0.16, target 0.70 (gap printed) |
+| Thresholded | ✅ `evidence_min_records` / `evidence_max_age_days` — **neither has fired on real data** (obs. 6) | ✅ same | ✅ | ✅ ratchet 0.28 / ceiling 0.16, target 0.70 (gap printed); plus a registry floor, `router_min_registry_skills` |
 | Authoritative source | ✅ | ✅ | ✅ | ✅ |
-| Skip-aware | ✅ only via explicit `GATE_REQUIRE_EVIDENCE=0`; an absent, short or aged-out stream FAILS | ✅ same | ✅ | ⚠️ never skips in practice |
+| Skip-aware | ✅ an absent, short or aged-out stream FAILS — **unless** `GATE_REQUIRE_EVIDENCE=0`, which returns before any file is read and so skips all three; CI never sets it (obs. 4) | ✅ same | ✅ | ⚠️ never skips in practice |
 | Aggregatable | ✅ | ✅ | ✅ | ✅ |
 | Failure-mode-defined | ✅ [rb1](./runbooks/kpi1-leak-checked-failure.md) | ✅ [rb2](./runbooks/kpi2-destructive-token-plan-hash-failure.md) | ✅ [rb3](./runbooks/kpi3-golden-coverage-failure.md) | ✅ [rb7](./runbooks/kpi7-router-confusion-failure.md) |
-| CI-hooked | ✅ | ✅ | ✅ | ✅ `make kpi-gates`, **blocking** CI step "KPI gates" in `validate-skills.yml` |
+| CI-hooked | ✅ `make kpi-gates` locally; the **blocking** "KPI gates" step in `validate-skills.yml` stages `scripts/fixtures/evidence/` and asserts the clean fixture passes *and* the violating one exits 1 (obs. 7). The fleet stream is never graded in CI — it cannot be | ✅ same | ✅ | ✅ `make kpi-gates`, **blocking** CI step "KPI gates" in `validate-skills.yml` |
 | Drift-detectable | ⚠️ | ⚠️ | ✅ | ⚠️ |
 
 **Observations:**
@@ -188,10 +191,43 @@ that `make kpi-gates` actually enforces today (Sep 2026), the matrix is:
    for a repo with no evidence is an explicit `GATE_REQUIRE_EVIDENCE=0` skip that
    says so, not a silent pass. Prefer the escape to a permissive default: an
    opt-out is auditable in the CI file, a default is invisible.
-4. **Drift detection is uneven.** Only KPI#3 has a working
+   *Correction (2026-09-20):* that escape is a **total** escape — it returns
+   before the glob, so with it set an absent, a present-but-empty and an
+   aged-out stream all `skip`, and a safety KPI can never fail the build. It is
+   an opt-out for machines that are *deliberately* evidence-free, not a floor
+   and not a freshness check; CI no longer sets it (obs. 7).
+5. **Drift detection is uneven.** Only KPI#3 has a working
    drift-detector (the threshold-drift case in
    [spec-drift-gate.md](./spec-drift-gate.md)). The other three could
    silently rot.
+6. **The two evidence thresholds have never fired on real data.** Every stream
+   measured so far — 357 and 550 records — reported `0 aged-out`, and none was
+   near the floor of 10, so `evidence_min_records` / `evidence_max_age_days` are
+   asserted only by tests and by the CI fixture. They are not arbitrary (10
+   records / 90 days are reasonable values), but the **first** time they fire
+   will also be the first time anyone sees them work — read
+   [rb1](./runbooks/kpi1-leak-checked-failure.md) V4/V5 before touching them.
+   Both are genuinely exercised by `scripts/fixtures/evidence/`: 12 fresh records
+   (above the floor) and 3 dated 2020 (aged out, reported and not counted).
+7. **For KPI#1/#2, "CI-hooked" now means a fixture, not the fleet.** Evidence
+   records are *output* of the code under review, so no CI job can grade the
+   fleet's behaviour offline. What CI can prove — and the blocking "KPI gates"
+   step now does — is that the safety **rules** are alive: the committed clean
+   fixture must pass and the committed violating fixture must exit 1.
+   `GATE_EVIDENCE_GLOB` names the graded set and the step writes that file
+   itself, so the verdict cannot come from whatever else sits in
+   `audit-results/` on the runner: that directory is machine-local and holds no
+   fleet evidence, only the records earlier steps left there (the workflow's own
+   smoke test writes one today; the unit-test step minted 17 more until it was
+   isolated in 2026-09, which is what the old escape was hiding).
+8. **KPI#7's ratchet has sub-percentage-point granularity.** `0.28` sits
+   0.2755pp under the measured 28.2755% (the misdelegation ceiling is 0.79pp
+   under its own baseline), while the smallest reachable step is one flipped
+   query — ≥1.25pp for a skill with 5 positives. Read literally that is "no
+   degradation at all": a legitimate coverage change (a new hard positive) can
+   trip it, and the printed `BELOW TARGET 70.00%` gap understates how tight the
+   floor is. Treat a first-time KPI#7 failure as "a query moved" until the diff
+   says otherwise; the value is deliberately left where the measurement put it.
 
 **Use this template to score your own KPIs.** A KPI with two ⚠️ rows
 is acceptable; four is a smell. If a KPI has ⚠️ on Failure-mode-defined

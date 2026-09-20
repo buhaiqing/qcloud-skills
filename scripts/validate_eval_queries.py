@@ -78,7 +78,9 @@ def _validate_file(path: Path, min_positive: int, min_negative: int) -> list[str
                     f"{label}: positive declares expected_skill={declared!r} but owns"
                     f" {owner!r}; KPI#7 scores positives against the owning directory"
                     f" (harness_router.confusion_matrix), so this case would be"
-                    f" counted as a router miss even if delegation is correct"
+                    f" counted as a router miss even if delegation is correct."
+                    f" A genuinely cross-skill positive is expressed by *deleting*"
+                    f" the label (nothing but this validator reads it), not here"
                 )
         else:
             negatives += 1

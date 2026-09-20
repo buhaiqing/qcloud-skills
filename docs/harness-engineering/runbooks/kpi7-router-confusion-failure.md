@@ -10,6 +10,7 @@
 ❌ fail | KPI#7 router confusion matrix | 16/31 skills scored; avg top1=24.10% avg misdelegation=15.21%; unmeasured: … — below ratchet 28.00%
 ❌ fail | KPI#7 router confusion matrix | 16/31 skills scored; avg top1=28.28% avg misdelegation=21.00%; unmeasured: … — above misdelegation ceiling 16.00%
 ❌ fail | KPI#7 router confusion matrix | only 12/31 skills are scoreable (need >= half); unmeasured: qcloud-agsx-ops, …
+❌ fail | KPI#7 router confusion matrix | registry has 30 skill(s), below the recorded floor of 31; …
 ```
 
 Or — when KPI#7 passes but the avg `top1_accuracy` drops sharply vs
@@ -23,7 +24,16 @@ Both arms are averaged over **scoreable** skills — those with a confusion
 matrix *and* non-empty `intent_keywords` in the registry. A skill the router can
 never return scores a structural 0.0 on both arms, so it is excluded and named
 in `unmeasured:`. If that list grows past half the registry the gate fails
-outright rather than report a green average over a minority.
+outright rather than report a green average over a minority. The registry itself
+is floored too (`router_min_registry_skills`): deleting a skill the router cannot
+route would otherwise raise both averages, so a shrunken registry fails.
+
+The ratchet is tight **on purpose**: 0.28 is 0.2755pp under the measured
+28.2755%, and the smallest reachable step is one flipped query (≥1.25pp for a
+skill with 5 positives). A first-time KPI#7 failure is therefore usually "a query
+or a keyword moved", not "the router broke" — read the diff before touching
+`thresholds.json`, and remember that lowering a ratchet without a runbook note is
+a KPI weakening, not a fix.
 
 ## First diagnosis
 
@@ -75,6 +85,20 @@ jq -r '.skills[] | select((.intent_keywords|length)==0) | .name' audit-results/s
 Fix: add `metadata.intent_keywords` to that skill's SKILL.md frontmatter
 (operation aliases from `cli_support_evidence`) — the same edit that fixes V3.
 The gate does not let you fix it by deleting eval_queries.json.
+
+**V6: the registry shrank.** The detail reads `registry has N skill(s), below the
+recorded floor of 31`. Both KPI#7 guards are relative to the fleet, so deleting a
+skill the router cannot route raises both averages — that is not a routing
+improvement, it is a deleted measurement.
+
+```bash
+ls -d qcloud-*-ops | wc -l    # expect 31
+```
+
+Fix: restore the deleted skill directory (and make it routable — V3/V5), or, if
+the removal is deliberate, lower `router_min_registry_skills` in
+`assets/shared/thresholds.json` **in the same commit** and say so in the runbook
+note. Never lower it to turn this row green on its own.
 
 ## Fix command
 

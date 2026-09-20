@@ -26,6 +26,17 @@ FLOOR = json.loads(
     (ROOT / "assets" / "shared" / "thresholds.json").read_text(encoding="utf-8")
 )["evidence_min_records"]
 
+# The KPI#1/#2 CI hook grades these committed fixtures (see
+# scripts/fixtures/evidence/ and the "KPI gates" step in validate-skills.yml).
+# Their *fresh* records are dated 2099: a fixture cannot carry a true capture
+# time, and a past date would rot into a freshness failure. The deliberately
+# 2020-dated records in the clean fixture exercise the ageing path.
+FIXTURES = ROOT / "scripts" / "fixtures" / "evidence"
+CLEAN_FIXTURE = "evidence-safety-clean.jsonl"
+VIOLATING_FIXTURE = "evidence-safety-violating.jsonl"
+# Fleet size the router-threshold fixture pins `router_min_registry_skills` to.
+FIXTURE_FLEET = 3
+
 # Schema-valid EvidenceRecord with KPI#1 (leak_checked) / KPI#2 clean.
 VALID_EVIDENCE = {
     "skill": "qcloud-cvm-ops", "run_id": "r1", "phase": "self-test",
@@ -78,6 +89,8 @@ def _write_repo(
     *,
     a_negative: dict = _CLEAN_NEGATIVE,
     missing_eval: tuple[str, ...] = (),
+    drop: tuple[str, ...] = (),
+    min_registry_skills: int = FIXTURE_FLEET,
 ) -> Path:
     """Fixture: qcloud-a-ops gets its positive query wrong (routes to b),
     qcloud-b-ops gets its own right -> avg top1 = (0.0 + 1.0) / 2 = 0.50,
@@ -87,23 +100,28 @@ def _write_repo(
     eval_queries.json, so the *old* aggregation averaged it in as a 0.0/0.0 and
     reported 33.33% — it is the "unmeasured" skill the detail must name.
     `a_negative` swaps in a negative that routes back to a-ops (misdelegation);
-    `missing_eval` deletes a skill's eval file to shrink the scoreable set.
+    `missing_eval` deletes a skill's eval file to shrink the scoreable set;
+    `drop` deletes the skill dir AND its registry entry, leaving
+    `router_min_registry_skills` (pinned to the pre-drop fleet, as the real
+    threshold is) as the only guard against a shrunken registry.
     """
+    fleet = [
+        {"name": "qcloud-a-ops", "intent_keywords": ["ZzzNeverUsedKeyword"]},
+        {"name": "qcloud-b-ops", "intent_keywords": ["RunCvmInstance"]},
+        {"name": "qcloud-c-ops", "intent_keywords": []},
+    ]
     (root / "assets" / "shared").mkdir(parents=True)
     (root / "assets" / "shared" / "thresholds.json").write_text(
         json.dumps({"router_min_top1_accuracy": min_top1,
                     "router_max_misdelegation": max_misd,
-                    "router_target_top1_accuracy": target_top1}),
+                    "router_target_top1_accuracy": target_top1,
+                    "router_min_registry_skills": min_registry_skills}),
         encoding="utf-8",
     )
     audit = root / "audit-results"
     audit.mkdir()
     (audit / "skill-registry.json").write_text(
-        json.dumps({"skills": [
-            {"name": "qcloud-a-ops", "intent_keywords": ["ZzzNeverUsedKeyword"]},
-            {"name": "qcloud-b-ops", "intent_keywords": ["RunCvmInstance"]},
-            {"name": "qcloud-c-ops", "intent_keywords": []},
-        ]}),
+        json.dumps({"skills": [s for s in fleet if s["name"] not in drop]}),
         encoding="utf-8",
     )
     queries = {
@@ -112,7 +130,7 @@ def _write_repo(
         "qcloud-c-ops": _C_QUERIES,
     }
     for name, cases in queries.items():
-        if name in missing_eval:
+        if name in missing_eval or name in drop:
             continue
         assets = root / name / "assets"
         assets.mkdir(parents=True)
@@ -203,6 +221,22 @@ class Kpi7RouterThresholdTest(unittest.TestCase):
         self.assertIn("qcloud-b-ops", detail)
         self.assertIn("qcloud-c-ops", detail)
 
+    def test_fails_when_a_skill_was_deleted_from_the_registry(self) -> None:
+        """A PR that deletes a skill it cannot make route legitimately used to
+        raise *both* averages: dropping qcloud-a-ops leaves 2/2 scoreable, so the
+        half-guard passes and the green row reports better numbers than the
+        baseline. The registry floor is the guard that catches it."""
+        with _router_fixture(0.10, 0.70, drop=("qcloud-a-ops",)), _quiet():
+            status, detail, _ = check_kpi_gates.kpi7_router_confusion()
+        self.assertEqual(status, "fail")
+        self.assertIn("registry has 2 skill(s), below the recorded floor of 3", detail)
+        # L6 (silent side): the same fixture with nothing dropped is inside the
+        # floor, so the guard stays quiet on a healthy registry.
+        with _router_fixture(0.10, 0.40), _quiet():
+            status, detail, _ = check_kpi_gates.kpi7_router_confusion()
+        self.assertEqual(status, "pass")
+        self.assertNotIn("below the recorded floor", detail)
+
     def test_green_row_names_the_skills_it_did_not_measure(self) -> None:
         """A skill with empty intent_keywords has an eval file but scores a
         structural 0.0 on both arms (the router can never return it), so it is
@@ -282,6 +316,9 @@ class Kpi1SafetyEvidenceTest(unittest.TestCase):
             status, detail, _ = check_kpi_gates.kpi1_2_safety()
         self.assertEqual(status, "fail")
         self.assertIn("0 fresh record(s)", detail)
+        # "0 fresh" alone cannot be told apart from an empty stream; the aged-out
+        # count is what sends the on-call to runbook V5 instead of V4.
+        self.assertIn(f"{FLOOR} record(s) were read but aged out beyond", detail)
         with self._audit_dir(self._records(FLOOR) + self._records(FLOOR, days_ago=3650)):
             status, detail, _ = check_kpi_gates.kpi1_2_safety()
         self.assertEqual(status, "pass")
@@ -307,6 +344,105 @@ class Kpi1SafetyEvidenceTest(unittest.TestCase):
                 self.assertEqual(check_kpi_gates.main(), 0)  # silent: clean stream
                 (audit / "evidence-local.jsonl").write_text("{not json}\n", encoding="utf-8")
                 self.assertEqual(check_kpi_gates.main(), 1)  # fires
+
+
+class CommittedEvidenceFixtureTest(unittest.TestCase):
+    """The KPI#1/#2 CI hook grades the committed fixtures in
+    scripts/fixtures/evidence/, staged by the workflow step under one name and
+    selected by GATE_EVIDENCE_GLOB. L6: the clean fixture must stay silent and
+    the violating one must fire in the same environment CI uses."""
+
+    @staticmethod
+    def _text(name: str) -> str:
+        return (FIXTURES / name).read_text(encoding="utf-8")
+
+    @contextlib.contextmanager
+    def _graded(self, name: str):
+        """Stage a fixture the way the workflow does, under the graded name."""
+        with tempfile.TemporaryDirectory() as td:
+            audit = Path(td) / "audit-results"
+            audit.mkdir()
+            staged = audit / "evidence-fixture.jsonl"
+            staged.write_text(self._text(name), encoding="utf-8")
+            with mock.patch.object(check_kpi_gates, "AUDIT", audit), \
+                    mock.patch.dict(os.environ,
+                                    {"GATE_EVIDENCE_GLOB": staged.name}):
+                yield staged
+
+    def test_clean_fixture_stays_silent_and_exercises_the_age_path(self) -> None:
+        with self._graded(CLEAN_FIXTURE):
+            status, detail, _ = check_kpi_gates.kpi1_2_safety()
+        self.assertEqual(status, "pass")
+        self.assertIn("record(s) valid", detail)
+        # the aged-out branch ran: the 2020-dated records are reported, not counted
+        self.assertIn("aged-out", detail)
+
+    def test_violating_fixture_fires_both_safety_rules(self) -> None:
+        with self._graded(VIOLATING_FIXTURE):
+            status, detail, _ = check_kpi_gates.kpi1_2_safety()
+        self.assertEqual(status, "fail")
+        self.assertIn("KPI#1 requires leak_checked=true", detail)
+        self.assertIn("KPI#2 destructive op requires a non-null confirmation token", detail)
+
+    def test_main_exits_0_on_the_clean_fixture_and_1_on_the_violating_one(self) -> None:
+        """What the workflow asserts, end to end: the very command CI runs goes
+        red if the safety rules stop firing."""
+        with self._graded(CLEAN_FIXTURE) as staged, _stub_other_kpis(), _quiet():
+            self.assertEqual(check_kpi_gates.main(), 0)
+            staged.write_text(self._text(VIOLATING_FIXTURE), encoding="utf-8")
+            self.assertEqual(check_kpi_gates.main(), 1)
+
+    def test_graded_set_is_the_named_file_not_the_local_stream(self) -> None:
+        """Steps in the same CI job write into this directory (the smoke test
+        writes one record; the unit tests minted 17 more until they were
+        isolated), so a default glob can grade records the job wrote seconds
+        earlier — the defect. Naming the fixture excludes them."""
+        forged = [{**VALID_EVIDENCE,
+                   "safety": {**VALID_EVIDENCE["safety"], "leak_checked": False}}]
+        with tempfile.TemporaryDirectory() as td:
+            audit = Path(td) / "audit-results"
+            audit.mkdir()
+            (audit / "evidence-local.jsonl").write_text(
+                "\n".join(json.dumps(r) for r in forged * (FLOOR + 1)) + "\n",
+                encoding="utf-8",
+            )
+            (audit / "evidence-fixture.jsonl").write_text(
+                self._text(CLEAN_FIXTURE), encoding="utf-8")
+            with mock.patch.object(check_kpi_gates, "AUDIT", audit):
+                status, detail, _ = check_kpi_gates.kpi1_2_safety()
+                self.assertEqual(status, "fail")          # the minted stream is read
+                self.assertIn("leak_checked", detail)
+                with mock.patch.dict(os.environ,
+                                     {"GATE_EVIDENCE_GLOB": "evidence-fixture.jsonl"}):
+                    status, detail, _ = check_kpi_gates.kpi1_2_safety()
+        self.assertEqual(status, "pass")                  # the fixture is read instead
+
+    def test_clean_fixture_supplies_the_configured_floor(self) -> None:
+        """The fixture exists to exercise the floor and the ageing window: raising
+        evidence_min_records past what it supplies must break this test loudly
+        instead of silently reddening CI."""
+        rows = [json.loads(line) for line in self._text(CLEAN_FIXTURE).splitlines()
+                if line.strip()]
+        fresh = [r for r in rows if not r["provenance"]["captured_at"].startswith("2020")]
+        self.assertGreaterEqual(len(fresh), FLOOR)
+        self.assertTrue(len(rows) > len(fresh), "no aged-out record: ageing unexercised")
+
+
+class GateFooterTest(unittest.TestCase):
+    """H-19: the escape skip and KPI#8's informational skip must not be
+    summarised by one word — a CI reader takes the last line as the verdict."""
+
+    def test_footer_separates_not_enforced_from_informational(self) -> None:
+        with tempfile.TemporaryDirectory() as td, _stub_other_kpis():
+            audit = Path(td) / "audit-results"
+            audit.mkdir()
+            with mock.patch.object(check_kpi_gates, "AUDIT", audit), \
+                    mock.patch.dict(os.environ, {"GATE_REQUIRE_EVIDENCE": "0"}), \
+                    contextlib.redirect_stdout(buf := io.StringIO()):
+                self.assertEqual(check_kpi_gates.main(), 0)
+        out = buf.getvalue()
+        self.assertIn("1 skipped (informational)", out)
+        self.assertIn("1 NOT ENFORCED (KPI#1/#2)", out)
 
 
 class GateConfigErrorTest(unittest.TestCase):

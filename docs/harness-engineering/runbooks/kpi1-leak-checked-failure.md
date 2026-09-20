@@ -13,17 +13,24 @@ The gate also fails (and this runbook covers) the three *evidence-supply*
 failures, which never name a record because there is nothing to name:
 
 ```
-❌ fail | no evidence stream under audit-results/ (need >= 10 fresh record(s)) …
+❌ fail | no evidence stream under audit-results/evidence-*.json* (need >= 10 fresh record(s)) …
 ❌ fail | FAIL only 0 fresh record(s) read; --min-records floor is 10
-❌ fail | FAIL only 0 fresh record(s) read; --min-records floor is 10
-         (N records were read but all aged out — see V5)
+❌ fail | FAIL only 0 fresh record(s) read; --min-records floor is 10 (12 record(s) were read but aged out beyond 90d)
 ```
+
+The third form is V5 — the trailing aged-out count is what tells the two apart,
+so quote it when you escalate.
 
 ## First diagnosis
 
 ```bash
 python3 scripts/validate_evidence_schema.py --min-records 10 --max-age-days 90 audit-results/evidence-*.json*
 ```
+
+The graded set is every `audit-results/evidence-*.json*` file unless
+`GATE_EVIDENCE_GLOB` names one instead (CI names its committed fixture — see the
+"KPI gates" step in `validate-skills.yml`; it is the fixture's verdict, not this
+machine's, that CI blocks on).
 
 The failing `N` and file identify the producer. A count line
 `OK: N record(s) valid, M aged-out` tells you how much of the stream is too old
@@ -58,12 +65,14 @@ for an empty stream.
 
 **V5: The stream is entirely aged out.** Every record is older than
 `evidence_max_age_days` (90) — the expiry is working, and the fleet/this machine
-has stopped emitting. Confirm with the `aged-out` count in the validator output,
-then check that runs are still happening:
+has stopped emitting. Confirm with the `aged-out` count in the validator output
+(V4 and V5 are the same first line without it), then check that runs are still
+happening:
 
 ```bash
-ls -l --time-style=long-iso audit-results/evidence-*.json*
+ls -l audit-results/evidence-*.json*     # portable; `--time-style` is GNU-only (fails on macOS)
 ```
+
 
 Note the two rules are deliberately different: a *stale-but-violating* record
 still fails KPI#1/#2 (a destructive op without a token is a violation whenever it

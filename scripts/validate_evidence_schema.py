@@ -181,8 +181,17 @@ def main(argv: list) -> int:
             else:
                 fresh.append(rec)
     if len(fresh) < args.min_records:
+        # Name the aged-out count when there is one: "0 fresh" otherwise reads
+        # identically for an empty stream and for a machine that stopped running
+        # the harness, which are two different on-call actions (runbook V4/V5).
+        aged_note = (
+            f" ({aged} record(s) were read but aged out beyond {args.max_age_days:g}d)"
+            if aged
+            else ""
+        )
         errors.append(
-            f"only {len(fresh)} fresh record(s) read; --min-records floor is {args.min_records}"
+            f"only {len(fresh)} fresh record(s) read; --min-records floor is"
+            f" {args.min_records}{aged_note}"
         )
     if errors:
         for err in errors:
