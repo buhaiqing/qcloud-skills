@@ -48,6 +48,11 @@
 | 00:2x | 编排者判定「每轮修复都引入同等级新缺陷」→ 提交人工决策 |
 | — | 用户裁定 **Plan A**：停止打补丁，改做根因 CR |
 | 00:3x | CR-3 `artifact-isolation` 派出；Generator 停滞被看门狗终止（未 commit 的 7 文件在盘） |
+| 08:44 | 编排者接管：写本审计登记（`2c8aa70`），补 `AGENTS.md` L25、修正 L24 陈旧数字、`TODO.md` 加指针 |
+| 08:47 | CR-3 Generator 恢复并提交 `724afc9` |
+| 08:5x | 编排者独立复现 5 项此前损坏行为，全部通过（见 §D） |
+| 09:0x | **CR-3 Round 1 Critic**：3A / 3B 均 NEEDS-WORK（**无 BLOCKER**，为三轮中最轻）；确认 H-21…H-28 全数关闭 |
+| — | CR-3 Round 2 派出（处理 H-29…H-39）；登记表同步刷新 |
 
 ## 已交付
 
@@ -58,6 +63,8 @@
 | `737e722` | CR-2 R2 | 计数改为 distinct traces；不再修剪本轮观测项；cap 落实 |
 | `30744b7` | CR-2 R2 | store 段落空行；重算后重建 store |
 | `f92f633` | CR-1 R2 | KPI gate 读真实证据流与真实路由基线 |
+| `2c8aa70` | — | 本审计登记（文档） |
+| `724afc9` | CR-3 R1 | **根因**：pattern store 与测试工作区隔离 + 格式可往返（关闭 H-21…H-28） |
 
 **独立验证（编排者亲自复现，非采信 subagent 报告）：**
 
@@ -108,18 +115,43 @@ CR-1 修复后:  avg top1=28.28%（16 个可评分 skill 口径），真实 fall
 | **H-19** | CI 尾行把安全类 skip 与信息类 skip 合并计为 `skipped (informational)` | `check_kpi_gates.py:346` | 🟡 |
 | **H-20** | `evidence_min_records: 10` 与 `evidence_max_age_days: 90` **两个阈值从未在真实数据上触发过** | 真实流：`OK: 357/550 record(s) valid, 0 aged-out` | 🟡 |
 
-### D. 产物格式（CR-3 范围，部分未完成时保留在此）
+### D. 产物格式 —— ✅ **已关闭**（CR-3 `724afc9`，2026-09-20）
+
+> 两个 Critic 独立确认「H-21…H-28 all genuinely closed by execution」。
+> 编排者另在一次性副本中独立复现了下列全部 5 项（此前均为实测损坏）。
+
+| ID | 现象 | 关闭证据 |
+|---|---|---|
+| **H-21** ✅ | `\|` 出现在 `command`/`error`/`fix` → 8 列变 9 格 → `Count` 读错列、`error` 被截断 → prune 见陈旧键 → 删除 → merge 重加 → **每轮同时报 `Retired: 1` + `New patterns: 1`** | `\|` 已转义；`parse_existing` 还原出精确 key `('qcloud-pipe-ops','tccli cvm Run \| jq .','InvalidParameter: a \| b')`，count=1；sources 改为 JSON 数组 |
+| **H-22** ✅ | 文件名含空格 → `sources` 空格分隔被切碎 → **count 每轮 +1** | 4 次运行 count **恒为 1**，sources 稳定为 `['ev il trace.json']` |
+| **H-23** ✅ | R3 gate 在 line cap **之前**求值，`missing` 恒为空 → cap 丢弃观测项仍 exit 0 | 250 traces → `Dropped (cap 200): 106`，gate **逐个点名** 106 个丢失 key，**rc=3** |
+| **H-24** ✅ | `merge()` 对无 sources 的行把 `count` 重置为 1 | 无 sources 且 `count=11` 的行 + 一次观测 → 保留并递增，不再重置 |
+| **H-25** ✅ | `reflexion_retrieve retrieve --json` → `TypeError: Object of type set is not JSON serializable` | 返回合法 JSON，rc=0 |
+| **H-26** ✅ | `enforce_line_cap` 无 `max_lines` 参数 → warm 层被静默压到 200 行 | 已参数化 |
+| **H-27** ✅ | store 内嵌说明仍教已废弃语义 | 已改写为新语义 |
+| **H-28** ✅ | `write_trace()` 在 cap 处静默驱逐 | 已报告驱逐 |
+
+**根因（接缝）也已关闭** —— 编排者实测：全量 672 个测试跑完后，
+`docs/failure-patterns.md` 的 md5 与 `audit-results/evidence-local.jsonl` 行数**双双不变**；
+Critic 另验证 `pytest`（964 passed）与 `gcl_runner --root <tmp>` 两条路径同样不污染仓库副本。
+
+#### D-新. CR-3 Round-1 Critic 发现的新增未关闭项
+
+> CR-3 的 Round-2 已派出处理；**这些是本轮新引入/新暴露的，不是历史遗留**。
 
 | ID | 现象 | 证据 | 严重度 |
 |---|---|---|---|
-| **H-21** | `\|` 出现在 `command`/`error`/`fix` → 8 列变 9 格 → `Count` 读错列、`error` 被截断 → prune 见陈旧键 → 删除 → merge 重加 → **每轮同时报 `Retired: 1` + `New patterns: 1`（Round 1 原 bug 复活）** | 实测 `\|` → `len(cells)=9`；`command` 由 `gcl_runner` 从实际 shell 命令构造，管道符是常态 | 🔴 |
-| **H-22** | 文件名含空格 → `sources` 空格分隔被切碎 → **count 每轮 +1**（count 再次成为「扫描次数」的函数，`--promote` 可伪造） | `ev il trace.json`：run1 count=1 → run2 count=**4** | 🔴 |
-| **H-23** | R3 gate 在 line cap **之前**求值，且 `missing` 两侧对同一列表求 key 恒为空 → cap 丢弃观测项仍 exit 0 | 250 traces → `Dropped (cap 200): 99`，**exit 0**，99 条观测键消失 | 🔴 |
-| **H-24** | `merge()` 对**无 sources 集合**的行把 `count` 重置为 1；`reflexion_store.store_failure_pattern()` 是**第三个写者**、从不记录 sources | `count=10` 行 + 一条新 trace → `count=1` | 🔴 |
-| **H-25** | 已发布的 CLI 接口被打崩：`reflexion_retrieve retrieve --json` → `TypeError: Object of type set is not JSON serializable` | `reflexion_retrieve.py:279`；**无测试覆盖 `--json`**，故发布 | 🔴 |
-| **H-26** | `enforce_line_cap` 无 `max_lines` 参数 → warm 层被静默压到 200 行而非其声明的 500（`WARM_LIMIT`/`COLD_LIMIT` 成为不可达常量） | `reflexion_store.py:145`；300 行追加 warm → 152 行 / 200 行 | 🟠 |
-| **H-27** | store 内嵌的自我说明仍在教 Round 2 已废弃的语义（"If existing: increment count" / "prune count<3"） | `failure_pattern_extract.py:628-629` 渲染进每个重建的 store | 🟠 |
-| **H-28** | `write_trace()` 在 cap 处静默驱逐已存 pattern，返回值被 `gcl_runner.py:726` 丢弃 | capped store + 1 次 `write_trace` → `True`，行数不变，一条 pattern 消失 | 🟠 |
+| **H-29** | `--layered` 走另一条 emitter（`emit_layer`，7 列、无 `Sources`）→ `_sources_recorded=False` → `merge()` 用 `len(sources)` 覆盖存储值 → **Round 2 的「Sources 静默胜出」由一个 flag 即可复现** | `count=6 sources=6` → `--layered` → 一次重观测 → **`count=1`** | 🔴 |
+| **H-30** | 转义在单元格边缘不对称：`unescape_cell(c.strip().strip("`"))` 对**仍处转义态**的文本剥反引号 → 转义的尾反引号被孤立。`error` 是去重键的一部分 → 同一故障会**改键成新行** | 23 组 fuzz → **14 处不匹配**；`error = "expected \`"` 读回 `expected \` | 🔴 |
+| **H-31** | 单元格内含 `\n`/`\r` → `parse_existing` 按行切分 → **整行静默消失**，而 `write_trace` 仍返回 `True` | `error = "boom\n\| forged \| row"` → `parse_existing` 返回 **0 行**（合法行原本存在） | 🔴 |
+| **H-32** | `docs/reflexion-memory.md:128` 称「**三条**路径写该文件」—— **第四次**错。实际第四条是 `failure_pattern_extract.main`（`:859`、`:822` 经 `HOT_PATH`），未出现在任何表格行 | 3B 复现；本轮 CR 重写的两个 docstring 反而**点出了**这条路径 | 🟠 |
+| **H-33** | 「store 不可能被误改」是**调用方纪律而非代码保证**：`reflexion_auto_writer.py:86` 仍默认 `PATTERNS_FILE`。一次不带 `patterns_path` 的调用即改变已提交 store 的 sha | `ea524363611f → ae54c1283c2c`，并新增一行 | 🟠 |
+| **H-34** | exit-3 消息给出的成因**结构上不可能**（空 `skill` 键永不进入 `observed`），两条补救措施**均无效**（`--min-count` 与 cap 驱逐无关；`MAX_LINES` 无 CLI 开关）。且它会让 `make reflexion-update` 变红 | 250 traces → exit 3 → `make: *** [reflexion-update] Error 3` | 🟠 |
+| **H-35** | `severity` / `last_seen` 是仅有的两个未转义单元格；一个反引号即可吃掉整个 `Sources` 单元格（provenance 被毁、count 不变） | `severity='a\`b'` → `sources=[]` | 🟡 |
+| **H-36** | hot→warm 降级触发器**不可达**：`HOT_LIMIT = 200` 按**行数**比较，而 200 行实测只容 ~130 行；`docs/failure-patterns-warm.md` / `-cold.md` 在仓库中不存在 | 5 类分节满载 → 130 行存活 | 🟡 |
+| **H-37** | 每个单元格的 `.strip()` 抹掉首尾空白与制表符 → 同一故障**改键成新行** | `' lead-trail '` → `'lead-trail'`；`'\ttab'` → `'tab'` | 🟡 |
+| **H-38** | `docs/failure-patterns.md` 表头内嵌当天日期 → 「byte-identical」仅在**同一天内**成立 | `failure_pattern_extract.py:620`；同日两次运行 md5 相同 | 🟡 |
+| **H-39** | 证据已跟随 `gcl_runner --root`，但 `check_kpi_gates.py` 仍读 `ROOT/audit-results` → 异 root 运行的证据**永不被打分**，exit 0 | `gcl_runner.py:899` vs `check_kpi_gates.py:53,130`；**归属 ADR 候选 1** | 🟡 |
 
 ## 人工决策
 
