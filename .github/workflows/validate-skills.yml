@@ -149,6 +149,11 @@ jobs:
         # NOTE: blocking. Same script the local `make kpi-gates` target runs;
         # thresholded (assets/shared/thresholds.json), so a router-accuracy,
         # golden-coverage or registry-shrink regression fails the build.
+        # Blocking is a property of this step, NOT of the workflow run: this is
+        # step 16 of 17 named steps, and Actions aborts the job at the first
+        # non-`continue-on-error` failure, so a red earlier step silently skips
+        # this one. A green workflow therefore means "nothing upstream was red",
+        # not "the KPI gate passed" — read the step list, not the run badge.
 
       - name: Compounding-engineering checks
         run: |

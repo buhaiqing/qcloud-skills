@@ -29,11 +29,20 @@ is floored too (`router_min_registry_skills`): deleting a skill the router canno
 route would otherwise raise both averages, so a shrunken registry fails.
 
 The ratchet is tight **on purpose**: 0.28 is 0.2755pp under the measured
-28.2755%, and the smallest reachable step is one flipped query (≥1.25pp for a
-skill with 5 positives). A first-time KPI#7 failure is therefore usually "a query
+28.2755%, and one flipped query moves the average by `1 / (positives × 16)` —
+0.2315pp for the largest scoreable skill (`qcloud-cvm-ops`, 27 positives) up to
+2.0833pp for the smallest (3). Against only 0.2755pp of headroom that single
+query trips the floor in 15 of the 16 scoreable skills; `qcloud-cvm-ops` absorbs
+exactly one. A first-time KPI#7 failure is therefore usually "a query
 or a keyword moved", not "the router broke" — read the diff before touching
 `thresholds.json`, and remember that lowering a ratchet without a runbook note is
 a KPI weakening, not a fix.
+
+The **misdelegation ceiling** is the loose arm by contrast: its 0.79pp of headroom
+absorbs the step in the 7 scoreable skills carrying ≥10 negatives, so one flipped
+negative trips it in only the other 9 of 16. A ceiling failure is therefore the
+stronger signal of the two — if `router_max_misdelegation` fires, something larger
+than a single query moved.
 
 ## First diagnosis
 

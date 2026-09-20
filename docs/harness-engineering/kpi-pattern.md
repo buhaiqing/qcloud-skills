@@ -66,7 +66,9 @@ aggregation:   kpi-gate-report.json (avg across *scoreable* skills; the
 failure_mode:  Improve intent_keywords in qcloud-*-ops/SKILL.md frontmatter
                (runbook: runbooks/kpi7-router-confusion-failure.md)
 ci_hook:       make kpi-gates; CI step "KPI gates" in
-               .github/workflows/validate-skills.yml (blocking)
+               .github/workflows/validate-skills.yml (blocking; step 16 of 17
+               named steps, so it executes only if every preceding step is green:
+               a red step 1 aborts the job before this runs — see obs. 7)
 drift_check:   none — definition is self-evident
 ```
 
@@ -93,7 +95,9 @@ its metric was a constant. `harness_router.confusion_matrix` decided correctness
 by looking up `q["intent"]` in the top-1 skill's `intent_keywords`, but only 7 of
 36 `eval_queries.json` files carry an `intent` key — for the other 29 the lookup
 compared `None`, so `top1_accuracy` and `misdelegation` were structurally `0.0`.
-(Same split on the 31-skill executable registry: 29 of 31 files carry none.)
+(Same split on the 31-skill executable registry: 24 of 31 files carry none — the
+other 7 do. `29` is the *corpus* numerator and does not pair with the registry
+denominator.)
 The gate printed `avg top1=14.72%` (a different, phantom quantity) and returned
 **PASS** with no threshold to cross. Measured honestly against owning-skill
 ground truth the same router scores **9.87% (46/466 positive queries)** across
@@ -111,8 +115,15 @@ misdelegation against a bound derived from the *aspirational* target
 ever close. Both ratchets now come from the same measured baseline
 (0.28 / 0.16) and the excluded skills are named in the detail string. Both sit
 within a percentage point of the measurement they came from (0.28 vs 28.2755%,
-0.16 vs 15.2083%) while a single flipped query moves the average by ≥1.25pp — so
-the ratchet fires on *any* degradation, not on a large one (obs. 8).
+0.16 vs 15.2083%). Granularity is sub-percentage-point: one flipped query moves
+the *average* by `1 / (positives × 16)`, from **0.2315pp** in the largest
+scoreable skill (`qcloud-cvm-ops`, 27 positives) to **2.0833pp** in the smallest
+(3 positives). The ratchet's headroom is only 0.2755pp, so that single query trips
+the floor in **15 of the 16 scoreable skills**; `qcloud-cvm-ops` alone absorbs one
+flip, and a second trips it. The ratchet is therefore not a guard against
+*meaningful* regression — for nearly the whole fleet it fires on the smallest
+possible move, which makes it a near-"no degradation at all" floor rather than a
+rubber stamp (obs. 8).
 
 > ⚠️ **The ratchet is self-referential — know what that buys.** `router_min_top1_accuracy`
 > and `router_max_misdelegation` live in `assets/shared/thresholds.json`, which
@@ -164,7 +175,7 @@ that `make kpi-gates` actually enforces today (Sep 2026), the matrix is:
 | Skip-aware | ✅ an absent, short or aged-out stream FAILS — **unless** `GATE_REQUIRE_EVIDENCE=0`, which returns before any file is read and so skips all three; CI never sets it (obs. 4) | ✅ same | ✅ | ⚠️ never skips in practice |
 | Aggregatable | ✅ | ✅ | ✅ | ✅ |
 | Failure-mode-defined | ✅ [rb1](./runbooks/kpi1-leak-checked-failure.md) | ✅ [rb2](./runbooks/kpi2-destructive-token-plan-hash-failure.md) | ✅ [rb3](./runbooks/kpi3-golden-coverage-failure.md) | ✅ [rb7](./runbooks/kpi7-router-confusion-failure.md) |
-| CI-hooked | ✅ `make kpi-gates` locally; the **blocking** "KPI gates" step in `validate-skills.yml` stages `scripts/fixtures/evidence/` and asserts the clean fixture passes *and* the violating one exits 1 (obs. 7). The fleet stream is never graded in CI — it cannot be | ✅ same | ✅ | ✅ `make kpi-gates`, **blocking** CI step "KPI gates" in `validate-skills.yml` |
+| CI-hooked | ✅ `make kpi-gates` locally; the **blocking** "KPI gates" step in `validate-skills.yml` stages `scripts/fixtures/evidence/` and asserts the clean fixture passes *and* the violating one exits 1 (obs. 7). The fleet stream is never graded in CI — it cannot be. **Conditional:** the step is step 16 of 17 and runs only if every preceding step is green, so a red step 1 skips it silently (obs. 7) | ✅ same (same step, same condition — obs. 7) | ✅ same step, same condition (obs. 7) | ✅ `make kpi-gates`, **blocking** CI step "KPI gates" in `validate-skills.yml` — step 16 of 17, so conditional exactly as the first column (obs. 7) |
 | Drift-detectable | ⚠️ | ⚠️ | ✅ | ⚠️ |
 
 **Observations:**
@@ -220,14 +231,38 @@ that `make kpi-gates` actually enforces today (Sep 2026), the matrix is:
    fleet evidence, only the records earlier steps left there (the workflow's own
    smoke test writes one today; the unit-test step minted 17 more until it was
    isolated in 2026-09, which is what the old escape was hiding).
+   **The step is blocking, but its *execution* is conditional — and that gap is
+   the whole point.** "KPI gates" is step 16 of 17 named steps in the `validate`
+   job, and Actions runs steps sequentially and aborts the job at the first
+   failure that is not `continue-on-error`. So a red step 1 (Ruff) aborts
+   everything downstream, this gate is never executed, and the run reports a
+   Ruff failure with no KPI verdict at all — a red run is honest, but a *green*
+   run proves only "nothing upstream was red". It never, on its own, proves the
+   KPI gate ran or passed. Read the step list, not the run badge. This is a
+   property of CI step order rather than of the gate, and it is why `CI-hooked`
+   in the matrix above is stated as conditional rather than absolute: the claim
+   to make about this step is "wired and blocking, and positioned 16th, so it
+   executes only when everything before it is green" — a claim that stays true
+   whether or not step 1 happens to be green today.
 8. **KPI#7's ratchet has sub-percentage-point granularity.** `0.28` sits
    0.2755pp under the measured 28.2755% (the misdelegation ceiling is 0.79pp
-   under its own baseline), while the smallest reachable step is one flipped
-   query — ≥1.25pp for a skill with 5 positives. Read literally that is "no
-   degradation at all": a legitimate coverage change (a new hard positive) can
-   trip it, and the printed `BELOW TARGET 70.00%` gap understates how tight the
-   floor is. Treat a first-time KPI#7 failure as "a query moved" until the diff
-   says otherwise; the value is deliberately left where the measurement put it.
+   under its own baseline). The smallest reachable step is one flipped query,
+   worth `1 / (positives × 16)` of the average: 0.2315pp in the largest scoreable
+   skill (`qcloud-cvm-ops`, 27 positives) and 2.0833pp in the smallest (3). No
+   scoreable skill has 5 positives (the set is 3, 4, 6, 7, 7, 8, 9, 10×7, 20,
+   27), so the ≥1.25pp figure is not a floor — it is the step for a skill size
+   that does not occur here. Because the 0.2755pp of headroom exceeds the
+   0.2315pp step and nothing above it, one flipped query trips the floor in 15 of
+   the 16 scoreable skills; `qcloud-cvm-ops` absorbs exactly one. Read literally that is "no degradation
+   at all" for nearly the whole fleet: a legitimate coverage change (a new hard
+   positive) can trip it, and the printed `BELOW TARGET 70.00%` gap understates
+   how tight the floor is. The *ceiling* arm is the loose one by contrast: its
+   0.79pp of headroom absorbs the step in the 7 skills carrying ≥10 negatives, so
+   one flipped negative trips it in only the other 9 — the ceiling is the weaker
+   of the two signals, not the tighter. Treat a first-time KPI#7 failure as "a query
+   moved" until the diff says otherwise; the value is deliberately left where
+   the measurement put it, because 0.28 is the measured 28.2755% rounded down
+   and the granularity above is exactly what makes it fire on a one-query move.
 
 **Use this template to score your own KPIs.** A KPI with two ⚠️ rows
 is acceptable; four is a smell. If a KPI has ⚠️ on Failure-mode-defined
