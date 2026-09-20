@@ -22,7 +22,7 @@ class TestSynthesize(unittest.TestCase):
             self.assertGreaterEqual(result["total"], 20)
             self.assertGreaterEqual(result["skills"], 5)
             self.assertEqual(set(result["severities"]), {"info", "warning", "critical"})
-            lines = [l for l in out.read_text(encoding="utf-8").splitlines() if l.strip()]
+            lines = [line for line in out.read_text(encoding="utf-8").splitlines() if line.strip()]
             self.assertEqual(len(lines), result["total"])
             for line in lines:
                 entry = json.loads(line)
@@ -43,7 +43,8 @@ class TestSynthesize(unittest.TestCase):
         corpus = _HERE / "fixtures" / "incidents" / "corpus.jsonl"
         if not corpus.exists():
             self.skipTest("corpus not generated")
-        entries = [json.loads(l) for l in corpus.read_text(encoding="utf-8").splitlines() if l.strip()]
+        entries = [json.loads(line) for line in
+                   corpus.read_text(encoding="utf-8").splitlines() if line.strip()]
         self.assertGreaterEqual(len(entries), 20)
         self.assertGreaterEqual(len({e["skill"] for e in entries}), 5)
         for e in entries:

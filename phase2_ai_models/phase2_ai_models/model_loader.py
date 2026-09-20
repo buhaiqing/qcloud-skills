@@ -94,7 +94,7 @@ class ModelLoader:
     # Checkpoint save
     # ------------------------------------------------------------------
 
-    def save_checkpoint(  # noqa: PLR0913, PLR0917
+    def save_checkpoint(  # noqa: PLR0913
         self,
         model_type: str,
         model_data: bytes,

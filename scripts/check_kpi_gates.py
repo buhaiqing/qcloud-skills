@@ -344,12 +344,12 @@ def kpi8_spec_drift() -> tuple[str, str, str]:
     lines = r.stdout.split("\n")
     # Extract non-pre-existing drift kinds (source_drift = known limitation)
     new_kinds = sorted({
-        l.split("|")[1].strip() for l in lines
-        if any(k in l for k in [
+        line.split("|")[1].strip() for line in lines
+        if any(k in line for k in [
             "file_line_ref_drift",
             "md_fragment_drift",
             "phantom_link_drift",
-        ]) and "pass" not in l.lower() and "Field" not in l
+        ]) and "pass" not in line.lower() and "Field" not in line
     })
     if not new_kinds:
         return "skip", "detector clean; 5 source_drift known limitations documented", "informational"

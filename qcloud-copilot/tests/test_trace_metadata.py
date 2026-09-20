@@ -94,7 +94,7 @@ def test_audit_trace_persists_skill_and_runtime(tmp_path: Path):
         )
     index_path = audit_dir / "_index.jsonl"
     assert index_path.is_file(), "audit file not written"
-    lines = [json.loads(l) for l in index_path.read_text().splitlines() if l]
+    lines = [json.loads(line) for line in index_path.read_text().splitlines() if line]
     assert lines, "_index.jsonl empty"
     payload = lines[-1]
     assert payload["skill"]["name"] == "qcloud-test-ops"
@@ -119,7 +119,7 @@ def test_audit_trace_backward_compat_no_skill_runtime(tmp_path: Path):
         )
     index_path = audit_dir / "_index.jsonl"
     assert index_path.is_file()
-    lines = [json.loads(l) for l in index_path.read_text().splitlines() if l]
+    lines = [json.loads(line) for line in index_path.read_text().splitlines() if line]
     assert lines
     payload = lines[-1]
     assert "skill" not in payload
