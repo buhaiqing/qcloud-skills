@@ -184,6 +184,43 @@ Critic 另验证 `pytest`（964 passed）与 `gcl_runner --root <tmp>` 两条路
 > **往轮备注（供 ADR 候选 1 参考）**：3R2-B 指出工作区中 `scripts/check_kpi_gates.py`
 > 有**未提交改动**，属并发进行的 CR-4，不是 CR-3 越界。
 
+#### Round-3 复核结果（CR-3 `cbeab00`，Critic-3R3-B 逐条实测）
+
+**结构性修复生效** —— 第 3 轮不再补路径，而是把两份计数实现**收敛为一份**：
+
+```
+--layered 连跑（同一语料 6 traces）:
+  修复前  count 6 → 12 → 18   sources 缺失 / 渲染为 —
+  修复后  count 6 →  6 →  6   sources=6                ✅ 幂等 + provenance 保留
+
+250-pattern 语料:
+  Hot layer: 190 (+190 new, 10 to warm over the 200-line cap)
+  docs/failure-patterns.md = 200 行                       ✅ 守住 P0 上限（原 214）
+```
+
+| ID | Round-3 状态 | 关闭证据 |
+|---|---|---|
+| H-36 | ✅ 关闭 | 恰好 200 行，pattern **无丢失**；200/201 边界行为一致 |
+| H-40 | ✅ 关闭 | `--layered` 连跑 `count 6/6/6`，`Sources` 已填充（不再是 `—`） |
+| H-41 | ✅ 关闭 | 新测试驱动生产函数（非手工构造），可证伪 |
+| H-43 | ✅ 关闭 | `--layered --root .` → exit 0，不再 traceback |
+| H-44 | ✅ 关闭 | 不变量改为可证伪表述 |
+| H-45 | ✅ 关闭 | 文档表述与行为一致（作用域已收窄） |
+| H-42 | ✅ 按要求处理 | `success_pattern_mine.py` **未被改动**（`git diff` 为空），已在 commit body 精确登记 |
+| **H-29** | ⚠️ **仍在** | 语义统一完成，但见 H-46/H-47 —— 该路径仍有独立缺陷 |
+
+#### Round-3 新暴露项（回归 + 新面）
+
+| ID | 现象 | 证据 | 严重度 |
+|---|---|---|---|
+| **H-46** | **回归**：`--layered` 在 store 溢出到 cold 后**不再可重跑**（≥701 patterns → exit 1、跨层重复键、什么都没写）。修复前 700 与 701 都能通过 | `failure_pattern_extract.py:455-488` + `:809-825` | 🟠 |
+| **H-47** | demotion 写入 `warm` 发生在 `self_verify_failure()` **之后** → 800-pattern 运行**报告成功**，而落盘状态其实**不满足 V2**（warm 510 > 500）。**与 H-23（gate 求值早于 cap）同一形态**，只是换了个位置 | `failure_pattern_extract.py:798-825` | 🟠 |
+| **H-48** | `docs/reflexion-memory.md:243`,`:64` 用「200 rows ≈ 214 lines」为修复做论证，但两个 emitter 实测都不产出该数字（实测 210 / 250） | 3R3-B 实测 | 🟡 |
+
+> **H-47 的形态值得单独标注**：「校验发生在被校验对象之前」这个模式，在本会话里已是**第四次**出现
+> （R3 gate 早于 cap → `missing` 恒空；CI gate 早于 evidence 读取；run_id 隔离被 glob 加宽抵消；
+> 现在 demotion 晚于 self-verify）。它不是巧合，是**编排顺序从不被断言**的必然结果。
+
 #### 系统性观察：五次「修好一条路径，镜像的那条被漏掉」
 
 | # | 修好 | 漏掉 |
