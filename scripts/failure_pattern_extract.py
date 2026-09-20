@@ -37,6 +37,7 @@ from _failure_pattern_store import (
     SILENCE_THRESHOLD_DAYS,
     WARM_LIMIT,
     WARM_PATH,
+    escape_cell,
     load_all_layers,
     parse_existing,
 )
@@ -227,6 +228,26 @@ def merge(
     reporting the same failure adds exactly 1. Callers that pass patterns
     without a ``_source`` (programmatic use) keep the legacy per-observation
     increment.
+
+    ``count`` is thus reconciled as ``len(sources) + unattributed``, where
+    ``unattributed`` is whatever the stored count exceeded the stored source
+    set. Three writers share this file, and only two of them record sources:
+
+      1. ``failure_pattern_extract.main`` — this module's CLI (legacy path);
+      2. ``reflexion_auto_writer`` — ``write_trace`` (single GCL run) and
+         ``_bulk_update`` (whole corpus); both funnel through here;
+      3. ``reflexion_store.store_failure_pattern`` — the qcloud-copilot sink,
+         which increments per call and records no source at all.
+
+    (3) is why the remainder must be carried: its rows have ``sources == {}``,
+    so deriving ``count`` from the source set alone would reset them to 1.
+    A row whose count exceeds its sources is not corrupt — it carries evidence
+    from a sink that has no trace to attribute.
+
+    The remainder is only honoured when the row's table declares a Sources
+    column (``_sources_recorded``). Rows written before that column existed
+    counted merge() invocations instead of traces, and that fiction must yield
+    to the corpus — so a source-less legacy row is reset to the observed count.
     """
     for p in new:
         key = pattern_key(p)
@@ -251,9 +272,25 @@ def merge(
             }
             continue
         sources = entry.setdefault("sources", set())
+        stored_count = entry.get("count", 0)
+        # Counts recorded without a trace of their own are whatever the stored
+        # count exceeds the recorded source set. Carrying that remainder keeps a
+        # sources=={} row from being reset to len(sources)==1 on the next merge,
+        # which is how the third writer's counts used to collapse.
+        #
+        # Only for rows whose table declares a Sources column. Rows from the
+        # pre-Sources format counted merge() invocations rather than traces, so
+        # their count is fiction and the observed truth replaces it.
+        unattributed = (
+            max(0, stored_count - len(sources))
+            if entry.get("_sources_recorded", True)
+            else 0
+        )
         if src:
             sources.add(src)
-        entry["count"] = len(sources) if sources else entry.get("count", 0) + 1
+            entry["count"] = len(sources) + unattributed
+        else:
+            entry["count"] = stored_count + 1
         entry["last_seen"] = now  # P0-C: update on every hit
     return existing
 
@@ -521,7 +558,9 @@ def emit_layer(
             last_seen = p.get("last_seen", p.get("first_seen", "—")) or "—"
             severity = p.get("severity", "minor") or "minor"
             lines.append(
-                f"| `{skill}` | `{command}` | {error} | {fix} | {count} | {last_seen} | {severity} |"
+                f"| `{escape_cell(skill)}` | `{escape_cell(command)}` | "
+                f"{escape_cell(error)} | {escape_cell(fix)} | "
+                f"{count} | {last_seen} | {severity} |"
             )
     return lines
 
@@ -581,6 +620,7 @@ def _emit_store(patterns: dict[str, dict[str, Any]]) -> list[str]:
         f"> **Updated**: {now} ({sum(p['count'] for p in patterns.values())} total hits across all patterns).",
         f"> **Token budget**: ≤ {MAX_LINES} lines, enforced — when exceeded, the least-recurring rows are dropped.",
         "> **Count**: distinct GCL runs (traces) that reported the pattern; re-scans do not inflate it.",
+        "> **Sources**: those runs by name, JSON array — Count = len(Sources) + unattributed sink hits.",
         "",
     ]
 
@@ -600,9 +640,15 @@ def _emit_store(patterns: dict[str, dict[str, Any]]) -> list[str]:
             count = p.get("count", 0)
             last_seen = p.get("last_seen", p.get("first_seen", "—")) or "—"  # P0-C
             severity = p.get("severity", "minor") or "minor"  # P0-C
-            sources = " ".join(sorted(p.get("sources") or ())) or "—"
+            # One cell, JSON-encoded: a space-joined list cannot be re-split
+            # into the names that went in, so a filename containing a space
+            # used to inflate count on every re-scan. _parse_sources reverses
+            # this; "—" means "no sources recorded".
+            sources = sorted(p.get("sources") or ())
+            sources = escape_cell(json.dumps(sources, ensure_ascii=False)) if sources else "—"
             lines.append(
-                f"| `{skill}` | `{command}` | {error} | {fix} | {count} | {last_seen} | {severity} | {sources} |"
+                f"| `{escape_cell(skill)}` | `{escape_cell(command)}` | {escape_cell(error)} | "
+                f"{escape_cell(fix)} | {count} | {last_seen} | {severity} | {sources} |"
             )
         lines.append("")  # blank line: without it the next "## " is absorbed into this table
 
@@ -624,9 +670,10 @@ def _emit_store(patterns: dict[str, dict[str, Any]]) -> list[str]:
         "# After completing R1 + R2:",
         "# 1. Extract new failure patterns from this session",
         "# 2. Check if pattern already exists (dedup by skill + command + error)",
-        "# 3. If new: append to appropriate section with count=1",
-        "# 4. If existing: increment count",
-        "# 5. If total lines > 200: prune patterns with count < 3",
+        "# 3. If new: append to the appropriate section with count=1, sources=[<trace>]",
+        "# 4. If existing: add this trace to `sources`; count follows the source set",
+        "# 5. Over the line cap: the least-recurring rows are dropped, highest count kept",
+        "# Do not hand-edit `count`: it is len(sources) plus any unattributed hits.",
         "```",
         "",
         "### For GCL Traces",
@@ -648,17 +695,25 @@ def _emit_store(patterns: dict[str, dict[str, Any]]) -> list[str]:
     return lines
 
 
-def enforce_line_cap(patterns: dict[str, dict[str, Any]]) -> list[str]:
-    """Rebuild failure-patterns.md content, enforcing the MAX_LINES cap.
+def enforce_line_cap(
+    patterns: dict[str, dict[str, Any]],
+    max_lines: int = MAX_LINES,
+) -> list[str]:
+    """Rebuild failure-patterns.md content, enforcing the ``max_lines`` cap.
 
     AGENTS.md makes "≤ 200 lines" a P0 constraint, so the cap is *applied*
     rather than warned about: while the rendered file overflows, the least
     valuable rows (lowest count, then oldest last_seen) are dropped from
     ``patterns``. ``patterns`` is mutated in place so the caller's own
     counters (Total patterns / Total hits) describe what was written.
+
+    Callers writing a warmer layer must pass that layer's own limit
+    (``WARM_LIMIT`` / ``COLD_LIMIT``): otherwise the 200-line hot cap applies
+    to it, and the layer's declared capacity is an unreachable ceiling that
+    makes demotion destroy memory instead of preserving it.
     """
     lines = _emit_store(patterns)
-    if len(lines) > MAX_LINES:
+    if len(lines) > max_lines:
         ranked = sorted(
             patterns.items(),
             key=lambda kv: (
@@ -670,7 +725,7 @@ def enforce_line_cap(patterns: dict[str, dict[str, Any]]) -> list[str]:
         for key, _entry in ranked:
             del patterns[key]
             lines = _emit_store(patterns)
-            if len(lines) <= MAX_LINES:
+            if len(lines) <= max_lines:
                 break
     return lines
 

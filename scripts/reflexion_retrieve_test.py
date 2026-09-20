@@ -6,11 +6,27 @@ Run: python3 -m unittest reflexion_retrieve_test -v
 
 from __future__ import annotations
 
+import argparse
+import contextlib
+import io
+import json
+import sys
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 
-from reflexion_retrieve import _mask_credentials, format_for_injection, load_failure_patterns
+# Ensure scripts/ is on sys.path when invoked as `python3 scripts/reflexion_retrieve_test.py`
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from reflexion_retrieve import (
+    _mask_credentials,
+    cmd_retrieve,
+    format_for_injection,
+    load_failure_patterns,
+)
 
 
 class TestReflexionRetrieve(unittest.TestCase):
@@ -146,6 +162,39 @@ class TestReflexionRetrieve(unittest.TestCase):
             # Format should return empty string, not None
             formatted = format_for_injection(result)
             self.assertEqual(formatted, "")
+
+    def test_json_output_serializes_sources(self) -> None:
+        """`--json` is a documented flag (docs/reflexion-quality/spec.md:25).
+
+        The `sources` set added to the store layer is not JSON-serializable, so
+        `--json` raised TypeError. No test covered the flag, which is why it
+        shipped broken.
+        """
+        # LastSeen must be current: recency_decay() drops a 2024 row below the
+        # composite-score floor of 2.0 and it would never reach the output.
+        now = datetime.now().strftime("%Y-%m")
+        content = f"""# Failure Patterns — Reflexion Memory
+
+## 1. CLI Parameter Errors
+
+| Skill | Command | Error Pattern | Fix | Count | LastSeen | Severity | Sources |
+|-------|---------|---------------|-----|-------|----------|----------|---------|
+| `qcloud-cvm-ops` | `TerminateInstances` | MissingParameter | Use JSON | 2 | {now} | major | ["gcl-trace-b.json","gcl-trace-a.json"] |
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = self._create_fixture_file(Path(tmp), content)
+            args = argparse.Namespace(
+                skill="qcloud-cvm-ops", command=None, top_n=3,
+                json=True, path=fixture, layer=None,
+            )
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = cmd_retrieve(args)  # pre-fix: TypeError, not JSON
+
+            self.assertEqual(rc, 0)
+            payload = json.loads(buf.getvalue())
+            self.assertEqual(len(payload), 1)
+            self.assertEqual(payload[0]["sources"], ["gcl-trace-a.json", "gcl-trace-b.json"])
 
     def test_mask_credentials_function(self) -> None:
         """Test _mask_credentials directly with various secret patterns."""

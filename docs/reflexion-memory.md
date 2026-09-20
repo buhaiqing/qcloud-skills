@@ -53,7 +53,8 @@ Each pattern in `docs/failure-patterns.md` follows this structure:
 | `command` | string | ❌ | The command that failed (for CLI errors) |
 | `error` | string | ✅ | Error message or pattern description |
 | `fix` | string | ✅ | How to fix or prevent this error |
-| `count` | int | ✅ | Distinct GCL runs (traces) that reported the pattern; a stored key absent from the current corpus is retired when `count < 3` |
+| `count` | int | ✅ | Distinct GCL runs (traces) that reported the pattern, plus hits reported by a sink with no trace (`count ≥ len(sources)`, §10). A stored key absent from the current corpus is retired when `count < 3` |
+| `sources` | string[] | ❌ | Those runs by name, as a JSON array in one table cell. Empty for the `qcloud-copilot` sink, which emits `—` |
 | `reusable` | bool | ✅ | Whether this pattern is generalizable |
 
 ## 4. Maintenance Rules
@@ -124,45 +125,82 @@ Reflexion changes are tracked in the unified runtime-quality changelog in `docs/
 
 ## 10. Write-Path Invariants (`--min-count` is an aging policy)
 
-Two paths write `docs/failure-patterns.md`: `write_trace()` (single trace, called by
-`gcl_runner.py`) and `_bulk_update()` (the CLI with no `--input` — `make reflexion-update`,
-part of `make all`).
+**Three** paths write `docs/failure-patterns.md`:
 
-**Invariant 1 — a pattern observed in the current run is never pruned in that run.**
+| # | Writer | Granularity | Records `sources`? |
+|---|--------|-------------|--------------------|
+| 1 | `reflexion_auto_writer.write_trace()` (called by `gcl_runner.py`, one GCL run) | per trace | yes |
+| 2 | `reflexion_auto_writer._bulk_update()` (the CLI with no `--input` — `make reflexion-update`, part of `make all`) | per corpus | yes |
+| 3 | `reflexion_store.store_failure_pattern()` (the `qcloud-copilot` sink) | per call | **no** |
+
+Writers 1 and 2 both funnel through `failure_pattern_extract.merge()`; writer 3 does not, and
+has no trace to attribute a hit to. That is the whole reason `count` and `sources` are two
+figures rather than one — see Invariant 2.
+
+**Invariant 1 — `--min-count` only ages out keys absent from the current run's corpus.**
 `_bulk_update()` prunes the stored patterns via
 `prune_low_frequency(existing, min_count, exclude=observed)`, where `observed` is the set of
 dedup keys this run found in the traces. A pattern the run just read has demonstrably *not*
 stopped recurring, so retiring it — before or after the merge — would delete it in the very
-transaction that records it and `count` could never reach `--min-count`. `--min-count`
-therefore only retires keys **absent from this run's corpus**.
+transaction that records it and `count` could never reach `--min-count`.
 
-**Invariant 2 — `count` is the number of distinct GCL runs that reported the pattern.**
-`merge()` keeps the set of trace names (`_source`) seen per key and sets
-`count = len(sources)`. Re-scanning the same corpus is a byte-for-byte no-op; a new GCL run
-reporting the same failure adds exactly 1. The count is *not* "how often the extractor
-ran", so it must never be produced by incrementing a stored value per occurrence. The
-`Sources` column in the store carries that set; a row written before that column existed
-has none, and the first run over a real corpus replaces its count with the truth — the old
-counts were run-multiplicity fiction.
+This is a statement about the **prune**, not about the file. The line cap (Invariant 3) is a
+second, independent loss path that *can* drop an observed pattern, and Invariant 4 is what
+makes that loss loud rather than silent.
 
-**Invariant 3 — the ≤ 200 line budget is enforced, not warned about.** `enforce_line_cap()`
+**Invariant 2 — `count = len(sources) + unattributed`, and re-scanning the same corpus on
+the same day changes nothing.** `merge()` keeps the set of trace names (`_source`) seen per
+key, so a new GCL run reporting the same failure adds exactly 1 and a re-scan adds 0. `count`
+is *not* "how often the extractor ran", so it must never be produced by incrementing a stored
+value per occurrence.
+
+Two qualifiers the invariant needs to actually hold:
+
+- **`count` may exceed `len(sources)`.** Writer 3 records no sources, so its hits live in the
+  remainder (`count - len(sources)`), which `merge()` carries across writes. A source-less row
+  whose table declares a `Sources` column is evidence, not corruption. A row from a table
+  that has *no* `Sources` column predates that column and its count was run-multiplicity
+  fiction, so the first run over a real corpus replaces it with the observed count.
+- **"Byte-for-byte no-op" holds within one day, not across a date boundary.** The rendered
+  header embeds today's date, so an unchanged corpus still rewrites the file when the date
+  rolls over. Compare the tables, not the file bytes.
+
+`Sources` is a JSON array in one cell, and every cell is escaped: a `|`, an unpaired backtick,
+or a space in a trace-supplied `command`/`error` used to shift or split the row, which made
+`Count` read from the wrong column and inflated `count` on every re-scan. Writer 3's rows have
+no sources at all and show `—`.
+
+**Invariant 3 — a layer's line budget is enforced, not warned about.** `enforce_line_cap()`
 drops the least valuable rows (lowest `count`, then oldest `last_seen`) until the rendered
 file fits, so the cap cannot be exceeded and the caller's `Total patterns` / `Total hits`
-describe what was written.
+describe what was written. Callers writing a warmer layer must pass that layer's own limit
+(`enforce_line_cap(patterns, max_lines=WARM_LIMIT)`); the default is the 200-line **hot** cap,
+so omitting it silently re-caps warm/cold and demotion destroys memory instead of preserving
+it.
 
-**Invariant 4 — the R3 gate asserts the real loss, not only a total wipeout.** A run that
+**Invariant 4 — the R3 gate asserts the real loss, and it runs after the cap.** A run that
 found a pattern in the traces but does not hold its key afterwards exits 3 and names the
-missing keys. The "store is empty" case is reported as a secondary branch (it is what an
+missing keys. The check must come *after* `enforce_line_cap()`, because the cap is the only
+path that drops an observed key — evaluated before it, the comparison is against the same
+`new_patterns` list that defines `observed`, so it is structurally empty and a truncated
+corpus exits 0. The "store is empty" case is reported as a secondary branch (it is what an
 all-empty-`skill` corpus produces, since `merge()` drops those). A `--dry-run` never returns
 3: it changes nothing, so it only warns in the future tense about what the next real run
 would do.
 
-**The two paths do NOT share all of this.** `write_trace()` never prunes — one trace cannot
-tell whether a stored pattern stopped recurring — and has no empty-store gate; it is allowed
-to be a no-op. Both paths count distinct traces and both enforce the line cap.
+**The writers do NOT share all of this.** `write_trace()` never prunes — one trace cannot tell
+whether a stored pattern stopped recurring — and has no empty-store gate; it is allowed to be
+a no-op. It does report what the cap evicted, to stderr.
+
+**The store is a committed artefact, not a test workspace.** Its destination derives from the
+caller's repo root (`gcl_runner.py` passes `root/docs/failure-patterns.md` and writes evidence
+to `root/audit-results/`), so a run against a temporary root — every unit test — cannot mutate
+the shipped file. The test suite is not a producer of anything it is then graded on
+(`TestShippedArtefactsAreNotATestWorkspace`).
 
 **History.** `4e8e77b` fixed prune-before-first-write in `write_trace()` only; `9bca8fc`
 moved the same call in `_bulk_update()` before the merge but still pruned keys the run had
 just observed, which reset `count` to 1 on every run; and counts accumulated per occurrence,
 so they grew with the number of runs. Regression tests: `reflexion_store_test`
-(`TestBulkUpdateFirstSeenSurvival`, `TestLineCapEnforcement`).
+(`TestBulkUpdateFirstSeenSurvival`, `TestLineCapEnforcement`,
+`TestShippedArtefactsAreNotATestWorkspace`), `gcl_runner_test` (`CmdRunEndToEndTests`).

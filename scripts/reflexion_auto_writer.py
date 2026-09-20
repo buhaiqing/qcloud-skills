@@ -80,15 +80,19 @@ def write_trace(
 
         # patterns_path is an explicit caller opt-in (tests/dry-runs); the
         # caller already holds filesystem access, so no path guard here —
-        # a guard would only break the documented tmp-dir use case.
+        # a guard would only break the documented tmp-dir use case. Callers
+        # that run against a non-repo root must pass root/docs/failure-patterns.md:
+        # falling through to PATTERNS_FILE writes the shipped store.
         target = patterns_path or PATTERNS_FILE
         target.parent.mkdir(parents=True, exist_ok=True)
         # fcntl.flock requires an open fd; create if missing
         target.touch(exist_ok=True)
+        evicted: list[str] = []
         with target.open("r+", encoding="utf-8") as f:
             fcntl.flock(f.fileno(), fcntl.LOCK_EX)
             try:
                 existing = parse_existing(target)
+                before = set(existing)
                 merged = merge(existing.copy(), [fp])
                 # Two deliberate asymmetries with _bulk_update():
                 #  - no prune here: one trace cannot tell whether a stored pattern
@@ -97,11 +101,22 @@ def write_trace(
                 # Both paths enforce the line cap, and both count DISTINCT traces
                 # via merge(), so re-writing the same trace changes nothing.
                 lines = enforce_line_cap(merged)
+                # At the cap every new pattern evicts an existing one. The
+                # caller cannot see that from the return value, so say it.
+                evicted = sorted(before - set(merged))
                 f.seek(0)
                 f.write("\n".join(lines) + "\n")
                 f.truncate()
             finally:
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        if evicted:
+            print(
+                f"[reflexion_auto_writer] line cap {MAX_LINES} evicted "
+                f"{len(evicted)} stored pattern(s) to write this one: "
+                + ", ".join(f"{s}:{c}:{e}" for s, c, e in evicted[:5])
+                + (f" (+{len(evicted) - 5} more)" if len(evicted) > 5 else ""),
+                file=sys.stderr,
+            )
         return True
     except Exception as e:  # noqa: BLE001 — reflexion must never break GCL
         print(f"[reflexion_auto_writer] write_trace failed: {e}", file=sys.stderr)
@@ -132,12 +147,15 @@ def _bulk_update(trace_paths: list[Path], dry_run: bool, min_count: int) -> int:
     kept_count = len(existing)
     merged = merge(existing, new_patterns)
     new_count = len(merged) - kept_count
-    # R3: a reflexion loop that silently drops what it just read is not a
-    # success. Asserted before the cap, which drops rows deliberately.
-    missing = sorted(observed - set(merged))
     kept = len(merged)
     lines = enforce_line_cap(merged)
     dropped = kept - len(merged)
+    # R3: a reflexion loop that silently drops what it just read is not a
+    # success — and the only path that drops an observed pattern is the line
+    # cap above, so the check has to run after it. Computed before, `missing`
+    # was structurally empty (both sides call pattern_key() on the same
+    # new_patterns list) while the cap evicted observed keys at exit 0.
+    missing = sorted(observed - set(merged))
 
     total_hits = sum(p["count"] for p in merged.values())
     print(
@@ -160,7 +178,7 @@ def _bulk_update(trace_paths: list[Path], dry_run: bool, min_count: int) -> int:
                 + ", ".join(f"{s}:{c}:{e}" for s, c, e in missing[:5]),
                 file=sys.stderr,
             )
-        elif not merged:
+        if not merged:
             print(
                 "[dry-run] WARNING: the next real run would leave the store empty.",
                 file=sys.stderr,
@@ -171,7 +189,9 @@ def _bulk_update(trace_paths: list[Path], dry_run: bool, min_count: int) -> int:
         print(
             f"REFLEXION GATE: {len(missing)} pattern(s) found in traces are missing from the "
             "store: " + ", ".join(f"{s}:{c}:{e}" for s, c, e in missing[:5])
-            + ". merge() must store every pattern with a non-empty 'skill'.",
+            + (f" (+{len(missing) - 5} more)" if len(missing) > 5 else "")
+            + ". Either merge() dropped them (empty 'skill') or the line cap evicted them; "
+            "raising the cap or lowering --min-count is the fix for the latter.",
             file=sys.stderr,
         )
         return 3

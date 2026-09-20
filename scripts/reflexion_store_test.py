@@ -13,7 +13,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from failure_pattern_extract import enforce_line_cap, parse_existing
+from failure_pattern_extract import enforce_line_cap, merge, parse_existing
 from reflexion_store import (
     MAX_LINES,
     normalize_reflexion_key,
@@ -664,6 +664,26 @@ class TestBulkUpdateFirstSeenSurvival(unittest.TestCase):
         self.assertEqual(len(digests), 1, "the store must not change on a re-run")
         self.assertEqual(hits, {3}, "Total hits must be the corpus hit count, not runs x hits")
 
+    def test_observed_patterns_evicted_by_the_cap_fail_the_gate(self) -> None:
+        """The R3 gate must run AFTER the line cap: the cap is the loss path.
+
+        Computed first, `missing` was structurally empty — both sides call
+        pattern_key() on the same new_patterns list — while the cap evicted
+        observed keys and the run still exited 0, so a GCL run could not tell
+        that its own corpus had been truncated.
+        """
+        traces = [
+            self._trace(f"gcl-trace-{i:03d}.json", "qcloud-bulk-ops", f"cmd{i}", f"err{i}")
+            for i in range(200)
+        ]
+        rc, out, err = self._bulk(traces)
+
+        dropped = int(re.search(r"Dropped \(cap \d+\):\s+(\d+)", out).group(1))
+        self.assertGreater(dropped, 0, "the fixture must actually overflow the cap")
+        self.assertEqual(rc, 3, f"a capped-away observed pattern must not exit 0 (stderr: {err})")
+        self.assertIn("REFLEXION GATE", err)
+        self.assertIn("qcloud-bulk-ops", err, "the dropped keys must be reported by name")
+
     def test_pre_upgrade_counts_are_replaced_by_the_true_count(self) -> None:
         """Counts written before the sources column existed were run-multiplicity
         fiction; the first run over a real corpus replaces them with the truth."""
@@ -824,7 +844,6 @@ class TestLineCapEnforcement(unittest.TestCase):
         patterns = self._patterns(2)
         lines = enforce_line_cap(patterns)
         self.assertTrue(any("| Sources |" in ln for ln in lines), "the column must be emitted")
-
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "failure-patterns.md"
             path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -834,6 +853,140 @@ class TestLineCapEnforcement(unittest.TestCase):
             {"gcl-trace-x.json"},
             "sources must survive a write/read round trip",
         )
+
+    # -- the cells hold arbitrary trace text -------------------------------
+
+    def test_sources_column_round_trips_hostile_values(self) -> None:
+        """Pipes, unpaired backticks and spaces in trace text must survive.
+
+        Cells are written verbatim from the trace, and `command` is the executed
+        shell command, so a pipe is ordinary. Unescaped, one pipe made an 8-cell
+        row for an 8-column header; the parser's leading/trailing trim then read
+        Count from the wrong column and truncated `error`, so prune saw a stale
+        key, deleted it, and merge re-added it — the same key reported as both
+        "Retired: 1" and "New patterns: 1" on every run, count pinned.
+        """
+        key = ("qcloud-adv-ops", "tccli cvm Run | grep Id", "InvalidParameter: a | b")
+        hostile = {
+            key: {
+                "category": "runtime",
+                "skill": key[0],
+                "command": key[1],
+                "error": key[2],
+                "fix": "quote it: `a|b` and a lone ` backtick",
+                "count": 2,
+                "last_seen": "2026-09",
+                "sources": {"ev il trace.json", "a`b.json"},
+            }
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "hostile.md"
+            path.write_text("\n".join(enforce_line_cap(hostile)) + "\n", encoding="utf-8")
+            back = parse_existing(path)
+
+        self.assertIn(key, back, f"the row key must survive the round trip, got {list(back)}")
+        self.assertEqual(back[key]["count"], 2, "Count must still be read from the Count cell")
+        self.assertEqual(back[key]["error"], "InvalidParameter: a | b")
+        self.assertEqual(back[key]["fix"], "quote it: `a|b` and a lone ` backtick")
+        self.assertEqual(back[key]["sources"], {"ev il trace.json", "a`b.json"})
+
+    def test_rescanning_a_hostile_corpus_does_not_inflate_count(self) -> None:
+        """Re-scanning an identical corpus must be a no-op, hostile names included.
+
+        Sources are persisted as a JSON array precisely so a filename containing
+        a space round-trips. Space-joined, one such filename became N tokens that
+        could never match the original again, so each re-scan added +1 and
+        --promote (count >= 10) was forgeable.
+        """
+        pattern = {
+            "category": "runtime",
+            "skill": "qcloud-adv-ops",
+            "command": "tccli cvm Run",
+            "error": "InvalidParameter",
+            "fix": "quote it",
+            "_source": "ev il trace.json",
+        }
+        key = ("qcloud-adv-ops", "tccli cvm Run", "InvalidParameter")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "store.md"
+            existing: dict = {}
+            for scan in range(4):
+                # Round-trip through the file each time: the defect was in the
+                # persisted form, not in memory.
+                existing = merge(existing, [pattern])
+                path.write_text("\n".join(enforce_line_cap(existing)) + "\n", encoding="utf-8")
+                existing = parse_existing(path)
+                self.assertEqual(
+                    existing[key]["count"], 1,
+                    f"scan {scan + 1} of the identical corpus inflated the count",
+                )
+
+    def test_unattributed_count_survives_a_merge(self) -> None:
+        """A row whose count exceeds its sources keeps that remainder.
+
+        reflexion_store.store_failure_pattern — the qcloud-copilot sink, the
+        third writer of this file — records no sources, so deriving count from
+        the source set alone reset its rows to 1: a count=10 row plus one new
+        trace became count=1, destroying the recurrence signal --promote reads.
+        """
+        key = ("qcloud-cvm-ops", "TerminateInstances", "MissingParameter")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "store.md"
+            path.write_text(
+                "## 4. Runtime Execution Patterns\n\n"
+                "| Skill | Operation | Error Pattern | Root Cause | Count | LastSeen | Severity | Sources |\n"
+                "| --- | --- | --- | --- | --- | --- | --- | --- |\n"
+                f"| `{key[0]}` | `{key[1]}` | {key[2]} | fix | 10 | 2026-09 | major | — |\n",
+                encoding="utf-8",
+            )
+            observed = {
+                "category": "runtime",
+                "skill": key[0],
+                "command": key[1],
+                "error": key[2],
+                "fix": "fix",
+                "_source": "gcl-trace-new.json",
+            }
+
+            merged = merge(parse_existing(path), [observed])
+            self.assertEqual(
+                merged[key]["count"], 11,
+                "10 unattributed hits + 1 observed trace must be 11, not 1",
+            )
+            # ...and the same trace again is still one observation.
+            merged = merge(merged, [observed])
+            self.assertEqual(merged[key]["count"], 11, "a re-scan must not add another hit")
+
+    def test_layer_limit_is_not_recapped_to_the_hot_limit(self) -> None:
+        """A layer's own limit must reach enforce_line_cap, not the 200-line hot cap.
+
+        _append_to_layer passed max_lines for its capacity maths but called the
+        global cap, so WARM_LIMIT=500 / COLD_LIMIT=2000 were unreachable ceilings
+        and demotion destroyed memory instead of preserving it.
+        """
+        import reflexion_store as rs
+
+        with tempfile.TemporaryDirectory() as tmp:
+            warm = Path(tmp) / "failure-patterns-warm.md"
+            fixture = self._patterns(250)
+            warm.write_text(
+                "\n".join(enforce_line_cap(fixture, max_lines=10**6)) + "\n", encoding="utf-8"
+            )
+            self.assertGreater(
+                len(parse_existing(warm)), 200, "fixture must exceed the hot cap to be meaningful"
+            )
+
+            extra = {
+                **next(iter(fixture.values())),
+                "skill": "qcloud-skill-extra-ops",
+                "command": "cmd-extra",
+                "error": "err-extra",
+            }
+            self.assertTrue(rs._append_to_layer(extra, warm, rs._WARM_LIMIT))
+            self.assertGreater(
+                len(parse_existing(warm)), 200,
+                "the warm layer's 500-line limit must not be re-capped to the hot 200",
+            )
 
     def test_every_section_heading_is_preceded_by_a_blank_line(self) -> None:
         """A table's last row must not swallow the next "## " section heading."""
@@ -849,6 +1002,48 @@ class TestLineCapEnforcement(unittest.TestCase):
         for i, line in enumerate(lines):
             if line.startswith("## "):
                 self.assertEqual(lines[i - 1], "", f"{line!r} is glued to the line above")
+
+
+# ---------------------------------------------------------------------------
+# The suite must not be a producer of the artefacts the KPI gate grades
+# ---------------------------------------------------------------------------
+
+def _shipped_artefact_snapshot() -> tuple[str, dict[str, int]]:
+    """(sha256 of the reflexion store, {evidence stream: line count})."""
+    repo = Path(__file__).resolve().parents[1]
+    store = repo / "docs" / "failure-patterns.md"
+    digest = hashlib.sha256(store.read_bytes()).hexdigest() if store.is_file() else ""
+    streams = {
+        p.name: len(p.read_text(encoding="utf-8").splitlines())
+        for p in (repo / "audit-results").glob("evidence-*.jsonl")
+    }
+    return digest, streams
+
+
+# Captured at import, before any test in the run has executed: `unittest
+# discover` imports every module first and only then runs them, so this is the
+# pristine state even though other modules run before this one.
+_AT_IMPORT = _shipped_artefact_snapshot()
+
+
+class TestShippedArtefactsAreNotATestWorkspace(unittest.TestCase):
+    """docs/failure-patterns.md and audit-results/evidence-*.jsonl are committed.
+
+    They are agent-facing inputs to the KPI gate, which grades the evidence
+    stream as a real run. The suite used to be their producer: `unittest
+    discover` minted schema-valid, leak_checked, run_id="local" records and
+    rewrote the store, so the gate read the test suite back as production
+    evidence — the floor of 10 records did not stop it, because it counted 17.
+    """
+
+    def test_full_suite_did_not_mutate_the_shipped_artefacts(self) -> None:
+        after = _shipped_artefact_snapshot()
+        self.assertEqual(
+            after,
+            _AT_IMPORT,
+            "the test suite wrote a committed, agent-facing artefact: "
+            f"{_AT_IMPORT} -> {after}",
+        )
 
 
 if __name__ == "__main__":

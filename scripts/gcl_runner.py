@@ -45,7 +45,7 @@ from typing import Any
 from cli_param_validator import validate_cli_params
 from distribution_drift import compute_drift
 from distribution_drift import load_traces as _load_traces_dd
-from evidence_kernel import SENSITIVE_KEY_RE, mask_trace, post_record, preflight
+from evidence_kernel import SENSITIVE_KEY_RE, mask_trace, preflight
 from gcl_trajectory_quality import classify_op
 from hallucination_detection import detect_hallucinations
 from reflexion_auto_writer import write_trace as _reflexion_write_trace
@@ -717,13 +717,18 @@ def extract_failure_pattern(
 
 
 def _post_persist_reflexion(root: Path, trace: dict[str, Any], path: Path) -> None:
-    """Phase Reflexion-A: auto-write failure_pattern to docs/failure-patterns.md.
+    """Phase Reflexion-A: auto-write failure_pattern to <root>/docs/failure-patterns.md.
 
     Best-effort — any exception is swallowed. Reflexion failures must never
     break the GCL caller (mirrors _emit_trace_span error policy).
+
+    The destination is derived from ``root``, not from the reflexion module's
+    repo-global PATTERNS_FILE: a run against a temp root (tests, dry-runs) must
+    not mutate the committed, agent-facing store. ``path`` is the trace path and
+    is positional second — see write_trace's signature.
     """
     try:
-        _reflexion_write_trace(trace, path)
+        _reflexion_write_trace(trace, path, root / "docs" / "failure-patterns.md")
     except Exception:  # noqa: BLE001, S110 - reflexion must never break GCL
         pass
 
@@ -860,6 +865,11 @@ def emit_evidence_record(root: Path, trace: dict[str, Any], args: argparse.Names
     `pf` is the PreFlight result already computed in cmd_run — carries the REAL
     destructive decision + token binding outcome so KPI #2 (destructive_coverage)
     is non-vacuous instead of hardcoded-false.
+
+    Written here rather than through evidence_kernel.post_record so the file
+    follows the caller's ``root``. post_record appends to the module-global repo
+    AUDIT, so every test that ran cmd_run with its own root minted records into
+    the committed evidence stream the KPI gate later grades as a real run.
     """
     try:
         masked = mask_trace(trace)
@@ -886,7 +896,10 @@ def emit_evidence_record(root: Path, trace: dict[str, Any], args: argparse.Names
             "cost": {"tokens": 0, "usd": None},
             "scores": _final_scores(trace),
         }
-        post_record(record, span_id=f"{run_id}:{args.skill}")
+        out = _audit_dir(root) / f"evidence-{run_id}.jsonl"
+        record = {**record, "span_id": f"{run_id}:{args.skill}"}
+        with out.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(mask_trace(record), ensure_ascii=False) + "\n")
     except Exception as exc:  # noqa: BLE001 - Evidence side-emit must never break GCL
         # Still non-fatal, but no longer silent: a permanently broken KPI
         # pipeline used to look identical to a healthy one.

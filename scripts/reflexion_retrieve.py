@@ -272,6 +272,8 @@ def cmd_retrieve(args: argparse.Namespace) -> int:
             base = 3.0 if p.get("skill") == args.skill else 2.0
             enriched.append({
                 **p,
+                # `sources` is a set in the store layer; JSON has no set type.
+                "sources": sorted(p.get("sources") or ()),
                 "_score": round(base * sev_weight * decay, 3),
                 "_severity_weight": sev_weight,
                 "_recency_decay": decay,
