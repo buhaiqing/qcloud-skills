@@ -216,6 +216,8 @@ Critic 另验证 `pytest`（964 passed）与 `gcl_runner --root <tmp>` 两条路
 | **H-46** | **回归**：`--layered` 在 store 溢出到 cold 后**不再可重跑**（≥701 patterns → exit 1、跨层重复键、什么都没写）。修复前 700 与 701 都能通过 | `failure_pattern_extract.py:455-488` + `:809-825` | 🟠 |
 | **H-47** | demotion 写入 `warm` 发生在 `self_verify_failure()` **之后** → 800-pattern 运行**报告成功**，而落盘状态其实**不满足 V2**（warm 510 > 500）。**与 H-23（gate 求值早于 cap）同一形态**，只是换了个位置 | `failure_pattern_extract.py:798-825` | 🟠 |
 | **H-48** | `docs/reflexion-memory.md:243`,`:64` 用「200 rows ≈ 214 lines」为修复做论证，但两个 emitter 实测都不产出该数字（实测 210 / 250） | 3R3-B 实测 | 🟡 |
+| **H-49** | **第三个 count 变更点**：`self_heal_pr_workflow._deduplicate_pattern()` 按**位置**读 `cells[-2]`（在 8 列 schema 下那是 `Severity` 列）→ `int("major")` 失败 → 回落为 1 → `count <= 1` 成立 → **该行被删除**。它同时也是「一个 count 函数」目标的漏网者 | `self_heal_pr_workflow.py:379-390`；3R2-A 亦独立复现，并确认 `docs/reflexion-memory.md:155-160` 已**如实记载**该缺陷 | 🟠 |
+
 
 > **H-47 的形态值得单独标注**：「校验发生在被校验对象之前」这个模式，在本会话里已是**第四次**出现
 > （R3 gate 早于 cap → `missing` 恒空；CI gate 早于 evidence 读取；run_id 隔离被 glob 加宽抵消；
