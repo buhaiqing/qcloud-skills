@@ -236,6 +236,29 @@ Critic 另验证 `pytest`（964 passed）与 `gcl_runner --root <tmp>` 两条路
 **结论：根因是「同一份逻辑存在两份拷贝」，不是某个具体 bug。** 故 CR-3 第 3 轮（§3.3 最后一轮）
 的指令是**消除重复计数实现（one count function, not two）**，而非再补一条路径。
 
+## CR-4 `kpi-honesty` 复核（Critic-4A / 4B，2026-09-20）
+
+**D-2=B 的核心实现是真的**：CI 现在自己从 `scripts/fixtures/evidence/` 落文件，并用
+`GATE_EVIDENCE_GLOB` **精确点名**被判分的那个文件（不再靠 glob 猜）；两侧都测
+（clean 必须过、violating 必须红，不红则 `::error::` 并 exit 1）；`trap ... EXIT` 清理。
+
+Critic 逐条实测确认：**注册表下限真的封死了 H-15**（在基线复现了 exploit：`15/30 → ✅ pass`、
+top1 30.16%；同一输入在 `1399f58` → `❌ fail | registry has 30 skill(s), below the recorded
+floor of 31`，exit 1）；缺失/空/超龄证据一律 fail-closed；本地 `make kpi-gates` 默认路径未变；
+CI 注释里的事实陈述逐条属实；单测隔离成立。**H-17…H-20 经执行验证关闭。**
+
+### 未关闭项
+
+| ID | 现象 | 证据 | 严重度 |
+|---|---|---|---|
+| **H-50** | **fire-side 无法检出「单条安全规则失效」**：violating fixture 同时触发 `leak_checked`/`token`/`plan_hash` **三条**规则，任一条死掉其余仍会开火 → 步骤依旧变红 → **看不出某条规则已停止工作**。而 D-2=B 的全部意义正是「证明规则本身还能开火」 | `.github/workflows/validate-skills.yml:140-148` | 🟠 |
+| **H-51** | **新 KPI 步骤在 CI 中永不执行**：其上游的**阻断式**单测步骤在**全新检出**上就是红的（`build_skill_registry_test.py:23` 读 gitignored 的 `audit-results/skill-registry.json`，文件不存在 → ERROR）。编排者独立复现：fresh clone `Ran 688 tests … FAILED (errors=1)`，而 CI 中该步骤在 `:81`、KPI 步骤在 `:113`。**与 H-08（`make all` 走不到 `reflexion-update`）同类** | 编排者实测 + 4A 独立复现 | 🔴 |
+| **H-52** | `GATE_EVIDENCE_GLOB` 被**无条件信任**，且可**穿出 `audit-results/`**（路径遍历） | `check_kpi_gates.py:151-152` | 🟠 |
+| **H-53** | *「单个翻转的 query 就让 ratchet 触发」* 是**假的** —— 而这是「把 ratchet 留在 0.28」的**全部理由** | `kpi-pattern.md:113-115`、`:225-227`、`runbooks/kpi7-*.md:31-33` | 🟠 |
+| **H-54** | `kpi1` runbook V4 仍在告诉 on-call **CI 使用本 CR 已删除的那个 escape** | `runbooks/kpi1-leak-checked-failure.md:60-64` | 🟠 |
+| **H-55** | spec（**被本 CR 编辑过的行**）与 AGENTS.md L24 的 `29/31` 混淆了两个分母；实为 `29/36`（注册表口径 `24/31`）。**AGENTS.md 已由编排者修正**（`0fb0314`） | `spec:258`；`AGENTS.md:165` | 🟠 |
+| **H-56** | kpi2 runbook 两条命令在本机仍失败（glob 不匹配）；kpi1 V3 行号引用过期；KPI#7 模板 yaml 漏了新增阈值；*"26 skills at 0.0"* 实为 27 | 4B 实测 | 🟡 |
+
 ## 人工决策
 
 ### D-1（已裁定）Plan A — 停止打补丁，改做根因 CR
