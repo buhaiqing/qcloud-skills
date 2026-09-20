@@ -125,9 +125,10 @@ def test_audit_trace_v3_legacy_callers_unaffected(tmp_path: Path):
     assert (legacy_dir / "_index.jsonl").is_file()
     # Idempotent: calling twice appends two lines, does not overwrite.
     audit_trace(session_id="ses-legacy", step_id="s2", trace_data={"status": "pass", "duration_ms": 3}, runtime_root=tmp_path)
-    lines = [json.loads(l) for l in (legacy_dir / "_index.jsonl").read_text().splitlines() if l]
+    lines = [json.loads(line) for line in
+             (legacy_dir / "_index.jsonl").read_text().splitlines() if line]
     assert len(lines) == 2, "idempotent: second call appended, not overwrote"
-    assert [l["step_id"] for l in lines] == ["s1", "s2"]
+    assert [line["step_id"] for line in lines] == ["s1", "s2"]
     # No v3 audit dir at .runtime root because no sink touched
     v3_dir = tmp_path / "audit" / "ses-legacy"
     assert not v3_dir.exists()

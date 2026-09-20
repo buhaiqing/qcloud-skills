@@ -167,7 +167,7 @@ class ParentChildChainTests(unittest.TestCase):
             sink.emit_trace_span(s)
 
         spans_path = tmp / "traces" / run_id / "spans.jsonl"
-        records = [json.loads(l) for l in
+        records = [json.loads(line) for line in
                    spans_path.read_text(encoding="utf-8").splitlines()]
 
         # All spans share the same trace_id

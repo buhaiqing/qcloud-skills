@@ -125,6 +125,11 @@ def _append_to_layer(
 
     Returns True if the pattern was written; False if the layer is at capacity.
     Demotes lowest-count existing patterns to make room.
+
+    ``max_lines`` must be handed to ``enforce_line_cap`` as well as used for the
+    capacity maths: the cap defaults to the 200-line HOT limit, so a warm/cold
+    layer rendered without it was silently re-capped to 200 lines and lost the
+    rows it had just demoted there.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     existing = parse_existing_safe(path) if path.exists() else {}
@@ -142,7 +147,7 @@ def _append_to_layer(
            key[2].strip().lower(), " ".join(key[3].strip().lower().split()))
     existing[key] = pattern
     try:
-        lines = enforce_line_cap(existing)
+        lines = enforce_line_cap(existing, max_lines=max_lines)
         path.write_text("\n".join(lines) + "\n", encoding="utf-8")
         return True
     except OSError:
@@ -175,6 +180,13 @@ def store_failure_pattern(
         2. If pattern exists: increments count, updates timestamp.
         3. If pattern is new: appends with count=1.
         4. Enforces ≤200 lines limit by pruning lowest-count patterns if needed.
+
+    One of the writers of docs/failure-patterns.md; the full list lives in
+    docs/reflexion-memory.md §10 and is machine-checked by
+    reflexion_store_test.TestTheWriterListIsComplete. It is one of the two with
+    no trace to attribute a hit to, so it records no ``sources`` and its
+    increments land in the unattributed remainder that merge() carries over
+    (see failure_pattern_extract.merge).
     """
     # Validate required fields
     if not skill or not skill.strip():

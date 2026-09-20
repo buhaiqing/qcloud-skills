@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -457,6 +458,49 @@ class CmdRunEndToEndTests(unittest.TestCase):
         ns = gcl_runner.build_parser().parse_args(args)
         rc = quiet_cmd_run(ns)
         return rc, tmp
+
+    def test_run_with_temp_root_never_touches_committed_artefacts(self) -> None:
+        """A run scoped to its own --root must not write the shipped artefacts.
+
+        docs/failure-patterns.md and audit-results/evidence-*.jsonl are
+        committed, agent-facing files — the KPI gate grades the evidence stream
+        as a real run. Both writers used to ignore --root and fall through to a
+        repo-global destination (the reflexion writer's PATTERNS_FILE,
+        evidence_kernel.post_record's AUDIT), so `unittest discover` minted the
+        patterns and records the gate then read back as production evidence.
+        """
+        repo = Path(gcl_runner.__file__).resolve().parents[1]
+        store = repo / "docs" / "failure-patterns.md"
+
+        def snapshot() -> tuple[str, dict[str, int]]:
+            digest = hashlib.sha256(store.read_bytes()).hexdigest()
+            streams = {
+                p.name: len(p.read_text(encoding="utf-8").splitlines())
+                for p in (repo / "audit-results").glob("evidence-*.jsonl")
+            }
+            return digest, streams
+
+        before = snapshot()
+        critic = {
+            "scores": {"correctness": 1, "safety": 0, "idempotency": 1,
+                       "traceability": 1, "spec_compliance": 1},
+            "suggestions": ["fix"],
+            "blocking": True,
+        }
+        rc, root = self._run(critic_payload=critic)
+        self.assertEqual(rc, 3)  # SAFETY_FAIL; the trace carries a failure_pattern
+        self.assertEqual(snapshot(), before, "the repo's committed artefacts moved")
+
+        # ...because both writers ran and landed under --root instead. Without
+        # these the guard passes vacuously whenever a writer stops firing.
+        self.assertTrue(
+            (root / "docs" / "failure-patterns.md").is_file(),
+            "reflexion writer did not fire — the isolation guard would be vacuous",
+        )
+        self.assertTrue(
+            list((root / "audit-results").glob("evidence-*.jsonl")),
+            "evidence writer did not fire — the isolation guard would be vacuous",
+        )
 
     def test_structural_pass(self) -> None:
         rc, root = self._run(critic_payload=None, structural=True, max_iter=1)

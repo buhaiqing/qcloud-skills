@@ -192,7 +192,7 @@ class AuditLogger:
 
         if revoked:
             with open(self._log_path, "w", encoding="utf-8") as fh:
-                fh.writelines(l + "\n" for l in updated_lines)
+                fh.writelines(line + "\n" for line in updated_lines)
 
         return revoked
 

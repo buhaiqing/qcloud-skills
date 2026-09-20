@@ -11,6 +11,15 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import build_skill_registry
 import harness_router
 
+# Two-skill registry where each skill is matched by distinct tokens, so the
+# owning-skill ground truth is unambiguous (no alphabetical tie-break involved).
+TWO_SKILLS = {
+    "skills": [
+        {"name": "qcloud-cvm-ops", "intent_keywords": ["RunCvmInstance"]},
+        {"name": "qcloud-cdb-ops", "intent_keywords": ["DescribeDbCluster"]},
+    ]
+}
+
 
 class HarnessRouterTest(unittest.TestCase):
     def test_router_selects_top1_in_memory(self) -> None:
@@ -64,6 +73,82 @@ class HarnessRouterTest(unittest.TestCase):
             result["top1_accuracy"], 0.0,
             "cvm positive queries must route to cvm (non-vacuous accuracy)",
         )
+
+    # --- ground truth is the owning skill, not a per-item `intent` key ---
+
+    def test_confusion_matrix_without_intent_field_is_not_constant(self) -> None:
+        """L5/L8: 29 of 31 eval_queries.json carry no `intent` key. The metric
+        must still measure something (previously it was a structural 0.0)."""
+        eval_queries = [
+            {"query": "run cvm instance", "should_trigger": True},
+            {"query": "cvm instance please", "should_trigger": True},
+            {"query": "describe db cluster", "should_trigger": False},
+        ]
+        self.assertFalse(any("intent" in q for q in eval_queries))
+        result = harness_router.confusion_matrix(TWO_SKILLS, eval_queries, "qcloud-cvm-ops")
+        self.assertEqual(result["top1_accuracy"], 1.0)  # both positives land on cvm
+        self.assertEqual(result["misdelegation"], 0.0)  # the negative lands on cdb
+
+    def test_unmatched_query_returns_empty_top1(self) -> None:
+        """L6: no silent alphabet fallback — an unmatched query routes nowhere
+        rather than to whichever skill sorts first."""
+        result = harness_router.select_top1(TWO_SKILLS, "write me a poem")
+        self.assertEqual(result["top1_skill"], "")
+        self.assertEqual(result["score"], 0)
+        # The old bug returned the alphabetically-first skill here.
+        self.assertNotEqual(result["top1_skill"], "qcloud-cdb-ops")
+        self.assertEqual(result["candidates"], ["qcloud-cvm-ops", "qcloud-cdb-ops"])
+
+    def test_negative_query_matching_owner_counts_as_misdelegation(self) -> None:
+        """A negative query that DOES route to the owning skill is a false
+        positive and must be counted as misdelegation."""
+        eval_queries = [
+            {"query": "run cvm instance", "should_trigger": True},
+            {"query": "cvm instance for my blog", "should_trigger": False},
+            {"query": "cvm instance again", "should_trigger": False},
+        ]
+        result = harness_router.confusion_matrix(TWO_SKILLS, eval_queries, "qcloud-cvm-ops")
+        self.assertEqual(result["top1_accuracy"], 1.0)
+        self.assertEqual(result["misdelegation"], 1.0)
+
+    # --- unmeasured arms must not be reported as measured zeros ---
+
+    def test_arms_without_items_are_unmeasured_not_zero(self) -> None:
+        """A file with no negatives cannot pin misdelegation at 0.0 (the old
+        `if neg else 0.0` reported a vacuous zero the gate then averaged in),
+        and a file with no positives cannot pin top1_accuracy."""
+        positives_only = [{"query": "run cvm instance", "should_trigger": True}]
+        result = harness_router.confusion_matrix(TWO_SKILLS, positives_only, "qcloud-cvm-ops")
+        self.assertIsNone(result["misdelegation"])
+        self.assertEqual(result["top1_accuracy"], 1.0)
+        self.assertEqual((result["positives"], result["negatives"]), (1, 0))
+
+        negatives_only = [{"query": "cvm instance for my blog", "should_trigger": False}]
+        result = harness_router.confusion_matrix(TWO_SKILLS, negatives_only, "qcloud-cvm-ops")
+        self.assertIsNone(result["top1_accuracy"])
+        self.assertEqual(result["misdelegation"], 1.0)
+
+    def test_fallback_is_measured_not_a_vacuous_constant(self) -> None:
+        """fallback used to be a hardcoded 0.0 that nothing read. With
+        select_top1 returning "" on no overlap it is the share of queries that
+        route nowhere — the router's most informative number."""
+        eval_queries = [
+            {"query": "run cvm instance", "should_trigger": True},
+            {"query": "describe db cluster", "should_trigger": False},
+            {"query": "write me a poem", "should_trigger": False},
+            {"query": "cook me dinner", "should_trigger": False},
+        ]
+        result = harness_router.confusion_matrix(TWO_SKILLS, eval_queries, "qcloud-cvm-ops")
+        self.assertEqual(result["fallback"], 0.5)  # 2 of 4 route nowhere
+        self.assertNotEqual(result["fallback"], 0.0)
+        # ...and it is genuinely non-zero on the real corpus (all-negatives or
+        # all-matched fixtures could still hide a constant-zero bug).
+        registry = build_skill_registry.build()
+        eval_path = ROOT / "qcloud-cvm-ops" / "assets" / "eval_queries.json"
+        if eval_path.exists():
+            real = harness_router.confusion_matrix(
+                registry, json.loads(eval_path.read_text()), "qcloud-cvm-ops")
+            self.assertGreater(real["fallback"], 0.0)
 
 
 if __name__ == "__main__":

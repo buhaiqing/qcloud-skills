@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Phase 4 — Runtime Router: frontmatter-only candidate selection, progressive
 references load (by the caller after selection), per-run budget enforcement, and
-intent confusion matrix over existing eval_queries.json (ground truth)."""
+a top-1 confusion matrix over the existing eval_queries.json, using the owning
+skill directory as ground truth."""
 import json
 import re
 import sys
@@ -37,10 +38,12 @@ def select_top1(registry: dict[str, Any], intent: str) -> dict[str, Any]:
 
     Deterministic tie-break: on equal score, the alphabetically-first skill name
     wins (avoids dict-order non-determinism). Returns top1_skill="" when no
-    skill scores (e.g. empty intent_keywords), never None.
+    skill scores >0 (e.g. empty intent_keywords, or a query whose tokens miss
+    every keyword), never None — a no-match must not be silently delegated to
+    whichever skill happens to sort first.
     """
     q_tokens = _tokens(intent)
-    best, best_score = "", -1
+    best, best_score = "", 0
     for s in sorted(registry["skills"], key=lambda x: x["name"]):
         score = sum(
             _keyword_overlap(kw, q_tokens)
@@ -57,29 +60,38 @@ def select_top1(registry: dict[str, Any], intent: str) -> dict[str, Any]:
 
 def confusion_matrix(
     registry: dict[str, Any], eval_queries: list[dict], skill: str
-) -> dict[str, float]:
-    """Reuse eval_queries.json (ground truth) for routing accuracy.
+) -> dict[str, float | int | None]:
+    """Routing accuracy for one skill, against owning-skill ground truth.
 
-    Each eval item: {"query": str, "should_trigger": bool, "intent": keyword}.
-    Positive (should_trigger=true): correct iff select_top1(query).top1_skill's
-    intent_keywords contain the item's intent keyword.
-    Negative (should_trigger=false): false-positive iff the top1 skill's
-    intent_keywords contain the item's intent keyword (misdelegation).
+    `skill` is the directory whose eval_queries.json this is, so it IS the label
+    for every item in the file — the router either lands on the owning skill or
+    it does not. No per-item `intent` key is required (29 of 31 eval_queries.json
+    files carry none; the previous intent-keyword lookup therefore compared
+    None against a keyword list and pinned top1_accuracy/misdelegation to the
+    constant 0.0 — a vacuous metric that the gate still reported as PASS).
+
+    Positive (should_trigger=true): correct iff select_top1(query).top1_skill == skill.
+    Negative (should_trigger=false): misdelegation iff top1_skill == skill.
+
+    An arm with no items of its class returns None ("unmeasured"), never 0.0: a
+    file with no `should_trigger: false` item cannot pin misdelegation at a
+    vacuous zero that then averages into the gate as if it were a measurement.
     """
-    pos = [q for q in eval_queries if q.get("should_trigger")]
-    neg = [q for q in eval_queries if not q.get("should_trigger")]
-    tp = sum(1 for q in pos if _top1_has_intent(registry, q, skill))
-    fp = sum(1 for q in neg if _top1_has_intent(registry, q, skill))
-    top1 = (tp / len(pos)) if pos else 0.0
-    misdelegation = (fp / len(neg)) if neg else 0.0
-    return {"top1_accuracy": top1, "misdelegation": misdelegation, "fallback": 0.0}
+    routed = [select_top1(registry, q.get("query", ""))["top1_skill"] for q in eval_queries]
+    pos = [i for i, q in enumerate(eval_queries) if q.get("should_trigger")]
+    neg = [i for i, q in enumerate(eval_queries) if not q.get("should_trigger")]
+    return {
+        "top1_accuracy": (sum(1 for i in pos if routed[i] == skill) / len(pos)) if pos else None,
+        "misdelegation": (sum(1 for i in neg if routed[i] == skill) / len(neg)) if neg else None,
+        # Share of this file's queries that route nowhere (top1 == ""). Measured,
+        # not assumed: with select_top1 returning "" on no keyword overlap this is
+        # the single most informative number about the router, so it is reported
+        # instead of the constant 0.0 it used to be.
+        "fallback": (sum(1 for t in routed if not t) / len(routed)) if routed else None,
+        "positives": len(pos),
+        "negatives": len(neg),
+    }
 
-
-def _top1_has_intent(registry: dict[str, Any], q: dict, skill: str) -> bool:
-    top = select_top1(registry, q.get("query", ""))["top1_skill"]
-    skills = {s["name"]: s for s in registry["skills"]}
-    top_kw = skills.get(top, {}).get("intent_keywords", [])
-    return q.get("intent") in top_kw
 
 
 def main() -> int:

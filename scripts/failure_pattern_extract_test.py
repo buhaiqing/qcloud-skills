@@ -270,5 +270,242 @@ class TestEnforceLineCap(unittest.TestCase):
         self.assertNotIn("## 4. Runtime Execution Patterns", section_titles)
 
 
+# ---------------------------------------------------------------------------
+# Cell escaping: one write/read cycle must be the identity
+# ---------------------------------------------------------------------------
+
+# Values a GCL trace can actually carry. `command` is the executed shell
+# command and `error` is a raw exception string, so a pipeline, a quoted param,
+# a Windows-ish path and an unpaired backtick are all ordinary inputs.
+HOSTILE = [
+    "plain",
+    "a|b",
+    "a\\b",
+    "a`b",
+    "trail`",          # escaped backtick at the cell edge (H-30)
+    "`lead",
+    "`",
+    "``",
+    "expected `",
+    'q"x',
+    "]",
+    '["',
+    '["a.json"]',
+    "a b",
+    " lead ",
+    "\ttabbed\t",
+    "|",
+    "\\",
+    "\\|",
+    "a`|`b",
+    "—",
+    "C:\\new",          # backslash + letter that is also an escape letter
+    "boom\n| forged | row |",   # newline: used to delete the whole row (H-31)
+    "new\nline",
+    "cr\rhere",
+    "\n",
+    "a\r\nb",
+]
+
+
+class TestCellEscaping(unittest.TestCase):
+    """`escape_cell`/`unescape_cell` must be exact inverses through a real row.
+
+    The old parser stripped backticks off *still-escaped* text, so an escaped
+    trailing backtick lost its backtick and kept its backslash: `expected \\``
+    read back as `expected \\`. It silently rewrote `error`, which is part of
+    the dedup key, so the same failure re-keyed as a new row on every scan.
+    Whitespace is the one documented exception — the key is normalised, so
+    `' lead '` and `'lead'` are one pattern.
+    """
+
+    def _round_trip(self, value: str, *, as_skill: bool) -> str:
+        """Write `value` into one cell, read the store back, return what came out.
+
+        The emitter produces two shapes: `skill`/`command` inside backticks and
+        `error`/`fix` bare. This exercises the value through both.
+        """
+        key = (value.strip(), "cmd", "err") if as_skill else ("qcloud-skill-ops", "cmd", value.strip())
+        patterns = {
+            key: {
+                "category": "runtime",
+                "skill": key[0],
+                "command": "cmd",
+                "error": key[2],
+                "fix": "fix",
+                "count": 1,
+                "last_seen": "2026-09",
+                "severity": "minor",
+                "sources": set(),
+            }
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "failure-patterns.md"
+            path.write_text("\n".join(fpe.enforce_line_cap(patterns)) + "\n", encoding="utf-8")
+            parsed = fpe.parse_existing(path)
+
+        self.assertEqual(len(parsed), 1, f"the row was lost for {value!r} (as_skill={as_skill})")
+        entry = next(iter(parsed.values()))
+        return entry["skill"] if as_skill else entry["error"]
+
+    def test_hostile_values_round_trip_either_emitted_shape(self):
+        mismatches = []
+        for value in HOSTILE:
+            # A whitespace-only skill has no row to read back — parse_existing
+            # skips those — so only the bare shape applies to it.
+            for as_skill in (False, True) if value.strip() else (False,):
+                got = self._round_trip(value, as_skill=as_skill)
+                # The emitter writes "—" for a cell that is empty; the only
+                # lossy case, and not an escaping one.
+                if got != (value.strip() or "—"):
+                    mismatches.append((value, as_skill, got))
+        self.assertEqual(mismatches, [], f"{len(mismatches)} value(s) did not survive one cycle")
+
+    def test_newline_in_a_cell_does_not_delete_the_row(self):
+        """`parse_existing` is line-oriented: a raw newline used to lose the row.
+
+        A nonempty `\n` or `\r` in any cell split the physical line, so the
+        pattern disappeared from the store while `write_trace` still returned
+        True. The pipes were already escaped, so this was data loss, not
+        injection.
+        """
+        key = ("qcloud-newline-ops", "tccli cvm Run", "boom\n| forged | row | x")
+        patterns = {
+            key: {
+                "category": "runtime",
+                "skill": key[0],
+                "command": key[1],
+                "error": key[2],
+                "fix": "fix",
+                "count": 3,
+                "last_seen": "2026-09",
+                "sources": {"gcl-trace-a.json"},
+            }
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "failure-patterns.md"
+            path.write_text("\n".join(fpe.enforce_line_cap(patterns)) + "\n", encoding="utf-8")
+            parsed = fpe.parse_existing(path)
+
+        self.assertEqual(len(parsed), 1, "a newline in a cell must not delete the row")
+        self.assertEqual(parsed[key]["count"], 3)
+        self.assertEqual(parsed[key]["error"], "boom\n| forged | row | x")
+        self.assertEqual(parsed[key]["sources"], {"gcl-trace-a.json"})
+
+    def test_unparseable_severity_does_not_eat_the_sources_cell(self):
+        """`severity` and `last_seen` were the only cells the emitter left raw.
+
+        An odd backtick in `severity` flipped the parser's backtick state for
+        the rest of the row: the trailing pipes stopped splitting and the
+        `Sources` cell was consumed. Provenance destroyed, count untouched —
+        which breaks `count = len(sources) + unattributed` permanently.
+        """
+        for severity in ("a`b", "nor`mal", "minor|x", "\\", "`"):
+            with self.subTest(severity=severity):
+                key = ("qcloud-sev-ops", "cmd", "err")
+                patterns = {
+                    key: {
+                        "category": "runtime",
+                        "skill": key[0],
+                        "command": key[1],
+                        "error": key[2],
+                        "fix": "fix",
+                        "count": 7,
+                        "last_seen": "2026-09",
+                        "severity": severity,
+                        "sources": {"gcl-trace-a.json"},
+                    }
+                }
+                with tempfile.TemporaryDirectory() as tmp:
+                    path = Path(tmp) / "failure-patterns.md"
+                    path.write_text(
+                        "\n".join(fpe.enforce_line_cap(patterns)) + "\n", encoding="utf-8"
+                    )
+                    parsed = fpe.parse_existing(path)
+
+                self.assertEqual(parsed[key]["sources"], {"gcl-trace-a.json"})
+                self.assertEqual(parsed[key]["count"], 7)
+                self.assertEqual(parsed[key]["severity"], severity)
+
+
+class TestOneTableSchema(unittest.TestCase):
+    """Both emitters must render the same 8 columns, `Sources` included.
+
+    `--layered` renders through `emit_layer` and writes the same
+    `docs/failure-patterns.md`. A Sources-less table there made
+    `parse_existing` set `_sources_recorded=False`, so the next `merge()`
+    computed `unattributed = 0` and replaced every stored count with
+    `len(sources)` — the count collapse, one flag away.
+    """
+
+    @staticmethod
+    def _patterns() -> dict[tuple[str, str, str], dict]:
+        key = ("qcloud-layer-ops", "tccli cvm Run", "InvalidParameter: bad")
+        return {
+            key: {
+                "category": "runtime",
+                "skill": key[0],
+                "command": key[1],
+                "error": key[2],
+                "fix": "fix",
+                "count": 6,
+                "last_seen": "2026-09",
+                "severity": "major",
+                "sources": {f"gcl-trace-{n}.json" for n in "abcdef"},
+            }
+        }
+
+    def test_both_emitters_declare_the_same_columns(self):
+        store = fpe._emit_store(self._patterns())
+        layer = fpe.emit_layer(self._patterns(), "Hot Layer")
+        self.assertEqual(
+            [ln for ln in store if ln.startswith("| Skill")],
+            [ln for ln in layer if ln.startswith("| Skill")],
+        )
+        self.assertTrue(any("| Sources |" in ln for ln in layer))
+
+    def test_layered_merge_is_idempotent_over_an_unchanged_corpus(self):
+        """`merge_failure_batch()` — the layered path's only count producer.
+
+        Driven for three runs over one fixed corpus, through the same
+        write → `parse_existing` → merge cycle the CLI performs. The previous
+        shape of this test hand-built `patterns` *including the `sources` set it
+        then asserted on* and never called `merge_failure_batch`, so it read back
+        its own input: the layered path inflated 6 → 12 → 18 while it passed.
+        """
+        key = ("qcloud-layer-ops", "tccli cvm Run", "InvalidParameter: bad")
+        corpus = [
+            {
+                "category": "runtime",
+                "skill": key[0],
+                "command": key[1],
+                "error": key[2],
+                "fix": "fix",
+                "severity": "major",
+                "_source": f"gcl-trace-{n}.json",
+            }
+            for n in "abcdef"
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "failure-patterns.md"
+            hot: dict = {}
+            counts = []
+            for _run in range(3):
+                hot, _warm, _cold = fpe.merge_failure_batch(
+                    [dict(p) for p in corpus], hot, {}, {}
+                )
+                fpe.save_layer(path, hot, "Hot Layer")
+                hot = fpe.parse_existing(path)  # the next run reads the file back
+                counts.append((hot[key]["count"], len(hot[key]["sources"])))
+
+        self.assertEqual(
+            counts,
+            [(6, 6)] * 3,
+            "one run over an unchanged corpus must not change count, and every "
+            f"distinct trace must survive as a source; got {counts}",
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -3,9 +3,9 @@
 
 Reads ``audit-results/gcl-trace-*.json`` (or ``--input`` paths),
 extracts each trace's ``failure_pattern`` field, deduplicates against
-``docs/failure-patterns.md`` (match by skill + command + error),
-increments count on duplicates, appends new patterns, and enforces the
-200-line cap by pruning count < 3.
+``docs/failure-patterns.md`` (match by skill + command + error), counts the
+distinct traces that reported each pattern, and enforces the 200-line cap by
+dropping the least-recurring rows.
 
 Usage:
   python3 scripts/failure_pattern_extract.py              # update in-place
@@ -15,7 +15,6 @@ Usage:
 Exit codes:
   0  success
   1  no traces / no patterns found
-  2  parse error in failure-patterns.md
 """
 
 from __future__ import annotations
@@ -24,6 +23,7 @@ import argparse
 import json
 import re
 import sys
+from collections.abc import Callable, Iterable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -36,6 +36,7 @@ from _failure_pattern_store import (
     SILENCE_THRESHOLD_DAYS,
     WARM_LIMIT,
     WARM_PATH,
+    escape_cell,
     load_all_layers,
     parse_existing,
 )
@@ -101,37 +102,82 @@ def derive_error_category(error: str, category: str) -> str:
 
     return "unknown"
 
+
 # ---------------------------------------------------------------------------
-# Markdown table emit
+# The one table schema
 # ---------------------------------------------------------------------------
+# Every writer of a failure-pattern table emits these columns. Two emitters with
+# two schemas was the whole of CR-3's count-collapse: `--layered` wrote a
+# 7-column table with no `Sources`, so parse_existing set
+# _sources_recorded=False, merge() computed unattributed=0, and the next merge
+# replaced each stored count with len(sources). A row must not mean two
+# different things depending on which flag wrote it, so there is one schema and
+# both emitters read it from here.
+_SECTION_HEADERS: dict[str, list[str]] = {
+    "## 1. CLI Parameter Errors": [
+        "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity", "Sources"
+    ],
+    "## 2. Skill Generation Issues": [
+        "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity", "Sources"
+    ],
+    "## 3. Cross-Skill Composition Failures": [
+        "Skill", "Command", "Error Pattern", "Resolution", "Count", "LastSeen", "Severity", "Sources"
+    ],
+    "## 4. Runtime Execution Patterns": [
+        "Skill", "Operation", "Error Pattern", "Root Cause", "Count", "LastSeen", "Severity", "Sources"
+    ],
+    "## 5. Token Efficiency Violations": [
+        "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity", "Sources"
+    ],
+}
 
-def emit_table(patterns: dict[str, dict[str, Any]], sections: dict[str, list[str]]) -> str:
-    """Rebuild the markdown table sections from in-memory patterns."""
+_SECTION_FOR_CATEGORY = {
+    "cli_parameter": "## 1. CLI Parameter Errors",
+    "skill_generation": "## 2. Skill Generation Issues",
+    "cross_skill": "## 3. Cross-Skill Composition Failures",
+    "runtime": "## 4. Runtime Execution Patterns",
+    "token_efficiency": "## 5. Token Efficiency Violations",
+}
 
-    def table_rows(category_filter: str) -> list[str]:
-        rows = []
-        for key, p in sorted(patterns.items(), key=lambda x: (-x[1]["count"], x[0][0])):
-            if p["category"] != category_filter:
-                continue
-            skill = p["skill"] or "—"
-            command = p["command"] or "—"
-            error = p["error"] or "—"
-            fix = p.get("fix", "—") or "—"
-            count = p.get("count", 0)
-            rows.append(
-                f"| `{skill}` | `{command}` | {error} | {fix} | {count} |"
-            )
-        return rows
 
-    lines = []
-    for section_title, headers in sections.items():
-        lines.append(f"\n{section_title}")
-        lines.append("")
-        lines.append("| " + " | ".join(headers) + " |")
-        lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
-        for row in table_rows(section_title.split("|")[1].strip()):
-            lines.append(row)
-    return "\n".join(lines)
+def _group_by_section(
+    patterns: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, dict[str, Any]]]:
+    """Bucket patterns by the section that renders them (unknown → runtime)."""
+    by_section: dict[str, dict[str, dict[str, Any]]] = {s: {} for s in _SECTION_HEADERS}
+    for key, p in patterns.items():
+        section = _SECTION_FOR_CATEGORY.get(
+            p.get("category", "runtime"), _SECTION_FOR_CATEGORY["runtime"]
+        )
+        by_section[section][key] = p
+    return by_section
+
+
+def _render_row(p: dict[str, Any]) -> str:
+    """Render one pattern as an 8-column table row (see _SECTION_HEADERS).
+
+    Every cell an emitter fills is escaped, including `last_seen` and
+    `severity`, which come straight from the trace. One unescaped odd backtick
+    in `severity` used to flip the parser's backtick state, so the rest of the
+    row stopped splitting and the row's `Sources` cell was swallowed: the
+    provenance was destroyed while its `count` stayed put, permanently breaking
+    `count = len(sources) + unattributed`.
+
+    `Sources` is a JSON array in one cell: a space-joined list cannot be split
+    back into the names that went in, so a trace filename containing a space
+    inflated `count` on every re-scan. `—` means "no sources recorded".
+    """
+    sources = sorted(p.get("sources") or ())
+    return (
+        f"| `{escape_cell(p.get('skill') or '—')}`"
+        f" | `{escape_cell(p.get('command', p.get('operation')) or '—')}`"
+        f" | {escape_cell(p.get('error', p.get('root cause')) or '—')}"
+        f" | {escape_cell(p.get('fix', p.get('resolution')) or '—')}"
+        f" | {p.get('count', 0)}"
+        f" | {escape_cell(p.get('last_seen', p.get('first_seen')) or '—')}"
+        f" | {escape_cell(p.get('severity') or 'minor')}"
+        f" | {escape_cell(json.dumps(sources, ensure_ascii=False)) if sources else '—'} |"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -191,42 +237,140 @@ def extract_failure_patterns(traces: list[Path]) -> list[dict[str, Any]]:
     return found
 
 
+def pattern_key(p: dict[str, Any]) -> tuple[str, str, str] | None:
+    """Dedup key (skill, command, error) for a raw failure_pattern.
+
+    Returns None when ``skill`` is empty — such a pattern has no home in the
+    store and every consumer (merge, the R3 gate, prune exemptions) drops it.
+    """
+    skill = (p.get("skill") or "").strip()
+    if not skill:
+        return None
+    return (skill, (p.get("command") or "").strip(), (p.get("error") or "").strip())
+
+
+def source_of(p: dict[str, Any]) -> str:
+    """The GCL run (trace file) that observed a raw failure_pattern.
+
+    ``_source`` is a trace filename, optionally suffixed ``#iter-N`` by
+    ``extract_failure_patterns``. The suffix is dropped: one GCL run is one
+    observation, however many of its iterations reported the same failure.
+    Without that, a single run could manufacture a count on its own.
+    """
+    return (p.get("_source") or "").strip().split("#", 1)[0]
+
+
+def _reconcile_count(entry: dict[str, Any], src: str) -> None:
+    """The one count rule: ``count = len(sources) + unattributed``.
+
+    ``src`` is the GCL run (trace) that observed the pattern. A row's count is
+    the number of DISTINCT traces that reported it — never the number of times
+    a merge ran — so a re-scan of an unchanged corpus changes nothing while a
+    new run adds exactly 1.
+
+    ``unattributed`` is whatever the stored count exceeded the stored source
+    set, and it is carried, not recomputed. Five writers share the store (the
+    machine-checked list is in docs/reflexion-memory.md §10) and only three
+    record sources; the other two — ``reflexion_store.store_failure_pattern``
+    and ``self_heal_pr_workflow._deduplicate_pattern`` — are sinks with no trace
+    to attribute. Their rows have ``sources == {}``, so deriving the count from
+    the source set alone would reset them to 1 on the next merge.
+
+    The remainder is honoured only when the row's table declares a Sources
+    column (``_sources_recorded``): rows written before that column existed
+    counted merge() invocations instead of traces, and that fiction yields to
+    the corpus.
+
+    Shared by ``merge()`` and ``merge_failure_batch()``. Two implementations of
+    this rule is precisely the defect CR-3 exists to kill: the layered path's
+    own ``count += 1`` per raw observation inflated ``--layered`` by one per
+    trace per run and recorded no sources at all.
+    """
+    sources = entry.setdefault("sources", set())
+    stored_count = entry.get("count", 0)
+    unattributed = (
+        max(0, stored_count - len(sources))
+        if entry.get("_sources_recorded", True)
+        else 0
+    )
+    if src:
+        sources.add(src)
+        entry["count"] = len(sources) + unattributed
+    else:
+        # No trace to attribute the hit to (programmatic callers). The legacy
+        # per-observation increment, kept so a source-less hit still moves the
+        # count rather than being silently dropped.
+        entry["count"] = stored_count + 1
+
+
+def _new_pattern_entry(
+    key: tuple[str, str, str],
+    p: dict[str, Any],
+    now: str,
+    src: str,
+) -> dict[str, Any]:
+    """The one shape of a newly observed pattern, whichever store writes it."""
+    return {
+        "category": p.get("category", "runtime"),
+        "skill": key[0],
+        "command": key[1],
+        "error": key[2],
+        "fix": p.get("fix", "—") or "—",
+        "count": 1,
+        "sources": {src} if src else set(),
+        "reusable": p.get("reusable", True),
+        "first_seen": now,
+        "last_seen": now,
+        "severity": p.get("severity", "minor"),
+    }
+
+
 def merge(
     existing: dict[str, dict[str, Any]],
     new: list[dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
-    """Merge new patterns into existing. Increment count on duplicate keys."""
+    """Merge new patterns into existing (single-file store).
+
+    Adds each new observation to its row's ``sources`` and reconciles the count
+    through ``_reconcile_count()`` — the same function the layered path uses, so
+    a row means one thing whichever flag wrote it. ``pattern_key()`` decides
+    what "the same pattern" is here and in ``merge_failure_batch()`` too.
+
+    Callers that pass patterns without a ``_source`` (programmatic use) keep the
+    legacy per-observation increment; see ``_reconcile_count()``.
+    """
     for p in new:
-        raw_skill = p.get("skill") or ""
-        command = (p.get("command") or "").strip()
-        error = (p.get("error") or "").strip()
-        if not raw_skill.strip():
+        key = pattern_key(p)
+        if key is None:
             continue
-        skill = raw_skill.strip()
-        key = (skill, command, error)
+        src = source_of(p)
         now = datetime.now().strftime("%Y-%m")
-        if key in existing:
-            existing[key]["count"] = existing[key].get("count", 0) + 1
-            existing[key]["last_seen"] = now  # P0-C: update on every hit
-        else:
-            existing[key] = {
-                "category": p.get("category", "runtime"),
-                "skill": skill,
-                "command": command,
-                "error": error,
-                "fix": p.get("fix", "—") or "—",
-                "count": 1,
-                "reusable": p.get("reusable", True),
-                "first_seen": now,
-                "last_seen": now,  # P0-C
-                "severity": p.get("severity", "minor"),
-            }
+        entry = existing.get(key)
+        if entry is None:
+            existing[key] = _new_pattern_entry(key, p, now, src)
+            continue
+        _reconcile_count(entry, src)
+        entry["last_seen"] = now  # P0-C: update on every hit
     return existing
 
 
-def prune_low_frequency(patterns: dict[str, dict[str, Any]], min_count: int = 3) -> None:
-    """Remove patterns with count < min_count (in-place)."""
-    dead = [k for k, v in patterns.items() if v.get("count", 0) < min_count]
+def prune_low_frequency(
+    patterns: dict[str, dict[str, Any]],
+    min_count: int = 3,
+    exclude: Iterable[tuple[str, str, str]] = (),
+) -> None:
+    """Remove patterns with count < min_count (in-place).
+
+    ``exclude`` lists keys observed in the current run; they are never pruned,
+    however low their count. A pattern seen now has demonstrably NOT stopped
+    recurring, and retiring it in the same transaction that records it makes
+    ``count`` unable to ever reach ``min_count`` — see docs/reflexion-memory.md §10.
+    """
+    keep = set(exclude)
+    dead = [
+        k for k, v in patterns.items()
+        if v.get("count", 0) < min_count and k not in keep
+    ]
     for k in dead:
         del patterns[k]
 
@@ -259,64 +403,53 @@ def merge_failure_batch(
 ) -> tuple[dict, dict, dict]:
     """Merge new failure patterns into hot/warm/cold layers.
 
-    Algorithm (mirrors success_pattern_mine.py merge_batch):
-      1. Substitution: same key → count++, last_seen=today
+    Algorithm:
+      1. Substitution: same key → reconcile count, last_seen=today
       2. Warm revive: key in warm + gap ≤ 30 days → move back to hot
       3. Silence hot: over HOT_LIMIT → oldest last_seen to warm
       4. Silence warm: over WARM_LIMIT → oldest last_seen to cold
       5. Cold cap: over COLD_LIMIT → prune lowest count
+
+    The key (``pattern_key()``) and the count (``_reconcile_count()``) are the
+    *same* functions ``merge()`` uses — one count rule, not two. This function
+    used to increment ``count`` per raw observation and never record ``sources``
+    at all, so `--layered` grew 6 → 12 → 18 over three runs of one unchanged
+    corpus while the single-file path stayed at 6, and every layered row
+    rendered its ``Sources`` cell as `—`. A row must mean one thing whichever
+    flag wrote it.
+
+    HOT_LIMIT counts *rows*, not lines — but the hot layer's file IS
+    ``docs/failure-patterns.md``, whose 200-**line** budget is a P0 constraint
+    in AGENTS.md. 200 rows render as ~214 lines, so the row cap alone breaches
+    the line cap the file's own header prints. The caller that writes HOT_PATH
+    therefore caps it by lines as well: see ``main()``'s ``--layered`` branch.
+    The warm/cold layers are separate files with no line budget, so there the
+    row cap is the only limit.
     """
     for p in new:
-        raw_skill = p.get("skill") or ""
-        command = (p.get("command") or "").strip()
-        error = (p.get("error") or "").strip()
-        if not raw_skill.strip():
+        key = pattern_key(p)
+        if key is None:
             continue
-        skill = raw_skill.strip()
-        key = (skill, command, error)
+        src = source_of(p)
         now = _today()
-        severity = p.get("severity", "minor")
 
         if key in hot:
-            # Substitution: increment count
-            hot[key]["count"] = hot[key].get("count", 0) + 1
+            # Substitution: add the observing trace, reconcile count
+            _reconcile_count(hot[key], src)
             hot[key]["last_seen"] = now
-        elif key in warm:
+        elif key in warm and (
+            _days_between(warm[key].get("last_seen", ""), now) <= SILENCE_THRESHOLD_DAYS
+        ):
             # Warm revive: gap ≤ 30 days
-            gap = _days_between(warm[key].get("last_seen", ""), now)
-            if gap <= SILENCE_THRESHOLD_DAYS:
-                warm[key]["count"] = warm[key].get("count", 0) + 1
-                warm[key]["last_seen"] = now
-                hot[key] = warm[key]
-                del warm[key]
-            else:
-                # No revive: create new in hot
-                hot[key] = {
-                    "category": p.get("category", "runtime"),
-                    "skill": skill,
-                    "command": command,
-                    "error": error,
-                    "fix": p.get("fix", "—") or "—",
-                    "count": 1,
-                    "reusable": p.get("reusable", True),
-                    "first_seen": now,
-                    "last_seen": now,
-                    "severity": severity,
-                }
+            _reconcile_count(warm[key], src)
+            warm[key]["last_seen"] = now
+            hot[key] = warm[key]
+            del warm[key]
         else:
-            # Fresh entry in hot
-            hot[key] = {
-                "category": p.get("category", "runtime"),
-                "skill": skill,
-                "command": command,
-                "error": error,
-                "fix": p.get("fix", "—") or "—",
-                "count": 1,
-                "reusable": p.get("reusable", True),
-                "first_seen": now,
-                "last_seen": now,
-                "severity": severity,
-            }
+            # Fresh entry in hot. Also reached when the key is in warm but the
+            # gap is too wide to revive; the stale warm copy is left where it is,
+            # unchanged from before.
+            hot[key] = _new_pattern_entry(key, p, now, src)
 
     # Silence eviction: hot cap
     if len(hot) > HOT_LIMIT:
@@ -415,37 +548,16 @@ def emit_layer(
     title: str,
     note: str = "",
 ) -> list[str]:
-    """Emit one layer's md content (used for hot/warm/cold output)."""
+    """Emit one layer's md content (used for hot/warm/cold output).
+
+    Same 8-column schema as the store (``_SECTION_HEADERS``) — the hot layer's
+    file *is* ``docs/failure-patterns.md``, so a layer table that dropped the
+    ``Sources`` column would make the next merge recompute every count from
+    ``len(sources)`` alone.
+    """
     now = _today()
-    sections = {
-        "## 1. CLI Parameter Errors": [
-            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity"
-        ],
-        "## 2. Skill Generation Issues": [
-            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity"
-        ],
-        "## 3. Cross-Skill Composition Failures": [
-            "Skill", "Command", "Error Pattern", "Resolution", "Count", "LastSeen", "Severity"
-        ],
-        "## 4. Runtime Execution Patterns": [
-            "Skill", "Operation", "Error Pattern", "Root Cause", "Count", "LastSeen", "Severity"
-        ],
-        "## 5. Token Efficiency Violations": [
-            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity"
-        ],
-    }
-    section_map = {
-        "cli_parameter": "## 1. CLI Parameter Errors",
-        "skill_generation": "## 2. Skill Generation Issues",
-        "cross_skill": "## 3. Cross-Skill Composition Failures",
-        "runtime": "## 4. Runtime Execution Patterns",
-        "token_efficiency": "## 5. Token Efficiency Violations",
-    }
-    by_section: dict[str, dict[str, dict[str, Any]]] = {s: {} for s in sections}
-    for key, p in patterns.items():
-        cat = p.get("category", "runtime")
-        section = section_map.get(cat, "## 4. Runtime Execution Patterns")
-        by_section[section][key] = p
+    sections = _SECTION_HEADERS
+    by_section = _group_by_section(patterns)
 
     total_hits = sum(p.get("count", 0) for p in patterns.values())
     lines = [
@@ -464,17 +576,8 @@ def emit_layer(
         lines.append("")
         lines.append("| " + " | ".join(headers) + " |")
         lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
-        for key, p in sorted(table_patterns.items(), key=lambda x: (-x[1].get("count", 0), x[0][0])):
-            skill = p.get("skill", "—") or "—"
-            command = p.get("command", p.get("operation", "—")) or "—"
-            error = p.get("error", p.get("root cause", "—")) or "—"
-            fix = p.get("fix", p.get("resolution", "—")) or "—"
-            count = p.get("count", 0)
-            last_seen = p.get("last_seen", p.get("first_seen", "—")) or "—"
-            severity = p.get("severity", "minor") or "minor"
-            lines.append(
-                f"| `{skill}` | `{command}` | {error} | {fix} | {count} | {last_seen} | {severity} |"
-            )
+        for _key, p in sorted(table_patterns.items(), key=lambda x: (-x[1].get("count", 0), x[0][0])):
+            lines.append(_render_row(p))
     return lines
 
 
@@ -489,41 +592,12 @@ def save_layer(
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def enforce_line_cap(patterns: dict[str, dict[str, Any]]) -> list[str]:
-    """Rebuild failure-patterns.md content, enforcing ~200 line cap."""
+def _emit_store(patterns: dict[str, dict[str, Any]]) -> list[str]:
+    """Render the store markdown: header + one table per non-empty category."""
     now = datetime.now().strftime("%Y-%m-%d")
 
-    sections = {
-        "## 1. CLI Parameter Errors": [
-            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity"
-        ],
-        "## 2. Skill Generation Issues": [
-            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity"
-        ],
-        "## 3. Cross-Skill Composition Failures": [
-            "Skill", "Command", "Error Pattern", "Resolution", "Count", "LastSeen", "Severity"
-        ],
-        "## 4. Runtime Execution Patterns": [
-            "Skill", "Operation", "Error Pattern", "Root Cause", "Count", "LastSeen", "Severity"
-        ],
-        "## 5. Token Efficiency Violations": [
-            "Skill", "Command", "Error Pattern", "Fix", "Count", "LastSeen", "Severity"
-        ],
-    }
-
-    # Split patterns into sections by category
-    by_section: dict[str, dict[str, dict[str, Any]]] = {s: {} for s in sections}
-    section_map = {
-        "cli_parameter": "## 1. CLI Parameter Errors",
-        "skill_generation": "## 2. Skill Generation Issues",
-        "cross_skill": "## 3. Cross-Skill Composition Failures",
-        "runtime": "## 4. Runtime Execution Patterns",
-        "token_efficiency": "## 5. Token Efficiency Violations",
-    }
-    for key, p in patterns.items():
-        cat = p.get("category", "runtime")
-        section = section_map.get(cat, "## 4. Runtime Execution Patterns")
-        by_section[section][key] = p
+    sections = _SECTION_HEADERS
+    by_section = _group_by_section(patterns)
 
     lines: list[str] = [
         "# Failure Patterns — Reflexion Memory",
@@ -531,7 +605,9 @@ def enforce_line_cap(patterns: dict[str, dict[str, Any]]) -> list[str]:
         "> **Purpose**: Structured failure memory extracted from GCL traces and Self-Review records.",
         "> Agents can optionally load this file during Pre-flight to 预防 (prevent) known errors.",
         f"> **Updated**: {now} ({sum(p['count'] for p in patterns.values())} total hits across all patterns).",
-        "> **Token budget**: ≤ 200 lines. When exceeded, prune patterns with count < 3.",
+        f"> **Token budget**: ≤ {MAX_LINES} lines, enforced — when exceeded, the least-recurring rows are dropped.",
+        "> **Count**: distinct GCL runs (traces) that reported the pattern; re-scans do not inflate it.",
+        "> **Sources**: those runs by name, JSON array — Count = len(Sources) + unattributed sink hits.",
         "",
     ]
 
@@ -543,15 +619,9 @@ def enforce_line_cap(patterns: dict[str, dict[str, Any]]) -> list[str]:
         lines.append("")
         lines.append("| " + " | ".join(headers) + " |")
         lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
-        for key, p in sorted(table_patterns.items(), key=lambda x: (-x[1]["count"], x[0][0])):
-            skill = p["skill"] or "—"
-            command = p.get("command", p.get("operation", "—")) or "—"
-            error = p.get("error", p.get("root cause", "—")) or "—"
-            fix = p.get("fix", p.get("resolution", "—")) or "—"
-            count = p.get("count", 0)
-            last_seen = p.get("last_seen", p.get("first_seen", "—")) or "—"  # P0-C
-            severity = p.get("severity", "minor") or "minor"  # P0-C
-            lines.append(f"| `{skill}` | `{command}` | {error} | {fix} | {count} | {last_seen} | {severity} |")
+        for _key, p in sorted(table_patterns.items(), key=lambda x: (-x[1]["count"], x[0][0])):
+            lines.append(_render_row(p))
+        lines.append("")  # blank line: without it the next "## " is absorbed into this table
 
     # Usage guidelines (always kept)
     lines.extend([
@@ -571,9 +641,10 @@ def enforce_line_cap(patterns: dict[str, dict[str, Any]]) -> list[str]:
         "# After completing R1 + R2:",
         "# 1. Extract new failure patterns from this session",
         "# 2. Check if pattern already exists (dedup by skill + command + error)",
-        "# 3. If new: append to appropriate section with count=1",
-        "# 4. If existing: increment count",
-        "# 5. If total lines > 200: prune patterns with count < 3",
+        "# 3. If new: append to the appropriate section with count=1, sources=[<trace>]",
+        "# 4. If existing: add this trace to `sources`; count follows the source set",
+        "# 5. Over the line cap: the least-recurring rows are dropped, highest count kept",
+        "# Do not hand-edit `count`: it is len(sources) plus any unattributed hits.",
         "```",
         "",
         "### For GCL Traces",
@@ -595,6 +666,66 @@ def enforce_line_cap(patterns: dict[str, dict[str, Any]]) -> list[str]:
     return lines
 
 
+def enforce_line_cap(
+    patterns: dict[str, dict[str, Any]],
+    max_lines: int = MAX_LINES,
+    render: Callable[[dict[str, dict[str, Any]]], list[str]] | None = None,
+) -> list[str]:
+    """Rebuild failure-patterns.md content, enforcing the ``max_lines`` cap.
+
+    AGENTS.md makes "≤ 200 lines" a P0 constraint, so the cap is *applied*
+    rather than warned about: while the rendered file overflows, the least
+    valuable rows (lowest count, then oldest last_seen) are dropped from
+    ``patterns``. ``patterns`` is mutated in place so the caller's own
+    counters (Total patterns / Total hits) describe what was written.
+
+    Callers writing a warmer layer must pass that layer's own limit
+    (``WARM_LIMIT`` / ``COLD_LIMIT``): otherwise the 200-line hot cap applies
+    to it, and the layer's declared capacity is an unreachable ceiling that
+    makes demotion destroy memory instead of preserving it.
+
+    ``render`` is the emitter whose line count is capped: ``_emit_store``
+    (single-file store) by default, ``emit_layer`` for the layered hot layer.
+    The two write different tables, so capping one by the other's line count
+    would either under- or over-shoot; the budget is the same P0 constraint
+    either way, because the hot layer's file is the same
+    ``docs/failure-patterns.md``.
+    """
+    emit = render or _emit_store
+    lines = emit(patterns)
+    if len(lines) > max_lines:
+        ranked = sorted(
+            patterns.items(),
+            key=lambda kv: (
+                kv[1].get("count", 0),
+                str(kv[1].get("last_seen") or kv[1].get("first_seen") or ""),
+                str(kv[0]),
+            ),
+        )
+        for key, _entry in ranked:
+            del patterns[key]
+            lines = emit(patterns)
+            if len(lines) <= max_lines:
+                break
+    return lines
+
+
+def _display(path: Path, root: Path) -> Path:
+    """``path`` relative to ``root`` when it is inside it, else ``path``.
+
+    ``--root`` may be relative (``--root .``), and the bare ``relative_to()``
+    this replaces raised ``ValueError`` — *after* the layers had already been
+    written, so a run that had mutated the store reported itself as a crash.
+    Falling back to the absolute path keeps the report honest when the
+    destination really is outside ``--root``: ``--root`` only steers
+    ``collect_traces``, the store is repo-absolute.
+    """
+    try:
+        return path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return path
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -613,7 +744,11 @@ def main() -> int:
     )
     parser.add_argument(
         "--min-count", type=int, default=3,
-        help="Prune patterns with count below this threshold (default: 3)"
+        help=(
+            "Retires stored patterns absent from this run's corpus whose count "
+            "is below the threshold (default: 3). Never retires a key this run "
+            "observed — see docs/reflexion-memory.md §10"
+        ),
     )
     parser.add_argument(
         "--layered", action="store_true",
@@ -671,11 +806,28 @@ def main() -> int:
                 print(f"  {e}", file=sys.stderr)
             if not args.dry_run:
                 return 1
+        # HOT_PATH *is* docs/failure-patterns.md, so the 200-LINE cap AGENTS.md
+        # makes P0 applies here too. HOT_LIMIT caps rows and 200 rows render as
+        # ~214 lines, so the row cap alone breaches the budget this file's own
+        # header prints. Cap the rendered hot layer before the write.
+        hot_note = f"> **Token budget**: ≤ {MAX_LINES} lines."
+        snapshot = dict(hot)
+        enforce_line_cap(
+            hot, MAX_LINES,
+            render=lambda ps: emit_layer(ps, "Hot Layer", hot_note),
+        )
+        # Rows the line cap evicts are demoted, not destroyed — hot → warm is the
+        # same policy the row cap applies above, and it keeps the layered store's
+        # promise (the number of *retained* patterns is not bounded by the
+        # single-file line budget).
+        for key in snapshot.keys() - hot.keys():
+            warm.setdefault(key, snapshot[key])
+        capped = len(snapshot) - len(hot)
         new_hot = len(hot) - old_hot
         total_hits = sum(p.get("count", 0) for p in {**hot, **warm, **cold}.values())
         print(
             f"Traces scanned: {len(trace_paths)}",
-            f"Hot layer:  {len(hot)} (+{new_hot} new)",
+            f"Hot layer:  {len(hot)} (+{new_hot} new, {capped} to warm over the {MAX_LINES}-line cap)",
             f"Warm layer: {len(warm)}",
             f"Cold layer: {len(cold)}",
             f"Total hits: {total_hits}",
@@ -684,34 +836,33 @@ def main() -> int:
         if args.dry_run:
             print(f"\n[dry-run] Would write hot={len(hot)}, warm={len(warm)}, cold={len(cold)}")
             return 0
-        save_layer(HOT_PATH, hot, "Hot Layer",
-                   f"> **Token budget**: ≤ {HOT_LIMIT} lines.")
+        save_layer(HOT_PATH, hot, "Hot Layer", hot_note)
         save_layer(WARM_PATH, warm, "Warm Layer",
                    f"> **Token budget**: ≤ {WARM_LIMIT} lines.")
         save_layer(COLD_PATH, cold, "Cold Layer",
                    f"> **Token budget**: ≤ {COLD_LIMIT} lines.")
-        print(f"Written: {HOT_PATH.relative_to(args.root)}")
-        print(f"Written: {WARM_PATH.relative_to(args.root)}")
-        print(f"Written: {COLD_PATH.relative_to(args.root)}")
+        print(f"Written: {_display(HOT_PATH, args.root)}")
+        print(f"Written: {_display(WARM_PATH, args.root)}")
+        print(f"Written: {_display(COLD_PATH, args.root)}")
     else:
         # Legacy single-file storage
         merged = merge(existing.copy(), new_patterns)
         new_count = len(merged) - existing_count
-        prune_low_frequency(merged, min_count=args.min_count)
+        # Same aging policy as reflexion_auto_writer._bulk_update: a pattern
+        # observed in this run is never pruned, however low its count.
+        observed = {k for p in new_patterns if (k := pattern_key(p))}
+        prune_low_frequency(merged, min_count=args.min_count, exclude=observed)
         pruned = existing_count + new_count - len(merged)
+        kept = len(merged)
         lines = enforce_line_cap(merged)
-        if len(lines) > MAX_LINES + 10:
-            print(
-                f"WARN: output {len(lines)} lines exceeds cap ({MAX_LINES}). "
-                f"Consider raising --min-count or archiving older patterns.",
-                file=sys.stderr
-            )
+        dropped = kept - len(merged)
         total_hits = sum(p["count"] for p in merged.values())
         print(
             f"Traces scanned:     {len(trace_paths)}",
             f"New patterns:        {new_count}",
             f"Count increments:    {len(merged) - existing_count - new_count + (existing_count - len([k for k in existing if k in merged]))}",
             f"Pruned (count<{args.min_count}): {pruned}",
+            f"Dropped (cap {MAX_LINES}):   {dropped}",
             f"Total patterns:      {len(merged)}",
             f"Total hits:          {total_hits}",
             f"Output lines:        {len(lines)}",
@@ -722,7 +873,7 @@ def main() -> int:
             print("\n".join(lines))
             return 0
         PATTERNS_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        print(f"\nUpdated: {PATTERNS_FILE.relative_to(args.root)}")
+        print(f"\nUpdated: {_display(PATTERNS_FILE, args.root)}")
     return 0
 
 

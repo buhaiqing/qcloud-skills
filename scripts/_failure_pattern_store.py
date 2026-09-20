@@ -6,6 +6,7 @@ Not executable directly.
 """
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -36,21 +37,122 @@ _SECTION_CAT: dict[str, str] = {
 }
 
 
+# The characters a backslash may escape, mapped to the letter that stands for
+# them after that backslash. Every other backslash in trace text is a literal,
+# so file paths survive. ``\n``/``\r`` are in the table because
+# ``parse_existing`` reads the file line by line: a raw newline used to split
+# the row, and the pattern vanished from the store while the writer still
+# reported success.
+_ESCAPES: dict[str, str] = {"\\": "\\", "|": "|", "`": "`", "\n": "n", "\r": "r"}
+# Inverse of _ESCAPES, keyed by the character after the backslash.
+_UNESCAPES: dict[str, str] = {letter: ch for ch, letter in _ESCAPES.items()}
+# Characters that can legally follow a backslash: what _parse_table_row must
+# keep glued together so an escaped pipe is not mistaken for a delimiter.
+_ESCAPABLE = "".join(_UNESCAPES)
+
+
+def escape_cell(text: Any) -> str:
+    """Encode a value so it survives one write/read cycle of a pipe table.
+
+    Inverse of ``unescape_cell``. A raw ``|`` splits the row (shifting every
+    later column into the wrong header), a raw backtick flips the parser's
+    backtick state, which defeats the pipe check for the rest of the row, and a
+    raw newline ends the row outright. Trace text reaches these cells verbatim —
+    ``command`` is the executed shell command, ``error`` is a raw exception
+    string — hence escaping rather than assuming the payload is tame.
+
+    Backslashes are doubled first, so a later replacement's own backslashes are
+    never re-escaped.
+    """
+    out = str(text)
+    for ch, letter in _ESCAPES.items():
+        out = out.replace(ch, "\\" + letter)
+    return out
+
+
+def unescape_cell(text: str) -> str:
+    """Decode one cell written by ``escape_cell``."""
+    out: list[str] = []
+    i = 0
+    while i < len(text):
+        if text[i] == "\\" and i + 1 < len(text) and text[i + 1] in _UNESCAPES:
+            out.append(_UNESCAPES[text[i + 1]])
+            i += 2
+        else:
+            out.append(text[i])
+            i += 1
+    return "".join(out)
+
+
+def _decode_cell(cell: str) -> str:
+    """Turn one raw table cell into the value that was written.
+
+    One *balanced* backtick wrapper is dropped before unescaping, never after.
+    ``escape_cell`` guarantees no unescaped backtick appears in the payload, so
+    a cell that both starts and ends with one can only be a wrapper: the check
+    cannot eat a value's own trailing backtick. Doing it in the other order (the
+    previous shape, ``strip("`")`` on still-escaped text) removed that trailing
+    backtick and orphaned its escape, silently rewriting ``error`` — part of the
+    dedup key — so the same failure re-keyed as a new row on every scan.
+
+    Leading/trailing whitespace is stripped, which makes the dedup key
+    whitespace-normalised: ``' lead '`` and ``'lead'`` are one pattern, and
+    ``merge``/``pattern_key`` strip the same way.
+    """
+    text = cell.strip()
+    if len(text) >= 2 and text[0] == "`" and text[-1] == "`":
+        text = text[1:-1]
+    return unescape_cell(text).strip()
+
+
 def _parse_table_row(line: str) -> list[str]:
-    """Split a markdown table row by pipes, respecting backtick-enclosed content."""
+    """Split a markdown table row into its inner cells.
+
+    Pipes are honoured only outside backticks, backticks and pipes can be
+    escaped, and the empty cells produced by the row's own leading/trailing
+    ``|`` are dropped. Every returned cell is already decoded, so callers see
+    the value that was written.
+    """
     cells, current = [], ""
     in_backtick = False
-    for ch in line:
+    i = 0
+    while i < len(line):
+        ch = line[i]
+        if ch == "\\" and i + 1 < len(line) and line[i + 1] in _ESCAPABLE:
+            current += line[i : i + 2]
+            i += 2
+            continue
         if ch == "`":
             in_backtick = not in_backtick
-            current += ch
         elif ch == "|" and not in_backtick:
-            cells.append(current.strip())
+            cells.append(current)
             current = ""
-        else:
-            current += ch
-    cells.append(current.strip())
-    return [c.strip().strip("`") for c in cells[1:-1] if c.strip()]
+            i += 1
+            continue
+        current += ch
+        i += 1
+    cells.append(current)
+    return [_decode_cell(c) for c in cells[1:-1]]
+
+
+def _parse_sources(cell: str) -> set[str]:
+    """Parse the Sources cell: a JSON array, falling back to the legacy list.
+
+    The JSON array (``["a.json","ev il b.json"]``) is the current encoding and
+    round-trips spaces, pipes and backticks. Rows written before it joined bare
+    filenames with spaces, so a legacy filename containing a space cannot be
+    recovered — such a row reads as N separate sources and heals on its next
+    write, which is why the fallback only has to be safe, not exact.
+    """
+    if not cell:
+        return set()
+    try:
+        parsed = json.loads(cell)
+    except ValueError:
+        parsed = None
+    if isinstance(parsed, list):
+        return {s for s in (str(v) for v in parsed) if s.strip()}
+    return {s for s in cell.replace(",", " ").split() if s and s not in ("—", "-")}
 
 
 def parse_existing(path: Path) -> dict[str, dict[str, Any]]:
@@ -61,6 +163,7 @@ def parse_existing(path: Path) -> dict[str, dict[str, Any]]:
 
     in_section = False
     table_headers: list[str] = []
+    has_sources_col = False
     current_section_cat = ""
 
     for raw in path.read_text(encoding="utf-8").splitlines():
@@ -74,6 +177,7 @@ def parse_existing(path: Path) -> dict[str, dict[str, Any]]:
                     current_section_cat = cat
                     break
             table_headers = []
+            has_sources_col = False
             continue
 
         if not in_section:
@@ -81,6 +185,11 @@ def parse_existing(path: Path) -> dict[str, dict[str, Any]]:
 
         if line.startswith("|") and "---" not in line and "Skill" in line:
             table_headers = [h.lower().replace(" ", "").replace("-", "") for h in _parse_table_row(line)]
+            # Whether this table declares a Sources column at all. Rows from the
+            # pre-Sources format counted merge() invocations, not traces, so their
+            # count is fiction to be replaced; a row that carries an explicit "—"
+            # is a modern row whose count is real but unattributable (see merge).
+            has_sources_col = "sources" in table_headers
             continue
 
         if line.startswith("|") and "---" not in line and table_headers:
@@ -114,6 +223,10 @@ def parse_existing(path: Path) -> dict[str, dict[str, Any]]:
                     row.get("resolution", row.get("rootcause", row.get("root cause", ""))),
                 ).strip(),
                 "count": count,
+                # Distinct GCL runs that reported this pattern (see merge()).
+                # "—" is the emitted placeholder for "no sources recorded".
+                "sources": _parse_sources(row.get("sources", "")),
+                "_sources_recorded": has_sources_col,
                 "reusable": row.get("reusable", "true").strip().lower() == "true",
                 "first_seen": row.get("first_seen", ""),
                 "last_seen": row.get("lastseen", row.get("first_seen", "")),

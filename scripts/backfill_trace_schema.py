@@ -72,7 +72,7 @@ def _backfill_jsonl(path: Path, dry_run: bool = True) -> dict[str, Any]:
     """Backfill evidence-local.jsonl (one JSON object per line)."""
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
-        records = [json.loads(l) for l in lines]
+        records = [json.loads(line) for line in lines]
     except (json.JSONDecodeError, OSError) as e:
         return {"path": str(path), "changed": False, "error": str(e), "missing": list(SCHEMA_FIELDS)}
 

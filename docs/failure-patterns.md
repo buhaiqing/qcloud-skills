@@ -2,8 +2,17 @@
 
 > **Purpose**: Structured failure memory extracted from GCL traces and Self-Review records.
 > Agents can optionally load this file during Pre-flight to 预防 (prevent) known errors.
-> **Updated**: 2026-09-07 (0 total hits across all patterns).
-> **Token budget**: ≤ 200 lines. When exceeded, prune patterns with count < 3.
+> **Updated**: 2026-09-20 (7 total hits across all patterns).
+> **Token budget**: ≤ 200 lines, enforced — when exceeded, the least-recurring rows are dropped.
+> **Count**: distinct GCL runs (traces) that reported the pattern; re-scans do not inflate it.
+> **Sources**: those runs by name, JSON array — Count = len(Sources) + unattributed sink hits.
+
+## 4. Runtime Execution Patterns
+
+| Skill | Operation | Error Pattern | Root Cause | Count | LastSeen | Severity | Sources |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `qcloud-test-ops` | `tccli cvm DescribeInstances` | idempotency=0.00<0.5 | set ClientToken | 6 | 2026-09 | major | ["gcl-trace-20260919-155113.json", "gcl-trace-20260919-155125.json", "gcl-trace-20260919-155205.json", "gcl-trace-20260919-155220.json", "gcl-trace-20260919-155308.json", "gcl-trace-20260919-155317.json"] |
+| `qcloud-cvm-ops` | `echo mock-cvm-output` | correctness=0.00<0.5 | Generator exit_code=-2; fix command or credentials | 1 | 2026-09 | major | ["gcl-trace-20260831-165139.json"] |
 
 
 ## Usage Guidelines
@@ -21,9 +30,10 @@
 # After completing R1 + R2:
 # 1. Extract new failure patterns from this session
 # 2. Check if pattern already exists (dedup by skill + command + error)
-# 3. If new: append to appropriate section with count=1
-# 4. If existing: increment count
-# 5. If total lines > 200: prune patterns with count < 3
+# 3. If new: append to the appropriate section with count=1, sources=[<trace>]
+# 4. If existing: add this trace to `sources`; count follows the source set
+# 5. Over the line cap: the least-recurring rows are dropped, highest count kept
+# Do not hand-edit `count`: it is len(sources) plus any unattributed hits.
 ```
 
 ### For GCL Traces

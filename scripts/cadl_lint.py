@@ -141,7 +141,7 @@ def lint_failure_patterns(path: Path) -> tuple[bool, str]:
     REQUIRED = ("category", "skill", "command", "error", "fix", "count")
     errors: list[str] = []
 
-    for key, pat in patterns.items():
+    for pat in patterns.values():
         skill = pat.get("skill", "")
         # Skip generated seeds — they are not real failures.
         if skill.endswith("_seed") or "_seed=true" in skill or pat.get("reusable") is False:

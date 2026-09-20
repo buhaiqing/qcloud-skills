@@ -49,6 +49,16 @@ jobs:
       - name: Lint Python in Markdown code blocks
         run: python3 scripts/check_markdown_python.py --root .
       - name: GCL runner smoke test (structural critic, stubbed tccli)
+        env:
+          # Unique run_id: the smoke record lands in its own
+          # audit-results/evidence-ci-smoke-<run_id>.jsonl instead of mixing into
+          # the developer stream evidence-local.jsonl.
+          # NOTE: this is hygiene, NOT the guard on the KPI#1/#2 gate — the gate
+          # globs `evidence-*.json*`, which matches this file too, so renaming it
+          # excludes nothing. What keeps the gate honest is that its CI step
+          # grades a committed fixture (see "KPI gates" below) rather than
+          # whatever audit-results/ happens to contain.
+          HARNESS_RUN_ID: ci-smoke-${{ github.run_id }}
         run: |
           set -euo pipefail
           # gcl_runner only executes `tccli`; an `echo ...` command is rejected
@@ -99,6 +109,51 @@ jobs:
           python3 scripts/pattern_anomaly_detect.py | tee audit-results/pattern-anomaly-$(date +%Y%m%d).json || true
         continue-on-error: true
         # NOTE: script outputs to stdout/stderr only; does not block merges
+
+      - name: KPI gates (KPI#1/#2 vs committed fixture; KPI#3/#7 on this checkout)
+        run: |
+          set -euo pipefail
+          mkdir -p audit-results
+          # The staged copies are synthetic and dated far forward, so they must not
+          # survive into anyone's evidence directory (they match the default glob).
+          trap 'rm -f audit-results/evidence-fixture.jsonl' EXIT
+          # KPI#1/#2 is graded against a COMMITTED fixture, and against nothing
+          # else. Two reasons it cannot be graded against audit-results/ as this
+          # job finds it:
+          #   (1) GATE_REQUIRE_EVIDENCE=0, the escape this step used to set, is not
+          #       a guard at all: it returns before any file is read, so with it
+          #       set KPI#1/#2 can never fail the build, whatever the evidence
+          #       says. It remains the documented escape for a deliberately
+          #       evidence-free repo, and is deliberately NOT set here.
+          #   (2) audit-results/ on a CI runner is machine-local and gitignored, so
+          #       it holds no fleet evidence — only what earlier steps in this job
+          #       happened to write. The smoke test above writes one synthetic
+          #       record there right now, and until the unit tests were isolated
+          #       (2026-09) they minted 17 more. Renaming a file excludes nothing:
+          #       the gate globs `evidence-*.json*`, so any of them would be read.
+          # What makes the graded bytes trustworthy is that this step writes the
+          # file itself, from scripts/fixtures/evidence/, and names exactly that
+          # file via GATE_EVIDENCE_GLOB.
+          cp scripts/fixtures/evidence/evidence-safety-clean.jsonl \
+             audit-results/evidence-fixture.jsonl
+          GATE_EVIDENCE_GLOB=evidence-fixture.jsonl python3 scripts/check_kpi_gates.py
+          # L6, fire side: the same rules must REJECT the known-violating fixture
+          # (leak_checked:false + destructive without token/plan_hash). If this
+          # step stops going red on it, the safety rules have stopped working.
+          cp scripts/fixtures/evidence/evidence-safety-violating.jsonl \
+             audit-results/evidence-fixture.jsonl
+          if GATE_EVIDENCE_GLOB=evidence-fixture.jsonl python3 scripts/check_kpi_gates.py; then
+            echo "::error::KPI#1/#2 did not fire on the known-violating fixture"
+            exit 1
+          fi
+        # NOTE: blocking. Same script the local `make kpi-gates` target runs;
+        # thresholded (assets/shared/thresholds.json), so a router-accuracy,
+        # golden-coverage or registry-shrink regression fails the build.
+        # Blocking is a property of this step, NOT of the workflow run: this is
+        # step 16 of 17 named steps, and Actions aborts the job at the first
+        # non-`continue-on-error` failure, so a red earlier step silently skips
+        # this one. A green workflow therefore means "nothing upstream was red",
+        # not "the KPI gate passed" — read the step list, not the run badge.
 
       - name: Compounding-engineering checks
         run: |
