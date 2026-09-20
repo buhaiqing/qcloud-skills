@@ -6,9 +6,9 @@ of truth and emits a richer JSON. Backward-compatible: existing fields kept,
 new fields (product_name, operation_aliases, param_mapping, version,
 last_updated, structured delegate_to) added when available.
 
-Outputs: audit-results/skill-registry.json
+Outputs: audit-results/skill-registry.json (override with --emit --out PATH)
 Modes:
-  --emit   write the registry JSON
+  --emit   write the registry JSON (--out PATH to redirect, e.g. into a tmpdir)
   --check  CI gate (KPI#3): every executable skill (dual-path / sdk-only)
            must provide >=5 parseable JSON files under assets/golden/.
            Missing the directory, having <5 golden files, or any unparseable
@@ -70,11 +70,28 @@ def _has_eval_queries(skill_path: Path) -> bool:
     return isinstance(data, list) and len(data) > 0
 
 
+def emit_path(argv: list[str]) -> Path:
+    """Destination for --emit; --out PATH overrides the repo-local default.
+
+    The default stays audit-results/skill-registry.json for every existing
+    caller (Makefile, check_kpi_gates, CI). Callers that must not write into
+    the repo — tests — pass --out instead of relying on the default.
+    """
+    if "--out" not in argv:
+        return AUDIT / "skill-registry.json"
+    value = argv[argv.index("--out") + 1:]
+    if not value:
+        print("usage: --emit [--out PATH] | --check")
+        sys.exit(2)
+    return Path(value[0])
+
+
 def main() -> None:
     if "--emit" in sys.argv:
         data = build()
-        AUDIT.mkdir(exist_ok=True)
-        (AUDIT / "skill-registry.json").write_text(json.dumps(data, indent=2, ensure_ascii=False))
+        out = emit_path(sys.argv)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(data, indent=2, ensure_ascii=False))
         print(f"emitted {data['count']} skills")
         sys.exit(0)
     if "--check" in sys.argv:
