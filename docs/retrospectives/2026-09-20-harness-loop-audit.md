@@ -253,6 +253,7 @@ CI 注释里的事实陈述逐条属实；单测隔离成立。**H-17…H-20 经
 |---|---|---|---|
 | **H-50** | **fire-side 无法检出「单条安全规则失效」**：violating fixture 同时触发 `leak_checked`/`token`/`plan_hash` **三条**规则，任一条死掉其余仍会开火 → 步骤依旧变红 → **看不出某条规则已停止工作**。而 D-2=B 的全部意义正是「证明规则本身还能开火」 | `.github/workflows/validate-skills.yml:140-148` | 🟠 |
 | **H-51** | **新 KPI 步骤在 CI 中永不执行**：其上游的**阻断式**单测步骤在**全新检出**上就是红的（`build_skill_registry_test.py:23` 读 gitignored 的 `audit-results/skill-registry.json`，文件不存在 → ERROR）。编排者独立复现：fresh clone `Ran 688 tests … FAILED (errors=1)`，而 CI 中该步骤在 `:81`、KPI 步骤在 `:113`。**与 H-08（`make all` 走不到 `reflexion-update`）同类** | 编排者实测 + 4A 独立复现 | 🔴 |
+| | ↳ **精确机制**：`test_intent_keywords_populated`（`:22`）读注册表却**不自己 emit**，依赖兄弟测试 `test_registry_has_all_skills`（`:11`）的副作用；而 unittest 按**字母序**执行方法名，`i` < `r` → **依赖方先跑**。开发者机器上有一个 gitignored 的陈旧 `skill-registry.json` 掩盖了它，全新检出则 ERROR。**又是一个「依赖别处的副作用、且无人断言接缝」** | 见 CR-5 修复 | |
 | **H-52** | `GATE_EVIDENCE_GLOB` 被**无条件信任**，且可**穿出 `audit-results/`**（路径遍历） | `check_kpi_gates.py:151-152` | 🟠 |
 | **H-53** | *「单个翻转的 query 就让 ratchet 触发」* 是**假的** —— 而这是「把 ratchet 留在 0.28」的**全部理由** | `kpi-pattern.md:113-115`、`:225-227`、`runbooks/kpi7-*.md:31-33` | 🟠 |
 | **H-54** | `kpi1` runbook V4 仍在告诉 on-call **CI 使用本 CR 已删除的那个 escape** | `runbooks/kpi1-leak-checked-failure.md:60-64` | 🟠 |
