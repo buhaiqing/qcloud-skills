@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -213,6 +214,39 @@ class GitDiffBumpGateTests(unittest.TestCase):
         errs, notes = vf.validate_git_diff(root, "no-such-ref")
         self.assertEqual(errs, [])
         self.assertTrue(any("skipping" in n.lower() for n in notes))
+
+
+class CommittedFixtureFireTests(unittest.TestCase):
+    """L6: the full-corpus mode must fire on a broken SKILL.md and stay silent on a good one.
+
+    Drives the committed fixtures in ``scripts/fixtures/frontmatter/`` — the same
+    files the CI step "Validate SKILL.md frontmatter (full corpus)" depends on.
+    ``--git-diff`` cannot substitute: it returns before the field checks, so a
+    SKILL.md with ``environment:`` deleted and its version bumped passes it
+    (reproduced 2026-09-20).
+    """
+
+    FIXTURES = _HERE / "fixtures" / "frontmatter"
+
+    def _run_full_mode(self, fixture: str) -> tuple[int, str]:
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            skill_dir = tmp / "qcloud-fixture-ops"
+            skill_dir.mkdir(parents=True)
+            shutil.copyfile(self.FIXTURES / fixture, skill_dir / "SKILL.md")
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = vf.main(["--root", str(tmp)])
+            return rc, buf.getvalue()
+
+    def test_full_mode_fires_on_missing_environment(self) -> None:
+        rc, out = self._run_full_mode("skill-missing-environment.SKILL.md.txt")
+        self.assertEqual(rc, 1, out)
+        self.assertIn("environment", out)
+
+    def test_full_mode_silent_on_complete_skill(self) -> None:
+        rc, out = self._run_full_mode("skill-complete.SKILL.md.txt")
+        self.assertEqual(rc, 0, out)
 
 
 if __name__ == "__main__":

@@ -158,9 +158,14 @@ def build_steps(python: str = sys.executable, github_output: bool = False) -> li
     return [
         Step("Ruff Python lint", ruff_args),
         Step(
-            "Validate SKILL.md frontmatter",
+            "Validate SKILL.md frontmatter (full corpus)",
+            (python, "scripts/validate_skills_frontmatter.py"),
+        ),
+        Step(
+            "Validate SKILL.md version bumps (diff scope)",
             (python, "scripts/validate_skills_frontmatter.py", "--git-diff", "HEAD"),
         ),
+        Step("Validate eval_queries coverage", (python, "scripts/validate_eval_queries.py")),
         Step("Validate Well-Architected worker JSON examples", (python, "scripts/validate_product_assessment.py")),
         Step("Validate Markdown local links", (python, "scripts/check_markdown_links.py")),
         Step("Lint Python in Markdown", (python, "scripts/check_markdown_python.py", "--root", ".")),
@@ -184,8 +189,20 @@ def build_steps(python: str = sys.executable, github_output: bool = False) -> li
         ),
         Step("GCL trace aggregate", (python, "scripts/gcl_trace_aggregate.py", "--since-hours", "168")),
         Step(
-            "Script unit tests",
-            (python, "-m", "unittest", "discover", "-s", "scripts", "-p", "*_test.py", "-v"),
+            "Script unit tests (pytest — collects both naming conventions)",
+            (python, "-m", "pytest", "scripts", "-q"),
+        ),
+        Step(
+            "Test collection floor",
+            (python, "scripts/check_test_collection.py"),
+        ),
+        Step(
+            "Gate wiring",
+            (python, "scripts/check_gate_wiring.py"),
+        ),
+        Step(
+            "Error table structure",
+            (python, "scripts/validate_error_tables.py"),
         ),
         Step(
             "Blueprint routing KPI gate",
@@ -205,6 +222,9 @@ def build_steps(python: str = sys.executable, github_output: bool = False) -> li
         Step("SecOps filename completeness", (python, "scripts/check_secops_completeness.py")),
         Step("Charter C2-C6 compliance", (python, "scripts/validate_charter.py")),
         Step("CADL hook compliance", (python, "scripts/cadl_lint.py")),
+        Step("Spec file references", (python, "scripts/check_spec_file_refs.py")),
+        Step("Doc↔code drift", (python, "scripts/check_doc_code_drift.py")),
+        Step("YAML↔Python drift", (python, "scripts/check_yaml_python_drift.py")),
     ]
 
 
@@ -307,8 +327,17 @@ def main(argv: list[str] | None = None) -> int:
     _print_quality_summary(quality_result)
 
     if quality_result["upgrade_signal"] == "critical":
-        print("\nWARNING: Critical upgrade signal detected", file=sys.stderr)
-        return 1
+        # Warn-only, matching CI: the workflow's "Skill quality score" step is
+        # `continue-on-error: true` and documents itself as "signal only". This
+        # step derives from machine-local audit-results/ traces, so on a fresh
+        # clone (3 committed gcl-trace files, 1 skill, 1 upgrade signal) the ratio
+        # is 1.0 → "critical" → the whole suite exited 1 for every developer while
+        # CI stayed green. A gate that can never pass is a false guarantee; the
+        # signal is still printed, and it no longer pretends to be a gate.
+        print(
+            "\nWARNING: Critical upgrade signal detected (informational, mirrors CI)",
+            file=sys.stderr,
+        )
 
     # FinOps cost gate (warn-only v1): surface GCL budget breaches without
     # blocking local validation. Only runs when traces exist; missing

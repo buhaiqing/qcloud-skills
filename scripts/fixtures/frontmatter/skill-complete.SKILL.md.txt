@@ -1,0 +1,42 @@
+---
+name: qcloud-fixture-clean
+description: >-
+  Use when the user needs to deploy, configure, troubleshoot, or monitor Tencent
+  Cloud CLB (Cloud Load Balancer, 负载均衡) — LoadBalancer instances, listeners,
+  backend servers, and health checks. User mentions CLB, 负载均衡, Load Balancer,
+  Tencent Cloud LB, or describes product-specific scenarios (e.g., traffic distribution,
+  backend binding, listener configuration, health check failures, SSL certificates,
+  cross-region binding, performance issues) even without naming the product directly.
+  Not for billing, CAM, VPC-only operations, CVM instance management, or related
+  products that have their own ops skills.
+license: MIT
+compatibility: >-
+  Official Tencent Cloud CLI (`tccli`, Python tool, pip installable),
+  Python 3.8+ runtime (for SDK fallback with tencentcloud-sdk-python-clb),
+  valid API credentials, network access to Tencent Cloud endpoints.
+metadata:
+  author: qcloud
+  version: "1.3.1"
+  last_updated: "2026-08-02"
+  runtime: Harness AI Agent, Claude Code, Cursor, or compatible Agent runtimes
+  python_version_minimum: "3.8"
+  api_profile: "https://cloud.tencent.com/document/api/214"
+  cli_applicability: "cli-first"
+  cli_support_evidence: >-
+    Verified via `tccli clb help` - CLI exposes CreateLoadBalancer, DescribeLoadBalancers,
+    ModifyLoadBalancerAttributes, DeleteLoadBalancer, CreateListener, DescribeListeners,
+    RegisterTargets, DeregisterTargets, DescribeTargetHealth, and 70+ more operations.
+  environment:
+    - TENCENTCLOUD_SECRET_ID
+    - TENCENTCLOUD_SECRET_KEY
+    - TENCENTCLOUD_REGION
+  product_name: clb
+  operation_aliases:
+    describe: describe-load-balancers
+  param_mapping:
+    describe-load-balancers: LoadBalancerIds.0
+---
+
+# Fixture: complete frontmatter
+
+Used by the L6 fire/silent step in .github/workflows/validate-skills.yml.
