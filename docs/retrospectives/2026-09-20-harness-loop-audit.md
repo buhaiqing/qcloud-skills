@@ -267,21 +267,31 @@ CI 注释里的事实陈述逐条属实；单测隔离成立。**H-17…H-20 经
 `.github/workflows/validate-skills.yml` 的**第 1 步**是 `Ruff Python lint`（ruff-action v3，pin `0.11.8`），**非 `continue-on-error`**。全新检出上它失败：
 
 ```
-ruff check .  →  Found 3 errors
-                 scripts/cadl_lint.py:144:21
-                 scripts/cadl_lint_test.py:159:13
-                 scripts/cadl_lint_test.py:214:17
+ruff check .  →  Found 99 errors   ← 必须用 CI 的 pin: uvx ruff@0.11.8
+                  88× E402（sys.path.insert 后再 import，刻意且必需）
+                  10× E741（变量名 l，真实风格问题）
+                   1× RUF100
               →  exit 1  →  作业死在第 1 步
               →  其后 ~16 个步骤（frontmatter / eval_queries / 689 项单测 /
                  KPI gates / GCL conformance / CADL hook / compounding）**全部被跳过**
 ```
 
-**`main` 同样如此**，3 个错误来自 `9d8c578`（2026-09-17，三天前）—— 一个「P2-2 给 cadl_lint 加检查」的提交，**它自己新增的检查没过 lint**，而拦住它的正是它弄红的那一步。
+**`main` 同样如此**（同样的 pin 下 **97** 个错误），分支另加了 2 个 —— **pre-existing，非本分支引入**。
 
 > **为什么无人察觉**：**没有任何地方断言「CI 真的跑完了」。** 与 H-01/H-04/H-05 同族 ——
 > 门禁的**存在**被反复清点，门禁的**执行**从未被验证。
 
-**CR-6 修复（3 行）→ 一次解锁 ~16 个 CI 步骤。**
+#### ⚠️ 本条目此前记载过一条**假结论**（Critic-M 发现，已更正）
+
+原文写「3 个错误」「**CR-6 修复（3 行）→ 一次解锁 ~16 个 CI 步骤**」—— **两条都错**。
+`3` 来自编排者本机的 ruff **0.16.1**；CI 跑的是 pin **0.11.8**，报 **99** 个。
+CR-6 修的是 0.16.1 报的那 3 个，**第 1 步依旧红，一个步骤也没解锁**。
+Critic-M 用 `uvx ruff@0.11.8` 独立复核，得到同一结论并判 **DO-NOT-MERGE**。
+
+**真正的修复是 CR-8**：`ruff.toml` 显式写 `select`（**根因**：没有 `select` → 版本一换默认规则集就变）+ 有理由地 `ignore` E402 + 修 10 个 E741。
+
+> **升级 pin 到 0.16.1 是被明确否决的方案**：实测 0.16.1 `--select E402` **仍能检出**，只是默认集不含 ——
+> 升级等于**静默丢掉 E4/E7 全部覆盖**，正是本会话反复批的「让检查器变安静」。
 
 #### 编排者的验证失误（如实记录）
 
