@@ -260,6 +260,49 @@ CI 注释里的事实陈述逐条属实；单测隔离成立。**H-17…H-20 经
 | **H-55** | spec（**被本 CR 编辑过的行**）与 AGENTS.md L24 的 `29/31` 混淆了两个分母；实为 `29/36`（注册表口径 `24/31`）。**AGENTS.md 已由编排者修正**（`0fb0314`） | `spec:258`；`AGENTS.md:165` | 🟠 |
 | **H-56** | kpi2 runbook 两条命令在本机仍失败（glob 不匹配）；kpi1 V3 行号引用过期；KPI#7 模板 yaml 漏了新增阈值；*"26 skills at 0.0"* 实为 27 | 4B 实测 | 🟡 |
 
+## CR-5 / CR-6 / CR-7 与合并就绪（2026-09-20）
+
+### 🔴 H-57 · 整个 CI 工作流已死 3 天（本会话最重要的发现）
+
+`.github/workflows/validate-skills.yml` 的**第 1 步**是 `Ruff Python lint`（ruff-action v3，pin `0.11.8`），**非 `continue-on-error`**。全新检出上它失败：
+
+```
+ruff check .  →  Found 3 errors
+                 scripts/cadl_lint.py:144:21
+                 scripts/cadl_lint_test.py:159:13
+                 scripts/cadl_lint_test.py:214:17
+              →  exit 1  →  作业死在第 1 步
+              →  其后 ~16 个步骤（frontmatter / eval_queries / 689 项单测 /
+                 KPI gates / GCL conformance / CADL hook / compounding）**全部被跳过**
+```
+
+**`main` 同样如此**，3 个错误来自 `9d8c578`（2026-09-17，三天前）—— 一个「P2-2 给 cadl_lint 加检查」的提交，**它自己新增的检查没过 lint**，而拦住它的正是它弄红的那一步。
+
+> **为什么无人察觉**：**没有任何地方断言「CI 真的跑完了」。** 与 H-01/H-04/H-05 同族 ——
+> 门禁的**存在**被反复清点，门禁的**执行**从未被验证。
+
+**CR-6 修复（3 行）→ 一次解锁 ~16 个 CI 步骤。**
+
+#### 编排者的验证失误（如实记录）
+
+我在 CR-5 之后曾断言「**CI 链路在本会话中第一次真正跑通**」—— **错误**。我模拟时从 **step 81**（单测）起跑，**跳过了 step 1**，因此把「第 2 个阻断点已解」误当成「链路已通」。Critic-5B 指出后我才实测第 1 步。
+
+**这正是本会话反复出现的形态：验证了链的一端，没验证另一端。** 教训：**验证 CI 必须从第 1 步开始，不能从你刚改的那一步开始。**
+
+### 其余新登记项
+
+| ID | 现象 | 证据 | 严重度 |
+|---|---|---|---|
+| **H-58** | 分支自身引入的**假 CI 声明**：`.github/workflows/validate-skills.yml:149`、`kpi-pattern.md:167`/观测 7、spec F5 均称阻断式的 KPI 步骤保护着 KPI#1/#2 —— 而作业死在第 1 步，该步骤永不执行。5B 判定 **DO-NOT-MERGE until corrected** | 5B | 🔴 |
+| **H-59** | `evidence_kernel.py:22` 在**模块导入时**执行 `AUDIT.mkdir(exist_ok=True)` → 任何导入都会创建 `audit-results/`。这是「测试改仓库状态」的第 **4** 例（已由 5A 实测：套件跑完后目录存在，0 文件） | 5A | 🟠 |
+| **H-60** | CR-5 新增的守卫**只守它自己的子进程**，未证明「全套件不改仓库状态」这一要求性质 | `build_skill_registry_test.py:59-95` | 🟠 |
+| **H-61** | `docs/superpowers/plans/phase1-merge-checklist.md:20,67` 记载了一个**从未存在过**的 flag `--output` | 5A | 🟡 |
+
+### 合并裁定
+
+**Critic-5B: DO-NOT-MERGE** —— 直到 H-58 的 CI 声明被修正（CR-7）且第 1 步变绿（CR-6）。
+其余（H-46/H-47/H-50/H-52/H-53）为 backlog。
+
 ## 人工决策
 
 ### D-1（已裁定）Plan A — 停止打补丁，改做根因 CR
