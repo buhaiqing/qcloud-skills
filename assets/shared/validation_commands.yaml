@@ -68,6 +68,9 @@ gates:
   - name: yaml_python_drift
     command: python3 scripts/check_yaml_python_drift.py
     runs_in: [ci, local, make]
+  - name: reflexion_efficacy
+    command: python3 scripts/check_reflexion_efficacy.py
+    runs_in: [ci, local, make]
   - name: secops_completeness
     command: python3 scripts/check_secops_completeness.py
     runs_in: [local, make]
@@ -174,9 +177,6 @@ tools:
   - name: kb_drift_check
     command: python3 scripts/kb_sync_openapi.py --check
     reason: "needs tccli + network (verified: reports DRIFT on a machine without fresh tccli metadata)"
-  - name: reflexion_efficacy
-    command: python3 scripts/reflexion_efficacy.py --json
-    reason: report-only
   - name: shadow_replay_smoke
     command: python3 scripts/tccli_shadow.py exec --fixture-dir audit-results/shadow-fixtures
     reason: needs local audit-results fixtures that are not committed
