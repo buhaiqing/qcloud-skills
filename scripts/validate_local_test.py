@@ -41,27 +41,11 @@ class BuildStepsTests(unittest.TestCase):
             [step.name for step in steps],
             [
                 "Ruff Python lint",
-                "Validate SKILL.md frontmatter (full corpus)",
                 "Validate SKILL.md version bumps (diff scope)",
-                "Validate eval_queries coverage",
-                "Validate Well-Architected worker JSON examples",
-                "Validate Markdown local links",
-                "Lint Python in Markdown",
+                "Manifest gates",
                 "GCL runner smoke test",
                 "GCL trace aggregate",
                 "Script unit tests (pytest — collects both naming conventions)",
-                "Test collection floor",
-                "Gate wiring",
-                "Error table structure",
-                "Blueprint routing KPI gate",
-                "GCL alarm wire plan",
-                "GCL Tier-A conformance",
-                "SecOps filename completeness",
-                "Charter C2-C6 compliance",
-                "CADL hook compliance",
-                "Spec file references",
-                "Doc↔code drift",
-                "YAML↔Python drift",
             ],
         )
         # Keyed by name, not by index: positional assertions break every time a
@@ -73,63 +57,21 @@ class BuildStepsTests(unittest.TestCase):
             by_name["Script unit tests (pytest — collects both naming conventions)"].argv,
             ("python3", "-m", "pytest", "scripts", "-q"),
         )
+        # The plain gates come from the manifest, which CI and `make gates` read
+        # too; check_gate_wiring.py rule W4 fails the build if a surface stops
+        # consuming it or grows an undeclared gate.
         self.assertEqual(
-            by_name["Test collection floor"].argv,
-            ("python3", "scripts/check_test_collection.py"),
-        )
-        self.assertEqual(
-            by_name["Gate wiring"].argv, ("python3", "scripts/check_gate_wiring.py")
-        )
-        self.assertEqual(
-            by_name["Error table structure"].argv,
-            ("python3", "scripts/validate_error_tables.py"),
-        )
-        self.assertEqual(
-            by_name["Blueprint routing KPI gate"].argv, ("python3", "scripts/routing_eval.py")
-        )
-        self.assertEqual(
-            by_name["GCL alarm wire plan"].argv,
-            (
-                "python3",
-                "scripts/gcl_alarm_wire.py",
-                "plan",
-                "--summary",
-                "scripts/fixtures/gcl-quality-summary-healthy.json",
-            ),
+            by_name["Manifest gates"].argv,
+            ("python3", "scripts/run_gates.py", "--set", "local"),
         )
 
-    def test_every_blocking_ci_script_also_runs_locally(self) -> None:
-        """Assert the CI <-> local seam instead of trusting it.
-
-        Every script a *blocking* CI step runs must also run in the local mirror,
-        unless it is listed in CI_ONLY_BLOCKING with a reason. Without this the two
-        surfaces drift silently: the mirror claims to be the same gate set while
-        CI grows steps nobody runs locally.
-        """
-        if yaml is None:
-            self.fail(
-                "PyYAML is required to assert CI<->local parity "
-                "(scripts/check_yaml_python_drift.py depends on it too)"
-            )
-        workflow = _HERE.parent / ".github" / "workflows" / "validate-skills.yml"
-        parsed = yaml.safe_load(workflow.read_text(encoding="utf-8"))
-        local_argv = " ".join(
-            " ".join(step.argv) for step in validate_local.build_steps(python="python3")
-        )
-        missing: list[str] = []
-        for step in parsed["jobs"]["validate"]["steps"]:
-            if step.get("continue-on-error"):
-                continue  # informational steps are exempt by construction
-            for script in re.findall(r"scripts/([A-Za-z0-9_]+\.py)", step.get("run", "")):
-                if script in CI_ONLY_BLOCKING:
-                    continue
-                if f"scripts/{script}" not in local_argv:
-                    missing.append(script)
-        self.assertEqual(
-            sorted(set(missing)),
-            [],
-            f"blocking CI gates absent from validate_local: {sorted(set(missing))}",
-        )
+    # `test_every_blocking_ci_script_also_runs_locally` used to compare a
+    # hand-copied list against the workflow. It is gone on purpose: the manifest
+    # (assets/shared/validation_commands.yaml) is now the single list all three
+    # surfaces consume, and check_gate_wiring.py rule W4 asserts that seam in both
+    # directions — a surface cannot grow an undeclared gate, and a declared
+    # exemption cannot outlive its step. Re-asserting it here by hand would be the
+    # same duplication this change removed.
 
     def test_github_output_adds_ruff_output_format(self) -> None:
         steps = validate_local.build_steps(python="python3", github_output=True)

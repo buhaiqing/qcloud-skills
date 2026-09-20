@@ -20,6 +20,25 @@ from typing import Any
 FINAL_STATUSES = ("PASS", "SAFETY_FAIL", "MAX_ITER")
 RUBRIC_DIMS = ("correctness", "safety", "idempotency", "traceability", "spec_compliance")
 
+# --- F14: Critic provenance (`critic._mode`, written by gcl_runner.py) ---------
+# `gcl_runner.py` tags every Critic payload with `_mode`:
+#   "llm-builtin"                — real LLM Critic scores
+#   "structural-only"            — CI/local smoke rule-based critic (--structural-critic-only)
+#   "structural-only-fallback"   — LLM Critic failed (timeout/ratelimit/bad JSON); rule scores
+#                                  were substituted and the run must NOT count as LLM-scored
+#   "missing"                    — legacy trace with no `_mode` at all
+CRITIC_MODE_MISSING = "missing"
+STRUCTURAL_FALLBACK_MODE = "structural-only-fallback"
+KNOWN_CRITIC_MODES = ("llm-builtin", "structural-only", STRUCTURAL_FALLBACK_MODE, CRITIC_MODE_MISSING)
+
+# Shared threshold (assets/shared/thresholds.json). A ratio above this means the
+# quality summary is dominated by rule-based scores and must not be read as an
+# LLM-Critic verdict.
+STRUCTURAL_FALLBACK_MAX_RATIO_KEY = "gcl_structural_fallback_max_ratio"
+# Fail-closed (L21): missing/unreadable/invalid threshold → 0.0, i.e. ANY fallback
+# run breaches. Warning goes to stderr; a broken config must never crash the gate.
+STRUCTURAL_FALLBACK_MAX_RATIO_FAIL_CLOSED = 0.0
+
 
 def parse_trace(path: Path) -> dict[str, Any] | None:
     try:
@@ -40,7 +59,80 @@ def last_scores(trace: dict[str, Any]) -> dict[str, float]:
     return dict(iters[-1].get("critic", {}).get("scores") or {})
 
 
-def aggregate(traces: list[dict[str, Any]]) -> dict[str, Any]:
+def critic_mode(trace: dict[str, Any]) -> str:
+    """Critic provenance mode of a trace's final iteration (F14).
+
+    Reads ``iterations[-1].critic._mode`` — the field written by
+    ``gcl_runner.py``. Legacy traces without the field return
+    ``CRITIC_MODE_MISSING`` so they are visible rather than silently
+    bucketed as LLM-scored.
+    """
+    iters = trace.get("iterations") or []
+    if not iters:
+        return CRITIC_MODE_MISSING
+    critic = iters[-1].get("critic")
+    if not isinstance(critic, dict):
+        return CRITIC_MODE_MISSING
+    mode = critic.get("_mode")
+    if isinstance(mode, str) and mode:
+        return mode
+    return CRITIC_MODE_MISSING
+
+
+def _count_critic_modes(traces: list[dict[str, Any]]) -> dict[str, int]:
+    """Bucket traces by Critic mode; known modes always present, even at 0."""
+    counts: dict[str, int] = {mode: 0 for mode in KNOWN_CRITIC_MODES}
+    for t in traces:
+        mode = critic_mode(t)
+        counts[mode] = counts.get(mode, 0) + 1
+    return counts
+
+
+def load_fallback_max_ratio(root: Path) -> tuple[float, bool]:
+    """Read ``gcl_structural_fallback_max_ratio`` from shared thresholds.
+
+    Returns ``(ratio, configured)``. Missing file/key or an invalid value
+    (non-numeric, bool, or outside [0, 1]) is fail-closed: ``(0.0, False)``
+    with a stderr warning — never an exception (F14 / L21).
+    """
+    fail_closed = STRUCTURAL_FALLBACK_MAX_RATIO_FAIL_CLOSED
+    path = root / "assets" / "shared" / "thresholds.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        print(
+            f"WARN: cannot read {path}: {e}; {STRUCTURAL_FALLBACK_MAX_RATIO_KEY}"
+            f" fails closed to {fail_closed} (any structural fallback run breaches)",
+            file=sys.stderr,
+        )
+        return fail_closed, False
+    if not isinstance(data, dict):
+        print(
+            f"WARN: {path} is not a JSON object; {STRUCTURAL_FALLBACK_MAX_RATIO_KEY}"
+            f" fails closed to {fail_closed}",
+            file=sys.stderr,
+        )
+        return fail_closed, False
+    value = data.get(STRUCTURAL_FALLBACK_MAX_RATIO_KEY)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        print(
+            f"WARN: {STRUCTURAL_FALLBACK_MAX_RATIO_KEY} missing or non-numeric in {path}"
+            f" (got {value!r}); fails closed to {fail_closed}",
+            file=sys.stderr,
+        )
+        return fail_closed, False
+    ratio = float(value)
+    if not 0.0 <= ratio <= 1.0:
+        print(
+            f"WARN: {STRUCTURAL_FALLBACK_MAX_RATIO_KEY}={ratio} outside [0, 1];"
+            f" fails closed to {fail_closed}",
+            file=sys.stderr,
+        )
+        return fail_closed, False
+    return ratio, True
+
+
+def aggregate(traces: list[dict[str, Any]], root: Path | None = None) -> dict[str, Any]:
     by_skill: dict[str, dict[str, Any]] = {}
     totals = {s: 0 for s in FINAL_STATUSES}
     totals["total_runs"] = len(traces)
@@ -76,6 +168,23 @@ def aggregate(traces: list[dict[str, Any]]) -> dict[str, Any]:
         d: round(score_sums[d] / score_count, 3) if score_count else None for d in RUBRIC_DIMS
     }
 
+    # F14: surface rule-based Critic substitutions instead of letting them pass
+    # as real Critic scores. Existing fields above are unchanged.
+    mode_counts = _count_critic_modes(traces)
+    fallback_runs = mode_counts.get(STRUCTURAL_FALLBACK_MODE, 0)
+    fallback_ratio = fallback_runs / totals["total_runs"] if totals["total_runs"] else 0.0
+    max_ratio, threshold_configured = load_fallback_max_ratio(
+        root if root is not None else Path(__file__).resolve().parents[1]
+    )
+    breach = fallback_ratio > max_ratio
+    if breach:
+        print(
+            f"ALERT: structural critic fallback {fallback_runs}/{totals['total_runs']} runs"
+            f" ({fallback_ratio:.4f}) > {STRUCTURAL_FALLBACK_MAX_RATIO_KEY} {max_ratio}"
+            " — summary scores are rule-based, not LLM-Critic scores",
+            file=sys.stderr,
+        )
+
     return {
         "version": "1.0",
         "generated_at": datetime.now(UTC).isoformat(),
@@ -84,6 +193,12 @@ def aggregate(traces: list[dict[str, Any]]) -> dict[str, Any]:
         "pass_rate": round(pass_rate, 4),
         "avg_rubric_scores": avg_scores,
         "by_skill": by_skill,
+        "critic_mode_counts": mode_counts,
+        "structural_fallback_runs": fallback_runs,
+        "structural_fallback_ratio": round(fallback_ratio, 4),
+        "structural_fallback_max_ratio": max_ratio,
+        "structural_fallback_breach": breach,
+        "structural_fallback_threshold_configured": threshold_configured,
         "trace_files": [t.get("_source_path") for t in traces],
     }
 
@@ -243,9 +358,15 @@ def main() -> int:
         print("No valid traces parsed.", file=sys.stderr)
         return 1
 
-    summary = aggregate(traces)
+    summary = aggregate(traces, root=args.root)
     out = persist_summary(args.root, summary)
-    print(json.dumps({"summary_path": str(out), "pass_rate": summary["pass_rate"], "total_runs": summary["totals"]["total_runs"]}))
+    print(json.dumps({
+        "summary_path": str(out),
+        "pass_rate": summary["pass_rate"],
+        "total_runs": summary["totals"]["total_runs"],
+        "structural_fallback_runs": summary["structural_fallback_runs"],
+        "structural_fallback_breach": summary["structural_fallback_breach"],
+    }))
     return 0
 
 

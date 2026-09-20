@@ -20,45 +20,44 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install pytest (pinned to the local runner version)
+        run: python3 -m pip install --disable-pip-version-check "pytest==7.4.4"
+
       - name: Ruff Python lint
         uses: astral-sh/ruff-action@v3
         with:
           version: 0.11.8
           args: check --output-format=github .
 
-      - name: Validate SKILL.md frontmatter (full corpus)
-        run: python3 scripts/validate_skills_frontmatter.py
-        # NOTE: `--git-diff` runs ONLY the version-bump gate — main() returns
-        # before the field checks — so wiring that mode alone left the required
-        # fields unguarded in CI: a SKILL.md with `environment:` deleted and its
-        # version bumped passed this job (reproduced 2026-09-20). This step is
-        # the field gate; the next one is the bump gate. Both are needed.
-        # The fire/silent proof for this mode lives in
-        # scripts/validate_skills_frontmatter_test.py (committed fixtures under
-        # scripts/fixtures/frontmatter/), so it runs in CI and locally alike.
-
       - name: Validate SKILL.md version bumps (diff scope)
         run: >-
           python3 scripts/validate_skills_frontmatter.py
           --git-diff ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || 'origin/main' }}
+        # NOTE: this is the *bump* gate only — `--git-diff` returns before the field
+        # checks, so wiring this mode alone left the required fields unguarded (a
+        # SKILL.md with `environment:` deleted and its version bumped passed,
+        # reproduced 2026-09-20). The field gate is `validate_frontmatter_full`,
+        # which runs in the manifest step below; the fire/silent proof for it lives
+        # in scripts/validate_skills_frontmatter_test.py.
 
-      - name: Validate eval_queries coverage
-        run: python3 scripts/validate_eval_queries.py
+      - name: Manifest gates (ci set)
+        run: python3 scripts/run_gates.py --set ci
+        # NOTE: these gates come from assets/shared/validation_commands.yaml — the
+        # same manifest `make gates` and scripts/validate_local.py consume. Before
+        # this, CI hand-listed 14 gate steps, the Makefile listed a different set
+        # and the local mirror a third, with nothing asserting they agreed (the
+        # 2026-09-20 audit found 12 Makefile targets no workflow ever called).
+        # Steps that cannot be a plain command — a ruff action, a base ref, a
+        # tccli stub, a committed fixture, an informational reporter — stay
+        # explicit below and are declared under `surface_specific:` with the
+        # reason; check_gate_wiring.py rule W4 fails the build if a surface grows
+        # an undeclared gate or stops running one it declares.
 
       - name: Affected skills regression (informational)
         run: python3 scripts/ci_affected_skills.py --from-git
         continue-on-error: true
         # NOTE: signal only; lists qcloud-*-ops skills touched by the diff, never blocks merges
 
-      - name: Validate Well-Architected worker JSON examples
-        run: python3 scripts/validate_product_assessment.py
-
-      - name: Validate Markdown local links
-        run: python3 scripts/check_markdown_links.py
-
-
-      - name: Lint Python in Markdown code blocks
-        run: python3 scripts/check_markdown_python.py --root .
       - name: GCL runner smoke test (structural critic, stubbed tccli)
         env:
           # Unique run_id: the smoke record lands in its own
@@ -87,9 +86,6 @@ jobs:
             --structural-critic-only
           python3 scripts/gcl_trace_aggregate.py --since-hours 168
 
-      - name: Install pytest (pinned to the local runner version)
-        run: python3 -m pip install --disable-pip-version-check "pytest==7.4.4"
-
       - name: Script unit tests (pytest — collects both naming conventions)
         run: python3 -m pytest scripts -q
         # NOTE: the previous runner, `unittest discover -p "*_test.py"`, silently
@@ -99,20 +95,6 @@ jobs:
         # unittest cannot execute at all. pytest collects both patterns and both
         # styles, so the runner — not the file name — decides what executes.
 
-      - name: Test collection floor (no orphan test files)
-        run: python3 scripts/check_test_collection.py
-        # NOTE: pytest exits non-zero when it collects nothing, which covers a
-        # total collapse. This gate covers the partial case — a stray
-        # conftest/pyproject deselecting most of the suite, or a new test file
-        # named outside both patterns — by asserting the collected count against
-        # assets/shared/thresholds.json:tests_min_collected and by requiring
-        # every test file to appear in pytest's collected node ids.
-
-      - name: GCL alarm wire plan (no mutations)
-        run: |
-          python3 scripts/gcl_alarm_wire.py plan \
-            --summary scripts/fixtures/gcl-quality-summary-healthy.json
-
       - name: Skill quality score (informational)
         run: |
           python3 scripts/skill_quality_score.py score --json \
@@ -120,17 +102,9 @@ jobs:
             2>&1 | head -50 || true
         continue-on-error: true
         # NOTE: signal only; aggregates per-skill upgrade_signal from audit-results/.
-        # Skips gracefully when no traces exist (L10 convergence gate).
-
-      - name: GCL Tier-A conformance (Charter C7)
-        run: |
-          python3 scripts/check_gcl_conformance.py
-
-      - name: Charter C2-C6 compliance
-        run: python3 scripts/validate_charter.py
-
-      - name: CADL hook compliance
-        run: python3 scripts/cadl_lint.py
+        # Skips gracefully when no traces exist (L10 convergence gate). Runs are
+        # graded by Critic mode: a structural-only-fallback run (LLM Critic failed)
+        # is reported separately instead of passing as a real Critic score.
 
       - name: Pattern anomaly detection (non-blocking alerts)
         run: |
@@ -145,9 +119,8 @@ jobs:
           # The staged copies are synthetic and dated far forward, so they must not
           # survive into anyone's evidence directory (they match the default glob).
           trap 'rm -f audit-results/evidence-fixture.jsonl' EXIT
-          # KPI#1/#2 is graded against a COMMITTED fixture, and against nothing
-          # else. Two reasons it cannot be graded against audit-results/ as this
-          # job finds it:
+          # KPI#1/#2 is graded against COMMITTED fixtures, and against nothing else.
+          # Two reasons it cannot be graded against audit-results/ as this job finds it:
           #   (1) GATE_REQUIRE_EVIDENCE=0, the escape this step used to set, is not
           #       a guard at all: it returns before any file is read, so with it
           #       set KPI#1/#2 can never fail the build, whatever the evidence
@@ -165,15 +138,26 @@ jobs:
           cp scripts/fixtures/evidence/evidence-safety-clean.jsonl \
              audit-results/evidence-fixture.jsonl
           GATE_EVIDENCE_GLOB=evidence-fixture.jsonl python3 scripts/check_kpi_gates.py
-          # L6, fire side: the same rules must REJECT the known-violating fixture
-          # (leak_checked:false + destructive without token/plan_hash). If this
-          # step stops going red on it, the safety rules have stopped working.
-          cp scripts/fixtures/evidence/evidence-safety-violating.jsonl \
-             audit-results/evidence-fixture.jsonl
-          if GATE_EVIDENCE_GLOB=evidence-fixture.jsonl python3 scripts/check_kpi_gates.py; then
-            echo "::error::KPI#1/#2 did not fire on the known-violating fixture"
-            exit 1
-          fi
+          # L6, fire side — ONE FIXTURE PER RULE. Grading a single fixture that
+          # trips three rules at once proves only "at least one rule still fires":
+          # kill any one rule and the other two keep this step red, so the dead
+          # rule is invisible (H-50). Each fixture below violates exactly one rule
+          # and must turn the gate red on its own; the per-rule isolation is
+          # asserted by name in scripts/check_kpi_gates_fixture_test.py.
+          for fixture in \
+            evidence-leak-unchecked-only \
+            evidence-destructive-no-token-only \
+            evidence-destructive-no-plan-hash-only
+          do
+            cp "scripts/fixtures/evidence/${fixture}.jsonl" audit-results/evidence-fixture.jsonl
+            if GATE_EVIDENCE_GLOB=evidence-fixture.jsonl python3 scripts/check_kpi_gates.py \
+                 > "/tmp/${fixture}.log" 2>&1; then
+              echo "::error::KPI#1/#2 did not fire on ${fixture}"
+              cat "/tmp/${fixture}.log"
+              exit 1
+            fi
+            echo "fired as expected: ${fixture}"
+          done
         # NOTE: blocking. Same script the local `make kpi-gates` target runs;
         # thresholded (assets/shared/thresholds.json), so a router-accuracy,
         # golden-coverage or registry-shrink regression fails the build.
@@ -184,25 +168,3 @@ jobs:
         # red", not "the KPI gate passed" — read the step list, not the run badge.
         # (This note used to pin "step 16 of 17"; the number drifted the moment a
         # step was added, which is the drift this repo keeps re-learning.)
-
-      - name: Gate wiring (both ends of every contract)
-        run: python3 scripts/check_gate_wiring.py
-        # NOTE: asserts the seams this repo keeps losing: a script that calls
-        # itself a CI gate must have an automation caller; every `gates:` entry in
-        # assets/shared/validation_commands.yaml must exist and be wired; every
-        # thresholds.json key must have a consumer; the reflexion store path must
-        # be declared in exactly one module. Each rule was proven to fire and to
-        # stay silent in scripts/check_gate_wiring_test.py.
-
-      - name: Error table structure
-        run: python3 scripts/validate_error_tables.py
-        # NOTE: this script's docstring called itself a "CI gate" while no
-        # workflow, Makefile or pre-commit hook referenced it — a false
-        # guarantee. It is now wired here and in `make error-tables`.
-
-      - name: Compounding-engineering checks
-        run: |
-          set -euo pipefail
-          python3 scripts/check_spec_file_refs.py
-          python3 scripts/check_doc_code_drift.py
-          python3 scripts/check_yaml_python_drift.py

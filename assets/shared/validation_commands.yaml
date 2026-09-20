@@ -1,38 +1,182 @@
-# Canonical validation manifest (TE-4 shared constant).
+# Canonical gate manifest — single source of truth (TE-4).
 #
-# Consumed by `scripts/check_gate_wiring.py` (rule W2). The split is load-bearing:
-#   gates: every entry MUST be wired into >= 1 automation surface
-#          (Makefile / .github/workflows / .pre-commit-config.yaml / .githooks /
-#           scripts/validate_local.py). An unwired gate is a false guarantee.
-#   tools: human-invoked entry points; wiring is NOT required. They are excluded
-#          because they need something a CI runner does not have — tccli +
-#          network (kb_drift_check), local audit-results fixtures
-#          (shadow_replay_smoke), a required argument (reflexion_retrieve), or
-#          they are report-only (reflexion_efficacy) / writers
-#          (reflexion_auto_write mutates a committed file).
-gates:
-  validate_frontmatter: "python3 scripts/validate_skills_frontmatter.py --git-diff HEAD"
-  frontmatter_full: "python3 scripts/validate_skills_frontmatter.py"
-  validate_assessment: "python3 scripts/validate_product_assessment.py"
-  validate_gcl: "python3 scripts/check_gcl_conformance.py"
-  validate_cadl: "python3 scripts/cadl_lint.py"
-  validate_python: "ruff check"
-  validate_links: "python3 scripts/check_markdown_links.py"
-  validate_markdown_python: "python3 scripts/check_markdown_python.py --root ."
-  validate_local: "python3 scripts/validate_local.py"
-  error_tables: "python3 scripts/validate_error_tables.py"
-  gate_wiring: "python3 scripts/check_gate_wiring.py"
-  test_collection: "python3 scripts/check_test_collection.py"
-  script_tests: "python3 -m pytest scripts -q"
-  gcl_smoke: "python3 scripts/gcl_runner.py --structural-critic-only"
-  gcl_trace_aggregate: "python3 scripts/gcl_trace_aggregate.py --since-hours 168"
-  skill_quality_score: "python3 scripts/skill_quality_score.py --json"
-  gcl_alarm_wire: "python3 scripts/gcl_alarm_wire.py plan --summary scripts/fixtures/gcl-quality-summary-healthy.json"
+# Three surfaces consume this file, and `scripts/run_gates.py --set <surface>`
+# executes the gates declared for that surface in this order:
+#
+#   ci    -> .github/workflows/validate-skills.yml   (step: "Manifest gates")
+#   local -> scripts/validate_local.py               (step: "Manifest gates")
+#   make  -> Makefile                                (target: gates)
+#
+# `scripts/check_gate_wiring.py` rule W4 keeps the declaration honest in both
+# directions: a surface that declares gates must actually invoke
+# `scripts/run_gates.py`, and every script a surface runs *explicitly* must be
+# declared under `surface_specific` with a reason. A surface therefore cannot
+# grow a gate nobody declared, and a gate cannot be declared for a surface that
+# ignores it. No surface depends on another (no CI -> make edge): the manifest is
+# the shared contract, not a call graph.
+#
+# `surface_specific` holds steps that cannot be a plain command in the manifest:
+# they need a CI action, a base ref, a stub on PATH, a committed fixture, or they
+# are informational reporters. Each carries the reason it is exempt.
+version: 1
 
+gates:
+  - name: validate_frontmatter_full
+    command: python3 scripts/validate_skills_frontmatter.py
+    runs_in: [ci, local, make]
+  - name: validate_eval_queries
+    command: python3 scripts/validate_eval_queries.py
+    runs_in: [ci, local, make]
+  - name: validate_product_assessment
+    command: python3 scripts/validate_product_assessment.py
+    runs_in: [ci, local, make]
+  - name: validate_markdown_links
+    command: python3 scripts/check_markdown_links.py
+    runs_in: [ci, local, make]
+  - name: validate_markdown_python
+    command: python3 scripts/check_markdown_python.py --root .
+    runs_in: [ci, local, make]
+  - name: test_collection
+    command: python3 scripts/check_test_collection.py
+    runs_in: [ci, local, make]
+  - name: gate_wiring
+    command: python3 scripts/check_gate_wiring.py
+    runs_in: [ci, local, make]
+  - name: error_tables
+    command: python3 scripts/validate_error_tables.py
+    runs_in: [ci, local, make]
+  - name: gcl_alarm_wire
+    command: >-
+      python3 scripts/gcl_alarm_wire.py plan
+      --summary scripts/fixtures/gcl-quality-summary-healthy.json
+    runs_in: [ci, local, make]
+  - name: gcl_conformance
+    command: python3 scripts/check_gcl_conformance.py
+    runs_in: [ci, local, make]
+  - name: charter
+    command: python3 scripts/validate_charter.py
+    runs_in: [ci, local, make]
+  - name: cadl
+    command: python3 scripts/cadl_lint.py
+    runs_in: [ci, local, make]
+  - name: spec_file_refs
+    command: python3 scripts/check_spec_file_refs.py
+    runs_in: [ci, local, make]
+  - name: doc_code_drift
+    command: python3 scripts/check_doc_code_drift.py
+    runs_in: [ci, local, make]
+  - name: yaml_python_drift
+    command: python3 scripts/check_yaml_python_drift.py
+    runs_in: [ci, local, make]
+  - name: secops_completeness
+    command: python3 scripts/check_secops_completeness.py
+    runs_in: [local, make]
+  - name: routing_eval
+    command: python3 scripts/routing_eval.py
+    runs_in: [local, make]
+
+surface_specific:
+  ci:
+    - name: Ruff Python lint
+      script: null
+      reason: runs through astral-sh/ruff-action@v3, pinned to 0.11.8
+    - name: Validate SKILL.md version bumps (diff scope)
+      script: validate_skills_frontmatter.py
+      reason: needs the PR base SHA, so the command is built by the workflow
+    - name: Script unit tests
+      script: null
+      reason: needs `pip install pytest==7.4.4` first, so install + run stay together
+    - name: GCL runner smoke test
+      script: gcl_runner.py
+      reason: needs a tccli stub on PATH and a unique HARNESS_RUN_ID
+    - name: GCL trace aggregate
+      script: gcl_trace_aggregate.py
+      reason: grades the traces the smoke test just wrote in this job
+    - name: KPI gates
+      script: check_kpi_gates.py
+      reason: needs a committed evidence fixture staged into audit-results/ and GATE_EVIDENCE_GLOB
+    - name: Affected skills regression
+      script: ci_affected_skills.py
+      reason: informational (continue-on-error)
+    - name: Skill quality score
+      script: skill_quality_score.py
+      reason: informational (continue-on-error); reads machine-local traces
+    - name: Pattern anomaly detection
+      script: pattern_anomaly_detect.py
+      reason: informational (continue-on-error)
+  local:
+    - name: Ruff Python lint
+      script: null
+      reason: runs the developer's ruff from PATH (root ruff.toml pins the rule set)
+    - name: Validate SKILL.md version bumps (diff scope)
+      script: validate_skills_frontmatter.py
+      reason: compares against HEAD, which is the local equivalent of the PR base
+    - name: Script unit tests
+      script: null
+      reason: pytest is invoked directly, no install step locally
+    - name: GCL runner smoke test
+      script: gcl_runner.py
+      reason: needs a tccli stub on PATH
+    - name: GCL trace aggregate
+      script: gcl_trace_aggregate.py
+      reason: grades the traces the smoke test just wrote
+    - name: Skill quality score
+      script: skill_quality_score.py
+      reason: warn-only signal, mirrors CI's continue-on-error
+  make:
+    - name: validate
+      script: validate_local.py
+      reason: runs the full local mirror, which itself consumes this manifest
+    - name: registry
+      script: build_skill_registry.py
+      reason: emits audit-results/skill-registry.json (runtime artifact, not a check)
+    - name: golden
+      script: sandbox_e2e.py
+      reason: runs the CVM golden scenario end-to-end
+    - name: kpi
+      script: aggregate_kpi.py
+      reason: aggregates local evidence files; skips when none exist
+    - name: kpi-gates
+      script: check_kpi_gates.py
+      reason: local KPI run against whatever audit-results/ holds
+    - name: reflexion-update
+      script: reflexion_auto_writer.py
+      reason: a WRITER (mutates the committed docs/failure-patterns.md); never a CI step
+    - name: replay-smoke
+      script: incident_replay.py
+      reason: needs a synthesized corpus plus local trace output
+    - name: replay-corpus
+      script: synthesize_incident_corpus.py
+      reason: builds the corpus replay-smoke consumes
+    - name: l4-gate
+      script: l4_metrics_tracker.py
+      reason: needs >= 5 local traces; currently red on main (backlog, not a merge gate)
+    - name: routing-check
+      script: routing_decision.py
+      reason: a routing self-check over example queries, not a repo gate
+    - name: manifest
+      script: null
+      reason: composes other targets
+
+# Human-invoked entry points. Wiring is NOT required: they need something a
+# runner does not have (tccli + network, local fixtures, a required argument) or
+# they are report-only / writers.
 tools:
-  reflexion_retrieve: "python3 scripts/reflexion_retrieve.py retrieve --skill"
-  reflexion_auto_write: "python3 scripts/reflexion_auto_writer.py"
-  reflexion_auto_write_dry: "python3 scripts/reflexion_auto_writer.py --dry-run"
-  kb_drift_check: "python3 scripts/kb_sync_openapi.py --check"
-  reflexion_efficacy: "python3 scripts/reflexion_efficacy.py --json"
-  shadow_replay_smoke: "python3 scripts/tccli_shadow.py exec --fixture-dir audit-results/shadow-fixtures"
+  - name: reflexion_retrieve
+    command: python3 scripts/reflexion_retrieve.py retrieve --skill
+    reason: requires a skill argument
+  - name: reflexion_auto_write
+    command: python3 scripts/reflexion_auto_writer.py
+    reason: writer — mutates the committed store
+  - name: reflexion_auto_write_dry
+    command: python3 scripts/reflexion_auto_writer.py --dry-run
+    reason: preview of the writer above
+  - name: kb_drift_check
+    command: python3 scripts/kb_sync_openapi.py --check
+    reason: "needs tccli + network (verified: reports DRIFT on a machine without fresh tccli metadata)"
+  - name: reflexion_efficacy
+    command: python3 scripts/reflexion_efficacy.py --json
+    reason: report-only
+  - name: shadow_replay_smoke
+    command: python3 scripts/tccli_shadow.py exec --fixture-dir audit-results/shadow-fixtures
+    reason: needs local audit-results fixtures that are not committed

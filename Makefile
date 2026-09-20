@@ -1,4 +1,4 @@
-.PHONY: validate registry golden kpi kpi-gates manifest all reflexion-update replay-smoke l4-gate compounding-checks routing-check tests test-collection gate-wiring error-tables
+.PHONY: validate gates tests registry golden kpi kpi-gates manifest all reflexion-update reflexion-update-dry replay-smoke l4-gate routing-check
 
 routing-check:
 	@echo "=== Blueprint routing decision self-check ==="
@@ -8,31 +8,21 @@ routing-check:
 	@python3 scripts/routing_decision.py "add KPI#9 to check_kpi_gates.py" | grep Routing
 	@echo "Blueprint self-check: all 4 queries routed correctly"
 
+# Local entry point for the plain gates. They are declared in
+# assets/shared/validation_commands.yaml — the same manifest the CI workflow and
+# scripts/validate_local.py consume — so a gate cannot be added to one surface
+# and forgotten in another. Per-gate targets were removed for the same reason:
+# they were a fourth hand-maintained list.
+gates:
+	python3 scripts/run_gates.py --set make
+
+# Full local mirror: the manifest gates plus the steps that need a tccli stub,
+# pytest, or the quality signal.
 validate:
 	python3 scripts/validate_local.py
 
 tests:
 	python3 -m pytest scripts -q
-
-# Asserts the collected-test count against assets/shared/thresholds.json
-# (tests_min_collected) and that no test file is invisible to the runner.
-test-collection:
-	python3 scripts/check_test_collection.py
-
-# Asserts both ends of every harness contract: self-declared CI gates are wired,
-# every `gates:` entry in assets/shared/validation_commands.yaml exists and is
-# wired, every thresholds.json key has a consumer, and the reflexion store path
-# is declared once.
-gate-wiring:
-	python3 scripts/check_gate_wiring.py
-
-error-tables:
-	python3 scripts/validate_error_tables.py
-
-compounding-checks:
-	python3 scripts/check_spec_file_refs.py
-	python3 scripts/check_doc_code_drift.py
-	python3 scripts/check_yaml_python_drift.py
 
 registry:
 	python3 scripts/build_skill_registry.py --emit
@@ -54,8 +44,14 @@ kpi:
 kpi-gates:
 	python3 scripts/check_kpi_gates.py
 
+# WRITER: rewrites the committed store docs/failure-patterns.md. Never wire this
+# into CI, and never into `all` — a convergence target that mutates tracked state
+# reports success while leaving the tree dirty.
 reflexion-update:
 	python3 scripts/reflexion_auto_writer.py
+
+reflexion-update-dry:
+	python3 scripts/reflexion_auto_writer.py --dry-run
 
 manifest: registry golden kpi
 	@echo "Capability manifest emitted via build_skill_registry --emit + aggregate_kpi"
@@ -68,5 +64,5 @@ replay-smoke:
 l4-gate:
 	python3 scripts/l4_metrics_tracker.py --gate --min-traces 5
 
-all: validate tests test-collection gate-wiring error-tables registry golden kpi kpi-gates manifest reflexion-update
+all: gates validate tests registry golden kpi kpi-gates manifest reflexion-update-dry
 	@echo "Harness Evidence gates passed"

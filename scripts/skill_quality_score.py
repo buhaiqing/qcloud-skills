@@ -34,6 +34,15 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+# F14: single-source the Critic provenance contract from the aggregator that
+# already owns `critic._mode` parsing (producer: gcl_runner.py). Duplicating the
+# mode literals here would let the two ends drift silently (L25).
+from gcl_trace_aggregate import (
+    CRITIC_MODE_MISSING,
+    STRUCTURAL_FALLBACK_MODE,
+    critic_mode,
+)
+
 # Component weights — sum to 1.0
 WEIGHTS: dict[str, float] = {
     "gcl_pass_rate": 0.40,
@@ -143,6 +152,27 @@ def _last_scores(trace: dict[str, Any]) -> dict[str, float]:
     if not iters:
         return {}
     return dict(iters[-1].get("critic", {}).get("scores") or {})
+
+
+def _fallback_run_count(traces: list[dict[str, Any]]) -> int:
+    """Runs whose scores came from the structural Critic fallback (F14).
+
+    These are rule-based scores substituted after the LLM Critic failed
+    (timeout / rate limit / invalid JSON). They must never be presented as
+    real Critic verdicts.
+    """
+    return sum(1 for t in traces if critic_mode(t) == STRUCTURAL_FALLBACK_MODE)
+
+
+def _unattributed_run_count(traces: list[dict[str, Any]]) -> int:
+    """Runs with no Critic provenance at all (F14).
+
+    Legacy traces predate `critic._mode`, and any producer that fails to copy
+    the field into the persisted iteration lands here. They are counted
+    separately so "no fallback runs" is never read as "every run is
+    LLM-scored".
+    """
+    return sum(1 for t in traces if critic_mode(t) == CRITIC_MODE_MISSING)
 
 
 def _by_skill(traces: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
@@ -333,12 +363,17 @@ def aggregate_skill_scores(
         if upgrade:
             upgrade_signal.append(skill)
 
+        fallback_runs = _fallback_run_count(skill_traces)
         skills[skill] = {
             "total": total,
             "pass": pass_n,
             "safety_fail": safety_fail,
             "max_iter": max_iter,
             "pass_rate": round(pass_rate, 4),
+            # F14: rule-based fallback runs are counted separately so `pass` /
+            # `pass_rate` above are not mistaken for pure LLM-Critic evidence.
+            "fallback_runs": fallback_runs,
+            "unattributed_runs": _unattributed_run_count(skill_traces),
             "dimensions_avg": _aggregate_dim_avg(skill_traces),
             "components": components,
             "quality_score": score,
@@ -367,6 +402,8 @@ def aggregate_skill_scores(
             "safety_fail": 0,
             "max_iter": 0,
             "pass_rate": 0.0,
+            "fallback_runs": 0,
+            "unattributed_runs": 0,
             "dimensions_avg": {d: 0.0 for d in RUBRIC_DIMS},
             "components": components,
             "quality_score": score,
@@ -375,11 +412,34 @@ def aggregate_skill_scores(
 
     total_exec = sum(s["total"] for s in skills.values())
     scores = [s["quality_score"] for s in skills.values()]
+    total_fallback = sum(s["fallback_runs"] for s in skills.values())
+    fallback_skills = sorted(
+        skill for skill, s in skills.items() if s["fallback_runs"] > 0
+    )
+    total_unattributed = sum(s["unattributed_runs"] for s in skills.values())
+    recommendations: list[str] = []
+    if total_fallback:
+        recommendations.append(
+            f"{total_fallback} run(s) were scored by the structural-only-fallback "
+            f"Critic (rule-based, LLM Critic failed) across {len(fallback_skills)} "
+            f"skill(s): {', '.join(fallback_skills)} — pass/pass_rate above include "
+            "these runs; re-run with a healthy LLM Critic before trusting the scores."
+        )
+    if total_unattributed:
+        recommendations.append(
+            f"{total_unattributed} run(s) carry no Critic provenance "
+            "(iterations[-1].critic._mode is absent) — Critic scoring mode is "
+            "unknown for these runs, so a zero fallback count must not be read "
+            "as proof they were LLM-scored."
+        )
+
     summary = {
         "total_executions": total_exec,
         "skill_count": len(skills),
         "upgrade_skill_count": len(upgrade_signal),
         "avg_quality_score": round(statistics.mean(scores), 4) if scores else 0.0,
+        "fallback_runs": total_fallback,
+        "unattributed_runs": total_unattributed,
     }
 
     return {
@@ -388,6 +448,7 @@ def aggregate_skill_scores(
         "window": {"trace_count": len(traces), "since_hours": since_hours},
         "by_skill": skills,
         "upgrade_signal": sorted(upgrade_signal),
+        "recommendations": recommendations,
         "summary": summary,
     }
 
@@ -443,7 +504,9 @@ def main(argv: list[str] | None = None) -> int:
         f"quality_score: {summary['avg_quality_score']:.4f} "
         f"skills={summary['skill_count']} "
         f"upgrade={summary['upgrade_skill_count']} "
-        f"executions={summary['total_executions']}",
+        f"executions={summary['total_executions']} "
+        f"fallback={summary['fallback_runs']} "
+        f"unattributed={summary['unattributed_runs']}",
         file=sys.stderr,
     )
     return 0

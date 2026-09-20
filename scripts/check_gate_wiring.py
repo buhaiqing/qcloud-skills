@@ -52,6 +52,8 @@ WORKFLOW_GLOB = ".github/workflows/*.yml"
 
 VALIDATION_MANIFEST = "assets/shared/validation_commands.yaml"
 THRESHOLDS = "assets/shared/thresholds.json"
+# The surfaces that consume the manifest (mirrors scripts/run_gates.py --set).
+SURFACES = ("ci", "local", "make")
 
 TEST_FILE = re.compile(r"^(?:test_.*|.*_test)\.py$")
 CI_GATE_MARKER = re.compile(r"ci gate", re.IGNORECASE)
@@ -104,6 +106,36 @@ def bare_imports(path: Path, stems: set[str]) -> set[str]:
     return found
 
 
+def _scripts_in_shell(text: str) -> set[str]:
+    """Scripts invoked by shell text, ignoring comment lines.
+
+    A script named only in a comment is *not* invoked: treating a comment as
+    wiring is how a dead gate keeps looking alive (and it is the loophole the
+    2026-09-20 critic probed for).
+    """
+    body = "\n".join(
+        line for line in text.splitlines() if not line.lstrip().startswith("#")
+    )
+    return {name for name in SCRIPT_REF.findall(body) if "/" not in name}
+
+
+def invoked_scripts(root: Path) -> set[str]:
+    """Every script an automation surface actually invokes (structural, not textual)."""
+    found: set[str] = set()
+    for workflow in sorted(root.glob(WORKFLOW_GLOB)):
+        data = _load_yaml_mapping(workflow)
+        steps = ((data.get("jobs") or {}).get("validate") or {}).get("steps") or []
+        for step in steps:
+            if isinstance(step, dict):
+                found |= _scripts_in_shell(str(step.get("run", "")))
+    found |= _surface_scripts_from_validate_local(root / "scripts" / "validate_local.py")
+    found |= _surface_scripts_from_makefile(root / "Makefile")
+    for path in (root / ".pre-commit-config.yaml", root / ".githooks" / "pre-commit"):
+        if path.is_file():
+            found |= _scripts_in_shell(path.read_text(encoding="utf-8", errors="replace"))
+    return found
+
+
 def wiring_state(root: Path) -> tuple[list[Path], list[Path], set[str]]:
     """Return (surfaces, scripts, wired stems) with the import closure applied."""
     scripts_dir = root / "scripts"
@@ -113,12 +145,10 @@ def wiring_state(root: Path) -> tuple[list[Path], list[Path], set[str]]:
     stems = {p.stem for p in scripts}
     surfaces = collect_surfaces(root)
 
-    wired: set[str] = set()
-    texts = surface_texts(surfaces)
-    for stem in stems:
-        pattern = _mention_pattern(stem)
-        if any(pattern.search(text) for _, text in texts):
-            wired.add(stem)
+    # Seed with *invocations*, not mentions: a script referenced only in a comment
+    # or a docstring is not wired. The extractors return file names; `wired` holds
+    # module stems, so normalize here.
+    wired: set[str] = {Path(name).stem for name in invoked_scripts(root)} & stems
 
     # Transitive closure over bare-name imports of wired scripts.
     edges = {stem: bare_imports(scripts_dir / f"{stem}.py", stems) for stem in stems}
@@ -130,6 +160,23 @@ def wiring_state(root: Path) -> tuple[list[Path], list[Path], set[str]]:
                 if target not in wired:
                     wired.add(target)
                     growing = True
+
+    # Manifest-declared gates are wired *through* the manifest, but only for a
+    # surface that actually invokes scripts/run_gates.py: a gate declared
+    # `runs_in: [ci]` in a repo whose CI never runs the manifest is not wired,
+    # it is just declared.
+    consuming = {
+        surface
+        for surface in SURFACES
+        if "run_gates.py" in _surface_scripts(root, surface)
+    }
+    if consuming:
+        manifest_path = root / VALIDATION_MANIFEST
+        if manifest_path.is_file():
+            manifest = _load_yaml_mapping(manifest_path)
+            for ref, runs_in in _manifest_gate_scripts(manifest).values():
+                if set(runs_in) & consuming:
+                    wired.add(Path(ref).stem)
     return surfaces, scripts, wired
 
 
@@ -163,27 +210,184 @@ def _load_yaml_mapping(path: Path) -> dict[str, object]:
     return loaded
 
 
+def _manifest_gate_scripts(manifest: dict[str, object]) -> dict[str, tuple[str, tuple[str, ...]]]:
+    """Return {gate_name: (script_rel, runs_in)} for every `gates:` entry naming a script.
+
+    Existence is *not* validated here: a missing script is a W2 finding, not a
+    config error, and `wiring_state` needs this list even when a script is absent.
+    """
+    entries = manifest.get("gates")
+    if not isinstance(entries, list) or not entries:
+        raise ConfigError("`gates:` must be a non-empty list of {name, command, runs_in}")
+    out: dict[str, tuple[str, tuple[str, ...]]] = {}
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            raise ConfigError(f"gates[{index}] must be a mapping")
+        name = entry.get("name")
+        command = entry.get("command")
+        if not isinstance(name, str) or not isinstance(command, str):
+            raise ConfigError(f"gates[{index}] needs string `name` and `command`")
+        runs_in = entry.get("runs_in")
+        if not isinstance(runs_in, list) or not runs_in:
+            raise ConfigError(f"gate {name!r} needs a non-empty `runs_in` list")
+        refs = SCRIPT_REF.findall(command)
+        if refs:
+            out[name] = (refs[0], tuple(str(s) for s in runs_in))
+    return out
+
+
 def check_manifest(root: Path, wired: set[str]) -> list[str]:
-    """W2: every `gates:` entry must exist on disk and be wired; `tools:` is exempt."""
+    """W2: every `gates:` entry must exist on disk and be wired; `tools:` is exempt.
+
+    A gate listed in the manifest is wired *through* the manifest: the surfaces
+    execute it via `scripts/run_gates.py`, so the gate's script does not need its
+    own mention in the workflow. `wiring_state` folds that in — this check only
+    reports a gate whose script is unreachable from any surface at all.
+    """
     path = root / VALIDATION_MANIFEST
     manifest = _load_yaml_mapping(path)
-    for section in ("gates", "tools"):
+    for section in ("gates", "tools", "surface_specific"):
         if section not in manifest:
             raise ConfigError(f"{path.name} is missing the top-level `{section}:` section")
-        value = manifest[section]
-        if value is not None and not isinstance(value, dict):
-            raise ConfigError(f"`{section}:` in {path.name} must be a mapping")
+    tools = manifest["tools"]
+    if tools is not None and not isinstance(tools, list):
+        raise ConfigError(f"`tools:` in {path.name} must be a list")
+    surfaces = manifest["surface_specific"]
+    if not isinstance(surfaces, dict):
+        raise ConfigError(f"`surface_specific:` in {path.name} must be a mapping")
 
     findings: list[str] = []
-    gates = manifest.get("gates") or {}
-    for key in sorted(gates):
-        command = str(gates[key])
-        for ref in SCRIPT_REF.findall(command):
-            target = root / "scripts" / ref
-            if not target.is_file():
-                findings.append(f"W2 {key}: command references missing scripts/{ref}")
-            elif target.stem not in wired:
-                findings.append(f"W2 {key}: unwired gate scripts/{ref}")
+    for name, (ref, _runs_in) in sorted(_manifest_gate_scripts(manifest).items()):
+        if not (root / "scripts" / ref).is_file():
+            findings.append(f"W2 {name}: command references missing scripts/{ref}")
+        elif Path(ref).stem not in wired:
+            findings.append(f"W2 {name}: unwired gate scripts/{ref}")
+    return findings
+
+
+def _surface_scripts_from_workflow(path: Path) -> set[str]:
+    if not path.is_file():
+        return set()
+    data = _load_yaml_mapping(path)
+    steps = ((data.get("jobs") or {}).get("validate") or {}).get("steps") or []
+    found: set[str] = set()
+    for step in steps:
+        if isinstance(step, dict):
+            found |= _scripts_in_shell(str(step.get("run", "")))
+    return found
+
+
+def _surface_scripts_from_validate_local(path: Path) -> set[str]:
+    """Scripts referenced by `Step(...)` argv tuples (AST, so comments don't count)."""
+    if not path.is_file():
+        return set()
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+    except SyntaxError:
+        return set()
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", "")
+        if name != "Step":
+            continue
+        for arg in node.args:
+            for sub in ast.walk(arg):
+                if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
+                    found.update(SCRIPT_REF.findall(sub.value))
+    return {name for name in found if "/" not in name}
+
+
+def _surface_scripts_from_makefile(path: Path) -> set[str]:
+    found: set[str] = set()
+    if not path.is_file():
+        return found
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.startswith("\t") or line.lstrip().startswith("#"):
+            continue  # only recipe lines, and never comments
+        found.update(SCRIPT_REF.findall(line))
+    return {name for name in found if "/" not in name}
+
+
+def _surface_scripts(root: Path, surface: str) -> set[str]:
+    if surface == "ci":
+        out: set[str] = set()
+        for workflow in sorted(root.glob(WORKFLOW_GLOB)):
+            out |= _surface_scripts_from_workflow(workflow)
+        return out
+    if surface == "local":
+        return _surface_scripts_from_validate_local(root / "scripts" / "validate_local.py")
+    return _surface_scripts_from_makefile(root / "Makefile")
+
+
+def _surface_text(root: Path, surface: str) -> str:
+    """Raw text of the surface's files (used for the reverse, tolerant check)."""
+    if surface == "ci":
+        files = sorted(root.glob(WORKFLOW_GLOB))
+    elif surface == "local":
+        files = [root / "scripts" / "validate_local.py"]
+    else:
+        files = [root / "Makefile"]
+    return "\n".join(p.read_text(encoding="utf-8", errors="replace") for p in files if p.is_file())
+
+
+def check_surfaces(root: Path) -> list[str]:
+    """W4: each surface must consume the manifest, and declare what it runs directly.
+
+    Both directions matter. A surface that declares gates must actually invoke
+    `scripts/run_gates.py` (otherwise the declaration is a lie), and every script a
+    surface invokes *explicitly* must be declared under `surface_specific` with a
+    reason — so a surface cannot grow an undeclared gate, and a declared exemption
+    cannot outlive the step it describes.
+
+    The forward direction reads argv/YAML/recipe structure (so a script named only
+    in a comment does not count as run). The reverse direction is deliberately
+    looser — a plain mention of `<script>.py` in the surface counts — because some
+    steps build the path at runtime (e.g. validate_local's quality-score step).
+    """
+    path = root / VALIDATION_MANIFEST
+    manifest = _load_yaml_mapping(path)
+    declared_raw = manifest.get("surface_specific") or {}
+    gates = manifest.get("gates") or []
+    findings: list[str] = []
+
+    for surface in SURFACES:
+        runs_manifest = any(
+            isinstance(entry, dict) and surface in (entry.get("runs_in") or []) for entry in gates
+        )
+        entries = declared_raw.get(surface) or []
+        if not isinstance(entries, list):
+            raise ConfigError(f"surface_specific.{surface} must be a list")
+        declared: dict[str, str] = {}
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, dict) or not str(entry.get("reason", "")).strip():
+                raise ConfigError(
+                    f"surface_specific.{surface}[{index}] needs a non-empty `reason`"
+                )
+            script = entry.get("script")
+            if script:
+                declared[str(script)] = str(entry.get("name", "?"))
+
+        actual = _surface_scripts(root, surface)
+        if runs_manifest and "run_gates.py" not in actual:
+            findings.append(
+                f"W4 {surface}: declares manifest gates but never runs scripts/run_gates.py"
+            )
+        allowed = set(declared) | {"run_gates.py"}
+        for script in sorted(actual - allowed):
+            findings.append(
+                f"W4 {surface}: runs scripts/{script} without declaring it in "
+                f"surface_specific.{surface}"
+            )
+        text = _surface_text(root, surface)
+        for script, name in sorted(declared.items()):
+            if script not in text:
+                findings.append(
+                    f"W4 {surface}: surface_specific entry {name!r} (scripts/{script}) is "
+                    f"no longer referenced by this surface"
+                )
     return findings
 
 
@@ -254,6 +458,7 @@ def run_checks(root: Path) -> tuple[list[str], dict[str, object]]:
     findings.extend(check_manifest(root, wired))
     findings.extend(check_thresholds(root))
     findings.extend(check_store_path(root))
+    findings.extend(check_surfaces(root))
     report: dict[str, object] = {
         "root": str(root),
         "surfaces": [p.relative_to(root).as_posix() for p in surfaces],

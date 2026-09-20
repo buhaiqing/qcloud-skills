@@ -47,6 +47,42 @@
         }
       }
     },
+    "critic_mode_counts": {
+      "description": "F14 — runs bucketed by Critic provenance (iterations[-1].critic._mode written by scripts/gcl_runner.py). Non-empty `missing` means the trace predates the provenance field; a non-zero `structural-only-fallback` means rule-based scores were substituted after an LLM Critic failure (timeout / rate limit / invalid JSON) and MUST NOT be read as LLM-Critic verdicts.",
+      "type": "object",
+      "properties": {
+        "llm-builtin": { "type": "integer", "minimum": 0 },
+        "structural-only": { "type": "integer", "minimum": 0 },
+        "structural-only-fallback": { "type": "integer", "minimum": 0 },
+        "missing": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "structural_fallback_runs": {
+      "description": "Explicit count of `structural-only-fallback` runs (0 when none).",
+      "type": "integer",
+      "minimum": 0
+    },
+    "structural_fallback_ratio": {
+      "description": "structural_fallback_runs / totals.total_runs (0.0 for an empty window).",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "structural_fallback_max_ratio": {
+      "description": "Threshold actually applied, read from assets/shared/thresholds.json key `gcl_structural_fallback_max_ratio`. Missing/invalid config fails closed to 0.0.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "structural_fallback_breach": {
+      "description": "true when structural_fallback_ratio exceeds structural_fallback_max_ratio. Alarm paths must treat true as 'pass_rate is rule-based, not LLM-scored'.",
+      "type": "boolean"
+    },
+    "structural_fallback_threshold_configured": {
+      "description": "false when the threshold was absent/invalid and fail-closed to 0.0 was applied.",
+      "type": "boolean"
+    },
     "trace_files": {
       "type": "array",
       "items": { "type": "string" }

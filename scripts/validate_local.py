@@ -158,17 +158,16 @@ def build_steps(python: str = sys.executable, github_output: bool = False) -> li
     return [
         Step("Ruff Python lint", ruff_args),
         Step(
-            "Validate SKILL.md frontmatter (full corpus)",
-            (python, "scripts/validate_skills_frontmatter.py"),
-        ),
-        Step(
             "Validate SKILL.md version bumps (diff scope)",
             (python, "scripts/validate_skills_frontmatter.py", "--git-diff", "HEAD"),
         ),
-        Step("Validate eval_queries coverage", (python, "scripts/validate_eval_queries.py")),
-        Step("Validate Well-Architected worker JSON examples", (python, "scripts/validate_product_assessment.py")),
-        Step("Validate Markdown local links", (python, "scripts/check_markdown_links.py")),
-        Step("Lint Python in Markdown", (python, "scripts/check_markdown_python.py", "--root", ".")),
+        # Every plain gate comes from assets/shared/validation_commands.yaml, the
+        # same manifest CI and `make gates` consume. Adding a gate is one edit to
+        # that file; it cannot be added to one surface and forgotten in another.
+        Step(
+            "Manifest gates",
+            (python, "scripts/run_gates.py", "--set", "local"),
+        ),
         Step(
             "GCL runner smoke test",
             (
@@ -192,39 +191,6 @@ def build_steps(python: str = sys.executable, github_output: bool = False) -> li
             "Script unit tests (pytest — collects both naming conventions)",
             (python, "-m", "pytest", "scripts", "-q"),
         ),
-        Step(
-            "Test collection floor",
-            (python, "scripts/check_test_collection.py"),
-        ),
-        Step(
-            "Gate wiring",
-            (python, "scripts/check_gate_wiring.py"),
-        ),
-        Step(
-            "Error table structure",
-            (python, "scripts/validate_error_tables.py"),
-        ),
-        Step(
-            "Blueprint routing KPI gate",
-            (python, "scripts/routing_eval.py"),
-        ),
-        Step(
-            "GCL alarm wire plan",
-            (
-                python,
-                "scripts/gcl_alarm_wire.py",
-                "plan",
-                "--summary",
-                "scripts/fixtures/gcl-quality-summary-healthy.json",
-            ),
-        ),
-        Step("GCL Tier-A conformance", (python, "scripts/check_gcl_conformance.py")),
-        Step("SecOps filename completeness", (python, "scripts/check_secops_completeness.py")),
-        Step("Charter C2-C6 compliance", (python, "scripts/validate_charter.py")),
-        Step("CADL hook compliance", (python, "scripts/cadl_lint.py")),
-        Step("Spec file references", (python, "scripts/check_spec_file_refs.py")),
-        Step("Doc↔code drift", (python, "scripts/check_doc_code_drift.py")),
-        Step("YAML↔Python drift", (python, "scripts/check_yaml_python_drift.py")),
     ]
 
 
