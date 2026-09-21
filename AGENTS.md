@@ -4,25 +4,9 @@
 
 Collection of Tencent Cloud AI Agent skills (OpenSpec) for ops runbooks. Each skill is a `SKILL.md` file with YAML frontmatter. Live work happens via `tccli` CLI (primary) or `tencentcloud-sdk-python` (fallback).
 
-## Context Loading Protocol (for any Agent runtime)
+## Context Loading Protocol
 
-Explicit loading priority to ensure consistent behavior across agent runtimes and minimize unnecessary context consumption.
-
-| Priority | File | When to load | Token cost |
-|----------|------|-------------|------------|
-| **ALWAYS** | `AGENTS.md` (root) | Every session | ~220 lines (post-optimization) |
-| **ALWAYS** | Current skill `qcloud-{product}-ops/SKILL.md` | Every skill execution | ~300-700 lines |
-| On-demand | `references/cli-usage.md` | When executing CLI commands | product-specific |
-| On-demand | `references/sdk-templates.md` | When writing SDK fallback code | ~100 lines |
-| On-demand | `references/rubric.md` | When running GCL Critic scoring | ~50 lines |
-| On-demand | `references/prompt-templates.md` | When generating GCL prompts | ~80 lines |
-| On-demand | `docs/execution-lessons.md` | When debugging CI/test or writing tests | ~35 lines |
-| On-demand | `docs/failure-patterns.md` | When diagnosing known error patterns | ≤200 lines |
-| On-demand | `docs/gcl-spec.md` | When implementing/modifying GCL logic | ~265 lines |
-| NEVER | Other skills' `SKILL.md` files | Only via explicit `delegate-to` routing | |
-| NEVER | `docs/superpowers/plans/*.md` | Historical notes, not runtime source | |
-
-**Rule**: Agent MUST NOT preemptively load on-demand files. Load only when the current task phase requires it.
+**ALWAYS**: `AGENTS.md` (this file), current skill's `SKILL.md`. **On-demand** (load only when task phase requires): `references/{cli-usage,sdk-templates,rubric,prompt-templates}.md`, `docs/{execution-lessons,failure-patterns,gcl-spec}.md`. **NEVER**: other skills' `SKILL.md` (only via `delegate-to` routing), `docs/superpowers/plans/*.md`. Full priority table with token costs in [`docs/execution-lessons.md`](docs/execution-lessons.md#context-loading-protocol-priority-table).
 
 ## Layout
 

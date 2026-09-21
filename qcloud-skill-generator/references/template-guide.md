@@ -70,8 +70,8 @@ When `tccli` CLI does not support a specific operation, use `tencentcloud-sdk-py
 SDK fallback script for [Product] Create[Resource]
 
 Tool-grounding integration (P1-3):
-  Before executing, validate params against the skill's tool-call-grounding.md
-  schema reference (see references/tool-call-grounding.md §2 for registration pattern).
+  Before executing, validate params against the skill's references/tool-call-grounding.md
+  schema (when that file exists; omit this block otherwise).
   Use GroundingDetector to catch tool_not_found, param_out_of_range, and
   state_not_satisfied errors before they reach the cloud.
 """
@@ -109,11 +109,10 @@ if __name__ == "__main__":
     main()
 ```
 
-> **Tool-grounding**: Every SDK fallback script should integrate the skill's
-> `references/tool-call-grounding.md` for parameter validation and state-dependency
-> checks. See `references/tool-call-grounding.md` §2 for `register()` / `validate_call()`
-> usage and §3 for `StateTracker` / `can_call()` patterns. This reduces
-> hallucinated parameters and prevents invalid state transitions.
+> **Tool-grounding** (optional): If the skill ships `references/tool-call-grounding.md`,
+> integrate it for parameter validation and state-dependency checks. See that file's
+> §2 for `register()` / `validate_call()` usage and §3 for `StateTracker` / `can_call()`
+> patterns. This reduces hallucinated parameters and prevents invalid state transitions.
 
 ---
 
@@ -156,3 +155,83 @@ for i in range(60):
 | `ResourceAlreadyExists` | 0 | — | Ask reuse vs new name | `[ERROR] ResourceAlreadyExists: A resource with this name already exists. What happened: The specified resource name is already in use. How to fix: Use a different name or reuse the existing resource. Next step: Choose a unique name or describe the existing resource.` |
 | RequestLimitExceeded / 429 | 3 | exponential | Back off; respect rate limit | `⚠️ Rate limit reached. Retrying in {backoff}s... (Attempt {current}/{max})` |
 | `InternalError` / 5xx | 3 | 2s, 4s, 8s | Retry; then HALT with RequestId if any | `[ERROR] InternalError: Server-side error occurred. What happened: Tencent Cloud encountered an internal error processing your request. How to fix: Retry the operation. If it persists, escalate with RequestId. Next step: Retry now or escalate with RequestId: {RequestId}.` |
+
+---
+
+## Section 7: Error Code Reference
+
+> **MANDATORY:** Fill this table with **actual** error codes from the product's API documentation.
+
+| Code | Meaning | Retry? | Agent Action |
+|------|---------|--------|--------------|
+| `InvalidParameter` | Parameter validation failed | No | Fix parameter; retry with correct value |
+| `InvalidParameterValue` | Parameter value out of range | No | Adjust value per spec |
+| `MissingParameter` | Required parameter missing | No | Add missing parameter |
+| `ResourceNotFound` | Target resource not found | No | Verify resource ID; suggest Describe |
+| `ResourceInsufficient` | Quota exceeded | No | HALT; suggest quota increase |
+| `InvalidSecretKey` | Credential invalid | No | HALT; fix credentials |
+| `InvalidSecretId` | Credential ID invalid | No | HALT; fix credentials |
+| `RequestLimitExceeded` | API rate limit | Yes (3x) | Exponential backoff |
+| `InternalError` | Server error | Yes (3x) | Retry; escalate with RequestId |
+| `OperationConflict` | Concurrent operation conflict | Yes (3x, 30s) | Wait; retry |
+
+> **After population:** Verify each code exists in the official API error documentation for this product.
+
+---
+
+## Section 8: Safety Gates (Destructive Operations)
+
+Every **Delete**, **Terminate**, or **irreversible** operation MUST have:
+
+1. **Explicit user confirmation** with resource identifier displayed
+2. **Pre-backup reminder** (product-specific: snapshot, backup, export)
+3. **Dependency check** (warn if resource has active connections/attachments)
+4. **Post-delete verification** (poll until 404 or deleted state)
+
+---
+
+## Section 9: Quality Gate (GCL)
+
+> **Required when:** this skill is GCL `required` or `recommended` per AGENTS.md §8. Defaults: any product with destructive operations (Terminate / Delete / Drop / Destroy / Reset) is `required` and `max_iter=2`. Read-only / advisory skills are `optional` and may skip this section.
+
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. Every mutation executes through `scripts/gcl_runner.py run` with an isolated-context Critic scoring 5 dimensions (correctness / safety / idempotency / traceability / spec_compliance). Safety = 0 ⇒ ABORT.
+
+| Item | Value |
+|---|---|
+| GCL applicability | `required` / `recommended` / `optional` (per AGENTS.md §8) |
+| `max_iterations` | `2` (required) / `3` (recommended) / `5` (optional) |
+| Rubric instance | [`references/rubric.md`](references/rubric.md) |
+| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) |
+| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` |
+
+> **Prompt-context isolation (mandatory):** Generator and Critic run in **isolated** prompt contexts (sub-agent or fresh conversation). Critic MUST NOT see the raw user request — only `{{output.generator_output}}` + `{{output.trace}}`. See `references/prompt-templates.md` §2 for the Critic skeleton.
+
+---
+
+## Section 10: Output Schema
+
+All responses follow Tencent Cloud API structure:
+
+```json
+{
+  "Response": {
+    "RequestId": "abc123",
+    "[ResourceId]": "ins-xxx",
+    // Product-specific fields
+  }
+}
+```
+
+Error responses:
+
+```json
+{
+  "Response": {
+    "RequestId": "abc123",
+    "Error": {
+      "Code": "InvalidParameter",
+      "Message": "Parameter validation failed"
+    }
+  }
+}
+```
