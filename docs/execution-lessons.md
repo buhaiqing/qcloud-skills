@@ -5,6 +5,22 @@
 >
 > **Source of truth**: This file. AGENTS.md retains only a routing pointer.
 
+## Context Loading Protocol Priority Table
+
+| Priority | File | When to load | Token cost |
+|----------|------|-------------|------------|
+| **ALWAYS** | `AGENTS.md` (root) | Every session | ~330 lines |
+| **ALWAYS** | Current skill `qcloud-{product}-ops/SKILL.md` | Every skill execution | ~300-700 lines |
+| On-demand | `references/cli-usage.md` | When executing CLI commands | product-specific |
+| On-demand | `references/sdk-templates.md` | When writing SDK fallback code | ~100 lines |
+| On-demand | `references/rubric.md` | When running GCL Critic scoring | ~50 lines |
+| On-demand | `references/prompt-templates.md` | When generating GCL prompts | ~80 lines |
+| On-demand | `docs/execution-lessons.md` (this file) | When debugging CI/test or writing tests | ~35 lines (excluding this table) |
+| On-demand | `docs/failure-patterns.md` | When diagnosing known error patterns | ≤200 lines |
+| On-demand | `docs/gcl-spec.md` | When implementing/modifying GCL logic | ~265 lines |
+| NEVER | Other skills' `SKILL.md` files | Only via explicit `delegate-to` routing | |
+| NEVER | `docs/superpowers/plans/*.md` | Historical notes, not runtime source | |
+
 | ID | Lesson | Key Fix |
 |----|--------|---------|
 | L1 | `unittest discover` only finds `TestCase` subclasses | Must use `class XxxTest(unittest.TestCase)` + `unittest.main()` |
@@ -33,3 +49,4 @@
 | L25 | **每个契约都有两端（生产者↔消费者、声明↔接线、规范↔实现），而不校验接缝时两端必然漂移，且漂移不可见。** 实证：一次审计中 10 个缺陷**全部是同一个缺陷**——`evidence_kernel` 写 `.jsonl` 而 gate glob `.json`；`Makefile` 定义 9 个门禁而无一 workflow 调用 `make`；`validate_error_tables.py` 自称 "CI gate" 却零接线；14 个测试叫 `test_*.py` 而 discover 用 `-p "*_test.py"`（静默排除 257 个测试）；AGENTS.md 写 "≥10 错误码" 而 validator 只查结构不查数量 | ① **修复必须打在构建实际执行的那条路径上**：`4e8e77b` 正确诊断了 bug 却只修了 `write_trace()`，而 `make all` 走的 `_bulk_update()` 原封不动——为修好的路径写了测试并通过，构建执行的那条仍在删光一切。改前先确认「谁真正调用这个函数」。② **主观保证不是证据**：两轮修复均在「测试全绿」状态下带着 BLOCKER，唯一有效证据是**把修复 revert 掉并证明测试会失败**。③ 新门禁必须同时证明「会开火」与「会静默」（见 L6），并落一个「门禁接线」检查器，否则第 4 条同类漂移必然出现 |
 | L26 | **验证 CI「已修复」必须用 CI 自己的工具版本、且从第 1 步开始。** 实证：CI 第 1 步 ruff pin `0.11.8` 报 **99** 个错误，而本机 ruff `0.16.1` 报 **0** —— 因为 `ruff.toml` 没写 `select`，各版本套用各自的默认规则集（0.16.x 默认不再选 E4/E7；实测 `--select E402` 仍能检出）。据此误判「已修复」两次：一次从 **step 81** 起验证（跳过 step 1），一次用错版本。**升级 pin 到本机版本是被否决的方案 —— 那会静默丢掉 E4/E7 全部覆盖。** 正确修法：显式写 `select` 把覆盖范围钉死，再有理由地 `ignore` 具体规则 | ① 改 CI 前先读 workflow 的**第 1 步**是什么、pin 了什么版本；② 用 `uvx <tool>@<pinned-version>` 复现 CI 环境，不要用本机版本；③ 验证时**从第 1 步往下走**，不要从你刚改的那一步开始 —— 后者会得出「链路已通」的假结论（本会话实际发生）；④ 工具版本与配置不匹配时，先问「是代码错了还是检查器的默认集变了」，优先钉住配置而非升级版本 |
 | L27 | **「跑绿了」不等于「跑到了」；测试运行器与文件命名是两个必须对齐的契约。** 实证：`unittest discover -p "*_test.py"` 与 `test_*.py` 命名不匹配 → **292/981（30%）测试从未执行**（274 个在 `test_*.py`；另有 ~18 个是正确命名文件内的 pytest 风格测试，unittest 根本不能跑）；同一批测试用 pytest 收集即 981 全绿。修法：换用能同时收集两种模式/两种风格的运行器（pytest，CI pin 7.4.4），并把收集数写成棘轮 `thresholds.json:tests_min_collected`；门禁 `check_test_collection.py` 另断言「每个测试文件都出现在收集到的 node id 中」 | ① 换运行器前先统计「命名模式 × 测试风格」二维矩阵，别假设默认模式覆盖你的命名；② 新增门禁的判据必须排除它自己的测试文件 —— `check_gate_wiring` W3b 首版把 checker 自身测试（fixture 内构造同名字面量）判成违规，自我误报；③ 火侧证明放进测试（`validate_skills_frontmatter_test.py::CommittedFixtureFireTests`），不要放进 CI 的 shell 片段 —— 同一证明写两遍就是漂移的起点；④ 断言按**名字**取不要按下标：`steps[7].argv` 在插入一步后必红，产出的是噪音不是信号 |
+| L28 | **「汇报成功」不等于「实际成功」；subagent report 是 hint，不是 ground truth。** 实证：context-engineering-opt GCL 流程中派 2 个 Generator subagent 后立即看到 `git status --short` 显示 5 个文件已改、磁盘验证 4 个文件已写——但 AGENTS.md 实际从 348→347 仅 -1 行（不是 subagent 报告的 -25 行）；实际减幅取决于真实 L*-rules 表行数（30 行）而非 task prompt 中的估计（55 行）。subagent 既可能假报"没做"（0 输出），也可能假报"做了"（含错误的 line count 估计） | ① **disk-first verification mandatory**：`git status --short` + `git diff --stat HEAD` + 关键文件 `wc -l`，在 subagent 报告送达后立即跑一遍，不要先看报告内容再看磁盘；② **subagent 报告中的数字永远 cross-check**：报告说"模板从 625 减到 ≤440"，disk 显示 486 → 接受磁盘、报告"实际只减 22%，需要再 slim"。报告与 disk 矛盾时**磁盘不赢**，不是报告赢；③ **structured prose 任务的 subagent 失败率高于 self-verifiable 代码任务**：实测 L23 表明 7 次 markdown 写作任务 0 输出，自己写更可靠——本会话 2 个 subagent 都产出了文件但实际数字与估计偏差 ~50%，说明"任务完成"报告可信度比"完成质量数字"高得多；④ **prompt 给出的估算要在 subagent prompt 中明确标注"是估算还是事实"**：把"AGENTS.md 减 55 行"标注为"目标"而非"承诺"，subagent 报"实际减 30 行"就不再是"失败"，而是"目标未达成，需要再迭代"。 |

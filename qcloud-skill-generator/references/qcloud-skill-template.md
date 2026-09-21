@@ -382,6 +382,8 @@ For complete Prerequisites: `tccli` install, Python runtime setup, credential co
 
 ## Reference Directory
 
+> **Scaffolding note**: Each link below is a per-skill artifact to be generated when scaffolding a new `qcloud-{product}-ops` skill. The template itself does not ship these files — they live under each skill's own `references/` after generation.
+
 - [Core Concepts](references/core-concepts.md)
 - [API & SDK Usage](references/api-sdk-usage.md)
 - [CLI Usage](references/cli-usage.md) (**required** when `cli_applicability: cli-first` or `dual-path`; omit for `sdk-only`; basic examples for `cli-only`)
@@ -404,84 +406,12 @@ For complete Prerequisites: `tccli` install, Python runtime setup, credential co
 - **Availability:** Multi-AZ or product-specific HA patterns per docs.
 - **Cost:** Right-size resources; use product cost controls where applicable.
 
----
-
-## Error Code Reference (Minimum 10 Product-Specific Codes)
-
-> **MANDATORY:** Fill this table with **actual** error codes from the product's API documentation.
-
-| Code | Meaning | Retry? | Agent Action |
-|------|---------|--------|--------------|
-| `InvalidParameter` | Parameter validation failed | No | Fix parameter; retry with correct value |
-| `InvalidParameterValue` | Parameter value out of range | No | Adjust value per spec |
-| `MissingParameter` | Required parameter missing | No | Add missing parameter |
-| `ResourceNotFound` | Target resource not found | No | Verify resource ID; suggest Describe |
-| `ResourceInsufficient` | Quota exceeded | No | HALT; suggest quota increase |
-| `InvalidSecretKey` | Credential invalid | No | HALT; fix credentials |
-| `InvalidSecretId` | Credential ID invalid | No | HALT; fix credentials |
-| `RequestLimitExceeded` | API rate limit | Yes (3x) | Exponential backoff |
-| `InternalError` | Server error | Yes (3x) | Retry; escalate with RequestId |
-| `OperationConflict` | Concurrent operation conflict | Yes (3x, 30s) | Wait; retry |
-
-> **After population:** Verify each code exists in the official API error documentation for this product.
-
----
-
-## Safety Gates (Destructive Operations)
-
-Every **Delete**, **Terminate**, or **irreversible** operation MUST have:
-
-1. **Explicit user confirmation** with resource identifier displayed
-2. **Pre-backup reminder** (product-specific: snapshot, backup, export)
-3. **Dependency check** (warn if resource has active connections/attachments)
-4. **Post-delete verification** (poll until 404 or deleted state)
-
----
+For Error Code Reference, Safety Gates, Quality Gate (GCL), and Output Schema templates — see [template-guide.md](template-guide.md#section-7-error-code-reference), [§8 Safety Gates](template-guide.md#section-8-safety-gates-destructive-operations), [§9 Quality Gate GCL](template-guide.md#section-9-quality-gate-gcl), [§10 Output Schema](template-guide.md#section-10-output-schema).
 
 ## Quality Gate (GCL)
 
-> **Required when:** this skill is GCL `required` or `recommended` per [AGENTS.md §10.8](../../AGENTS.md#8-per-skill-defaults-qcloud). Defaults: any product with destructive operations (Terminate / Delete / Drop / Destroy / Reset) is `required` and `max_iter=2`. Read-only / advisory skills are `optional` and may skip this section.
-
-This skill participates in the **Generator-Critic-Loop (GCL)** pilot ([AGENTS.md §10](../../AGENTS.md#10-generator-critic-loop-gcl--adversarial-quality-gate)). Every mutation executes through `scripts/gcl_runner.py run` with an isolated-context Critic scoring 5 dimensions (correctness / safety / idempotency / traceability / spec_compliance). Safety = 0 ⇒ ABORT.
-
-| Item | Value |
-|---|---|
-| GCL applicability | `required` / `recommended` / `optional` (per AGENTS.md §8) |
-| `max_iterations` | `2` (required) / `3` (recommended) / `5` (optional) |
-| Rubric instance | [`references/rubric.md`](references/rubric.md) |
-| Prompt templates | [`references/prompt-templates.md`](references/prompt-templates.md) |
-| Trace path | `./audit-results/gcl-trace-YYYYMMDD-HHMMSS.json` |
-
-> **Prompt-context isolation (mandatory):** Generator and Critic run in **isolated** prompt contexts (sub-agent or fresh conversation). Critic MUST NOT see the raw user request — only `{{output.generator_output}}` + `{{output.trace}}`. See `references/prompt-templates.md` §2 for the Critic skeleton.
+This skill participates in the **Generator-Critic-Loop (GCL)** pilot. See [template-guide.md](template-guide.md#section-9-quality-gate-gcl) for the full GCL Quality Gate section template including applicability rules, max_iterations, rubric instance, and prompt-context isolation requirements.
 
 ---
 
-## Output Schema
-
-All responses follow Tencent Cloud API structure:
-
-```json
-{
-  "Response": {
-    "RequestId": "abc123",
-    "[ResourceId]": "ins-xxx",
-    // Product-specific fields
-  }
-}
-```
-
-Error responses:
-
-```json
-{
-  "Response": {
-    "RequestId": "abc123",
-    "Error": {
-      "Code": "InvalidParameter",
-      "Message": "Parameter validation failed"
-    }
-  }
-}
-```
-
-> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL)」复盘并沉淀可复用资产。
+> 任务完成后按根 AGENTS.md 的「复利资产沉淀机制 (CADL）」复盘并沉淀可复用资产。
