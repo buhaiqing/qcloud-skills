@@ -73,16 +73,19 @@ When `{{user.mode}}=well-architected-readonly`: read-only Describe*/GetMonitorDa
 | `{{env.TENCENTCLOUD_SECRET_ID}}` | From runtime environment | NEVER ask the user; fail if unset |
 | `{{env.TENCENTCLOUD_SECRET_KEY}}` | From runtime environment | NEVER ask the user; fail if unset |
 | `{{env.TENCENTCLOUD_REGION}}` | From runtime environment | Use default `ap-guangzhou` if unset |
-| `{{user.zone}}` | User-supplied availability zone | Ask once; reuse (e.g., `ap-guangzhou-3`) |
-| `{{user.instance_type}}` | User-supplied instance type | Ask once; suggest S5.SMALL1 for test |
-| `{{user.image_id}}` | User-supplied image ID | Ask once; suggest default public image |
+| `{{user.zone}}` | User-supplied availability zone | Ask once; reuse (e.g., `ap-guangzhou-3`). Falls back to `{{derived.default_zone}}` if unset. |
+| `{{user.instance_type}}` | User-supplied instance type | Ask once; falls back to `{{derived.default_instance_type}}` (e.g., `S5.SMALL1`). |
+| `{{user.image_id}}` | User-supplied image ID | Ask once; falls back to `{{derived.default_image_id}}` (first public image). |
 | `{{user.instance_name}}` | User-supplied instance name | Ask once; reuse |
 | `{{user.instance_id}}` | User-supplied instance ID (ins-xxx) | Ask once; reuse for subsequent ops |
 | `{{user.disk_size}}` | User-supplied disk size in GB | Ask once; default 50GB for system disk |
+| `{{derived.default_zone}}` | First valid zone from `DescribeZones` (filter: `ZoneState=AVAILABLE`) | Use as default for `{{user.zone}}` when not specified |
+| `{{derived.default_instance_type}}` | First instance type from `DescribeZoneInstanceConfigInfos` | Use as default for `{{user.instance_type}}` when not specified |
+| `{{derived.default_image_id}}` | First image from `DescribeImages` (filter: `ImageType=PUBLIC,Os=CentOS,Architecture=x86_64`) | Use as default for `{{user.image_id}}` when not specified |
 | `{{output.instance_id}}` | From RunInstances response | Parse `$.Response.InstanceIdSet[0]` |
 | `{{output.request_id}}` | From any API response | Parse `$.Response.RequestId` for tracking |
 
-> **`{{env.*}}` MUST NOT** be collected from the user. **`{{user.*}}`** MUST be collected interactively when missing.
+> **`{{env.*}}` MUST NOT** be collected from the user. **`{{user.*}}`** MUST be collected interactively when missing (or falls back to `{{derived.*}}`). **`{{derived.*}}`** is NEVER asked — computed via pre-flight API calls. **`{{output.*}}`** is parsed from the immediate prior response.
 
 > **Security Warning (Credential Masking — MANDATORY):** **NEVER** log, print, or expose `TENCENTCLOUD_SECRET_KEY` in any output. Mask all credentials with `***` or `<masked>`. Check existence only: `test -n "$TENCENTCLOUD_SECRET_KEY"` ✅ | `echo $TENCENTCLOUD_SECRET_KEY` ❌
 
