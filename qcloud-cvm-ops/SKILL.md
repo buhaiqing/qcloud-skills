@@ -162,18 +162,22 @@ Every operation: **Pre-flight → Execute (CLI and SDK) → Validate → Recover
 | Region | `tccli cvm DescribeZones --Region {{env.TENCENTCLOUD_REGION}}` | Valid zone set | HALT; set valid region |
 | VPC exists | Delegate to `qcloud-vpc-ops` DescribeVpcs | VPC in region | HALT; create VPC first |
 | Security Group | Delegate to `qcloud-vpc-ops` DescribeSecurityGroups | SG exists | HALT; create SG first |
-| Image available | `tccli cvm DescribeImages --ImageId {{user.image_id}}` | `IMAGE_AVAILABLE` | HALT; use valid image |
+| Image available | `tccli cvm DescribeImages --ImageId {{user.image_id or derived.default_image_id}}` | `IMAGE_AVAILABLE` | If both unset: `tccli cvm DescribeImages` (filter `ImageType=PUBLIC,Os=CentOS,Architecture=x86_64`) → use first as `{{derived.default_image_id}}`. HALT if none found. |
 | Quota | `tccli cvm DescribeAccountQuota` | Instance quota > 0 | HALT; raise quota |
 
 #### Execution — CLI (`tccli`) (Primary Path)
 
 ```bash
 # Create single instance
+# {{user.*} fall back to {{derived.*} when user did not specify. Example:
+#   {{user.zone}}            -> {{derived.default_zone}}          (DescribeZones)
+#   {{user.instance_type}}   -> {{derived.default_instance_type}} (DescribeZoneInstanceConfigInfos)
+#   {{user.image_id}}        -> {{derived.default_image_id}}      (DescribeImages, ImageType=PUBLIC)
 tccli cvm RunInstances \
   --Region "{{env.TENCENTCLOUD_REGION}}" \
-  --Placement '{"Zone":"{{user.zone}}"}' \
-  --InstanceType "{{user.instance_type}}" \
-  --ImageId "{{user.image_id}}" \
+  --Placement '{"Zone":"{{user.zone or derived.default_zone}}"}' \
+  --InstanceType "{{user.instance_type or derived.default_instance_type}}" \
+  --ImageId "{{user.image_id or derived.default_image_id}}" \
   --InstanceName "{{user.instance_name}}" \
   --SystemDisk '{"DiskType":"CLOUD_PREMIUM","DiskSize":50}' \
   --InternetAccessible '{"InternetChargeType":"TRAFFIC_POSTPAID_BY_HOUR","PublicIpAssigned":true}' \

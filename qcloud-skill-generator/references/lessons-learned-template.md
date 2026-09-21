@@ -36,12 +36,13 @@ This file is **not** required for every skill — only skills that have accumula
 
 | ID | Lesson | Key Fix |
 |----|--------|---------|
-| {SL1} | {one-line lesson statement} | {concrete fix: code snippet, CLI flag, API field} |
-| {SL2} | ... | ... |
+| {PRODUCT}-SL1 | {one-line lesson statement} | {concrete fix: code snippet, CLI flag, API field} |
+| {PRODUCT}-SL2 | ... | ... |
 ```
 
-**ID prefix convention**: `{SL}` = "single-skill" (e.g., `CVM-SL1`, `CDB-SL1`).
-Avoid using the global `L{N}` prefix reserved for `docs/execution-lessons.md`.
+**ID prefix convention**: `{PRODUCT}-SL{N}` = "single-skill" (e.g., `CVM-SL1`, `CDB-SL1`).
+The `{PRODUCT}` is the uppercase skill slug (e.g. `CVM`, `CDB`, `COS`). Avoid using the
+global `L{N}` prefix reserved for `docs/execution-lessons.md`.
 
 ## Linter integration (optional)
 

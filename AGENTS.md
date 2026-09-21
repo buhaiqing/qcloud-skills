@@ -143,12 +143,13 @@ Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` addition
 
 ## Execution lessons (CADL — distilled, reusable)
 
-> Full lesson table (L1-L27) moved to [`docs/execution-lessons.md`](docs/execution-lessons.md) to reduce AGENTS.md context load. This file is the cold-knowledge store; load on-demand when debugging CI, writing tests, or encountering known patterns.
+> Full lesson table (L1-L28, with L23 gap pre-existing in source) moved to [`docs/execution-lessons.md`](docs/execution-lessons.md) to reduce AGENTS.md context load. This file is the cold-knowledge store; load on-demand when debugging CI, writing tests, or encountering known patterns.
 >
 > **Quick routing**:
 > - CI/test failures → `docs/execution-lessons.md` (L1-L12, L20, L27)
 > - YAML/config issues → L17-L18
 > - GCL/review patterns → L15, L21-L22, L24-L26
+> - Subagent verification (report = hint, disk = truth) → L28
 > - Credential masking → L3
 > - Architecture/checkpoints → L14
 
