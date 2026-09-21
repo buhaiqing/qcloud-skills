@@ -762,6 +762,118 @@ class StructuralCriticErrorCodeTests(unittest.TestCase):
         self.assertIsInstance(gen["_error_code_map"], dict)
 
 
+class TestCompressGeneratorForCritic(unittest.TestCase):
+    """Tests for compress_generator_for_critic — Critic context compression."""
+
+    def _full_generator(self) -> dict:
+        # Realistic tccli DescribeInstances response shape (truncated to 250 chars
+        # for the head, plus an Error section beyond the cutoff to exercise the
+        # Error.Code/RequestId recovery logic).
+        return {
+            "command": "tccli cvm DescribeInstances --Region ap-guangzhou",
+            "exit_code": 0,
+            "result_excerpt": (
+                '{"Response":{"InstanceSet":[{"InstanceId":"ins-aaaa",'
+                '"InstanceType":"S5.SMALL1","CPU":1,"Memory":1,"Status":"RUNNING",'
+                '"PrivateIpAddresses":["10.0.0.1"],"PublicIpAddresses":[],"Tags":[]'
+                '"zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz' * 4
+                + ',"Error":{"Code":"AuthFailure","RequestId":"abc-def-123-456"}}'
+            ),
+            "stdout_len": 1842,
+            "stderr_len": 0,
+            "op_type": "describe",
+            "shadow": False,
+            "args": {"iter": 1, "critic_feedback": "previous attempt failed"},
+            "error_code_hints": "AuthFailure",
+            "_error_code_map": {"AuthFailure": "Credential invalid"},
+        }
+
+    def test_keeps_required_fields(self) -> None:
+        from gcl_runner import compress_generator_for_critic
+        gen = self._full_generator()
+        c = compress_generator_for_critic(gen)
+        # Always-keep fields
+        for key in ("exit_code", "command", "op_type", "shadow",
+                    "stdout_len", "stderr_len", "result_signature"):
+            self.assertIn(key, c, f"missing always-keep field: {key}")
+        self.assertEqual(c["command"], gen["command"])
+        self.assertEqual(c["exit_code"], 0)
+
+    def test_args_only_keeps_iter(self) -> None:
+        from gcl_runner import compress_generator_for_critic
+        c = compress_generator_for_critic(self._full_generator())
+        self.assertEqual(c["args"], {"iter": 1})
+        # critic_feedback MUST be dropped — it leaks prior iteration details
+        self.assertNotIn("critic_feedback", c["args"])
+
+    def test_result_excerpt_truncated_to_200_plus_signals(self) -> None:
+        from gcl_runner import compress_generator_for_critic
+        gen = self._full_generator()
+        c = compress_generator_for_critic(gen)
+        excerpt = c["result_excerpt"]
+        # Must start with the original head (first 200 chars)
+        self.assertTrue(excerpt.startswith(gen["result_excerpt"][:50]))
+        # Must NOT include the entire bloated body (length must be well under input)
+        self.assertLess(len(excerpt), len(gen["result_excerpt"]))
+        # Must include the recovered Error.Code from the tail
+        self.assertIn("Error.Code=AuthFailure", excerpt)
+        # Must include the recovered RequestId
+        self.assertIn("RequestId=abc-def-123-456", excerpt)
+
+    def test_drops_error_code_map_and_hints(self) -> None:
+        from gcl_runner import compress_generator_for_critic
+        c = compress_generator_for_critic(self._full_generator())
+        self.assertNotIn("_error_code_map", c)
+        self.assertNotIn("error_code_hints", c)
+
+    def test_signature_changes_with_error_code(self) -> None:
+        from gcl_runner import compress_generator_for_critic
+        gen1 = self._full_generator()
+        gen2 = dict(gen1)
+        gen2["result_excerpt"] = gen1["result_excerpt"].replace(
+            "AuthFailure", "ResourceNotFound"
+        )
+        sig1 = compress_generator_for_critic(gen1)["result_signature"]
+        sig2 = compress_generator_for_critic(gen2)["result_signature"]
+        self.assertNotEqual(sig1, sig2, "signature must differ when error_code differs")
+
+    def test_signature_stable_for_identical_inputs(self) -> None:
+        from gcl_runner import compress_generator_for_critic
+        gen = self._full_generator()
+        sig1 = compress_generator_for_critic(gen)["result_signature"]
+        sig2 = compress_generator_for_critic(dict(gen))["result_signature"]
+        self.assertEqual(sig1, sig2, "signature must be deterministic")
+
+    def test_empty_excerpt_handled(self) -> None:
+        from gcl_runner import compress_generator_for_critic
+        gen = {"exit_code": 0, "command": "tccli foo", "result_excerpt": ""}
+        c = compress_generator_for_critic(gen)
+        self.assertEqual(c.get("result_excerpt", ""), "")
+        self.assertIn("result_signature", c)
+
+    def test_no_excerpt_handled(self) -> None:
+        from gcl_runner import compress_generator_for_critic
+        gen = {"exit_code": 0, "command": "tccli foo"}
+        c = compress_generator_for_critic(gen)
+        self.assertNotIn("result_excerpt", c)
+        self.assertIn("result_signature", c)
+
+    def test_non_dict_input_passthrough(self) -> None:
+        from gcl_runner import compress_generator_for_critic
+        # Defensive: should not crash on unexpected types
+        self.assertEqual(compress_generator_for_critic(None), None)  # type: ignore[arg-type]
+        self.assertEqual(compress_generator_for_critic("not a dict"), "not a dict")  # type: ignore[arg-type]
+
+    def test_token_savings_min_50pct(self) -> None:
+        """Empirical claim: compression saves ≥50% on bloated excerpts."""
+        from gcl_runner import compress_generator_for_critic
+        gen = self._full_generator()
+        original_len = len(gen["result_excerpt"])
+        compressed_len = len(compress_generator_for_critic(gen)["result_excerpt"])
+        saving_pct = (1 - compressed_len / original_len) * 100
+        self.assertGreater(saving_pct, 50,
+                           f"token saving {saving_pct:.1f}% < 50% target")
+
 
 if __name__ == "__main__":
     unittest.main()
