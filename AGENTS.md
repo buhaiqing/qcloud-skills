@@ -230,6 +230,31 @@ Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` addition
 
 **快速入口**：`python3 scripts/cadl_lint.py`（lint）/ `--fix`（幂等补钩子）
 
+### CADL Landing Point Routing Table
+
+沉淀时按"谁会用到这条经验"决定落点，避免 AGENTS.md 膨胀：
+
+| Asset type / 谁会用到 | 落点 | 容量上限 |
+|---|---|---|
+| **跨 agent-runtime 通用**（如 subagent 验证协议、reflexion 协议） | 用户级 guidance 文件（路径随 agent 而变；不写进本仓库） | 无 |
+| **跨 skill + 跨子系统**（多个 skill 都触发同样的模式） | 根 `AGENTS.md`（仅简明规则；详尽内容外链） | ≤500 行门禁 |
+| **单 skill only**（只在某个产品的 CLI 错误码 / API quirk） | `qcloud-*-ops/references/lessons-learned.md`（新建） | 无硬性上限 |
+| **CLI / API 错误模式**（带 `skill + command + error` 去重键） | `docs/failure-patterns.md` | ≤200 行门禁 |
+| **CADL 流程本身 / 加载策略 / L 编号 lessons** | `docs/cadl-spec.md` + `docs/execution-lessons.md` | 无硬性上限 |
+| **跨子系统架构决策**（ADR；长期方向） | `docs/architecture/ADR-NNNN-*.md` | 无硬性上限 |
+
+**判定问题**（任一为 YES 即落入对应行）：
+1. 这条经验只会在某个具体 skill 触发吗？→ `references/lessons-learned.md`
+2. 是错误码 + 命令 + skill 的三元组？→ `docs/failure-patterns.md`
+3. 影响 ≥2 个 skill 的运行行为？→ 根 `AGENTS.md`（简明） + `docs/execution-lessons.md`（详尽）
+4. 是关于 agent runtime 本身的协议？→ 用户级 guidance
+5. 是架构选型（"we picked X over Y"）？→ ADR
+
+**反模式**：
+- 把 CLI 参数技巧塞进 AGENTS.md（应去单 skill `lessons-learned.md`）
+- 把架构选型塞进 `failure-patterns.md`（应去 ADR）
+- 把"我今天踩了一个坑"塞进 AGENTS.md（应去 `failure-patterns.md`，命中后再升级）
+
 ## Architecture Decision Records (ADR, P0)
 
 ADR 记录**跨子系统**架构决策（参见 `docs/architecture/ADR-0001-establish-adr-mechanism.md` §2.5 边界规则）。
