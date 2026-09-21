@@ -116,23 +116,9 @@ Structured placeholders reduce injection ambiguity and unsafe prompts:
 
 > **`{{env.*}}` MUST NOT** be collected from the user. **`{{user.*}}`** MUST be collected interactively when missing.
 
-> **Security Warning (Credential Masking — MANDATORY):** **NEVER** log, print, or expose `TENCENTCLOUD_SECRET_KEY`, `SecretKey`, or any credential field value in console output, debug messages, error messages, or logs.
->
-> **Masking rules across all execution paths:**
-> | Execution Path | Safe Pattern | Unsafe Pattern |
-> |----------------|-------------|----------------|
-> | Console output | `TENCENTCLOUD_SECRET_KEY=<masked>` | `TENCENTCLOUD_SECRET_KEY=abc123...` |
-> | Error messages | `Error: API call failed (credential omitted)` | `Error: InvalidSecretKey.XXX ... actual key...` |
-> | Log files | `[INFO] Credentials configured: Key=***` | `[INFO] Secret Key: abc123...` |
-> | Verification | `test -n "$TENCENTCLOUD_SECRET_KEY" && echo "✅ Key is set"` | `echo "Key=$TENCENTCLOUD_SECRET_KEY"` |
-> | Python SDK | `SecretKey=os.environ.get("...")` (env read is safe) | `print(f"Config: {config}")` or `logging.info("%s", ...)` |
-> | Debug/verbose | `⚠️ Debug mode may expose credential values` (warning only) | `--debug` with un-masked credential output |
->
-> **Credential verification MUST check existence only**, never echo the value:
-> - Bash: `test -n "$TENCENTCLOUD_SECRET_KEY"` ✅ | `echo $TENCENTCLOUD_SECRET_KEY` ❌
-> - Python: `if os.environ.get("TENCENTCLOUD_SECRET_KEY") == ""` ✅ | `print(os.environ.get("TENCENTCLOUD_SECRET_KEY"))` ❌
->
-> **If any execution flow violates this rule, the skill SHALL be blocked from merge as a security incident.**
+> For detailed variable conventions, API response patterns, CLI notes, SDK templates, and execution flow guidance, see [template-guide.md](template-guide.md).
+
+> **Credential Masking**: See [credential-masking.md](credential-masking.md) for full masking rules. Summary: NEVER log/expose credentials; check existence only. Violations block merge.
 
 ## API and Response Conventions (Agent-Readable)
 
@@ -226,11 +212,7 @@ Every operation: **Pre-flight → Execute (SDK/API and, when applicable, `tccli`
 
 Use the [Tencent Cloud CLI (tccli)](https://cloud.tencent.com/document/product/440) as the **primary execution path**.
 
-> **Critical CLI Notes** (verified through official documentation):
-> - Output is **JSON by default** — standard JSON structure with `Response` wrapper
-> - CLI uses `--region` for region specification (not `--RegionId`)
-> - Credentials from env vars: `TENCENTCLOUD_SECRET_ID`, `TENCENTCLOUD_SECRET_KEY`
-> - CLI format: `tccli <product> <ActionName> --Param1 value1 --Param2 value2`
+> CLI behavioral notes: see [template-guide.md](template-guide.md#section-3-cli-execution-notes).
 
 ```bash
 # CLI call (JSON output by default)
@@ -243,58 +225,7 @@ tccli [product] Create[Resource] \
 
 #### Execution — Python SDK (Fallback Path)
 
-When `tccli` CLI does not support a specific operation, use `tencentcloud-sdk-python`:
-
-```python
-#!/usr/bin/env python3
-"""
-SDK fallback script for [Product] Create[Resource]
-
-Tool-grounding integration (P1-3):
-  Before executing, validate params against the skill's tool-call-grounding.md
-  schema reference (see references/tool-call-grounding.md §2 for registration pattern).
-  Use GroundingDetector to catch tool_not_found, param_out_of_range, and
-  state_not_satisfied errors before they reach the cloud.
-"""
-import os
-import json
-from tencentcloud.common import credential
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-# Import product-specific module
-from tencentcloud.[product] import [product_client, models]
-
-def main():
-    try:
-        # Credential from environment
-        cred = credential.Credential(
-            os.environ.get("TENCENTCLOUD_SECRET_ID"),
-            os.environ.get("TENCENTCLOUD_SECRET_KEY")
-        )
-        
-        # Client with region
-        client = [product_client].[Product]Client(cred, os.environ.get("TENCENTCLOUD_REGION"))
-        
-        # Request per API spec
-        req = models.Create[Resource]Request()
-        req.[Param1] = "<value1>"
-        req.[Param2] = "<value2>"
-        
-        # Execute
-        resp = client.Create[Resource](req)
-        print(json.dumps(resp.to_json_string(), indent=2))
-        
-    except TencentCloudSDKException as err:
-        print(f"[ERROR] {err}")
-
-if __name__ == "__main__":
-    main()
-```
-
-> **Tool-grounding**: Every SDK fallback script should integrate the skill's
-> `references/tool-call-grounding.md` for parameter validation and state-dependency
-> checks. See `references/tool-call-grounding.md` §2 for `register()` / `validate_call()`
-> usage and §3 for `StateTracker` / `can_call()` patterns. This reduces
-> hallucinated parameters and prevents invalid state transitions.
+When `tccli` CLI does not support a specific operation, use `tencentcloud-sdk-python`. See [template-guide.md](template-guide.md#section-4-sdk-fallback-script-template) for the complete SDK fallback script template.
 
 Execute:
 ```bash
@@ -307,29 +238,7 @@ python3 /tmp/qcloud-sdk-script/create_resource.py
 
 #### Post-execution Validation
 
-1. Read `{{output.resource_id}}` from the **documented** response path (`$.Response.InstanceId` for most products).
-2. Poll **Describe** until terminal success state or timeout:
-
-```bash
-# CLI polling (manual loop)
-for i in $(seq 1 60); do
-  STATUS=$(tccli [product] Describe[Resource] --[IdName] "{{output.resource_id}}" | jq -r '.Response.Status')
-  [ "$STATUS" = "RUNNING" ] && break
-  sleep 5
-done
-```
-
-```python
-# SDK polling
-import time
-for i in range(60):
-    resp = client.Describe[Resource](describe_req)
-    if resp.Status == "RUNNING":
-        break
-    time.sleep(5)
-```
-
-3. On success, report `{{output.resource_id}}` and key fields to the user.
+See [template-guide.md](template-guide.md#section-5-post-execution-validation-pattern) for the full polling pattern (CLI + SDK). Summary: read `{{output.resource_id}}` from documented response path; poll **Describe** until terminal state.
 4. On terminal failure, go to **Failure Recovery**.
 
 #### Failure Recovery
@@ -467,57 +376,9 @@ tccli [product] Restore[Resource] \
 
 ## Prerequisites
 
-1. **Install `tccli` CLI** (primary execution path — Python CLI tool):
+For complete Prerequisites: `tccli` install, Python runtime setup, credential configuration, and verification — see [execution-environment.md](execution-environment.md). All credentials use `{{env.*}}` placeholders; never commit `.env` to version control.
 
-   ```bash
-   # Official installer via pip
-   pip install tccli
-   
-   # Or via Homebrew (macOS)
-   brew install tccli
-   ```
-
-2. **Bootstrap Python runtime** (for SDK fallback — Python 3.8+):
-
-   ```bash
-   # Check Python version
-   python3 --version  # Should be ≥ 3.8
-   
-   # Install SDK
-   pip install tencentcloud-sdk-python
-   
-   # Or install product-specific SDK module
-   pip install tencentcloud-sdk-python-[product]
-   ```
-
-3. **Configure Credentials** — Environment variables (recommended for Agent execution):
-
-   ```bash
-   export TENCENTCLOUD_SECRET_ID="{{env.TENCENTCLOUD_SECRET_ID}}"
-   export TENCENTCLOUD_SECRET_KEY="{{env.TENCENTCLOUD_SECRET_KEY}}"
-   export TENCENTCLOUD_REGION="{{env.TENCENTCLOUD_REGION}}"
-   ```
-
-   **Alternative — Interactive CLI Configuration:**
-   ```bash
-   tccli configure
-   ```
-
-   **Alternative — Config File (`~/.tccli/config`):**
-   ```yaml
-   default:
-     secretId: {{user.secret_id}}
-     secretKey: {{user.secret_key}}
-     region: {{user.region}}
-   ```
-
-4. **Verify Configuration**:
-   ```bash
-   # Quick validation (JSON output by default)
-   tccli cvm DescribeZones --Region ap-guangzhou
-   ```
-
-> **Security:** Never commit `.env` to version control (already in `.gitignore`). All credentials use `{{env.*}}` placeholders in generated Skills — never real values.
+**One-line verify**: `tccli cvm DescribeZones --Region ap-guangzhou` returns JSON ⇒ environment ready.
 
 ## Reference Directory
 
