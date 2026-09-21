@@ -113,8 +113,9 @@ Structured placeholders reduce injection ambiguity and unsafe prompts:
 | `{{user.region}}` | User-supplied region | Ask once; reuse |
 | `{{user.resource_name}}` | User-supplied name | Ask once; reuse |
 | `{{output.resource_id}}` | From last API or CLI JSON response | Parse per **API spec** (SDK) or **verified CLI** path for this operation |
+| `{{derived.<name>}}` | Computed from API response(s) or local logic (e.g., default zone from `DescribeZones`, instance type from `DescribeZoneInstanceConfigInfos`) | Use as default; user may override via `{{user.*}}` if they specify |
 
-> **`{{env.*}}` MUST NOT** be collected from the user. **`{{user.*}}`** MUST be collected interactively when missing.
+> **`{{env.*}}` MUST NOT** be collected from the user. **`{{user.*}}`** MUST be collected interactively when missing. **`{{derived.*}}`** is NEVER asked — computed via pre-flight API calls or skill-defined defaults. **`{{output.*}}`** is parsed from the immediate prior response.
 
 > For detailed variable conventions, API response patterns, CLI notes, SDK templates, and execution flow guidance, see [template-guide.md](template-guide.md).
 

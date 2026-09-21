@@ -8,7 +8,7 @@
 
 ## Section 1: Variable Convention Details
 
-Structured placeholders reduce injection ambiguity and unsafe prompts:
+Structured placeholders reduce injection ambiguity and unsafe prompts. Four placeholder types:
 
 | Placeholder | Meaning | Agent Action |
 |-------------|---------|--------------|
@@ -18,8 +18,36 @@ Structured placeholders reduce injection ambiguity and unsafe prompts:
 | `{{user.region}}` | User-supplied region | Ask once; reuse |
 | `{{user.resource_name}}` | User-supplied name | Ask once; reuse |
 | `{{output.resource_id}}` | From last API or CLI JSON response | Parse per **API spec** (SDK) or **verified CLI** path for this operation |
+| `{{derived.<name>}}` | Computed from API response(s) or local logic | Use as default; user may override via `{{user.*}}` if they specify |
 
-> **`{{env.*}}` MUST NOT** be collected from the user. **`{{user.*}}`** MUST be collected interactively when missing.
+> **`{{env.*}}` MUST NOT** be collected from the user. **`{{user.*}}`** MUST be collected interactively when missing. **`{{derived.*}}`** is NEVER asked — computed via pre-flight API calls or skill-defined defaults. **`{{output.*}}`** is parsed from the immediate prior response.
+
+### When to use `{{derived.*}}` vs `{{user.*}}`
+
+| Scenario | Use | Reasoning |
+|----------|-----|-----------|
+| User explicitly wants X | `{{user.X}}` | User intent overrides any default |
+| Skill can compute a sane default from API | `{{derived.X}}` | Reduce user prompts; UX-friendly |
+| Value is mandatory and only user knows | `{{user.X}}` | `{{derived.*}}` cannot hallucinate |
+| Default + override pattern | `{{derived.X}}` with `{{user.X}}` override hint | Best UX: works zero-config but customizable |
+
+### `{{derived.*}}` example patterns
+
+```yaml
+# Default zone from DescribeZones (pre-flight)
+{{derived.default_zone}}: "$.Response.ZoneSet[0].Zone"
+
+# Default instance type for a zone (matrix lookup)
+{{derived.default_instance_type}}: "S5.SMALL1" (or first from DescribeZoneInstanceConfigInfos)
+
+# Default region from env or first valid from DescribeRegions
+{{derived.default_region}}: {{env.TENCENTCLOUD_REGION}} or "$.Response.RegionSet[0].Region"
+
+# Default VPC in region
+{{derived.default_vpc}}: "$.Response.VpcSet[0].VpcId"
+```
+
+**Pattern**: pre-flight API call → store result → reference as `{{derived.*}}` in subsequent operations. NEVER ask user for a `{{derived.*}}` value; if the API call fails, HALT and surface the error.
 
 ---
 
