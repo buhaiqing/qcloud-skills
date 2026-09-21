@@ -400,7 +400,7 @@ For complete Prerequisites: `tccli` install, Python runtime setup, credential co
 - [CLI Behavioral Reference](references/cli-behavior.md) — verified `tccli` CLI conventions (JSON output, env vars, invocation patterns)
 - [Enhanced Self-Healing Framework](references/enhanced-self-healing-framework.md) — **MANDATORY** self-healing patterns for all installation flows
 - [Well-Architected Assessment](references/well-architected-assessment.md) — **MANDATORY** Tencent Cloud Well-Architected Framework four-pillar integration
-- [Lessons Learned](references/lessons-learned.md) — single-skill CADL landing point (per [lessons-learned-template.md](lessons-learned-template.md); create only when single-skill lessons accumulate)
+- [Lessons Learned](references/lessons-learned.md) — single-skill CADL landing point (per [lessons-learned-template.md](lessons-learned-template.md); create from the template only when single-skill lessons accumulate, otherwise omit)
 
 ## Operational Best Practices
 
