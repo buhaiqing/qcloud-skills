@@ -87,13 +87,100 @@ class GateConfigError(Exception):
     """
 
 
+# The full set of keys this gate (and its sibling gates) read from
+# thresholds.json. CR-2 makes the *aggregate* gate fail-closed when any of
+# these is missing or wrong-typed, so a partial-thresholds file can't
+# silently leave a downstream gate unable to grade (the same bug shape
+# that c15e11a introduced — restore the file vs. rely on every script to
+# fail independently; one assertion beats five). Each tuple is
+# (key, expected_type_str, owner).
+_REQUIRED_THRESHOLD_KEYS: tuple[tuple[str, str, str], ...] = (
+    ("rubric_min_score", "number", "gcl_runner"),
+    ("safety_fail_threshold", "number", "gcl_runner"),
+    ("max_iterations", "number", "gcl_runner"),
+    ("gcl_structural_critic_only", "boolean", "gcl_runner"),
+    ("reflexion_max_lines", "integer", "_failure_pattern_store"),
+    ("agents_md_max_lines", "integer", "cadl_lint"),
+    ("router_min_top1_accuracy", "number", "kpi7_router_confusion"),
+    ("router_max_misdelegation", "number", "kpi7_router_confusion"),
+    ("router_target_top1_accuracy", "number", "kpi7_router_confusion"),
+    ("router_min_registry_skills", "integer", "kpi7_router_confusion"),
+    ("evidence_min_records", "integer", "kpi1_2_safety"),
+    ("evidence_max_age_days", "integer", "kpi1_2_safety"),
+    ("tests_min_collected", "integer", "check_test_collection.py"),
+    ("gcl_structural_fallback_max_ratio", "number", "gcl_trace_aggregate"),
+    ("reflexion_min_injected_runs", "integer", "check_reflexion_efficacy"),
+)
+
+
+def _validate_thresholds_complete(cfg: dict) -> None:
+    """Raise GateConfigError if any required key is missing or wrong-typed.
+
+    Cross-gate invariant: even if the KPIs this script *runs* don't read a
+    key, the aggregate gate still validates it, because the on-call's
+    cognitive load is "did make gates pass?" — not "did the right subset
+    of gates run?". A partial file is a configuration error, full stop.
+    """
+    for key, kind, owner in _REQUIRED_THRESHOLD_KEYS:
+        if key not in cfg:
+            raise GateConfigError(
+                f"{THRESHOLDS}: missing required key {key!r} (consumer: {owner}); "
+                f"this gate fails-closed so a partial thresholds.json cannot"
+                f" silently skip a downstream grade (CR-2 / H-100)"
+            )
+        value = cfg[key]
+        # Type probe is lenient on int/float (both 'number'), strict on bool
+        # vs number (Python's bool is an int subclass).
+        ok = {
+            "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
+            "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
+            "boolean": lambda v: isinstance(v, bool),
+        }[kind](value)
+        if not ok:
+            raise GateConfigError(
+                f"{THRESHOLDS}: key {key!r} must be {kind}, got {type(value).__name__}"
+                f" (consumer: {owner})"
+            )
+
+
+def _safe_evidence_glob(raw: str) -> str:
+    """Reject globs that escape AUDIT (H-52 — gate as attack surface).
+
+    `Path.glob()` is a thin wrapper over `fnmatch.fnmatchcase`; ``..``
+    segments and absolute paths are NOT rejected by the stdlib. Without
+    this guard, a CI job that exports `GATE_EVIDENCE_GLOB=../../etc/*`
+    reads files outside the project root and prints their contents into
+    the gate report — both an information leak and a way to make a
+    failing KPI look like a passing one (the validator returns 0 when
+    it processes an empty set, depending on `--min-records`).
+    """
+    if not raw:
+        return EVIDENCE_GLOB
+    # Strip leading slashes (Path treats them as relative) and disallow
+    # `..` segments — both are unambiguous escape attempts.
+    cleaned = raw.lstrip("/")
+    if ".." in cleaned.split("/"):
+        raise GateConfigError(
+            f"GATE_EVIDENCE_GLOB={raw!r} contains '..' — refusing to read"
+            f" outside {AUDIT} (H-52)"
+        )
+    if Path(cleaned).is_absolute():
+        raise GateConfigError(
+            f"GATE_EVIDENCE_GLOB={raw!r} is an absolute path — refusing"
+            f" to read outside {AUDIT} (H-52)"
+        )
+    return cleaned
+
+
 def _thresholds() -> dict:
     try:
-        return json.loads(THRESHOLDS.read_text(encoding="utf-8"))
+        cfg = json.loads(THRESHOLDS.read_text(encoding="utf-8"))
     except OSError as exc:
         raise GateConfigError(f"{THRESHOLDS}: cannot read ({exc})") from exc
     except json.JSONDecodeError as exc:
         raise GateConfigError(f"{THRESHOLDS}: invalid JSON ({exc})") from exc
+    _validate_thresholds_complete(cfg)
+    return cfg
 
 
 def _threshold(cfg: dict, key: str) -> float:
