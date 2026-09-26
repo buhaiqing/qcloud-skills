@@ -58,10 +58,19 @@ code emitting records skipped it. Search for `record = {...}` near new code.
 has never run the harness (`make kpi-gates` needs at least one real run:
 `python3 scripts/gcl_runner.py run --skill … --request …`), or the stream was
 deleted/truncated, or `audit-results/` was cleaned. `audit-results/` is
-gitignored, so a *fresh clone* is always in this state — that is why CI runs the
-gate with `GATE_REQUIRE_EVIDENCE=0` (an explicit, visible skip). Do not add that
-escape to a machine that is supposed to be emitting evidence; it is not a fix
-for an empty stream.
+gitignored, so a *fresh clone* is always in this state.
+
+**CI does not need the `GATE_REQUIRE_EVIDENCE=0` escape anymore.** After the
+CR-3 job split (validate-skills.yml's `kpi-gates` job), CI grades a committed
+fixture staged under a name — `cp scripts/fixtures/evidence/evidence-safety-clean.jsonl
+audit-results/evidence-fixture.jsonl && GATE_EVIDENCE_GLOB=evidence-fixture.jsonl
+python3 scripts/check_kpi_gates.py` — so the same workflow has both the
+graded bytes and the rule it must pass. `GATE_REQUIRE_EVIDENCE=0` is the
+documented escape for a *deliberately evidence-free local repo*; CI does not
+set it, and a future runbook that mentions it is stale. The H-50 fix in
+`scripts/check_kpi_gates.py:aggregate()` ensures any future re-introduction
+of the escape would still turn CI red (a silently-skipped rule now exits 1
+with a "warn" verdict, not 0).
 
 **V5: The stream is entirely aged out.** Every record is older than
 `evidence_max_age_days` (90) — the expiry is working, and the fleet/this machine

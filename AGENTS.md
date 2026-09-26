@@ -143,13 +143,16 @@ Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` addition
 
 ## Execution lessons (CADL — distilled, reusable)
 
-> Full lesson table (L1-L28, with L23 gap pre-existing in source) moved to [`docs/execution-lessons.md`](docs/execution-lessons.md) to reduce AGENTS.md context load. This file is the cold-knowledge store; load on-demand when debugging CI, writing tests, or encountering known patterns.
+> Full lesson table (L1-L31, with L23 gap pre-existing in source) moved to [`docs/execution-lessons.md`](docs/execution-lessons.md) to reduce AGENTS.md context load. This file is the cold-knowledge store; load on-demand when debugging CI, writing tests, or encountering known patterns.
 >
 > **Quick routing**:
-> - CI/test failures → `docs/execution-lessons.md` (L1-L12, L20, L27)
+> - CI/test failures / test pollution → `docs/execution-lessons.md` (L1-L12, L20, L27, L29)
 > - YAML/config issues → L17-L18
 > - GCL/review patterns → L15, L21-L22, L24-L26
 > - Subagent verification (report = hint, disk = truth) → L28
+> - Wire-it / wiring-rule gaps (silent scripts, zero-caller) → L30
+> - Workflow job-isolation (fail-closed responsibility per job) → L31
+> - Ratchet noise / buffer-zone design (false positives) → L30, L24
 > - Credential masking → L3
 > - Architecture/checkpoints → L14
 
@@ -178,7 +181,7 @@ Requires `tccli` (pip-installable) and Python 3.8+. `qcloud-finops-ops` addition
 | `docs/gcl-spec.md` | Runtime GCL spec — rubric, trace schema, prompt templates |
 | `docs/reflexion-memory.md` | Reflexion rules — cross-session failure-pattern memory governance |
 | `docs/failure-patterns.md` | Reflexion memory store |
-| `docs/execution-lessons.md` | Execution lessons (L1-L22, L24-L27): CI, testing, YAML, GCL patterns (L23 gap is pre-existing in source) |
+| `docs/execution-lessons.md` | Execution lessons (L1-L22, L24-L31): CI, testing, YAML, GCL, silent-skip, zero-wiring, CI-job-isolation patterns (L23 gap is pre-existing in source) |
 | `docs/cadl-spec.md` | CADL long-form spec — trigger conditions, 5-step loop, asset types, anti-patterns |
 | `docs/architecture/README.md` | ADR index — cross-subsystem decisions |
 | `docs/architecture/ADR-0001-establish-adr-mechanism.md` | ADR mechanism — format, lifecycle, when to write |
