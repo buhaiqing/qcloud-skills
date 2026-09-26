@@ -34,8 +34,16 @@ class FixtureRepo:
         self.add_script("consumer.py", "FLOOR = 1  # test_floor\n")
         # The surface consumes the manifest rather than naming gates one by one.
         self.add_script("run_gates.py", '"""Manifest runner (fixture stub)."""\n')
+        # W5 (CR-4) baseline invariant: every fixture script must be invoked by
+        # the Makefile (or transitively imported) so the W1-W5 baseline stays
+        # clean. Tests that opt out of these invocations must expect W5 to fire.
         (root / "Makefile").write_text(
-            "validate:\n\tpython3 scripts/run_gates.py --set make\n", "utf-8"
+            "validate:\n"
+            "\tpython3 scripts/run_gates.py --set make\n"
+            "\tpython3 scripts/_failure_pattern_store.py --print-paths\n"
+            "\tpython3 scripts/base_tool.py --help\n"
+            "\tpython3 scripts/consumer.py --check\n",
+            "utf-8",
         )
         self.set_manifest(
             gates={"base_gate": "python3 scripts/base_gate.py"},
@@ -60,6 +68,29 @@ class FixtureRepo:
         runs_in: tuple[str, ...] = ("make",),
         surface_specific: dict[str, list[tuple[str, str]]] | None = None,
     ) -> None:
+        # Default surface entries that the W5 baseline requires: a script
+        # invoked by Makefile but absent from surface_specific.make would
+        # trip W4, and a script with no caller of any kind would trip W5.
+        # Callers that pass an explicit `surface_specific={...}` get their
+        # entries merged with the defaults — but only the surfaces the caller
+        # named are reset; others keep the defaults.
+        default_surface_specific = {
+            "make": [
+                ("store_paths", "_failure_pattern_store.py"),
+                ("base_tool_help", "base_tool.py"),
+                ("consumer_check", "consumer.py"),
+            ],
+        }
+        if surface_specific is None:
+            spec = default_surface_specific
+        else:
+            # Merge caller entries with defaults so a caller who only adds a
+            # 'make' entry does not silently drop the default `ci` / `local`
+            # surface lists. The baseline invariant is that every fixture
+            # script has a caller; this merge keeps that invariant intact.
+            spec = {surface: list(entries) for surface, entries in default_surface_specific.items()}
+            for surface, entries in surface_specific.items():
+                spec[surface] = spec.get(surface, []) + list(entries)
         lines = ["version: 1", "gates:"]
         for key, value in gates.items():
             lines.append(f"  - name: {key}")
@@ -71,7 +102,6 @@ class FixtureRepo:
             lines.append(f'    command: "{value}"')
             lines.append("    reason: fixture tool")
         lines.append("surface_specific:")
-        spec = surface_specific or {}
         for surface in ("ci", "local", "make"):
             entries = spec.get(surface) or []
             if not entries:
@@ -115,13 +145,21 @@ class CheckerTestCase(unittest.TestCase):
         )
 
     def assert_clean(self, result: subprocess.CompletedProcess[str]) -> None:
+        """Assert exit 0 + no W1-W4 findings. W5 is opt-in (see `assert_no_w5`)."""
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         for code in ("W1", "W2", "W3", "W4"):
             self.assertNotIn(code, result.stdout, result.stdout)
 
+    def assert_no_w5(self, result: subprocess.CompletedProcess[str]) -> None:
+        """Strict W5-clean check (call after `assert_clean`)."""
+        self.assertNotIn("W5", result.stdout, result.stdout)
+
 
 class BaselineTests(CheckerTestCase):
     def test_complete_fixture_is_clean(self) -> None:
+        # The baseline wires every fixture script through the Makefile and the
+        # manifest, so W1-W5 all stay silent. This is the invariant every
+        # other test relies on.
         self.assert_clean(self.run_checker())
 
     def test_json_report_lists_surfaces_and_codes(self) -> None:
@@ -130,9 +168,10 @@ class BaselineTests(CheckerTestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         report = json.loads(result.stdout)
         self.assertIn("Makefile", report["surfaces"])
-        self.assertEqual(report["finding_count"], 1)
-        self.assertEqual(report["findings"][0]["code"], "W1")
-        self.assertEqual(report["findings"][0]["detail"], "scripts/dead.py")
+        self.assertEqual(report["finding_count"], 2)
+        # W1 (self-declared CI gate unwired) AND W5 (no caller at all)
+        codes = sorted(f["code"] for f in report["findings"])
+        self.assertEqual(codes, ["W1", "W5"])
 
 
 class W1DeadGateTests(CheckerTestCase):
@@ -172,9 +211,24 @@ class W1DeadGateTests(CheckerTestCase):
         self.assertIn("W1 scripts/library_gate.py", result.stdout)
 
     def test_w1_marker_window_is_the_first_sixty_lines(self) -> None:
+        # First sub-case: marker at line 60 (inside the W1 60-line window).
+        # late_gate.py is intentionally UNwired so W1 fires; we also expect
+        # W5 to fire in passing (the W5 baseline requires unwired scripts
+        # to surface). What matters for this test is the W1 finding.
         self.repo.add_script("late_gate.py", "# pad\n" * 59 + "# CI gate\n")
-        self.assertEqual(self.run_checker().returncode, 1)
+        result = self.run_checker()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("W1 scripts/late_gate.py", result.stdout)
+        # Second sub-case: marker at line 61 (outside the window). Wire the
+        # script via Makefile so W1 is silent AND W5 is silent; the test is
+        # checking that the marker-window boundary is correct.
         self.repo.add_script("late_gate.py", "# pad\n" * 60 + "# CI gate\n")
+        self.repo.add_makefile_line("\tpython3 scripts/late_gate.py")
+        self.repo.set_manifest(
+            gates={"base_gate": "python3 scripts/base_gate.py"},
+            tools={"base_tool": "python3 scripts/base_tool.py"},
+            surface_specific={"make": [("late_gate", "late_gate.py")]},
+        )
         self.assert_clean(self.run_checker())
 
     def test_w1_ignores_test_named_modules(self) -> None:
@@ -234,9 +288,14 @@ class W2ManifestTests(CheckerTestCase):
 
     def test_w2_exempts_tools_section(self) -> None:
         self.repo.add_script("manual_only.py", '"""Human-invoked."""\n')
+        # W5 baseline: tools-declared scripts must still be wired by some
+        # surface, otherwise W5 reports them. Wire via Makefile so the test
+        # stays focused on W2 (manifest gate wiring) rather than W5.
+        self.repo.add_makefile_line("\tpython3 scripts/manual_only.py --help")
         self.repo.set_manifest(
             gates={"base_gate": "python3 scripts/base_gate.py"},
             tools={"manual": "python3 scripts/manual_only.py"},
+            surface_specific={"make": [("manual_help", "manual_only.py")]},
         )
         self.assert_clean(self.run_checker())
 
@@ -320,10 +379,15 @@ class W4SurfaceTests(CheckerTestCase):
 
     def test_w4_ignores_a_comment_only_mention(self) -> None:
         # A script named only in a comment is not invoked. Treating a comment as
-        # wiring is how a dead gate keeps looking alive.
+        # wiring is how a dead gate keeps looking alive. W5 reinforces this:
+        # the script's comment-only mention does not count as a caller.
         self.repo.add_script("commented.py", '"""Only mentioned in a comment."""\n')
         self.repo.add_makefile_line("\t# python3 scripts/commented.py")
-        self.assert_clean(self.run_checker())
+        result = self.run_checker()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("W5 scripts/commented.py", result.stdout)
+        # W4 must NOT fire (it would, if a comment counted as an invocation).
+        self.assertNotIn("W4 make", result.stdout)
 
 
 class W3ThresholdTests(CheckerTestCase):
@@ -337,6 +401,13 @@ class W3ThresholdTests(CheckerTestCase):
     def test_w3a_silent_when_every_key_has_a_consumer(self) -> None:
         self.repo.set_thresholds({"test_floor": 1, "second_key": 2})
         self.repo.add_script("reader.py", "LIMIT = 2  # second_key\n")
+        # W5 baseline: reader.py must be wired, otherwise W5 fires.
+        self.repo.add_makefile_line("\tpython3 scripts/reader.py")
+        self.repo.set_manifest(
+            gates={"base_gate": "python3 scripts/base_gate.py"},
+            tools={"base_tool": "python3 scripts/base_tool.py"},
+            surface_specific={"make": [("reader_run", "reader.py")]},
+        )
         self.assert_clean(self.run_checker())
 
     def test_w3a_counts_makefile_and_workflow_as_consumers(self) -> None:
@@ -379,7 +450,100 @@ class W3StorePathTests(CheckerTestCase):
             '    """Caller supplies the root; not a declaration."""\n'
             '    return root / "docs" / "failure-patterns.md"\n',
         )
+        # W5 baseline: param_store.py is a real helper used by other scripts.
+        # Wire it via Makefile so the test stays focused on W3b (store-path
+        # rules for parameterised helpers) rather than W5.
+        self.repo.add_makefile_line("\tpython3 scripts/param_store.py")
+        self.repo.set_manifest(
+            gates={"base_gate": "python3 scripts/base_gate.py"},
+            tools={"base_tool": "python3 scripts/base_tool.py"},
+            surface_specific={"make": [("param_store", "param_store.py")]},
+        )
         self.assert_clean(self.run_checker())
+
+
+class W5ZeroWiringTests(CheckerTestCase):
+    """W5 (CR-4): scripts with no caller — neither surface-invoked nor transitively imported.
+
+    The motivating finding is H-101: 67% of the script corpus compiled, ran in isolation,
+    and produced output nobody read. W1 only catches self-declared CI gates, so a script
+    that never declared itself a gate silently escaped. W5 is the catch-all.
+    """
+
+    def test_w5_fires_when_a_script_has_no_caller(self) -> None:
+        self.repo.add_script(
+            "orphan.py",
+            '"""Compiles, runs in isolation, but no surface or wired script imports it."""\n',
+        )
+        result = self.run_checker()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("W5 scripts/orphan.py", result.stdout)
+
+    def test_w5_silent_once_a_surface_invokes_the_script(self) -> None:
+        self.repo.add_script("wired_via_make.py", '"""Wired by Makefile."""\n')
+        self.repo.add_makefile_line("\tpython3 scripts/wired_via_make.py")
+        # The W4 surface declaration keeps W4 silent. W5 follows W4: a script
+        # wired by a surface without that surface's declaration is not wired,
+        # it is a W4 drift waiting to be noticed.
+        self.repo.set_manifest(
+            gates={"base_gate": "python3 scripts/base_gate.py"},
+            tools={"base_tool": "python3 scripts/base_tool.py"},
+            surface_specific={"make": [("wired_via_make", "wired_via_make.py")]},
+        )
+        result = self.run_checker()
+        self.assert_clean(result)
+        # Wired is exempt from W5 — the only remaining W5 hits in the fixture
+        # baseline (`_failure_pattern_store`, `base_tool`, `consumer`) are the
+        # test-corpus fixtures that W5 is specifically meant to surface.
+        wired_count = result.stdout.count("scripts/wired_via_make.py")
+        self.assertEqual(wired_count, 0, "wired_via_make.py must not be flagged by W5")
+
+    def test_w5_silent_once_a_wired_script_imports_it(self) -> None:
+        # Transitive closure: consumer.py is wired (Makefile runs it via the
+        # `consumer_check` surface entry), and it bare-imports `orphan_helper`.
+        # W5 must not flag the helper.
+        self.repo.add_script(
+            "orphan_helper.py", '"""Helper for consumer."""\nVALUE = 42\n',
+        )
+        self.repo.add_script(
+            "consumer.py",
+            '"""Top-level consumer (rewritten to import the helper)."""\n'
+            "import orphan_helper  # noqa: F401  -- transitive wiring\n"
+            "FLOOR = 1  # test_floor\n",
+        )
+        self.repo.add_makefile_line("\tpython3 scripts/consumer.py --check")
+        self.repo.set_manifest(
+            gates={"base_gate": "python3 scripts/base_gate.py"},
+            tools={"base_tool": "python3 scripts/base_tool.py"},
+            surface_specific={"make": [("consumer_check", "consumer.py")]},
+        )
+        result = self.run_checker()
+        self.assert_clean(result)
+        self.assertNotIn("scripts/orphan_helper.py", result.stdout)
+
+    def test_w5_exempts_init_and_conftest(self) -> None:
+        # __init__.py and conftest.py are pytest/package plumbing; they have no
+        # caller because they ARE the infrastructure, not a script invoked by it.
+        (self.repo.root / "scripts" / "__init__.py").write_text("", encoding="utf-8")
+        (self.repo.root / "scripts" / "conftest.py").write_text("", encoding="utf-8")
+        result = self.run_checker()
+        self.assert_clean(result)
+        self.assertNotIn("__init__.py", result.stdout)
+        self.assertNotIn("scripts/conftest.py", result.stdout)
+
+    def test_w5_exempts_package_internal_scripts(self) -> None:
+        # scripts inside qcloud-*/scripts/ are wired by their own package's test
+        # suite, not by the harness's automation surfaces. W5 reflects only the
+        # top-level scripts/ directory.
+        pkg = self.repo.root / "qcloud-cvm-ops" / "scripts"
+        pkg.mkdir(parents=True)
+        (pkg / "internal.py").write_text(
+            '"""Internal helper; wired by qcloud-cvm-ops package tests."""\n',
+            encoding="utf-8",
+        )
+        result = self.run_checker()
+        self.assert_clean(result)
+        self.assertNotIn("qcloud-cvm-ops/scripts/internal.py", result.stdout)
 
 
 if __name__ == "__main__":

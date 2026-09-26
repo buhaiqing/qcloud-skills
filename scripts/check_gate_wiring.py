@@ -194,6 +194,42 @@ def check_dead_gates(root: Path, scripts: list[Path], wired: set[str]) -> list[s
     return findings
 
 
+# H-101 / CR-4: scripts that exist but have NO call site — neither invoked by
+# any automation surface (CI, Makefile, pre-commit, validate_local) nor
+# imported by any wired script. They are not "self-declared dead" like W1
+# targets; they are silent: the file compiles, runs in isolation, and
+# produces output that no one reads. Code-as-documentation is anti-pattern;
+# either a script has a caller (and that caller is recorded here) or it is
+# dead-on-arrival.
+#
+# Exemptions: __init__.py, conftest.py, scripts inside `qcloud-*/scripts/`
+# (those are package-internal and have their own wiring tests at the
+# package level). Anything else is reported.
+_ZERO_WIRING_EXEMPT_STEMS: frozenset[str] = frozenset({
+    "__init__",
+    "conftest",
+})
+
+
+def check_zero_wiring(root: Path, scripts: list[Path], wired: set[str]) -> list[str]:
+    """W5 (CR-4): every non-test, non-exempt script must have ≥1 caller."""
+    findings: list[str] = []
+    for script in scripts:
+        if TEST_FILE.match(script.name):
+            continue
+        if script.stem in _ZERO_WIRING_EXEMPT_STEMS:
+            continue
+        # Per-package internal scripts (e.g. qcloud-cvm-ops/scripts/xyz.py)
+        # are wired by their own package's test suite, not by the harness's
+        # automation surfaces. Skip them so W5 reflects only the top-level
+        # `scripts/` directory.
+        if script.relative_to(root).parts[:-1] != ("scripts",):
+            continue
+        if script.stem not in wired:
+            findings.append(f"W5 {script.relative_to(root).as_posix()}")
+    return findings
+
+
 def _load_yaml_mapping(path: Path) -> dict[str, object]:
     try:
         import yaml
@@ -459,6 +495,10 @@ def run_checks(root: Path) -> tuple[list[str], dict[str, object]]:
     findings.extend(check_thresholds(root))
     findings.extend(check_store_path(root))
     findings.extend(check_surfaces(root))
+    # W5 (CR-4): silent scripts — neither surface-invoked nor transitively
+    # imported. Run last so W1-W4 findings surface first; W5 is the
+    # "nothing else reported, but a script exists" catch-all.
+    findings.extend(check_zero_wiring(root, scripts, wired))
     report: dict[str, object] = {
         "root": str(root),
         "surfaces": [p.relative_to(root).as_posix() for p in surfaces],
