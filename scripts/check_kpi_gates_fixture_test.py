@@ -84,13 +84,18 @@ def _quiet():
 @contextlib.contextmanager
 def _other_kpis_stubbed():
     """Judge main() on the evidence arm alone: KPI#3/#7/#8 shell out to the real
-    repo, and a failure there would fake the exit-1 this test is asserting."""
+    repo, and a failure there would fake the exit-1 this test is asserting.
+
+    H-50 invariant: any non-pass status (incl. skip) escalates to exit 1.
+    The kpi8_spec_drift stub now reports "pass" so the verdict reflects only
+    the rule under test (the per-rule fixtures) and not the stubbing
+    strategy. See scripts/check_kpi_gates_test.py:_stub_other_kpis."""
     with mock.patch.object(check_kpi_gates, "kpi3_golden_coverage",
                            return_value=("pass", "stub", "")), \
             mock.patch.object(check_kpi_gates, "kpi7_router_confusion",
                               return_value=("pass", "stub", "")), \
             mock.patch.object(check_kpi_gates, "kpi8_spec_drift",
-                              return_value=("skip", "stub", "stubbed")):
+                              return_value=("pass", "stub", "stubbed")):
         yield
 
 
