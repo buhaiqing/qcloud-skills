@@ -119,6 +119,13 @@ def _write_repo(
                     "reflexion_max_lines": 200,
                     "agents_md_max_lines": 500,
                     "router_min_top1_accuracy": min_top1,
+                    # H-53: buffer-zone keys required by the strict validator
+                    # even when the fixture only exercises the basic fail/pass
+                    # arms. Same shape as _REQUIRED_THRESHOLD_KEYS in the gate;
+                    # 0 here keeps the old tests' contract (no buffer;
+                    # effective_floor = min_top1).
+                    "router_min_top1_accuracy_noise_band": 0.0,
+                    "router_min_top1_accuracy_meaningful_regression": 0.0,
                     "router_max_misdelegation": max_misd,
                     "router_target_top1_accuracy": target_top1,
                     "router_min_registry_skills": min_registry_skills,
@@ -172,13 +179,17 @@ def _router_fixture(min_top1: float, target_top1: float, max_misd: float = 0.30,
 
 def _stub_other_kpis() -> contextlib.ExitStack:
     """main() must be judged on the evidence gate alone; the other KPIs shell out
-    to the real repo (registry build, spec-drift detector) and are stubbed."""
+    to the real repo (registry build, spec-drift detector) and are stubbed.
+
+    H-50 invariant: any non-pass status (incl. skip) escalates to exit 1.
+    Stubbing kpi8_spec_drift to "skip" used to be benign — the old aggregator
+    counted skip as harmless — but that escape hatch is exactly the silent-skip
+    defect this slice exists to eliminate. The helper now reports "pass" for
+    every stubbed KPI so the verdict reflects only the rule under test."""
     stack = contextlib.ExitStack()
-    for name in ("kpi3_golden_coverage", "kpi7_router_confusion"):
+    for name in ("kpi3_golden_coverage", "kpi7_router_confusion", "kpi8_spec_drift"):
         stack.enter_context(mock.patch.object(check_kpi_gates, name,
                                               return_value=("pass", "stub", "")))
-    stack.enter_context(mock.patch.object(check_kpi_gates, "kpi8_spec_drift",
-                                          return_value=("skip", "stub", "")))
     return stack
 
 
@@ -189,7 +200,11 @@ class Kpi7RouterThresholdTest(unittest.TestCase):
             status, detail, _ = check_kpi_gates.kpi7_router_confusion()
             self.assertEqual(status, "fail")
             self.assertIn("50.00%", detail)
-            self.assertIn("below ratchet 60.00%", detail)
+            # H-53: the ratchet failure wording is now "below effective ratchet floor"
+            # so the on-call can tell a real regression from a noise-band pass.
+            # With noise_band=0 and meaningful_regression=0 in this fixture,
+            # effective_floor == min_top1, so the message still names 60.00%.
+            self.assertIn("below effective ratchet floor 60.00%", detail)
             # the artifact is still written for trend tracking, even on failure
             written = json.loads(
                 (root / "audit-results" / "router-confusion.json").read_text(encoding="utf-8"))
@@ -263,6 +278,163 @@ class Kpi7RouterThresholdTest(unittest.TestCase):
         # ...and it does not dilute the arms it was excluded from: averaging it
         # in would report 33.33% top1 instead of the keyworded skills' 50.00%.
         self.assertIn("avg top1=50.00%", detail)
+
+
+def _write_repo_with_thresholds(
+    root, *,
+    min_top1, noise_band, meaningful_regression,
+    target_top1=0.40, max_misd=0.30, min_registry_skills=FIXTURE_FLEET,
+    a_query=None, omit_keys=(),
+):
+    """H-53 fixture: pin the buffer-zone keys to specific values. The fleet
+    returns top1 = 0.0 for qcloud-a-ops and 1.0 for qcloud-b-ops by default
+    (avg = 0.50), so the test sweeps min_top1 across the boundaries to land
+    the measurement in each branch.
+    """
+    fleet = [
+        {"name": "qcloud-a-ops", "intent_keywords": ["ZzzNeverUsedKeyword"]},
+        {"name": "qcloud-b-ops", "intent_keywords": ["RunCvmInstance"]},
+        {"name": "qcloud-c-ops", "intent_keywords": []},
+    ]
+    base = {
+        "rubric_min_score": 0.5,
+        "safety_fail_threshold": 0,
+        "max_iterations": 5,
+        "gcl_structural_critic_only": True,
+        "reflexion_max_lines": 200,
+        "agents_md_max_lines": 500,
+        "router_min_top1_accuracy": min_top1,
+        "router_min_top1_accuracy_noise_band": noise_band,
+        "router_min_top1_accuracy_meaningful_regression": meaningful_regression,
+        "router_max_misdelegation": max_misd,
+        "router_target_top1_accuracy": target_top1,
+        "router_min_registry_skills": min_registry_skills,
+        "evidence_min_records": 0,
+        "evidence_max_age_days": 90,
+        "tests_min_collected": 1,
+        "gcl_structural_fallback_max_ratio": 0.0,
+        "reflexion_min_injected_runs": 1,
+    }
+    for k in omit_keys:
+        base.pop(k, None)
+    (root / "assets" / "shared").mkdir(parents=True)
+    (root / "assets" / "shared" / "thresholds.json").write_text(
+        json.dumps(base), encoding="utf-8",
+    )
+    audit = root / "audit-results"
+    audit.mkdir()
+    (audit / "skill-registry.json").write_text(
+        json.dumps({"skills": fleet}), encoding="utf-8",
+    )
+    queries = {
+        "qcloud-a-ops": [a_query or _POSITIVE, _CLEAN_NEGATIVE],
+        "qcloud-b-ops": [_POSITIVE, _CLEAN_NEGATIVE],
+        "qcloud-c-ops": _C_QUERIES,
+    }
+    for name, cases in queries.items():
+        assets = root / name / "assets"
+        assets.mkdir(parents=True)
+        (assets / "eval_queries.json").write_text(
+            json.dumps(cases), encoding="utf-8",
+        )
+    return root
+
+
+@contextlib.contextmanager
+def _buffer_zone_fixture(
+    *,
+    min_top1, noise_band, meaningful_regression,
+    target_top1=0.40, max_misd=0.30, a_query=None, omit_keys=(),
+):
+    """H-53: throwaway repo whose thresholds include the buffer-zone keys.
+    effective_floor = min_top1 - noise_band - meaningful_regression."""
+    with tempfile.TemporaryDirectory() as td:
+        root = _write_repo_with_thresholds(
+            Path(td),
+            min_top1=min_top1, noise_band=noise_band,
+            meaningful_regression=meaningful_regression,
+            target_top1=target_top1, max_misd=max_misd,
+            a_query=a_query, omit_keys=omit_keys,
+        )
+        with mock.patch.object(check_kpi_gates, "ROOT", root), \
+                mock.patch.object(check_kpi_gates, "REGISTRY",
+                                  root / "audit-results" / "skill-registry.json"), \
+                mock.patch.object(check_kpi_gates, "AUDIT", root / "audit-results"), \
+                mock.patch.object(check_kpi_gates, "THRESHOLDS",
+                                  root / "assets" / "shared" / "thresholds.json",
+                                  create=True):
+            yield root
+
+
+class TestRouterBufferZone(unittest.TestCase):
+    """H-53: ratchet has a buffer zone. effective_floor = min_top1 - noise_band
+    - meaningful_regression. Three branches:
+      - avg < effective_floor  -> "fail" with detail naming "effective"
+      - effective_floor <= avg < min_top1 -> "pass" with note naming noise/buffer
+      - avg >= min_top1 -> "pass" with NO noise/buffer mention
+
+    Plus a CR-2 invariant: missing `noise_band` raises GateConfigError so a
+    partial thresholds file cannot silently revert the buffer zone."""
+
+    def test_router_below_effective_floor_fails(self) -> None:
+        """avg = 0.50 < effective_floor (0.70 - 0.015 - 0.025 = 0.660) -> fail
+        and the detail names the effective floor so the on-call can see why."""
+        with _buffer_zone_fixture(
+            min_top1=0.70, noise_band=0.015, meaningful_regression=0.025,
+        ), _quiet():
+            status, detail, _ = check_kpi_gates.kpi7_router_confusion()
+        self.assertEqual(status, "fail")
+        self.assertIn("effective", detail.lower())
+        self.assertIn("66.00%", detail)
+        self.assertIn("avg top1=50.00%", detail)
+        self.assertIn("below effective ratchet floor", detail)
+        self.assertIn("noise_band=1.50%", detail)
+        self.assertIn("meaningful_regression=2.50%", detail)
+
+    def test_router_in_noise_zone_passes_with_note(self) -> None:
+        """avg = 0.50 sits inside the buffer zone (effective_floor, min_top1) =
+        (0.50, 0.70) when noise_band=0.10 + meaningful_regression=0.10 ->
+        effective_floor = 0.50. So measurement lands >= effective_floor and
+        < min_top1: canonical buffer-zone position."""
+        with _buffer_zone_fixture(
+            min_top1=0.70, noise_band=0.10, meaningful_regression=0.10,
+        ), _quiet():
+            status, detail, note = check_kpi_gates.kpi7_router_confusion()
+        self.assertEqual(status, "pass")
+        self.assertTrue(
+            "noise" in note.lower() or "buffer" in note.lower(),
+            f"note should mention noise/buffer; got {note!r}",
+        )
+        self.assertIn("avg top1=50.00%", detail)
+        self.assertIn("gap to fail floor", note)
+        self.assertIn("gap to target", note)
+        self.assertIn("+10.00%", note)
+        self.assertIn("+0.00%", note)
+
+    def test_router_above_min_top1_passes_cleanly(self) -> None:
+        """avg = 0.50 >= min_top1 (0.10) -> "pass" with NO noise/buffer mention.
+        Above-min_top1 reads like a normal score, not a noisy one (L6 silent side)."""
+        with _buffer_zone_fixture(
+            min_top1=0.10, noise_band=0.015, meaningful_regression=0.025,
+            target_top1=0.40,
+        ), _quiet():
+            status, detail, note = check_kpi_gates.kpi7_router_confusion()
+        self.assertEqual(status, "pass")
+        self.assertIn("avg top1=50.00%", detail)
+        self.assertNotIn("noise", note.lower())
+        self.assertNotIn("buffer", note.lower())
+
+    def test_missing_noise_band_key_raises_GateConfigError(self) -> None:
+        """CR-2 / H-53: a partial thresholds.json cannot silently revert the
+        buffer zone. Strict validator fires before kpi7 reads anything."""
+        with _buffer_zone_fixture(
+            min_top1=0.70, noise_band=0.015, meaningful_regression=0.025,
+            omit_keys=("router_min_top1_accuracy_noise_band",),
+        ), _quiet():
+            with self.assertRaises(check_kpi_gates.GateConfigError) as ctx:
+                check_kpi_gates.kpi7_router_confusion()
+        self.assertIn("router_min_top1_accuracy_noise_band", str(ctx.exception))
+        self.assertIn("kpi7_router_confusion", str(ctx.exception))
 
 
 class Kpi1SafetyEvidenceTest(unittest.TestCase):
@@ -442,21 +614,74 @@ class CommittedEvidenceFixtureTest(unittest.TestCase):
         self.assertTrue(len(rows) > len(fresh), "no aged-out record: ageing unexercised")
 
 
+class TestAggregate(unittest.TestCase):
+    """H-50: aggregate() must downgrade any non-pass status (incl. skip) to
+    exit 1, so a silently-skipped rule cannot masquerade as a green build.
+    The frozen KpiResult / AggregateVerdict dataclasses live in
+    check_kpi_gates.py; the function uses raw strings."""
+
+    def test_aggregate_all_pass_returns_exit_0(self) -> None:
+        results = [
+            check_kpi_gates.KpiResult(rule="kpi1", status="pass", detail="ok"),
+            check_kpi_gates.KpiResult(rule="kpi2", status="pass", detail="ok"),
+            check_kpi_gates.KpiResult(rule="kpi7", status="pass", detail="ok"),
+        ]
+        verdict = check_kpi_gates.aggregate(results)
+        self.assertEqual(verdict.status, "pass")
+        self.assertEqual(verdict.exit_code, 0)
+
+    def test_aggregate_any_fail_returns_exit_1(self) -> None:
+        results = [
+            check_kpi_gates.KpiResult(rule="kpi1", status="pass", detail="ok"),
+            check_kpi_gates.KpiResult(rule="kpi2", status="fail", detail="leak"),
+            check_kpi_gates.KpiResult(rule="kpi7", status="pass", detail="ok"),
+        ]
+        verdict = check_kpi_gates.aggregate(results)
+        self.assertEqual(verdict.status, "fail")
+        self.assertEqual(verdict.exit_code, 1)
+
+    def test_aggregate_any_skip_returns_exit_1_and_warns(self) -> None:
+        """H-50 KEY: a skip in any rule -> AggregateVerdict("warn", 1, ...)."""
+        results = [
+            check_kpi_gates.KpiResult(rule="kpi1", status="pass", detail="ok"),
+            check_kpi_gates.KpiResult(rule="kpi2", status="skip", detail="GATE_REQUIRE_EVIDENCE=0"),
+            check_kpi_gates.KpiResult(rule="kpi7", status="pass", detail="ok"),
+        ]
+        verdict = check_kpi_gates.aggregate(results)
+        self.assertEqual(verdict.status, "warn")
+        self.assertEqual(verdict.exit_code, 1)
+        self.assertIn("skipped", verdict.note)
+
+    def test_aggregate_all_skip_returns_exit_1(self) -> None:
+        results = [
+            check_kpi_gates.KpiResult(rule="kpi1", status="skip", detail="d1"),
+            check_kpi_gates.KpiResult(rule="kpi2", status="skip", detail="d2"),
+            check_kpi_gates.KpiResult(rule="kpi7", status="skip", detail="d3"),
+        ]
+        verdict = check_kpi_gates.aggregate(results)
+        self.assertEqual(verdict.status, "warn")
+        self.assertEqual(verdict.exit_code, 1)
+
+
 class GateFooterTest(unittest.TestCase):
     """H-19: the escape skip and KPI#8's informational skip must not be
     summarised by one word — a CI reader takes the last line as the verdict."""
 
     def test_footer_separates_not_enforced_from_informational(self) -> None:
+        """H-19 + H-50: KPI#1's escape skip and KPI#8's informational skip
+        must not be summarised by one word. After H-50 the escape skip also
+        makes main() exit 1 (visible degradation) -- the test asserts that
+        contract."""
         with tempfile.TemporaryDirectory() as td, _stub_other_kpis():
             audit = Path(td) / "audit-results"
             audit.mkdir()
             with mock.patch.object(check_kpi_gates, "AUDIT", audit), \
                     mock.patch.dict(os.environ, {"GATE_REQUIRE_EVIDENCE": "0"}), \
                     contextlib.redirect_stdout(buf := io.StringIO()):
-                self.assertEqual(check_kpi_gates.main(), 0)
+                self.assertEqual(check_kpi_gates.main(), 1)
         out = buf.getvalue()
-        self.assertIn("1 skipped (informational)", out)
         self.assertIn("1 NOT ENFORCED (KPI#1/#2)", out)
+        self.assertIn("skipped", out.lower())
 
 
 class GateConfigErrorTest(unittest.TestCase):

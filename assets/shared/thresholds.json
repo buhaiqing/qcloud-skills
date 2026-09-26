@@ -13,5 +13,7 @@
   "evidence_max_age_days": 90,
   "tests_min_collected": 981,
   "gcl_structural_fallback_max_ratio": 0.0,
-  "reflexion_min_injected_runs": 1
+  "reflexion_min_injected_runs": 1,
+  "router_min_top1_accuracy_noise_band": 0.015,
+  "router_min_top1_accuracy_meaningful_regression": 0.025
 }

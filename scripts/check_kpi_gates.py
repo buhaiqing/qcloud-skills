@@ -57,6 +57,7 @@ import json
 import os
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -76,6 +77,51 @@ ROUTER_GAP_ANCHOR = "docs/harness-engineering/runbooks/kpi7-router-confusion-fai
 # points it at a committed fixture (scripts/fixtures/evidence/) that it copies in
 # itself, so the graded bytes are the caller's, not whatever the directory holds.
 EVIDENCE_GLOB = "evidence-*.json*"
+
+
+@dataclass(frozen=True)
+class KpiResult:
+    """One rule's verdict (H-50). `status` is a raw string ("pass" / "fail" /
+    "skip") consistent with the tuple-returning KPI helpers in this module.
+    `note` is the free-form rationale that the footer uses to distinguish
+    an escape-skip (note containing "NOT ENFORCED") from an informational one."""
+
+    rule: str
+    status: str
+    detail: str
+    note: str = ""
+
+
+@dataclass(frozen=True)
+class AggregateVerdict:
+    """H-50 top-level verdict. `status` is one of "pass" / "fail" / "warn"; any
+    non-pass value is a visible degradation. `exit_code` is 0 only when status
+    is "pass"; a "warn" still exits 1 so CI turns red on a silently-skipped
+    rule rather than reporting a green build."""
+
+    status: str
+    exit_code: int
+    note: str
+
+
+def aggregate(results):
+    """H-50: downgrade any non-pass status. A single skipped rule used to let a
+    CI job go green while one of its guards never ran — the silent-skip defect
+    this function exists to eliminate.
+
+    Precedence:
+      - any status == "fail"  -> ("fail", 1, f"{n_fail} rule(s) failed")
+      - any status == "skip"  -> ("warn", 1, f"{n_skip} rule(s) skipped (silent degradation)")
+      - otherwise             -> ("pass", 0, "all pass")
+    """
+    statuses = [r.status for r in results]
+    n_skip = sum(1 for s in statuses if s == "skip")
+    n_fail = sum(1 for s in statuses if s == "fail")
+    if n_fail > 0:
+        return AggregateVerdict("fail", 1, f"{n_fail} rule(s) failed")
+    if n_skip > 0:
+        return AggregateVerdict("warn", 1, f"{n_skip} rule(s) skipped (silent degradation)")
+    return AggregateVerdict("pass", 0, "all pass")
 
 
 class GateConfigError(Exception):
@@ -102,6 +148,8 @@ _REQUIRED_THRESHOLD_KEYS: tuple[tuple[str, str, str], ...] = (
     ("reflexion_max_lines", "integer", "_failure_pattern_store"),
     ("agents_md_max_lines", "integer", "cadl_lint"),
     ("router_min_top1_accuracy", "number", "kpi7_router_confusion"),
+    ("router_min_top1_accuracy_noise_band", "number", "kpi7_router_confusion"),
+    ("router_min_top1_accuracy_meaningful_regression", "number", "kpi7_router_confusion"),
     ("router_max_misdelegation", "number", "kpi7_router_confusion"),
     ("router_target_top1_accuracy", "number", "kpi7_router_confusion"),
     ("router_min_registry_skills", "integer", "kpi7_router_confusion"),
@@ -348,6 +396,18 @@ def kpi7_router_confusion() -> tuple[str, str, str]:
     # `router_target_top1_accuracy` is only used to print the gap.
     cfg = _thresholds()
     min_top1 = _threshold(cfg, "router_min_top1_accuracy")
+    # H-53 buffer zone: avg top1 inside (effective_floor, min_top1) is a
+    # *pass* with a noise-band note; below effective_floor is a *fail*. The
+    # effective_floor is two standard knobs below the ratchet — `noise_band`
+    # (the fleet-level p95 of per-skill one-query flip steps, ≈1.5pp) and
+    # `meaningful_regression` (the smallest change worth paging the on-call
+    # for, ≈2.5pp) — so a single flipped query inside the buffer zone cannot
+    # trip the floor and a measurable regression still can.
+    noise_band = _threshold(cfg, "router_min_top1_accuracy_noise_band")
+    meaningful_regression = _threshold(
+        cfg, "router_min_top1_accuracy_meaningful_regression"
+    )
+    effective_floor = min_top1 - noise_band - meaningful_regression
     max_misdelegation = _threshold(cfg, "router_max_misdelegation")
     target_top1 = _threshold(cfg, "router_target_top1_accuracy")
     min_registry_skills = int(_threshold(cfg, "router_min_registry_skills"))
@@ -401,8 +461,25 @@ def kpi7_router_confusion() -> tuple[str, str, str]:
         f"avg top1={avg_top1:.2%} avg misdelegation={avg_misd:.2%}; "
         f"unmeasured: {', '.join(unmeasured) or 'none'}"
     )
+    if avg_top1 < effective_floor:
+        return (
+            "fail",
+            (
+                f"{detail} — below effective ratchet floor {effective_floor:.2%}"
+                f" (min_top1={min_top1:.2%} - noise_band={noise_band:.2%}"
+                f" - meaningful_regression={meaningful_regression:.2%})"
+            ),
+            "",
+        )
     if avg_top1 < min_top1:
-        return "fail", f"{detail} — below ratchet {min_top1:.2%}", ""
+        # Inside the buffer zone: not a regression, but the ratchet is close
+        # enough to flag. Print the gaps to both boundaries so the on-call can
+        # see how much room is left.
+        note = (
+            f"in noise band: gap to fail floor = {(avg_top1 - effective_floor):+.2%};"
+            f" gap to target = {(avg_top1 - target_top1):+.2%}"
+        )
+        return "pass", detail, note
     if avg_misd > max_misdelegation:
         return "fail", f"{detail} — above misdelegation ceiling {max_misdelegation:.2%}", ""
     if avg_top1 < target_top1:
@@ -464,13 +541,10 @@ def main() -> int:
 
     print("| KPI | Status | Detail |")
     print("|---|---|---|")
-    failed = 0
     for label, (status, detail, note) in results.items():
         marker = {"pass": "✅", "fail": "❌", "skip": "⏭ ", "informational": "ℹ️ "}[status]
         suffix = f" — {note}" if note else ""
         print(f"| {label} | {marker} {status} | {detail}{suffix} |")
-        if status == "fail":
-            failed += 1
     # The escape skip and KPI#8's informational skip are both "skip", but only
     # one of them is harmless. Summarising them with one word put "informational"
     # on the last line a CI reader sees, over a skipped *safety* KPI (H-19).
@@ -480,6 +554,9 @@ def main() -> int:
     )
     not_enforced = sum(
         1 for _label, (_s, _d, note) in results.items() if "NOT ENFORCED" in note
+    )
+    n_skipped_total = sum(
+        1 for _label, (s, _d, _n) in results.items() if s == "skip"
     )
 
     AUDIT.mkdir(exist_ok=True)
@@ -493,13 +570,26 @@ def main() -> int:
         encoding="utf-8",
     )
 
-    if failed:
-        print(f"\nKPI GATES FAIL: {failed} enforced KPI(s) failed")
+    # H-50: route the verdict through aggregate() so any non-pass status —
+    # including skip — bumps exit_code to 1. The footer carries both the
+    # aggregate note and the per-category counts so a CI reader sees the
+    # visible-degradation signal AND the breakdown without re-reading source.
+    kpi_results = [
+        KpiResult(rule=label, status=status, detail=detail, note=note)
+        for label, (status, detail, note) in results.items()
+    ]
+    verdict = aggregate(kpi_results)
+    if verdict.status == "fail":
+        print(f"\nKPI GATES FAIL: {verdict.note}")
         return 1
     tail = f"{informative} skipped (informational)"
     if not_enforced:
         tail += f", {not_enforced} NOT ENFORCED (KPI#1/#2)"
-    print(f"\nKPI GATES PASS: enforced KPIs green; {tail}")
+    if verdict.status == "warn":
+        # H-50: any skip (incl. an escape) escalates to warn + exit 1.
+        print(f"\nKPI GATES FAIL (warn): {n_skipped_total} skipped — {verdict.note}; {tail}")
+        return 1
+    print(f"\nKPI GATES PASS: {verdict.note}; {tail}")
     return 0
 
 

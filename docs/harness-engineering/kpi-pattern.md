@@ -264,6 +264,18 @@ that `make kpi-gates` actually enforces today (Sep 2026), the matrix is:
    the measurement put it, because 0.28 is the measured 28.2755% rounded down
    and the granularity above is exactly what makes it fire on a one-query move.
 
+
+
+> **H-53 update:** `router_min_top1_accuracy` now has a buffer zone.
+> Effective fail floor = `min_top1 - noise_band - meaningful_regression`
+> (defaults: 0.015 + 0.025; see `assets/shared/thresholds.json`). Measured
+> accuracy in `(effective_floor, min_top1)` reports `pass` with a noise-band
+> note; below `effective_floor` reports `fail`. This guards against false
+> positives on single-skill flips while still tripping on regressions.
+> Per-skill noise bands are recomputed at runtime from query-set size; the
+> 1.5pp fleet-level floor is a 95th-percentile worst case, not a guardrail
+> for any single skill.
+
 **Use this template to score your own KPIs.** A KPI with two ⚠️ rows
 is acceptable; four is a smell. If a KPI has ⚠️ on Failure-mode-defined
 AND Drift-detectable, treat it as a known-loose KPI and schedule a
