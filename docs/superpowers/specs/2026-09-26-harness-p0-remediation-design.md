@@ -1,6 +1,6 @@
 # Harness Engineering P0 Remediation — Spec & Plan
 
-> 状态：✅ Phase 1-3 已落地（CR-1/conftest/CR-2/CR-3 已 commit）；Phase 4（CR-4）已实现未提交；Phase 5-7（CR-5/CR-6/TDD test for 闭环）TBD。
+> 状态：✅ Phase 1-5 已落地（CR-1/conftest/CR-2/CR-3/CR-4 + P0/P1 spec 全部就位）；Phase 6（H-50/53/54 / H-46/H-47 spec stubs）已 deferred 到 P1 spec。
 > 关联审计：`docs/superpowers/specs/2026-09-26-harness-audit.md`（H-10 / H-46 / H-47 / H-50 / H-52 / H-53 / H-54 / H-100 / H-101）
 > 关联 commit：`e86f28f`（CR-1 restore）· `8026955`（conftest 防御）· `2d747d1`（CR-2 fail-closed + H-52）· `21775e0`（CR-3 job split）
 
@@ -175,13 +175,13 @@ def check_zero_wiring(root: Path, scripts: list[Path], wired: set[str]) -> list[
 - [x] **Phase 2（conftest 防御）**: 写 `scripts/conftest.py` 自动还原。Commit `8026955`。
 - [x] **Phase 3（CR-2 fail-closed + H-52）**: `_validate_thresholds_complete` + `_safe_evidence_glob`。Commit `2d747d1`。
 - [x] **Phase 4（CR-3 拆 job）**: `.github/workflows/validate-skills.yml` 拆 `kpi-gates`。Commit `21775e0`。
-- [⚙️ 进行中] **Phase 5（CR-4 W5 规则）**:
+- [x] **Phase 5（CR-4 W5 规则）**:
   - [x] 实现 `check_zero_wiring()`
-  - [ ] 写 W5 测试（test_w5_finds_unwired_script / test_w5_exempts_init / test_w5_exempts_pkg_internal）
-  - [ ] 接入 `wiring_state()` 主循环（`main()` 调 `check_zero_wiring` 并 append 到 findings）
-  - [ ] 全量 pytest 通过
-  - [ ] 提交
-- [ ] **Phase 6（CR-5 TBD）**: 后续 backlog H-50 / H-53 / H-54 / H-46 / H-47 选优先级最高的 1-2 项。独立 spec `harness-p1-remediation.md`。
+  - [x] 写 W5 测试（5 个：finds_unwired / surface_invokes / transitive_imports / exempts_init_conftest / exempts_pkg_internal）
+  - [x] 接入 `run_checks()` 主循环
+  - [x] 全量 pytest 通过（1082 tests）
+  - [x] Commit `6410b0a`
+- [x] **Phase 6（独立 spec stubs）**: H-50/H-53/H-54 写入独立 spec `2026-09-26-harness-p1-remediation-design.md`（commit `32de616`）；H-46/H-47 在该 spec §3.4 stub。
 - [ ] **Phase 7（CADL 沉淀）**: 5 项变更涉及 L25/L26/L28 重述、CI badge 语义、`check_gate_wiring` W5 规则——按 AGENTS.md §CADL 沉淀到对应 skill 的 SKILL.md 钩子行。
 
 ## 8. DoD / 验收标准
