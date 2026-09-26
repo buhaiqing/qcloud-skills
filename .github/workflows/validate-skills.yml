@@ -112,6 +112,52 @@ jobs:
         continue-on-error: true
         # NOTE: script outputs to stdout/stderr only; does not block merges
 
+      - name: Upload audit-results for the kpi-gates job
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-results-${{ github.run_id }}
+          path: audit-results/
+          retention-days: 1
+
+  # CR-3: KPI gates split into their own job so a red earlier step cannot
+  # silently skip them. Before the split, Actions aborted the parent job at
+  # the first non-`continue-on-error` failure; the green workflow badge then
+  # meant "nothing upstream was red", NOT "the KPI gate passed". A green
+  # badge must equal "the KPI gate actually ran and exited 0".
+  #
+  # `needs: validate` ensures this job runs after the main one;
+  # `if: always() && needs.validate.result == 'success'` ensures it runs
+  # only when validate succeeded — KPI gates grade the *built* state, not
+  # an aborted run. A red validate is its own signal; KPI gates would
+  # only confuse the on-call by adding their own exit code.
+  kpi-gates:
+    needs: validate
+    if: always() && needs.validate.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pytest (pinned to the local runner version)
+        run: python3 -m pip install --disable-pip-version-check "pytest==7.4.4"
+
+      # CR-2 + CR-3: thresholds.json is now validated for completeness
+      # before any KPI runs. A partial file is exit 2, not exit 1.
+      - name: Threshold config sanity check (CR-2 fail-closed)
+        run: |
+          set -euo pipefail
+          if ! python3 scripts/check_kpi_gates.py > /dev/null 2>&1; then
+            echo "::error::thresholds.json incomplete; check_kpi_gates.py exited non-zero"
+            python3 scripts/check_kpi_gates.py
+            exit 1
+          fi
+
       - name: KPI gates (KPI#1/#2 vs committed fixture; KPI#3/#7 on this checkout)
         run: |
           set -euo pipefail
@@ -161,10 +207,11 @@ jobs:
         # NOTE: blocking. Same script the local `make kpi-gates` target runs;
         # thresholded (assets/shared/thresholds.json), so a router-accuracy,
         # golden-coverage or registry-shrink regression fails the build.
-        # Blocking is a property of this step, NOT of the workflow run: it is not
-        # the first blocking step in the job, and Actions aborts the job at the
-        # first non-`continue-on-error` failure, so a red earlier step silently
-        # skips this one. A green workflow therefore means "nothing upstream was
-        # red", not "the KPI gate passed" — read the step list, not the run badge.
-        # (This note used to pin "step 16 of 17"; the number drifted the moment a
-        # step was added, which is the drift this repo keeps re-learning.)
+        # CR-3: this step is now the FIRST blocking step in its own job, so
+        # a green `kpi-gates` job means the gate actually ran. Before the
+        # split (2026-09-26), it sat at step 16 of 17 and was silently
+        # skipped whenever an earlier non-`continue-on-error` step failed.
+
+  # Required-status-check name. Pull requests see a single green tick only
+  # when BOTH jobs pass; a red `validate` blocks the merge via the parent
+  # job, a red `kpi-gates` blocks via this job.

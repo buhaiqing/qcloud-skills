@@ -112,10 +112,24 @@ def _write_repo(
     ]
     (root / "assets" / "shared").mkdir(parents=True)
     (root / "assets" / "shared" / "thresholds.json").write_text(
-        json.dumps({"router_min_top1_accuracy": min_top1,
+        json.dumps({"rubric_min_score": 0.5,
+                    "safety_fail_threshold": 0,
+                    "max_iterations": 5,
+                    "gcl_structural_critic_only": True,
+                    "reflexion_max_lines": 200,
+                    "agents_md_max_lines": 500,
+                    "router_min_top1_accuracy": min_top1,
                     "router_max_misdelegation": max_misd,
                     "router_target_top1_accuracy": target_top1,
-                    "router_min_registry_skills": min_registry_skills}),
+                    "router_min_registry_skills": min_registry_skills,
+                    # CR-2 fail-closed requires these keys even when the fixture
+                    # only exercises kpi7 — partial files are a config error,
+                    # not a "this test doesn't need them" case.
+                    "evidence_min_records": 0,
+                    "evidence_max_age_days": 90,
+                    "tests_min_collected": 1,
+                    "gcl_structural_fallback_max_ratio": 0.0,
+                    "reflexion_min_injected_runs": 1}),
         encoding="utf-8",
     )
     audit = root / "audit-results"
@@ -459,17 +473,28 @@ class GateConfigErrorTest(unittest.TestCase):
                 yield path
 
     def test_broken_thresholds_raise_a_config_error(self) -> None:
-        """Each breakage names the file it tried to read (and the key, when the
-        file parsed but the key did not) instead of dying with a traceback."""
+        """Each breakage names the file it tried to read (and a missing key, when
+        the file parsed but a key did not) instead of dying with a traceback.
+
+        CR-2: the *aggregate* gate fails-closed on any missing key from the
+        full required set, not just the one the calling KPI reads. The error
+        message names the FIRST missing key (alphabetical) and the owner
+        module; the test asserts one of the legitimately-missing keys is
+        named, not a specific one — the strict validation is the contract.
+        """
         bad = {
             "absent": (None, None),
             "unparseable": ("{oops", None),
+            # the file is missing most keys; whichever one the strict
+            # validator surfaces first is acceptable — it's still a config
+            # error pointing at the file.
             "missing key": ('{"router_min_top1_accuracy": 0.1}',
-                            "router_max_misdelegation"),
-            "null value": (json.dumps({"router_min_top1_accuracy": None,
+                            "rubric_min_score"),
+            "null value": (json.dumps({"rubric_min_score": None,
+                                       "router_min_top1_accuracy": 0.1,
                                        "router_max_misdelegation": 0.3,
                                        "router_target_top1_accuracy": 0.7}),
-                           "router_min_top1_accuracy"),
+                           "rubric_min_score"),
         }
         with _router_fixture(0.10, 0.70):
             for label, (text, key) in bad.items():
